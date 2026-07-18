@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Similarity Checker</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161923;
+    --panel-2: #1d2130;
+    --border: #2a2f40;
+    --ink: #eef0f5;
+    --ink-500: #9aa1b5;
+    --accent: #6366f1;
+    --accent-2: #818cf8;
+    --good: #22c55e;
+    --mid: #f59e0b;
+    --bad: #ef4444;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+  }
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+  }
+  h1 {
+    font-size: 22px;
+    margin: 0 0 4px;
+  }
+  .subtitle {
+    color: var(--ink-500);
+    font-size: 14px;
+    margin: 0 0 28px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-500);
+    margin-bottom: 6px;
+    margin-top: 16px;
+  }
+  label:first-child { margin-top: 0; }
+  select, textarea {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--ink);
+    padding: 12px 14px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+  }
+  select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  textarea { min-height: 120px; line-height: 1.5; }
+  .model-desc {
+    font-size: 12px;
+    color: var(--ink-500);
+    margin-top: 6px;
+  }
+  .question-meta {
+    font-size: 12px;
+    color: var(--ink-500);
+    margin-top: 6px;
+  }
+  .question-meta .tag {
+    display: inline-block;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px 8px;
+    margin-right: 6px;
+  }
+  button {
+    width: 100%;
+    margin-top: 22px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  button:hover:not(:disabled) { background: var(--accent-2); }
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .error-box {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13px;
+    margin-top: 16px;
+    display: none;
+  }
+  .result-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 20px;
+    display: none;
+  }
+  .result-row {
+    margin-bottom: 14px;
+  }
+  .result-row:last-of-type { margin-bottom: 0; }
+  .result-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-500);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .result-value {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .result-value.model-name {
+    font-weight: 700;
+    font-size: 15px;
+  }
+  .percent-block {
+    text-align: center;
+    padding: 18px 0 6px;
+  }
+  .percent-number {
+    font-size: 64px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .percent-number small {
+    font-size: 28px;
+    font-weight: 700;
+  }
+  .percent-band {
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .band-good { color: var(--good); }
+  .band-mid { color: var(--mid); }
+  .band-bad { color: var(--bad); }
+  .history-header {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink-500);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 28px 0 12px;
+  }
+  .history-empty {
+    color: var(--ink-500);
+    font-size: 13px;
+    padding: 16px;
+    text-align: center;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+  }
+  .history-item {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .history-item-left { flex: 1; min-width: 0; }
+  .history-model {
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .history-question {
+    font-size: 12px;
+    color: var(--ink-500);
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .history-percent {
+    font-size: 22px;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,0.35);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Similarity Checker</h1>
+  <p class="subtitle">Pick a model and a question, write your own answer, and see the raw similarity score. Standalone debug tool — separate from the main interview app.</p>
+
+  <div class="panel">
+    <label for="modelSelect">Model</label>
+    <select id="modelSelect"></select>
+
+    <label for="questionSelect">Question</label>
+    <select id="questionSelect"></select>
+    <div class="question-meta" id="questionMeta"></div>
+
+    <label for="answerInput">Your answer</label>
+    <textarea id="answerInput" placeholder="Type your answer to the selected question..."></textarea>
+
+    <button id="checkBtn">Check Similarity</button>
+    <div class="error-box" id="errorBox"></div>
+  </div>
+
+  <div class="result-card" id="resultCard">
+    <div class="percent-block">
+      <div class="percent-number" id="percentNumber">--<small>%</small></div>
+      <div class="percent-band" id="percentBand"></div>
+    </div>
+    <div class="result-row">
+      <div class="result-label">Model</div>
+      <div class="result-value model-name" id="resModel"></div>
+    </div>
+    <div class="result-row">
+      <div class="result-label">Question</div>
+      <div class="result-value" id="resQuestion"></div>
+    </div>
+    <div class="result-row">
+      <div class="result-label">Your Answer</div>
+      <div class="result-value" id="resAnswer"></div>
+    </div>
+  </div>
+
+  <div class="history-header">History (this session)</div>
+  <div id="historyList">
+    <div class="history-empty">No checks yet — run one above to start comparing models.</div>
+  </div>
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+
+let allModels = [];
+let allQuestions = [];
+let history = [];
+
+const modelSelect = document.getElementById('modelSelect');
+const questionSelect = document.getElementById('questionSelect');
+const questionMeta = document.getElementById('questionMeta');
+const answerInput = document.getElementById('answerInput');
+const checkBtn = document.getElementById('checkBtn');
+const errorBox = document.getElementById('errorBox');
+const resultCard = document.getElementById('resultCard');
+const percentNumber = document.getElementById('percentNumber');
+const percentBand = document.getElementById('percentBand');
+const resModel = document.getElementById('resModel');
+const resQuestion = document.getElementById('resQuestion');
+const resAnswer = document.getElementById('resAnswer');
+const historyList = document.getElementById('historyList');
+
+function showError(msg) {
+  errorBox.textContent = msg;
+  errorBox.style.display = 'block';
+}
+function clearError() {
+  errorBox.style.display = 'none';
+  errorBox.textContent = '';
+}
+
+function humanizeDomain(code) {
+  if (!code) return '';
+  return code.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+async function loadModels() {
+  const res = await fetch(`${API_BASE}/api/models`);
+  const data = await res.json();
+  allModels = data.models || [];
+  modelSelect.innerHTML = '';
+  allModels.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.key;
+    opt.textContent = m.label;
+    modelSelect.appendChild(opt);
+  });
+  const defaultKey = data.default;
+  if (defaultKey) modelSelect.value = defaultKey;
+}
+
+async function loadQuestions() {
+  const res = await fetch(`${API_BASE}/api/questions`);
+  const data = await res.json();
+  allQuestions = data.questions || [];
+
+  questionSelect.innerHTML = '';
+  const byDomain = {};
+  allQuestions.forEach(q => {
+    const d = q.domain || 'Other';
+    if (!byDomain[d]) byDomain[d] = [];
+    byDomain[d].push(q);
+  });
+
+  Object.keys(byDomain).sort().forEach(domain => {
+    const group = document.createElement('optgroup');
+    group.label = humanizeDomain(domain);
+    byDomain[domain].forEach(q => {
+      const opt = document.createElement('option');
+      opt.value = q.id;
+      opt.textContent = `[${q.difficulty}] ${q.question}`;
+      group.appendChild(opt);
+    });
+    questionSelect.appendChild(group);
+  });
+
+  updateQuestionMeta();
+}
+
+function updateQuestionMeta() {
+  const qid = questionSelect.value;
+  const q = allQuestions.find(x => String(x.id) === String(qid));
+  if (!q) { questionMeta.innerHTML = ''; return; }
+  questionMeta.innerHTML = `<span class="tag">${q.difficulty}</span><span class="tag">${humanizeDomain(q.domain)}</span>`;
+}
+
+function bandFor(pct) {
+  if (pct >= 70) return { cls: 'band-good', label: 'Strong Match', color: '#22c55e' };
+  if (pct >= 40) return { cls: 'band-mid', label: 'Partial Match', color: '#f59e0b' };
+  return { cls: 'band-bad', label: 'Weak Match', color: '#ef4444' };
+}
+
+function renderResult(data) {
+  const band = bandFor(data.similarity_percent);
+  percentNumber.innerHTML = `${data.similarity_percent}<small>%</small>`;
+  percentNumber.style.color = band.color;
+  percentBand.textContent = band.label;
+  percentBand.className = `percent-band ${band.cls}`;
+  resModel.textContent = allModels.find(m => m.key === data.model_key)?.label || data.model_key;
+  resQuestion.textContent = data.question;
+  resAnswer.textContent = data.answer;
+  resultCard.style.display = 'block';
+}
+
+function addToHistory(data) {
+  history.unshift(data);
+  renderHistory();
+}
+
+function renderHistory() {
+  if (history.length === 0) {
+    historyList.innerHTML = '<div class="history-empty">No checks yet — run one above to start comparing models.</div>';
+    return;
+  }
+  historyList.innerHTML = '';
+  history.forEach(item => {
+    const band = bandFor(item.similarity_percent);
+    const div = document.createElement('div');
+    div.className = 'history-item';
+    const modelLabel = allModels.find(m => m.key === item.model_key)?.label || item.model_key;
+    div.innerHTML = `
+      <div class="history-item-left">
+        <div class="history-model">${modelLabel}</div>
+        <div class="history-question">${item.question}</div>
+      </div>
+      <div class="history-percent" style="color:${band.color}">${item.similarity_percent}%</div>
+    `;
+    historyList.appendChild(div);
+  });
+}
+
+async function checkSimilarity() {
+  clearError();
+  const model = modelSelect.value;
+  const questionId = questionSelect.value;
+  const answer = answerInput.value.trim();
+
+  if (!answer) {
+    showError('Please write an answer first.');
+    return;
+  }
+
+  checkBtn.disabled = true;
+  checkBtn.innerHTML = '<span class="spinner"></span>Scoring...';
+
+  try {
+    const q = allQuestions.find(x => String(x.id) === String(questionId));
+    const res = await fetch(`${API_BASE}/api/score`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        question_id: q.id,
+        answer
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showError(data.error || 'Something went wrong.');
+      return;
+    }
+    renderResult(data);
+    addToHistory(data);
+  } catch (e) {
+    showError('Could not reach the server. Is app.py running on port 5050?');
+  } finally {
+    checkBtn.disabled = false;
+    checkBtn.textContent = 'Check Similarity';
+  }
+}
+
+questionSelect.addEventListener('change', updateQuestionMeta);
+checkBtn.addEventListener('click', checkSimilarity);
+
+(async function init() {
+  try {
+    await loadModels();
+    await loadQuestions();
+  } catch (e) {
+    showError('Failed to load models/questions from the server. Is app.py running on port 5050?');
+  }
+})();
+</script>
+</body>
+</html>

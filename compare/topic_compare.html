@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Topic Model Comparison</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161923;
+    --panel-2: #1d2130;
+    --border: #2a2f40;
+    --ink: #eef0f5;
+    --ink-500: #9aa1b5;
+    --accent: #6366f1;
+    --accent-2: #818cf8;
+    --good: #22c55e;
+    --mid: #f59e0b;
+    --bad: #ef4444;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+  }
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .subtitle { color: var(--ink-500); font-size: 14px; margin: 0 0 28px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-500);
+    margin-bottom: 6px;
+    margin-top: 16px;
+  }
+  label:first-child { margin-top: 0; }
+  select, textarea {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--ink);
+    padding: 12px 14px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+  }
+  select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  textarea { min-height: 120px; line-height: 1.5; }
+  button {
+    width: 100%;
+    margin-top: 22px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  button:hover:not(:disabled) { background: var(--accent-2); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.secondary {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+  }
+  button.secondary:hover:not(:disabled) { background: var(--border); }
+  .error-box {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13px;
+    margin-top: 16px;
+    display: none;
+  }
+  .progress {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--accent-2);
+    margin-bottom: 10px;
+  }
+  .progress-bar {
+    height: 4px;
+    background: var(--panel-2);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.25s ease;
+  }
+  .question-text {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.5;
+    margin-bottom: 4px;
+  }
+  .question-diff {
+    font-size: 12px;
+    color: var(--ink-500);
+    margin-bottom: 16px;
+  }
+  .model-results {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 20px;
+  }
+  .model-card {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 10px;
+    text-align: center;
+  }
+  .model-card-name {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ink-500);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 10px;
+    min-height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .model-card-percent {
+    font-size: 30px;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .model-card-percent small { font-size: 16px; font-weight: 700; }
+  .band-good { color: var(--good); }
+  .band-mid { color: var(--mid); }
+  .band-bad { color: var(--bad); }
+  .answer-echo {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13px;
+    color: var(--ink-500);
+    margin-top: 20px;
+  }
+  .answer-echo .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+    color: var(--ink-500);
+    margin-bottom: 4px;
+  }
+  .answer-echo .text { color: var(--ink); }
+  .question-detail-text {
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 20px;
+    margin-bottom: 2px;
+  }
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,0.35);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Topic Model Comparison</h1>
+  <p class="subtitle">Pick a topic, answer 5 questions, and see how all 3 scoring models evaluate the same answer.</p>
+
+  <!-- Screen 1: topic picker -->
+  <div class="panel" id="topicPanel">
+    <label for="topicSelect">Topic</label>
+    <select id="topicSelect"></select>
+    <button id="startBtn">Start</button>
+    <div class="error-box" id="topicError"></div>
+  </div>
+
+  <!-- Screen 2: question flow -->
+  <div class="panel hidden" id="questionPanel">
+    <div class="progress" id="progressLabel">Question 1 of 5</div>
+    <div class="progress-bar"><div class="progress-bar-fill" id="progressFill"></div></div>
+    <div class="question-text" id="questionText"></div>
+    <div class="question-diff" id="questionDiff"></div>
+    <textarea id="answerInput" placeholder="Type your answer..."></textarea>
+    <button id="submitBtn">Submit Answer</button>
+    <div class="error-box" id="questionError"></div>
+
+    <div class="hidden" id="resultBlock">
+      <div class="model-results" id="modelResults"></div>
+      <div class="answer-echo">
+        <div class="label">Your Answer</div>
+        <div class="text" id="answerEcho"></div>
+      </div>
+      <button id="nextBtn"></button>
+    </div>
+  </div>
+
+  <!-- Screen 3: summary -->
+  <div class="panel hidden" id="summaryPanel">
+    <h1 style="font-size:18px;margin-bottom:4px;">Overall Comparison</h1>
+    <p class="subtitle" style="margin-bottom:16px;">Average score per model across all 5 questions.</p>
+    <div class="model-results" id="overallResults"></div>
+
+    <label for="questionDropdown">View a specific question</label>
+    <select id="questionDropdown"></select>
+    <div id="questionDetail"></div>
+
+    <button id="restartBtn">Start Again</button>
+  </div>
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+
+let allModels = [];
+let currentTopic = null;
+let questions = [];
+let currentIndex = 0;
+let results = [];
+
+const topicSelect = document.getElementById('topicSelect');
+const startBtn = document.getElementById('startBtn');
+const topicError = document.getElementById('topicError');
+
+const topicPanel = document.getElementById('topicPanel');
+const questionPanel = document.getElementById('questionPanel');
+const summaryPanel = document.getElementById('summaryPanel');
+
+const progressLabel = document.getElementById('progressLabel');
+const progressFill = document.getElementById('progressFill');
+const questionText = document.getElementById('questionText');
+const questionDiff = document.getElementById('questionDiff');
+const answerInput = document.getElementById('answerInput');
+const submitBtn = document.getElementById('submitBtn');
+const questionError = document.getElementById('questionError');
+const resultBlock = document.getElementById('resultBlock');
+const modelResults = document.getElementById('modelResults');
+const answerEcho = document.getElementById('answerEcho');
+const nextBtn = document.getElementById('nextBtn');
+
+const overallResults = document.getElementById('overallResults');
+const questionDropdown = document.getElementById('questionDropdown');
+const questionDetail = document.getElementById('questionDetail');
+const restartBtn = document.getElementById('restartBtn');
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function humanizeDomain(code) {
+  if (!code) return '';
+  const map = { ML: 'Machine Learning', DL: 'Deep Learning', NLP: 'NLP', DATA_ANALYSIS: 'Data Analysis', Python: 'Python' };
+  return map[code] || code.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function bandFor(pct) {
+  if (pct === null || pct === undefined) return { cls: 'band-bad', color: 'var(--ink-500)' };
+  if (pct >= 70) return { cls: 'band-good', color: '#22c55e' };
+  if (pct >= 40) return { cls: 'band-mid', color: '#f59e0b' };
+  return { cls: 'band-bad', color: '#ef4444' };
+}
+
+async function loadModels() {
+  const res = await fetch(`${API_BASE}/api/models`);
+  const data = await res.json();
+  allModels = data.models || [];
+}
+
+async function loadTopics() {
+  const res = await fetch(`${API_BASE}/api/topics`);
+  const data = await res.json();
+  topicSelect.innerHTML = '';
+  (data.topics || []).forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t;
+    opt.textContent = humanizeDomain(t);
+    topicSelect.appendChild(opt);
+  });
+}
+
+function showScreen(name) {
+  topicPanel.classList.toggle('hidden', name !== 'topic');
+  questionPanel.classList.toggle('hidden', name !== 'question');
+  summaryPanel.classList.toggle('hidden', name !== 'summary');
+}
+
+async function startTopic() {
+  topicError.style.display = 'none';
+  currentTopic = topicSelect.value;
+  startBtn.disabled = true;
+  startBtn.innerHTML = '<span class="spinner"></span>Loading...';
+
+  try {
+    const res = await fetch(`${API_BASE}/api/topic-questions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ domain: currentTopic })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      topicError.textContent = data.error || 'Failed to load questions.';
+      topicError.style.display = 'block';
+      return;
+    }
+    questions = data.questions || [];
+    if (questions.length === 0) {
+      topicError.textContent = 'No questions available for this topic.';
+      topicError.style.display = 'block';
+      return;
+    }
+    results = [];
+    currentIndex = 0;
+    showScreen('question');
+    renderQuestion();
+  } catch (e) {
+    topicError.textContent = 'Could not reach the server. Is app.py running on port 5050?';
+    topicError.style.display = 'block';
+  } finally {
+    startBtn.disabled = false;
+    startBtn.textContent = 'Start';
+  }
+}
+
+function renderQuestion() {
+  const q = questions[currentIndex];
+  progressLabel.textContent = `Question ${currentIndex + 1} of ${questions.length}`;
+  progressFill.style.width = `${((currentIndex) / questions.length) * 100}%`;
+  questionText.textContent = q.question;
+  questionDiff.textContent = q.difficulty || '';
+  answerInput.value = '';
+  answerInput.disabled = false;
+  submitBtn.disabled = false;
+  submitBtn.style.display = 'block';
+  resultBlock.classList.add('hidden');
+  questionError.style.display = 'none';
+  answerInput.focus();
+}
+
+async function submitAnswer() {
+  questionError.style.display = 'none';
+  const answer = answerInput.value.trim();
+  if (!answer) {
+    questionError.textContent = 'Please write an answer first.';
+    questionError.style.display = 'block';
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<span class="spinner"></span>Scoring...';
+
+  try {
+    const q = questions[currentIndex];
+    const res = await fetch(`${API_BASE}/api/topic-score`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question_id: q.id, answer })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      questionError.textContent = data.error || 'Something went wrong.';
+      questionError.style.display = 'block';
+      return;
+    }
+
+    results.push(data);
+    renderResult(data);
+  } catch (e) {
+    questionError.textContent = 'Could not reach the server. Is app.py running on port 5050?';
+    questionError.style.display = 'block';
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Submit Answer';
+  }
+}
+
+function renderModelCards(container, scoresObj) {
+  container.innerHTML = '';
+  allModels.forEach(m => {
+    const pct = scoresObj[m.key];
+    const band = bandFor(pct);
+    const card = document.createElement('div');
+    card.className = 'model-card';
+    card.innerHTML = `
+      <div class="model-card-name">${m.label}</div>
+      <div class="model-card-percent ${band.cls}">${pct !== null && pct !== undefined ? pct : '--'}<small>%</small></div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function renderResult(data) {
+  answerInput.disabled = true;
+  submitBtn.style.display = 'none';
+
+  renderModelCards(modelResults, data.scores);
+  answerEcho.textContent = data.answer;
+
+  const isLast = currentIndex === questions.length - 1;
+  nextBtn.textContent = isLast ? 'View Summary' : 'Next Question';
+  resultBlock.classList.remove('hidden');
+  progressFill.style.width = `${((currentIndex + 1) / questions.length) * 100}%`;
+}
+
+function goNext() {
+  if (currentIndex === questions.length - 1) {
+    showSummary();
+  } else {
+    currentIndex += 1;
+    renderQuestion();
+  }
+}
+
+function computeOverallAverages() {
+  const sums = {};
+  const counts = {};
+  allModels.forEach(m => { sums[m.key] = 0; counts[m.key] = 0; });
+
+  results.forEach(r => {
+    allModels.forEach(m => {
+      const pct = r.scores[m.key];
+      if (pct !== null && pct !== undefined) {
+        sums[m.key] += pct;
+        counts[m.key] += 1;
+      }
+    });
+  });
+
+  const averages = {};
+  allModels.forEach(m => {
+    averages[m.key] = counts[m.key] > 0 ? Math.round((sums[m.key] / counts[m.key]) * 100) / 100 : null;
+  });
+  return averages;
+}
+
+function renderQuestionDetail(index) {
+  const r = results[index];
+  questionDetail.innerHTML = `
+    <div class="question-detail-text">${escapeHtml(r.question)}</div>
+    <div class="question-diff">${escapeHtml(r.difficulty || '')}</div>
+    <div class="model-results" id="detailModelResults"></div>
+    <div class="answer-echo">
+      <div class="label">Your Answer</div>
+      <div class="text">${escapeHtml(r.answer)}</div>
+    </div>
+  `;
+  renderModelCards(document.getElementById('detailModelResults'), r.scores);
+}
+
+function showSummary() {
+  showScreen('summary');
+  renderModelCards(overallResults, computeOverallAverages());
+
+  questionDropdown.innerHTML = '';
+  results.forEach((r, i) => {
+    cons
