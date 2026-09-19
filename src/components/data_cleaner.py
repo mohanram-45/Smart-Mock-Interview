@@ -28,6 +28,57 @@ class DataCleaner:
             return 0
         return len(str(text).split())
 
+    def normalize_difficulty(self, value):
+        """Map source labels to the app's three difficulty levels."""
+        label = str(value or "").strip().lower()
+        labels = {
+            "easy": "Easy",
+            "beginner": "Easy",
+            "medium": "Medium",
+            "intermediate": "Medium",
+            "hard": "Hard",
+            "advanced": "Hard",
+        }
+        return labels.get(label)
+
+    def complexity_score(self, question):
+        """Estimate technical complexity for deterministic difficulty balancing."""
+        text = f"{question.get('question', '')} {question.get('reference_answer', '')}".lower()
+        score = self.word_count(text)
+        hard_terms = [
+            'optimisation', 'optimization', 'architecture', 'distributed',
+            'production', 'trade-off', 'complexity', 'gradient', 'transformer',
+            'window function', 'hypothesis', 'confidence interval'
+        ]
+        score += sum(25 for term in hard_terms if term in text)
+        return score
+
+    def rebalance_difficulties(self, questions):
+        """Apply the requested Easy/Medium/Hard 30/45/25 distribution."""
+        total = len(questions)
+        target = {
+            'Easy': round(total * 0.30),
+            'Medium': round(total * 0.45),
+        }
+        target['Hard'] = total - target['Easy'] - target['Medium']
+
+        ranked = sorted(
+            questions,
+            key=lambda item: (self.complexity_score(item), str(item.get('question', '')))
+        )
+        easy_cutoff = target['Easy']
+        medium_cutoff = target['Easy'] + target['Medium']
+
+        for index, item in enumerate(ranked):
+            if index < easy_cutoff:
+                item['difficulty'] = 'Easy'
+            elif index < medium_cutoff:
+                item['difficulty'] = 'Medium'
+            else:
+                item['difficulty'] = 'Hard'
+
+        return questions
+
     def clean(self, questions):
         """Apply cleaning operations"""
 
@@ -105,17 +156,20 @@ class DataCleaner:
                 self.removed_log['bad_difficulty'] += 1
                 continue
 
-            difficulty = str(difficulty).strip()
+            normalized_difficulty = self.normalize_difficulty(difficulty)
 
-            if difficulty.lower() == 'nan':
+            if str(difficulty).strip().lower() == 'nan':
                 self.removed_log['bad_difficulty'] += 1
                 continue
 
-            if difficulty not in valid_difficulties:
+            if normalized_difficulty not in valid_difficulties:
                 self.removed_log['bad_difficulty'] += 1
                 continue
 
+            q['difficulty'] = normalized_difficulty
             q6.append(q)
+
+        q6 = self.rebalance_difficulties(q6)
 
         # 7. Remove short answers (<1 word)
         q7 = []

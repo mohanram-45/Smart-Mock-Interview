@@ -2,7 +2,6 @@
 import re
 import csv
 from pathlib import Path
-from docx import Document
 
 
 class DataIngestion:
@@ -11,12 +10,27 @@ class DataIngestion:
     def __init__(self, raw_data_path):
         self.raw_data_path = Path(raw_data_path)
 
+    def normalize_difficulty(self, value):
+        """Map source labels to the app's three difficulty levels."""
+        label = str(value or "").strip().lower()
+        labels = {
+            "easy": "Easy",
+            "beginner": "Easy",
+            "medium": "Medium",
+            "intermediate": "Medium",
+            "hard": "Hard",
+            "advanced": "Hard",
+        }
+        return labels.get(label, "")
+
     def load_raw_data(self):
         """Load all DOCX, CSV, TXT files"""
         questions, q_id = [], 1
 
         for docx_file in sorted(self.raw_data_path.glob("*.docx")):
             try:
+                from docx import Document
+
                 paras = [p.text.strip() for p in Document(docx_file).paragraphs if p.text.strip()]
                 domain = docx_file.stem
                 has_prefixed = any(p.startswith('Question:') for p in paras[:20])
@@ -33,8 +47,8 @@ class DataIngestion:
                     for row in csv.DictReader(f):
                         questions.append({
                             "id": q_id,
-                            "domain": "Python",
-                            "difficulty": row.get('difficulty', ''),
+                            "domain": row.get('domain', csv_file.stem),
+                            "difficulty": self.normalize_difficulty(row.get('difficulty', '')),
                             "question": row.get('question', ''),
                             "answer": row.get('answer', '')
                         })
@@ -58,7 +72,7 @@ class DataIngestion:
                             elif 'Difficulty' in lines[i]:
                                 m = re.search(r'(\w+)$', lines[i])
                                 if m:
-                                    d = m.group(1)
+                                    d = self.normalize_difficulty(m.group(1))
                             i += 1
                         if q and a:
                             questions.append({"id": q_id, "domain": domain, "difficulty": d, "question": q, "answer": a})
@@ -84,8 +98,8 @@ class DataIngestion:
                         a = paras[i].replace('Answer:', '').strip()
                     elif 'difficulty' in paras[i].lower():
                         m = re.search(r'(\w+)$', paras[i])
-                        if m and m.group(1).lower() in ['easy', 'medium', 'hard']:
-                            d = m.group(1).capitalize()
+                        if m:
+                            d = self.normalize_difficulty(m.group(1))
                     i += 1
                 if q and a:
                     questions.append({"id": q_id, "domain": domain, "difficulty": d, "question": q, "answer": a})
@@ -106,8 +120,8 @@ class DataIngestion:
                 while i < len(paras) and not re.match(r'^\d+[.)]\s+', paras[i]):
                     if 'difficulty' in paras[i].lower():
                         m = re.search(r'(\w+)$', paras[i])
-                        if m and m.group(1).lower() in ['easy', 'medium', 'hard']:
-                            d = m.group(1).capitalize()
+                        if m:
+                            d = self.normalize_difficulty(m.group(1))
                         i += 1
                         break
                     if re.match(r'^(answer|ans)\s*[:–-]\s*', paras[i], re.IGNORECASE):

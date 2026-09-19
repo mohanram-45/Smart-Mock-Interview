@@ -35,7 +35,7 @@ if __name__ == "__main__":
     cleaner = DataCleaner(processed_path)
     questions = cleaner.clean(questions)
     cleaner.save_json(questions, "questions_cleaned.json")
-    cleaner.save_csv(questions, "questions_cleaned.csv")
+    cleaner.save_csv(questions, "questions.csv")
 
     print("\n" + "="*70)
     print("COMPLETE")
