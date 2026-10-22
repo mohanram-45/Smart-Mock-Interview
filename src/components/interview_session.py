@@ -4,8 +4,9 @@ import json
 import random
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any, List, Set
+from typing import Callable, Optional, Dict, Any, List, Set
 
+from question_provider import QuestionSourceUnavailable
 from data_ingestion import DataIngestion
 from feedback_generator import FeedbackGenerator
 from report_generator import ReportGenerator
@@ -59,7 +60,8 @@ class AdaptiveInterviewSession:
         session_id: str,
         role: str,
         custom_domains: Optional[List[str]] = None,
-        model_choice: str = DEFAULT_MODEL
+        model_choice: str = DEFAULT_MODEL,
+        question_provider: Optional[Callable[[List[str]], List[Dict[str, Any]]]] = None
     ):
         """
         Initialize adaptive interview session.
@@ -74,6 +76,10 @@ class AdaptiveInterviewSession:
         """
         self.session_id = session_id
         self.role = role
+        # None (default) = legacy questions_cleaned.json path, exactly as before. A provider (see question_provider.py)
+        # supplies already domain-filtered, legacy-shaped question dicts instead; the two sources are never mixed.
+        self.question_provider = question_provider
+        self.question_source = "legacy" if question_provider is None else getattr(question_provider, "name", "custom")
         self.started_at = datetime.utcnow().isoformat() + "Z"
         self.ended_at: Optional[str] = None
 
@@ -107,7 +113,7 @@ class AdaptiveInterviewSession:
             "Medium": [],
             "Hard": []
         }
-        self.asked_question_ids: Set[int] = set()
+        self.asked_question_ids: Set[Any] = set()   # int ids (legacy) or stable string ids (curated)
 
         # Current state
         self.current_round = 0
@@ -150,19 +156,23 @@ class AdaptiveInterviewSession:
             True if questions loaded, False otherwise
         """
         try:
-            processed_path = (
-                Path(__file__).parent.parent.parent / "data" / "processed"
-            )
-            questions_file = processed_path / "questions_cleaned.json"
+            if self.question_provider is not None:
+                # Provider returns the domain-filtered pool itself (it owns domain-label normalisation).
+                self.all_questions = list(self.question_provider(self.selected_domains))
+            else:
+                processed_path = (
+                    Path(__file__).parent.parent.parent / "data" / "processed"
+                )
+                questions_file = processed_path / "questions_cleaned.json"
 
-            with open(questions_file, "r", encoding="utf-8") as f:
-                all_questions = json.load(f)
+                with open(questions_file, "r", encoding="utf-8") as f:
+                    all_questions = json.load(f)
 
-            # Filter by selected domains
-            self.all_questions = [
-                q for q in all_questions
-                if q.get("domain") in self.selected_domains
-            ]
+                # Filter by selected domains
+                self.all_questions = [
+                    q for q in all_questions
+                    if q.get("domain") in self.selected_domains
+                ]
 
             if not self.all_questions:
                 logger.error(f"No questions found for domains {self.selected_domains}")
@@ -192,6 +202,8 @@ class AdaptiveInterviewSession:
             )
             return True
 
+        except QuestionSourceUnavailable:
+            raise   # surfaced as HTTP 503 by the app; never silently replaced by another source
         except FileNotFoundError:
             logger.error("Questions file not found")
             return False

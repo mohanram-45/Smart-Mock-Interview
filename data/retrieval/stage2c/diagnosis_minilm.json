@@ -1,0 +1,2042 @@
+{
+ "tokenizer": "real MiniLM tokenizer",
+ "target": "smi-0453",
+ "cluster": [
+  "smi-0445",
+  "smi-0446",
+  "smi-0447",
+  "smi-0448",
+  "smi-0449",
+  "smi-0450",
+  "smi-0451",
+  "smi-0452",
+  "smi-0453",
+  "smi-h0032"
+ ],
+ "records": {
+  "smi-0445": {
+   "domain": "Python",
+   "difficulty": "Easy",
+   "topic": "Data structures and algorithms",
+   "question": "How to implement a stack using Python lists.",
+   "key_concepts": [
+    "stack",
+    "LIFO",
+    "list append and pop",
+    "amortized O(1)",
+    "IndexError on empty",
+    "queue.LifoQueue"
+   ],
+   "canonical_answer_words": 145,
+   "tokens": {
+    "qka": 352,
+    "question": 11,
+    "qk": 48,
+    "qk_concise": 253
+   },
+   "qka_visible_to_model": "data structures and algorithms how to implement a stack using python lists. key concepts : stack ; lifo ; list append and pop ; amortized o ( 1 ) ; indexerror on empty ; queue. lifoqueue use a list with its end as the top : append ( ) pushes and pop ( ) removes and returns the last item, giving lifo order. both are amortised o ( 1 ) ( append occasionally triggers a resize, so ' amortised ' is the accurate term ). peek is stack [ - 1 ], and emptiness is checked with ` not stack `. popping an empty list raises indexerror, so check first or wrap it. never use the front ( insert ( 0, x ) / pop ( 0 ) ) because those are o ( n ). a small class gives a clean interface and sensible errors. for multi - threaded producers and consumers use queue. lifoqueue, which is thread - safe, and collections. deque also works as a stack with the same o ( 1 ) end operations. ` ` ` python class stack : def _ _ init _ _ ( self ) : self. _ items = [ ] def push ( self, item ) : self. _"
+  },
+  "smi-0446": {
+   "domain": "Python",
+   "difficulty": "Medium",
+   "topic": "Data structures and algorithms",
+   "question": "How do you implement a queue in Python?",
+   "key_concepts": [
+    "queue",
+    "FIFO",
+    "collections.deque",
+    "popleft",
+    "list.pop(0) is O(n)",
+    "queue.Queue",
+    "maxlen"
+   ],
+   "canonical_answer_words": 135,
+   "tokens": {
+    "qka": 347,
+    "question": 11,
+    "qk": 50,
+    "qk_concise": 246
+   },
+   "qka_visible_to_model": "data structures and algorithms how do you implement a queue in python? key concepts : queue ; fifo ; collections. deque ; popleft ; list. pop ( 0 ) is o ( n ) ; queue. queue ; maxlen use collections. deque : append ( ) enqueues at the right and popleft ( ) dequeues from the left, both o ( 1 ), giving fifo order. a plain list is a poor queue because list. pop ( 0 ) shifts every remaining element and is o ( n ), so it degrades on large queues. deque supports maxlen for a fixed - size sliding buffer ( old items are dropped ), but indexing in the middle is o ( n ). deque is not designed as a blocking queue : for producer / consumer code across threads use queue. queue ( thread - safe, blocking get / put, optional maxsize ), or asyncio. queue for coroutines ; queue. priorityqueue or heapq give priority ordering. wrap the deque in a class to give clear errors on empty dequeue. ` ` ` python from collections import deque class queue : def _ _ init _ _ ( self )"
+  },
+  "smi-0447": {
+   "domain": "Python",
+   "difficulty": "Easy",
+   "topic": "Data structures and algorithms",
+   "question": "How would you reverse a list in Python?",
+   "key_concepts": [
+    "reverse a list",
+    "list.reverse()",
+    "slicing",
+    "reversed()",
+    "iterator"
+   ],
+   "canonical_answer_words": 77,
+   "tokens": {
+    "qka": 177,
+    "question": 11,
+    "qk": 37,
+    "qk_concise": 177
+   },
+   "qka_visible_to_model": "data structures and algorithms how would you reverse a list in python? key concepts : reverse a list ; list. reverse ( ) ; slicing ; reversed ( ) ; iterator list. reverse ( ) reverses in place and returns none ; slicing [ : : - 1 ] returns a new reversed list ; reversed ( ) returns an iterator over the items in reverse order ( wrap in list ( ) for a list ). each is o ( n ) ; use reverse ( ) to avoid a copy and slicing / reversed ( ) to keep the original. ` ` ` python a = [ 1, 2, 3 ] b = a [ : : - 1 ] # new reversed list ; a unchanged c = list ( reversed ( a ) ) # iterator - > new list ; a unchanged a. reverse ( ) # in place ; returns none ` ` `"
+  },
+  "smi-0448": {
+   "domain": "Python",
+   "difficulty": "Hard",
+   "topic": "Data structures and algorithms",
+   "question": "Implement a binary search tree in Python.",
+   "key_concepts": [
+    "binary search tree",
+    "self-balancing tree",
+    "AVL tree",
+    "red-black tree",
+    "height"
+   ],
+   "canonical_answer_words": 179,
+   "tokens": {
+    "qka": 419,
+    "question": 10,
+    "qk": 36,
+    "qk_concise": 254
+   },
+   "qka_visible_to_model": "data structures and algorithms implement a binary search tree in python. key concepts : binary search tree ; self - balancing tree ; avl tree ; red - black tree ; height a bst stores keys so that every left descendant is smaller and every right descendant is larger. search, insert and delete take o ( h ), where h is the height : o ( log n ) on average for random insertions but o ( n ) in the worst case ( sorted input ) unless the tree is self - balancing ( avl, red - black ). minimal implementation ( no delete ) : ` ` ` python class node : def _ _ init _ _ ( self, key ) : self. key, self. left, self. right = key, none, none class bst : def _ _ init _ _ ( self ) : self. root = none def insert ( self, key ) : if self. root is none : self. root = node ( key ) return cur = self. root while true : if key < cur. key : if cur. left is none : cur. left = node ( key ) ; return cur = cur. left elif key > cur. key : if cu"
+  },
+  "smi-0449": {
+   "domain": "Python",
+   "difficulty": "Easy",
+   "topic": "Data structures and algorithms",
+   "question": "What is the time complexity of binary search?",
+   "key_concepts": [
+    "binary search",
+    "O(log n)",
+    "linear search"
+   ],
+   "canonical_answer_words": 30,
+   "tokens": {
+    "qka": 66,
+    "question": 11,
+    "qk": 29,
+    "qk_concise": 66
+   },
+   "qka_visible_to_model": "data structures and algorithms what is the time complexity of binary search? key concepts : binary search ; o ( log n ) ; linear search binary search has o ( log n ) time complexity because it divides the search space in half with each iteration. this makes it much more efficient than linear search for large datasets."
+  },
+  "smi-0450": {
+   "domain": "Python",
+   "difficulty": "Easy",
+   "topic": "Data structures and algorithms",
+   "question": "Implement the fizzbuzz algorithm in Python.",
+   "key_concepts": [
+    "FizzBuzz",
+    "divisibility",
+    "modulo operator",
+    "if-elif chain ordering"
+   ],
+   "canonical_answer_words": 71,
+   "tokens": {
+    "qka": 184,
+    "question": 12,
+    "qk": 38,
+    "qk_concise": 184
+   },
+   "qka_visible_to_model": "data structures and algorithms implement the fizzbuzz algorithm in python. key concepts : fizzbuzz ; divisibility ; modulo operator ; if - elif chain ordering loop from 1 to n ; test divisibility by 15 ( or by 3 and 5 ) first, then 3, then 5, otherwise use the number. checking the combined case first is the key detail. ` ` ` python def fizzbuzz ( n ) : out = [ ] for i in range ( 1, n + 1 ) : if i % 15 = = 0 : out. append ( \" fizzbuzz \" ) elif i % 3 = = 0 : out. append ( \" fizz \" ) elif i % 5 = = 0 : out. append ( \" buzz \" ) else : out. append ( str ( i ) ) return out ` ` `"
+  },
+  "smi-0451": {
+   "domain": "Python",
+   "difficulty": "Hard",
+   "topic": "Data structures and algorithms",
+   "question": "Implement Dijkstra's shortest path algorithm.",
+   "key_concepts": [
+    "Dijkstra's algorithm",
+    "shortest path",
+    "min-heap",
+    "Bellman-Ford",
+    "negative weights"
+   ],
+   "canonical_answer_words": 119,
+   "tokens": {
+    "qka": 284,
+    "question": 12,
+    "qk": 40,
+    "qk_concise": 254
+   },
+   "qka_visible_to_model": "data structures and algorithms implement dijkstra ' s shortest path algorithm. key concepts : dijkstra ' s algorithm ; shortest path ; min - heap ; bellman - ford ; negative weights dijkstra ' s algorithm finds shortest paths from a source to all nodes in a graph with non - negative edge weights. use a min - heap keyed by distance ; repeatedly pop the closest unfinalised node and relax its edges. with a binary heap it runs in o ( ( v + e ) log v ). it fails with negative weights ( use bellman - ford ). ` ` ` python import heapq def dijkstra ( graph, source ) : \" \" \" graph : { node : [ ( neighbour, weight ),... ] } with non - negative weights. \" \" \" dist = { node : float ( \" inf \" ) for node in graph } dist [ source ] = 0 heap = [ ( 0, source ) ] while heap : d, u = heapq. heappop ( heap ) if d > dist [ u ] : continue # stale entry for v, w in graph [ u ] : nd = d + w if nd < dist [ v ] : dist"
+  },
+  "smi-0452": {
+   "domain": "Python",
+   "difficulty": "Medium",
+   "topic": "Data structures and algorithms",
+   "question": "What is quicksort and how would you implement it in Python?",
+   "key_concepts": [
+    "quicksort",
+    "pivot",
+    "divide-and-conquer",
+    "partition",
+    "worst case"
+   ],
+   "canonical_answer_words": 114,
+   "tokens": {
+    "qka": 246,
+    "question": 16,
+    "qk": 40,
+    "qk_concise": 246
+   },
+   "qka_visible_to_model": "data structures and algorithms what is quicksort and how would you implement it in python? key concepts : quicksort ; pivot ; divide - and - conquer ; partition ; worst case quicksort is a divide - and - conquer sort : choose a pivot, partition the items into smaller, equal and larger groups, and recursively sort the outer groups. average time is o ( n log n ) ; the worst case is o ( n ^ 2 ) ( for example consistently bad pivots ), and the in - place version uses o ( log n ) extra stack space on average. the version below favours clarity ( it allocates new lists ) : ` ` ` python def quicksort ( arr ) : if len ( arr ) < = 1 : return arr pivot = arr [ len ( arr ) / / 2 ] left = [ x for x in arr if x < pivot ] mid = [ x for x in arr if x = = pivot ] right = [ x for x in arr if x > pivot ] return quicksort ( left ) + mid + quicksort ( right ) ` ` `"
+  },
+  "smi-0453": {
+   "domain": "Python",
+   "difficulty": "Easy",
+   "topic": "Data structures and algorithms",
+   "question": "What is bubble sort and what is its time complexity?",
+   "key_concepts": [
+    "bubble sort",
+    "time complexity",
+    "O(n²)",
+    "adjacent elements"
+   ],
+   "canonical_answer_words": 31,
+   "tokens": {
+    "qka": 75,
+    "question": 13,
+    "qk": 34,
+    "qk_concise": 75
+   },
+   "qka_visible_to_model": "data structures and algorithms what is bubble sort and what is its time complexity? key concepts : bubble sort ; time complexity ; o ( n² ) ; adjacent elements bubble sort repeatedly steps through the list, compares adjacent elements and swaps them if they ' re in the wrong order. it has o ( n² ) time complexity and is mainly used for educational purposes."
+  },
+  "smi-h0032": {
+   "domain": "Python",
+   "difficulty": "Medium",
+   "topic": "Data structures and algorithms",
+   "question": "This function is correct but too slow on large lists:\n\ndef has_duplicates_quadratic(items):\n    for i in range(len(items)):\n        for j in range(i + 1, len(items)):\n            if items[i] == items[j]:\n                return True\n    return False\n\nRewrite it as has_duplicates(items) running in O(n) expected time for hashable items, and as has_duplicates_sorted(items) for items that are orderable but not hashable (e.g. lists). Prove the complexity claim without wall-clock timing: write a wrapper class that counts __eq__ calls (and __hash__ / __lt__ calls) and show that on 200 unique items the quadratic version makes n(n-1)/2 comparisons while the hash version makes at most 2n hash calls and fewer than n equality calls. Finally, when would sorting beat hashing?",
+   "key_concepts": [
+    "time complexity O(n^2) vs O(n)",
+    "hash set",
+    "sorting and adjacent comparison",
+    "operation counting",
+    "hashability",
+    "space-time trade-off"
+   ],
+   "canonical_answer_words": 393,
+   "tokens": {
+    "qka": 1009,
+    "question": 207,
+    "qk": 248,
+    "qk_concise": 248
+   },
+   "qka_visible_to_model": "data structures and algorithms this function is correct but too slow on large lists : def has _ duplicates _ quadratic ( items ) : for i in range ( len ( items ) ) : for j in range ( i + 1, len ( items ) ) : if items [ i ] = = items [ j ] : return true return false rewrite it as has _ duplicates ( items ) running in o ( n ) expected time for hashable items, and as has _ duplicates _ sorted ( items ) for items that are orderable but not hashable ( e. g. lists ). prove the complexity claim without wall - clock timing : write a wrapper class that counts _ _ eq _ _ calls ( and _ _ hash _ _ / _ _ lt _ _ calls ) and show that on 200 unique items the quadratic version makes n ( n - 1 ) / 2 comparisons while the hash version makes at most 2n hash calls and fewer than n equality calls. finally, when would sorting beat hashing? key concepts : time complexity o ( n ^ 2 ) vs o ( n ) ; hash set ; sorting and adjacent comparison ; operation counting ; hashability ; space - time trade - off hashing : add each item to a"
+  }
+ },
+ "probes": [
+  {
+   "label": "exact question text of smi-0453 (what the demo sent)",
+   "query": "What is bubble sort and what is its time complexity?",
+   "per_format": {
+    "qka": {
+     "top10_excluding_self": [
+      {
+       "id": "smi-0450",
+       "score": 0.454,
+       "domain": "Python",
+       "q": "Implement the fizzbuzz algorithm in Python."
+      },
+      {
+       "id": "smi-0452",
+       "score": 0.44604,
+       "domain": "Python",
+       "q": "What is quicksort and how would you implement it in Python?"
+      },
+      {
+       "id": "smi-0449",
+       "score": 0.37756,
+       "domain": "Python",
+       "q": "What is the time complexity of binary search?"
+      },
+      {
+       "id": "smi-h0032",
+       "score": 0.37126,
+       "domain": "Python",
+       "q": "This function is correct but too slow on large lists:\n\ndef has_duplica"
+      },
+      {
+       "id": "smi-0446",
+       "score": 0.36881,
+       "domain": "Python",
+       "q": "How do you implement a queue in Python?"
+      },
+      {
+       "id": "smi-0445",
+       "score": 0.35798,
+       "domain": "Python",
+       "q": "How to implement a stack using Python lists."
+      },
+      {
+       "id": "smi-0431",
+       "score": 0.31394,
+       "domain": "SQL",
+       "q": "Difference between ROW_NUMBER and RANK?"
+      },
+      {
+       "id": "smi-0430",
+       "score": 0.31387,
+       "domain": "SQL",
+       "q": "What is a window function?"
+      },
+      {
+       "id": "smi-l0023",
+       "score": 0.29187,
+       "domain": "MLOps & Model Deployment",
+       "q": "Implement a deterministic simulator for dynamic request batching on a "
+      },
+      {
+       "id": "smi-0186",
+       "score": 0.28964,
+       "domain": "Machine Learning",
+       "q": "What is collaborative filtering?"
+      }
+     ],
+     "cluster_rank_score": {
+      "smi-0445": {
+       "rank": 7,
+       "score": 0.35798
+      },
+      "smi-0446": {
+       "rank": 6,
+       "score": 0.36881
+      },
+      "smi-0447": {
+       "rank": 38,
+       "score": 0.22707
+      },
+      "smi-0448": {
+       "rank": 15,
+       "score": 0.27789
+      },
+      "smi-0449": {
+       "rank": 4,
+       "score": 0.37756
+      },
+      "smi-0450": {
+       "rank": 2,
+       "score": 0.454
+      },
+      "smi-0451": {
+       "rank": 19,
+       "score": 0.26521
+      },
+      "smi-0452": {
+       "rank": 3,
+       "score": 0.44604
+      },
+      "smi-0453": {
+       "rank": 1,
+       "score": 0.86134
+      },
+      "smi-h0032": {
+       "rank": 5,
+       "score": 0.37126
+      }
+     },
+     "rank_of_self": 1
+    },
+    "question": {
+     "top10_excluding_self": [
+      {
+       "id": "smi-0449",
+       "score": 0.4382,
+       "domain": "Python",
+       "q": "What is the time complexity of binary search?"
+      },
+      {
+       "id": "smi-0452",
+       "score": 0.39921,
+       "domain": "Python",
+       "q": "What is quicksort and how would you implement it in Python?"
+      },
+      {
+       "id": "smi-0450",
+       "score": 0.39231,
+       "domain": "Python",
+       "q": "Implement the fizzbuzz algorithm in Python."
+      },
+      {
+       "id": "smi-h0032",
+       "score": 0.35555,
+       "domain": "Python",
+       "q": "This function is correct but too slow on large lists:\n\ndef has_duplica"
+      },
+      {
+       "id": "smi-0319",
+       "score": 0.34676,
+       "domain": "Data Analysis",
+       "q": "What is Time series?"
+      },
+      {
+       "id": "smi-0434",
+       "score": 0.33937,
+       "domain": "SQL",
+       "q": "What is a clustered index?"
+      },
+      {
+       "id": "smi-0156",
+       "score": 0.3148,
+       "domain": "Machine Learning",
+       "q": "How does the k-means clustering algorithm work, and what are its main "
+      },
+      {
+       "id": "smi-0154",
+       "score": 0.31455,
+       "domain": "Machine Learning",
+       "q": "What is clustering?"
+      },
+      {
+       "id": "smi-0203",
+       "score": 0.30284,
+       "domain": "Machine Learning",
+       "q": "How is a decision tree pruned?"
+      },
+      {
+       "id": "smi-l0023",
+       "score": 0.30083,
+       "domain": "MLOps & Model Deployment",
+       "q": "Implement a deterministic simulator for dynamic request batching on a "
+      }
+     ],
+     "cluster_rank_score": {
+      "smi-0445": {
+       "rank": 179,
+       "score": 0.13683
+      },
+      "smi-0446": {
+       "rank": 31,
+       "score": 0.23813
+      },
+      "smi-0447": {
+       "rank": 219,
+       "score": 0.12301
+      },
+      "smi-0448": {
+       "rank": 103,
+       "score": 0.17084
+      },
+      "smi-0449": {
+       "rank": 2,
+       "score": 0.4382
+      },
+      "smi-0450": {
+       "rank": 4,
+       "score": 0.39231
+      },
+      "smi-0451": {
+       "rank": 39,
+       "score": 0.22082
+      },
+      "smi-0452": {
+       "rank": 3,
+       "score": 0.39921
+      },
+      "smi-0453": {
+       "rank": 1,
+       "score": 1.0
+      },
+      "smi-h0032": {
+       "rank": 5,
+       "score": 0.35555
+      }
+     },
+     "rank_of_self": 1
+    },
+    "qk": {
+     "top10_excluding_self": [
+      {
+       "id": "smi-0450",
+       "score": 0.47228,
+       "domain": "Python",
+       "q": "Implement the fizzbuzz algorithm in Python."
+      },
+      {
+       "id": "smi-0449",
+       "score": 0.40031,
+       "domain": "Python",
+       "q": "What is the time complexity of binary search?"
+      },
+      {
+       "id": "smi-0452",
+       "score": 0.37468,
+       "domain": "Python",
+       "q": "What is quicksort and how would you implement it in Python?"
+      },
+      {
+       "id": "smi-h0032",
+       "score": 0.36807,
+       "domain": "Python",
+       "q": "This function is correct but too slow on large lists:\n\ndef has_duplica"
+      },
+      {
+       "id": "smi-0446",
+       "score": 0.34682,
+       "domain": "Python",
+       "q": "How do you implement a queue in Python?"
+      },
+      {
+       "id": "smi-0163",
+       "score": 0.30039,
+       "domain": "Machine Learning",
+       "q": "What is UMAP, how does it work, and how does it compare with t-SNE for"
+      },
+      {
+       "id": "smi-0416",
+       "score": 0.29965,
+       "domain": "SQL",
+       "q": "What is GROUP BY?"
+      },
+      {
+       "id": "smi-0203",
+       "score": 0.29581,
+       "domain": "Machine Learning",
+       "q": "How is a decision tree pruned?"
+      },
+      {
+       "id": "smi-l0023",
+       "score": 0.29187,
+       "domain": "MLOps & Model Deployment",
+       "q": "Implement a deterministic simulator for dynamic request batching on a "
+      },
+      {
+       "id": "smi-0319",
+       "score": 0.28932,
+       "domain": "Data Analysis",
+       "q": "What is Time series?"
+      }
+     ],
+     "cluster_rank_score": {
+      "smi-0445": {
+       "rank": 13,
+       "score": 0.288
+      },
+      "smi-0446": {
+       "rank": 6,
+       "score": 0.34682
+      },
+      "smi-0447": {
+       "rank": 79,
+       "score": 0.17609
+      },
+      "smi-0448": {
+       "rank": 30,
+       "score": 0.25112
+      },
+      "smi-0449": {
+       "rank": 3,
+       "score": 0.40031
+      },
+      "smi-0450": {
+       "rank": 2,
+       "score": 0.47228
+      },
+      "smi-0451": {
+       "rank": 12,
+       "score": 0.28882
+      },
+      "smi-0452": {
+       "rank": 4,
+       "score": 0.37468
+      },
+      "smi-0453": {
+       "rank": 1,
+       "score": 0.88646
+      },
+      "smi-h0032": {
+       "rank": 5,
+       "score": 0.36807
+      }
+     },
+     "rank_of_self": 1
+    },
+    "qk_concise": {
+     "top10_excluding_self": [
+      {
+       "id": "smi-0450",
+       "score": 0.454,
+       "domain": "Python",
+       "q": "Implement the fizzbuzz algorithm in Python."
+      },
+      {
+       "id": "smi-0452",
+       "score": 0.44604,
+       "domain": "Python",
+       "q": "What is quicksort and how would you implement it in Python?"
+      },
+      {
+       "id": "smi-0446",
+       "score": 0.3786,
+       "domain": "Python",
+       "q": "How do you implement a queue in Python?"
+      },
+      {
+       "id": "smi-0449",
+       "score": 0.37756,
+       "domain": "Python",
+       "q": "What is the time complexity of binary search?"
+      },
+      {
+       "id": "smi-h0032",
+       "score": 0.36807,
+       "domain": "Python",
+       "q": "This function is correct but too slow on large lists:\n\ndef has_duplica"
+      },
+      {
+       "id": "smi-0445",
+       "score": 0.36118,
+       "domain": "Python",
+       "q": "How to implement a stack using Python lists."
+      },
+      {
+       "id": "smi-0430",
+       "score": 0.31421,
+       "domain": "SQL",
+       "q": "What is a window function?"
+      },
+      {
+       "id": "smi-0431",
+       "score": 0.31394,
+       "domain": "SQL",
+       "q": "Difference between ROW_NUMBER and RANK?"
+      },
+      {
+       "id": "smi-l0023",
+       "score": 0.29187,
+       "domain": "MLOps & Model Deployment",
+       "q": "Implement a deterministic simulator for dynamic request batching on a "
+      },
+      {
+       "id": "smi-0424",
+       "score": 0.2877,
+       "domain": "SQL",
+       "q": "What is an index?"
+      }
+     ],
+     "cluster_rank_score": {
+      "smi-0445": {
+       "rank": 7,
+       "score": 0.36118
+      },
+      "smi-0446": {
+       "rank": 4,
+       "score": 0.3786
+      },
+      "smi-0447": {
+       "rank": 37,
+       "score": 0.22707
+      },
+      "smi-0448": {
+       "rank": 17,
+       "score": 0.27562
+      },
+      "smi-0449": {
+       "rank": 5,
+       "score": 0.37756
+      },
+      "smi-0450": {
+       "rank": 2,
+       "score": 0.454
+      },
+      "smi-0451": {
+       "rank": 21,
+       "score": 0.26658
+      },
+      "smi-0452": {
+       "rank": 3,
+       "score": 0.44604
+      },
+      "smi-0453": {
+       "rank": 1,
+       "score": 0.86134
+      },
+      "smi-h0032": {
+       "rank": 6,
+       "score": 0.36807
+      }
+     },
+     "rank_of_self": 1
+    }
+   },
+   "qka_python_only_top5_excl_self": [
+    [
+     "smi-0450",
+     0.454
+    ],
+    [
+     "smi-0452",
+     0.44604
+    ],
+    [
+     "smi-0449",
+     0.37756
+    ],
+    [
+     "smi-h0032",
+     0.37126
+    ],
+    [
+     "smi-0446",
+     0.36881
+    ]
+   ]
+  },
+  {
+   "label": "paraphrase: how does bubble sort work and why is it slow",
+   "query": "Explain how bubble sort works and why it is considered slow.",
+   "per_format": {
+    "qka": {
+     "top10_all": [
+      {
+       "id": "smi-0453",
+       "score": 0.74169,
+       "domain": "Python",
+       "q": "What is bubble sort and what is its time complexity?"
+      },
+      {
+       "id": "smi-0452",
+       "score": 0.43778,
+       "domain": "Python",
+       "q": "What is quicksort and how would you implement it in Python?"
+      },
+      {
+       "id": "smi-h0032",
+       "score": 0.37505,
+       "domain": "Python",
+       "q": "This function is correct but too slow on large lists:\n\ndef has_duplica"
+      },
+      {
+       "id": "smi-0446",
+       "score": 0.37502,
+       "domain": "Python",
+       "q": "How do you implement a queue in Python?"
+      },
+      {
+       "id": "smi-0450",
+       "score": 0.37084,
+       "domain": "Python",
+       "q": "Implement the fizzbuzz algorithm in Python."
+      },
+      {
+       "id": "smi-0439",
+       "score": 0.34026,
+       "domain": "SQL",
+       "q": "What are execution plans?"
+      },
+      {
+       "id": "smi-0445",
+       "score": 0.33514,
+       "domain": "Python",
+       "q": "How to implement a stack using Python lists."
+      },
+      {
+       "id": "smi-0061",
+       "score": 0.33011,
+       "domain": "Deep Learning",
+       "q": "Explain the following variant of Gradient Descent: Stochastic, Batch, "
+      },
+      {
+       "id": "smi-0424",
+       "score": 0.32446,
+       "domain": "SQL",
+       "q": "What is an index?"
+      },
+      {
+       "id": "smi-0130",
+       "score": 0.32155,
+       "domain": "Deep Learning",
+       "q": "When using mini batch gradient descent, why is it important to shuffle"
+      }
+     ],
+     "cluster_rank_score": {
+      "smi-0445": {
+       "rank": 7,
+       "score": 0.33514
+      },
+      "smi-0446": {
+       "rank": 4,
+       "score": 0.37502
+      },
+      "smi-0447": {
+       "rank": 63,
+       "score": 0.1991
+      },
+      "smi-0448": {
+       "rank": 47,
+       "score": 0.22854
+      },
+      "smi-0449": {
+       "rank": 22,
+       "score": 0.28547
+      },
+      "smi-0450": {
+       "rank": 5,
+       "score": 0.37084
+      },
+      "smi-0451": {
+       "rank": 43,
+       "score": 0.23357
+      },
+      "smi-0452": {
+       "rank": 2,
+       "score": 0.43778
+      },
+      "smi-0453": {
+       "rank": 1,
+       "score": 0.74169
+      },
+      "smi-h0032": {
+       "rank": 3,
+       "score": 0.37505
+      }
+     }
+    },
+    "question": {
+     "top10_all": [
+      {
+       "id": "smi-0453",
+       "score": 0.86039,
+       "domain": "Python",
+       "q": "What is bubble sort and what is its time complexity?"
+      },
+      {
+       "id": "smi-0452",
+       "score": 0.41646,
+       "domain": "Python",
+       "q": "What is quicksort and how would you implement it in Python?"
+      },
+      {
+       "id": "smi-h0032",
+       "score": 0.3502,
+       "domain": "Python",
+       "q": "This function is correct but too slow on large lists:\n\ndef has_duplica"
+      },
+      {
+       "id": "smi-l0023",
+       "score": 0.33187,
+       "domain": "MLOps & Model Deployment",
+       "q": "Implement a deterministic simulator for dynamic request batching on a "
+      },
+      {
+       "id": "smi-h0039",
+       "score": 0.31675,
+       "domain": "Data Analysis",
+       "q": "Revenue per order for an online shop is heavily right-skewed. A sample"
+      },
+      {
+       "id": "smi-0450",
+       "score": 0.31488,
+       "domain": "Python",
+       "q": "Implement the fizzbuzz algorithm in Python."
+      },
+      {
+       "id": "smi-0434",
+       "score": 0.30896,
+       "domain": "SQL",
+       "q": "What is a clustered index?"
+      },
+      {
+       "id": "smi-0449",
+       "score": 0.30338,
+       "domain": "Python",
+       "q": "What is the time complexity of binary search?"
+      },
+      {
+       "id": "smi-0130",
+       "score": 0.30256,
+       "domain": "Deep Learning",
+       "q": "When using mini batch gradient descent, why is it important to shuffle"
+      },
+      {
+       "id": "smi-0435",
+       "score": 0.29271,
+       "domain": "SQL",
+       "q": "What is a non-clustered index?"
+      }
+     ],
+     "cluster_rank_score": {
+      "smi-0445": {
+       "rank": 324,
+       "score": 0.0963
+      },
+      "smi-0446": {
+       "rank": 63,
+       "score": 0.20856
+      },
+      "smi-0447": {
+       "rank": 265,
+       "score": 0.11342
+      },
+      "smi-0448": {
+       "rank": 358,
+       "score": 0.08715
+      },
+      "smi-0449": {
+       "rank": 8,
+       "score": 0.30338
+      },
+      "smi-0450": {
+       "rank": 6,
+       "score": 0.31488
+      },
+      "smi-0451": {
+       "rank": 46,
+       "score": 0.22828
+      },
+      "smi-0452": {
+       "rank": 2,
+       "score": 0.41646
+      },
+      "smi-0453": {
+       "rank": 1,
+       "score": 0.86039
+      },
+      "smi-h0032": {
+       "rank": 3,
+       "score": 0.3502
+      }
+     }
+    },
+    "qk": {
+     "top10_all": [
+      {
+       "id": "smi-0453",
+       "score": 0.75272,
+       "domain": "Python",
+       "q": "What is bubble sort and what is its time complexity?"
+      },
+      {
+       "id": "smi-0450",
+       "score": 0.39061,
+       "domain": "Python",
+       "q": "Implement the fizzbuzz algorithm in Python."
+      },
+      {
+       "id": "smi-0452",
+       "score": 0.38229,
+       "domain": "Python",
+       "q": "What is quicksort and how would you implement it in Python?"
+      },
+      {
+       "id": "smi-h0032",
+       "score": 0.36985,
+       "domain": "Python",
+       "q": "This function is correct but too slow on large lists:\n\ndef has_duplica"
+      },
+      {
+       "id": "smi-l0023",
+       "score": 0.31968,
+       "domain": "MLOps & Model Deployment",
+       "q": "Implement a deterministic simulator for dynamic request batching on a "
+      },
+      {
+       "id": "smi-0130",
+       "score": 0.31788,
+       "domain": "Deep Learning",
+       "q": "When using mini batch gradient descent, why is it important to shuffle"
+      },
+      {
+       "id": "smi-g0029",
+       "score": 0.31184,
+       "domain": "SQL",
+       "q": "Table daily_sales(day TEXT PRIMARY KEY, revenue INTEGER) stores ISO da"
+      },
+      {
+       "id": "smi-h0039",
+       "score": 0.31086,
+       "domain": "Data Analysis",
+       "q": "Revenue per order for an online shop is heavily right-skewed. A sample"
+      },
+      {
+       "id": "smi-0424",
+       "score": 0.30149,
+       "domain": "SQL",
+       "q": "What is an index?"
+      },
+      {
+       "id": "smi-0435",
+       "score": 0.29718,
+       "domain": "SQL",
+       "q": "What is a non-clustered index?"
+      }
+     ],
+     "cluster_rank_score": {
+      "smi-0445": {
+       "rank": 38,
+       "score": 0.23099
+      },
+      "smi-0446": {
+       "rank": 15,
+       "score": 0.28741
+      },
+      "smi-0447": {
+       "rank": 134,
+       "score": 0.15293
+      },
+      "smi-0448": {
+       "rank": 102,
+       "score": 0.16721
+      },
+      "smi-0449": {
+       "rank": 22,
+       "score": 0.27009
+      },
+      "smi-0450": {
+       "rank": 2,
+       "score": 0.39061
+      },
+      "smi-0451": {
+       "rank": 25,
+       "score": 0.26732
+      },
+      "smi-0452": {
+       "rank": 3,
+       "score": 0.38229
+      },
+      "smi-0453": {
+       "rank": 1,
+       "score": 0.75272
+      },
+      "smi-h0032": {
+       "rank": 4,
+       "score": 0.36985
+      }
+     }
+    },
+    "qk_concise": {
+     "top10_all": [
+      {
+       "id": "smi-0453",
+       "score": 0.74169,
+       "domain": "Python",
+       "q": "What is bubble sort and what is its time complexity?"
+      },
+      {
+       "id": "smi-0452",
+       "score": 0.43778,
+       "domain": "Python",
+       "q": "What is quicksort and how would you implement it in Python?"
+      },
+      {
+       "id": "smi-0446",
+       "score": 0.38117,
+       "domain": "Python",
+       "q": "How do you implement a queue in Python?"
+      },
+      {
+       "id": "smi-0450",
+       "score": 0.37084,
+       "domain": "Python",
+       "q": "Implement the fizzbuzz algorithm in Python."
+      },
+      {
+       "id": "smi-h0032",
+       "score": 0.36985,
+       "domain": "Python",
+       "q": "This function is correct but too slow on large lists:\n\ndef has_duplica"
+      },
+      {
+       "id": "smi-0439",
+       "score": 0.33838,
+       "domain": "SQL",
+       "q": "What are execution plans?"
+      },
+      {
+       "id": "smi-0424",
+       "score": 0.33776,
+       "domain": "SQL",
+       "q": "What is an index?"
+      },
+      {
+       "id": "smi-0445",
+       "score": 0.33666,
+       "domain": "Python",
+       "q": "How to implement a stack using Python lists."
+      },
+      {
+       "id": "smi-0434",
+       "score": 0.33249,
+       "domain": "SQL",
+       "q": "What is a clustered index?"
+      },
+      {
+       "id": "smi-0061",
+       "score": 0.33011,
+       "domain": "Deep Learning",
+       "q": "Explain the following variant of Gradient Descent: Stochastic, Batch, "
+      }
+     ],
+     "cluster_rank_score": {
+      "smi-0445": {
+       "rank": 8,
+       "score": 0.33666
+      },
+      "smi-0446": {
+       "rank": 3,
+       "score": 0.38117
+      },
+      "smi-0447": {
+       "rank": 62,
+       "score": 0.1991
+      },
+      "smi-0448": {
+       "rank": 50,
+       "score": 0.22658
+      },
+      "smi-0449": {
+       "rank": 22,
+       "score": 0.28547
+      },
+      "smi-0450": {
+       "rank": 4,
+       "score": 0.37084
+      },
+      "smi-0451": {
+       "rank": 45,
+       "score": 0.23459
+      },
+      "smi-0452": {
+       "rank": 2,
+       "score": 0.43778
+      },
+      "smi-0453": {
+       "rank": 1,
+       "score": 0.74169
+      },
+      "smi-h0032": {
+       "rank": 5,
+       "score": 0.36985
+      }
+     }
+    }
+   },
+   "qka_python_only_top5_excl_self": [
+    [
+     "smi-0452",
+     0.43778
+    ],
+    [
+     "smi-h0032",
+     0.37505
+    ],
+    [
+     "smi-0446",
+     0.37502
+    ],
+    [
+     "smi-0450",
+     0.37084
+    ],
+    [
+     "smi-0445",
+     0.33514
+    ]
+   ]
+  },
+  {
+   "label": "short keyword query",
+   "query": "bubble sort",
+   "per_format": {
+    "qka": {
+     "top10_all": [
+      {
+       "id": "smi-0453",
+       "score": 0.6692,
+       "domain": "Python",
+       "q": "What is bubble sort and what is its time complexity?"
+      },
+      {
+       "id": "smi-0450",
+       "score": 0.38728,
+       "domain": "Python",
+       "q": "Implement the fizzbuzz algorithm in Python."
+      },
+      {
+       "id": "smi-h0039",
+       "score": 0.34127,
+       "domain": "Data Analysis",
+       "q": "Revenue per order for an online shop is heavily right-skewed. A sample"
+      },
+      {
+       "id": "smi-0452",
+       "score": 0.33197,
+       "domain": "Python",
+       "q": "What is quicksort and how would you implement it in Python?"
+      },
+      {
+       "id": "smi-0445",
+       "score": 0.30675,
+       "domain": "Python",
+       "q": "How to implement a stack using Python lists."
+      },
+      {
+       "id": "smi-i0016",
+       "score": 0.29957,
+       "domain": "SQL",
+       "q": "sales(id INTEGER PRIMARY KEY, category TEXT, product TEXT, amount INTE"
+      },
+      {
+       "id": "smi-g0030",
+       "score": 0.27998,
+       "domain": "SQL",
+       "q": "Table logins(user_id INTEGER, login_date TEXT) records one row per log"
+      },
+      {
+       "id": "smi-0430",
+       "score": 0.27454,
+       "domain": "SQL",
+       "q": "What is a window function?"
+      },
+      {
+       "id": "smi-0431",
+       "score": 0.27235,
+       "domain": "SQL",
+       "q": "Difference between ROW_NUMBER and RANK?"
+      },
+      {
+       "id": "smi-g0027",
+       "score": 0.27112,
+       "domain": "SQL",
+       "q": "Table employees(id INTEGER PRIMARY KEY, name TEXT, dept TEXT, salary I"
+      }
+     ],
+     "cluster_rank_score": {
+      "smi-0445": {
+       "rank": 5,
+       "score": 0.30675
+      },
+      "smi-0446": {
+       "rank": 12,
+       "score": 0.26908
+      },
+      "smi-0447": {
+       "rank": 58,
+       "score": 0.16799
+      },
+      "smi-0448": {
+       "rank": 25,
+       "score": 0.22149
+      },
+      "smi-0449": {
+       "rank": 152,
+       "score": 0.09303
+      },
+      "smi-0450": {
+       "rank": 2,
+       "score": 0.38728
+      },
+      "smi-0451": {
+       "rank": 33,
+       "score": 0.20173
+      },
+      "smi-0452": {
+       "rank": 4,
+       "score": 0.33197
+      },
+      "smi-0453": {
+       "rank": 1,
+       "score": 0.6692
+      },
+      "smi-h0032": {
+       "rank": 18,
+       "score": 0.23904
+      }
+     }
+    },
+    "question": {
+     "top10_all": [
+      {
+       "id": "smi-0453",
+       "score": 0.79105,
+       "domain": "Python",
+       "q": "What is bubble sort and what is its time complexity?"
+      },
+      {
+       "id": "smi-h0039",
+       "score": 0.38323,
+       "domain": "Data Analysis",
+       "q": "Revenue per order for an online shop is heavily right-skewed. A sample"
+      },
+      {
+       "id": "smi-0452",
+       "score": 0.36755,
+       "domain": "Python",
+       "q": "What is quicksort and how would you implement it in Python?"
+      },
+      {
+       "id": "smi-0450",
+       "score": 0.33152,
+       "domain": "Python",
+       "q": "Implement the fizzbuzz algorithm in Python."
+      },
+      {
+       "id": "smi-i0016",
+       "score": 0.32095,
+       "domain": "SQL",
+       "q": "sales(id INTEGER PRIMARY KEY, category TEXT, product TEXT, amount INTE"
+      },
+      {
+       "id": "smi-g0030",
+       "score": 0.30618,
+       "domain": "SQL",
+       "q": "Table logins(user_id INTEGER, login_date TEXT) records one row per log"
+      },
+      {
+       "id": "smi-i0032",
+       "score": 0.29782,
+       "domain": "Data Analysis",
+       "q": "Average order value on your shop is 84 but most customers seem to spen"
+      },
+      {
+       "id": "smi-g0035",
+       "score": 0.28538,
+       "domain": "SQL",
+       "q": "employees(id INTEGER PRIMARY KEY, name TEXT, salary INTEGER) has rows "
+      },
+      {
+       "id": "smi-g0027",
+       "score": 0.27649,
+       "domain": "SQL",
+       "q": "Table employees(id INTEGER PRIMARY KEY, name TEXT, dept TEXT, salary I"
+      },
+      {
+       "id": "smi-0416",
+       "score": 0.26672,
+       "domain": "SQL",
+       "q": "What is GROUP BY?"
+      }
+     ],
+     "cluster_rank_score": {
+      "smi-0445": {
+       "rank": 100,
+       "score": 0.14574
+      },
+      "smi-0446": {
+       "rank": 60,
+       "score": 0.17897
+      },
+      "smi-0447": {
+       "rank": 93,
+       "score": 0.14944
+      },
+      "smi-0448": {
+       "rank": 90,
+       "score": 0.14995
+      },
+      "smi-0449": {
+       "rank": 124,
+       "score": 0.13317
+      },
+      "smi-0450": {
+       "rank": 4,
+       "score": 0.33152
+      },
+      "smi-0451": {
+       "rank": 40,
+       "score": 0.19966
+      },
+      "smi-0452": {
+       "rank": 3,
+       "score": 0.36755
+      },
+      "smi-0453": {
+       "rank": 1,
+       "score": 0.79105
+      },
+      "smi-h0032": {
+       "rank": 17,
+       "score": 0.24659
+      }
+     }
+    },
+    "qk": {
+     "top10_all": [
+      {
+       "id": "smi-0453",
+       "score": 0.70017,
+       "domain": "Python",
+       "q": "What is bubble sort and what is its time complexity?"
+      },
+      {
+       "id": "smi-h0039",
+       "score": 0.37189,
+       "domain": "Data Analysis",
+       "q": "Revenue per order for an online shop is heavily right-skewed. A sample"
+      },
+      {
+       "id": "smi-0450",
+       "score": 0.35804,
+       "domain": "Python",
+       "q": "Implement the fizzbuzz algorithm in Python."
+      },
+      {
+       "id": "smi-0452",
+       "score": 0.31721,
+       "domain": "Python",
+       "q": "What is quicksort and how would you implement it in Python?"
+      },
+      {
+       "id": "smi-i0016",
+       "score": 0.3164,
+       "domain": "SQL",
+       "q": "sales(id INTEGER PRIMARY KEY, category TEXT, product TEXT, amount INTE"
+      },
+      {
+       "id": "smi-g0030",
+       "score": 0.29208,
+       "domain": "SQL",
+       "q": "Table logins(user_id INTEGER, login_date TEXT) records one row per log"
+      },
+      {
+       "id": "smi-g0039",
+       "score": 0.28663,
+       "domain": "SQL",
+       "q": "orders(id INTEGER PRIMARY KEY, created_at TEXT) holds timestamps 'YYYY"
+      },
+      {
+       "id": "smi-g0035",
+       "score": 0.28642,
+       "domain": "SQL",
+       "q": "employees(id INTEGER PRIMARY KEY, name TEXT, salary INTEGER) has rows "
+      },
+      {
+       "id": "smi-g0027",
+       "score": 0.28603,
+       "domain": "SQL",
+       "q": "Table employees(id INTEGER PRIMARY KEY, name TEXT, dept TEXT, salary I"
+      },
+      {
+       "id": "smi-i0032",
+       "score": 0.27929,
+       "domain": "Data Analysis",
+       "q": "Average order value on your shop is 84 but most customers seem to spen"
+      }
+     ],
+     "cluster_rank_score": {
+      "smi-0445": {
+       "rank": 14,
+       "score": 0.23923
+      },
+      "smi-0446": {
+       "rank": 24,
+       "score": 0.21726
+      },
+      "smi-0447": {
+       "rank": 111,
+       "score": 0.12447
+      },
+      "smi-0448": {
+       "rank": 81,
+       "score": 0.14546
+      },
+      "smi-0449": {
+       "rank": 131,
+       "score": 0.11368
+      },
+      "smi-0450": {
+       "rank": 3,
+       "score": 0.35804
+      },
+      "smi-0451": {
+       "rank": 69,
+       "score": 0.15734
+      },
+      "smi-0452": {
+       "rank": 4,
+       "score": 0.31721
+      },
+      "smi-0453": {
+       "rank": 1,
+       "score": 0.70017
+      },
+      "smi-h0032": {
+       "rank": 16,
+       "score": 0.23319
+      }
+     }
+    },
+    "qk_concise": {
+     "top10_all": [
+      {
+       "id": "smi-0453",
+       "score": 0.6692,
+       "domain": "Python",
+       "q": "What is bubble sort and what is its time complexity?"
+      },
+      {
+       "id": "smi-0450",
+       "score": 0.38728,
+       "domain": "Python",
+       "q": "Implement the fizzbuzz algorithm in Python."
+      },
+      {
+       "id": "smi-h0039",
+       "score": 0.34452,
+       "domain": "Data Analysis",
+       "q": "Revenue per order for an online shop is heavily right-skewed. A sample"
+      },
+      {
+       "id": "smi-0452",
+       "score": 0.33197,
+       "domain": "Python",
+       "q": "What is quicksort and how would you implement it in Python?"
+      },
+      {
+       "id": "smi-0445",
+       "score": 0.30933,
+       "domain": "Python",
+       "q": "How to implement a stack using Python lists."
+      },
+      {
+       "id": "smi-i0016",
+       "score": 0.3035,
+       "domain": "SQL",
+       "q": "sales(id INTEGER PRIMARY KEY, category TEXT, product TEXT, amount INTE"
+      },
+      {
+       "id": "smi-g0030",
+       "score": 0.27998,
+       "domain": "SQL",
+       "q": "Table logins(user_id INTEGER, login_date TEXT) records one row per log"
+      },
+      {
+       "id": "smi-g0039",
+       "score": 0.2754,
+       "domain": "SQL",
+       "q": "orders(id INTEGER PRIMARY KEY, created_at TEXT) holds timestamps 'YYYY"
+      },
+      {
+       "id": "smi-0446",
+       "score": 0.27385,
+       "domain": "Python",
+       "q": "How do you implement a queue in Python?"
+      },
+      {
+       "id": "smi-0431",
+       "score": 0.27235,
+       "domain": "SQL",
+       "q": "Difference between ROW_NUMBER and RANK?"
+      }
+     ],
+     "cluster_rank_score": {
+      "smi-0445": {
+       "rank": 5,
+       "score": 0.30933
+      },
+      "smi-0446": {
+       "rank": 9,
+       "score": 0.27385
+      },
+      "smi-0447": {
+       "rank": 59,
+       "score": 0.16799
+      },
+      "smi-0448": {
+       "rank": 25,
+       "score": 0.21964
+      },
+      "smi-0449": {
+       "rank": 154,
+       "score": 0.09303
+      },
+      "smi-0450": {
+       "rank": 2,
+       "score": 0.38728
+      },
+      "smi-0451": {
+       "rank": 34,
+       "score": 0.20355
+      },
+      "smi-0452": {
+       "rank": 4,
+       "score": 0.33197
+      },
+      "smi-0453": {
+       "rank": 1,
+       "score": 0.6692
+      },
+      "smi-h0032": {
+       "rank": 19,
+       "score": 0.23319
+      }
+     }
+    }
+   },
+   "qka_python_only_top5_excl_self": [
+    [
+     "smi-0450",
+     0.38728
+    ],
+    [
+     "smi-0452",
+     0.33197
+    ],
+    [
+     "smi-0445",
+     0.30675
+    ],
+    [
+     "smi-0446",
+     0.26908
+    ],
+    [
+     "smi-h0032",
+     0.23904
+    ]
+   ]
+  },
+  {
+   "label": "different record: quicksort question text",
+   "query": "What is quicksort and how would you implement it in Python?",
+   "per_format": {
+    "qka": {
+     "top10_all": [
+      {
+       "id": "smi-0452",
+       "score": 0.78954,
+       "domain": "Python",
+       "q": "What is quicksort and how would you implement it in Python?"
+      },
+      {
+       "id": "smi-0446",
+       "score": 0.42508,
+       "domain": "Python",
+       "q": "How do you implement a queue in Python?"
+      },
+      {
+       "id": "smi-0453",
+       "score": 0.42049,
+       "domain": "Python",
+       "q": "What is bubble sort and what is its time complexity?"
+      },
+      {
+       "id": "smi-0448",
+       "score": 0.39428,
+       "domain": "Python",
+       "q": "Implement a binary search tree in Python."
+      },
+      {
+       "id": "smi-0450",
+       "score": 0.38815,
+       "domain": "Python",
+       "q": "Implement the fizzbuzz algorithm in Python."
+      },
+      {
+       "id": "smi-0447",
+       "score": 0.38481,
+       "domain": "Python",
+       "q": "How would you reverse a list in Python?"
+      },
+      {
+       "id": "smi-0445",
+       "score": 0.3776,
+       "domain": "Python",
+       "q": "How to implement a stack using Python lists."
+      },
+      {
+       "id": "smi-h0032",
+       "score": 0.34557,
+       "domain": "Python",
+       "q": "This function is correct but too slow on large lists:\n\ndef has_duplica"
+      },
+      {
+       "id": "smi-h0026",
+       "score": 0.34198,
+       "domain": "Python",
+       "q": "Python 3.10 has no itertools.batched. Implement two lazy generators th"
+      },
+      {
+       "id": "smi-0467",
+       "score": 0.32739,
+       "domain": "Python",
+       "q": "Implement a generator function in Python."
+      }
+     ],
+     "cluster_rank_score": {
+      "smi-0445": {
+       "rank": 7,
+       "score": 0.3776
+      },
+      "smi-0446": {
+       "rank": 2,
+       "score": 0.42508
+      },
+      "smi-0447": {
+       "rank": 6,
+       "score": 0.38481
+      },
+      "smi-0448": {
+       "rank": 4,
+       "score": 0.39428
+      },
+      "smi-0449": {
+       "rank": 113,
+       "score": 0.13983
+      },
+      "smi-0450": {
+       "rank": 5,
+       "score": 0.38815
+      },
+      "smi-0451": {
+       "rank": 22,
+       "score": 0.25547
+      },
+      "smi-0452": {
+       "rank": 1,
+       "score": 0.78954
+      },
+      "smi-0453": {
+       "rank": 3,
+       "score": 0.42049
+      },
+      "smi-h0032": {
+       "rank": 8,
+       "score": 0.34557
+      }
+     }
+    },
+    "question": {
+     "top10_all": [
+      {
+       "id": "smi-0452",
+       "score": 1.0,
+       "domain": "Python",
+       "q": "What is quicksort and how would you implement it in Python?"
+      },
+      {
+       "id": "smi-0450",
+       "score": 0.39957,
+       "domain": "Python",
+       "q": "Implement the fizzbuzz algorithm in Python."
+      },
+      {
+       "id": "smi-0453",
+       "score": 0.39921,
+       "domain": "Python",
+       "q": "What is bubble sort and what is its time complexity?"
+      },
+      {
+       "id": "smi-0447",
+       "score": 0.39658,
+       "domain": "Python",
+       "q": "How would you reverse a list in Python?"
+      },
+      {
+       "id": "smi-0448",
+       "score": 0.39471,
+       "domain": "Python",
+       "q": "Implement a binary search tree in Python."
+      },
+      {
+       "id": "smi-0446",
+       "score": 0.38053,
+       "domain": "Python",
+       "q": "How do you implement a queue in Python?"
+      },
+      {
+       "id": "smi-0445",
+       "score": 0.36805,
+       "domain": "Python",
+       "q": "How to implement a stack using Python lists."
+      },
+      {
+       "id": "smi-h0026",
+       "score": 0.35058,
+       "domain": "Python",
+       "q": "Python 3.10 has no itertools.batched. Implement two lazy generators th"
+      },
+      {
+       "id": "smi-i0028",
+       "score": 0.3413,
+       "domain": "Python",
+       "q": "What does this print, and what does `swallow()` return? Explain the or"
+      },
+      {
+       "id": "smi-0465",
+       "score": 0.34061,
+       "domain": "Python",
+       "q": "How do you write a basic unit test in Python?"
+      }
+     ],
+     "cluster_rank_score": {
+      "smi-0445": {
+       "rank": 7,
+       "score": 0.36805
+      },
+      "smi-0446": {
+       "rank": 6,
+       "score": 0.38053
+      },
+      "smi-0447": {
+       "rank": 4,
+       "score": 0.39658
+      },
+      "smi-0448": {
+       "rank": 5,
+       "score": 0.39471
+      },
+      "smi-0449": {
+       "rank": 172,
+       "score": 0.13773
+      },
+      "smi-0450": {
+       "rank": 2,
+       "score": 0.39957
+      },
+      "smi-0451": {
+       "rank": 57,
+       "score": 0.22937
+      },
+      "smi-0452": {
+       "rank": 1,
+       "score": 1.0
+      },
+      "smi-0453": {
+       "rank": 3,
+       "score": 0.39921
+      },
+      "smi-h0032": {
+       "rank": 12,
+       "score": 0.33628
+      }
+     }
+    },
+    "qk": {
+     "top10_all": [
+      {
+       "id": "smi-0452",
+       "score": 0.90475,
+       "domain": "Python",
+       "q": "What is quicksort and how would you implement it in Python?"
+      },
+      {
+       "id": "smi-0450",
+       "score": 0.47791,
+       "domain": "Python",
+       "q": "Implement the fizzbuzz algorithm in Python."
+      },
+      {
+       "id": "smi-0448",
+       "score": 0.41479,
+       "domain": "Python",
+       "q": "Implement a binary search tree in Python."
+      },
+      {
+       "id": "smi-0447",
+       "score": 0.41188,
+       "domain": "Python",
+       "q": "How would you reverse a list in Python?"
+      },
+      {
+       "id": "smi-0446",
+       "score": 0.38443,
+       "domain": "Python",
+       "q": "How do you implement a queue in Python?"
+      },
+      {
+       "id": "smi-0453",
+       "score": 0.37736,
+       "domain": "Python",
+       "q": "What is bubble sort and what is its time complexity?"
+      },
+      {
+       "id": "smi-0467",
+       "score": 0.37318,
+       "domain": "Python",
+       "q": "Implement a generator function in Python."
+      },
+      {
+       "id": "smi-0445",
+       "score": 0.36213,
+       "domain": "Python",
+       "q": "How to implement a stack using Python lists."
+      },
+      {
+       "id": "smi-h0026",
+       "score": 0.34198,
+       "domain": "Python",
+       "q": "Python 3.10 has no itertools.batched. Implement two lazy generators th"
+      },
+      {
+       "id": "smi-h0032",
+       "score": 0.34176,
+       "domain": "Python",
+       "q": "This function is correct but too slow on large lists:\n\ndef has_duplica"
+      }
+     ],
+     "cluster_rank_score": {
+      "smi-0445": {
+       "rank": 8,
+       "score": 0.36213
+      },
+      "smi-0446": {
+       "rank": 5,
+       "score": 0.38443
+      },
+      "smi-0447": {
+       "rank": 4,
+       "score": 0.41188
+      },
+      "smi-0448": {
+       "rank": 3,
+       "score": 0.41479
+      },
+      "smi-0449": {
+       "rank": 151,
+       "score": 0.12467
+      },
+      "smi-0450": {
+       "rank": 2,
+       "score": 0.47791
+      },
+      "smi-0451": {
+       "rank": 22,
+       "score": 0.26752
+      },
+      "smi-0452": {
+       "rank": 1,
+       "score": 0.90475
+      },
+      "smi-0453": {
+       "rank": 6,
+       "score": 0.37736
+      },
+      "smi-h0032": {
+       "rank": 10,
+       "score": 0.34176
+      }
+     }
+    },
+    "qk_concise": {
+     "top10_all": [
+      {
+       "id": "smi-0452",
+       "score": 0.78954,
+       "domain": "Python",
+       "q": "What is quicksort and how would you implement it in Python?"
+      },
+      {
+       "id": "smi-0446",
+       "score": 0.43606,
+       "domain": "Python",
+       "q": "How do you implement a queue in Python?"
+      },
+      {
+       "id": "smi-0453",
+       "score": 0.42049,
+       "domain": "Python",
+       "q": "What is bubble sort and what is its time complexity?"
+      },
+      {
+       "id": "smi-0448",
+       "score": 0.39489,
+       "domain": "Python",
+       "q": "Implement a binary search tree in Python."
+      },
+      {
+       "id": "smi-0450",
+       "score": 0.38815,
+       "domain": "Python",
+       "q": "Implement the fizzbuzz algorithm in Python."
+      },
+      {
+       "id": "smi-0447",
+       "score": 0.38481,
+       "domain": "Python",
+       "q": "How would you reverse a list in Python?"
+      },
+      {
+       "id": "smi-0445",
+       "score": 0.37932,
+       "domain": "Python",
+       "q": "How to implement a stack using Python lists."
+      },
+      {
+       "id": "smi-h0026",
+       "score": 0.34198,
+       "domain": "Python",
+       "q": "Python 3.10 has no itertools.batched. Implement two lazy generators th"
+      },
+      {
+       "id": "smi-h0032",
+       "score": 0.34176,
+       "domain": "Python",
+       "q": "This function is correct but too slow on large lists:\n\ndef has_duplica"
+      },
+      {
+       "id": "smi-0467",
+       "score": 0.32739,
+       "domain": "Python",
+       "q": "Implement a generator function in Python."
+      }
+     ],
+     "cluster_rank_score": {
+      "smi-0445": {
+       "rank": 7,
+       "score": 0.37932
+      },
+      "smi-0446": {
+       "rank": 2,
+       "score": 0.43606
+      },
+      "smi-0447": {
+       "rank": 6,
+       "score": 0.38481
+      },
+      "smi-0448": {
+       "rank": 4,
+       "score": 0.39489
+      },
+      "smi-0449": {
+       "rank": 122,
+       "score": 0.13983
+      },
+      "smi-0450": {
+       "rank": 5,
+       "score": 0.38815
+      },
+      "smi-0451": {
+       "rank": 23,
+       "score": 0.25533
+      },
+      "smi-0452": {
+       "rank": 1,
+       "score": 0.78954
+      },
+      "smi-0453": {
+       "rank": 3,
+       "score": 0.42049
+      },
+      "smi-h0032": {
+       "rank": 9,
+       "score": 0.34176
+      }
+     }
+    }
+   },
+   "qka_python_only_top5_excl_self": [
+    [
+     "smi-0452",
+     0.78954
+    ],
+    [
+     "smi-0446",
+     0.42508
+    ],
+    [
+     "smi-0448",
+     0.39428
+    ],
+    [
+     "smi-0450",
+     0.38815
+    ],
+    [
+     "smi-0447",
+     0.38481
+    ]
+   ]
+  }
+ ]
+}

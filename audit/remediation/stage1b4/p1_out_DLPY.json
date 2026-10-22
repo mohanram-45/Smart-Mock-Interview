@@ -1,0 +1,453 @@
+[
+ {
+  "id": "smi-h0013",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "x*x gives 6.0, x+x gives 2.0; '=' instead of '+=' gives 3.0 for x*x",
+    "method": "derivation",
+    "evidence": "closure assigns other.data*out.grad=3 twice -> 3.0; executed correct code gives 6.0/2.0"
+   },
+   {
+    "claim": "Engine matches central differences on tanh/relu/pow diamond graphs",
+    "method": "executed",
+    "evidence": "5 random points, h=1e-6, |err|<1e-7 for both partials; analytic tanh(x^3-x^2) grad 0.010727605 matches"
+   },
+   {
+    "claim": "Second backward() without zeroing accumulates",
+    "method": "executed",
+    "evidence": "y=x*x; y.backward() twice -> x.grad 12.0"
+   },
+   {
+    "claim": "Recursive DFS hits recursion limit on deep graphs",
+    "method": "executed",
+    "evidence": "chain of 2000 adds -> RecursionError (limit 1000)"
+   },
+   {
+    "claim": "Central difference h~1e-6 agrees to ~1e-8",
+    "method": "derivation",
+    "evidence": "truncation O(h^2 f''')~1e-12, rounding ~eps/h~1e-10"
+   },
+   {
+    "claim": "Original terminology flag (parents/children)",
+    "method": "executed",
+    "evidence": "answer prose now says operands; consistent with code"
+   },
+   {
+    "claim": "Original flag: 2 - x raised TypeError although question says '-' is supported",
+    "method": "executed",
+    "evidence": "still TypeError in the submitted code (no __rsub__)"
+   }
+  ],
+  "remaining_limitations": [
+   "pow with negative base and fractional exponent yields complex data; 0**negative raises ZeroDivisionError (edge, not claimed)",
+   "recursive DFS (disclosed in answer)"
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "    def __sub__(self, other):\n        return self + (-other if isinstance(other, Value) else -other)\n",
+    "problem": "Previously flagged and still unfixed: '2 - x' raises TypeError although the question asks for '-' support.",
+    "replacement": "    def __sub__(self, other):\n        return self + (-other if isinstance(other, Value) else -other)\n\n    def __rsub__(self, other):             # supports 2 - x\n        return (-self) + other\n"
+   }
+  ],
+  "code_patch": {
+   "solution": "import math\n\n\nclass Value:\n    \"\"\"Scalar node in a computation graph with reverse-mode autodiff.\"\"\"\n\n    def __init__(self, data, children=()):\n        self.data = float(data)\n        self.grad = 0.0\n        self._prev = tuple(children)\n        self._backward = lambda: None\n\n    def __add__(self, other):\n        other = other if isinstance(other, Value) else Value(other)\n        out = Value(self.data + other.data, (self, other))\n\n        def _backward():\n            self.grad += out.grad          # accumulate (+=), never assign\n            other.grad += out.grad\n        out._backward = _backward\n        return out\n\n    def __mul__(self, other):\n        other = other if isinstance(other, Value) else Value(other)\n        out = Value(self.data * other.data, (self, other))\n\n        def _backward():\n            self.grad += other.data * out.grad\n            other.grad += self.data * out.grad\n        out._backward = _backward\n        return out\n\n    def __pow__(self, k):\n        assert isinstance(k, (int, float)), \"constant exponent only\"\n        out = Value(self.data ** k, (self,))\n\n        def _backward():\n            self.grad += k * self.data ** (k - 1) * out.grad\n        out._backward = _backward\n        return out\n\n    def tanh(self):\n        t = math.tanh(self.data)\n        out = Value(t, (self,))\n\n        def _backward():\n            self.grad += (1.0 - t * t) * out.grad\n        out._backward = _backward\n        return out\n\n    def relu(self):\n        out = Value(self.data if self.data > 0 else 0.0, (self,))\n\n        def _backward():\n            self.grad += (1.0 if out.data > 0 else 0.0) * out.grad\n        out._backward = _backward\n        return out\n\n    __radd__ = __add__\n    __rmul__ = __mul__\n\n    def __neg__(self):\n        return self * -1.0\n\n    def __sub__(self, other):\n        return self + (-other if isinstance(other, Value) else -other)\n\n    def __rsub__(self, other):             # supports 2 - x\n        return (-self) + other\n\n    def backward(self):\n        topo, seen = [], set()\n\n        def build(v):                      # iterative DFS would avoid recursion limits\n            if id(v) not in seen:\n                seen.add(id(v))\n                for c in v._prev:\n                    build(c)\n                topo.append(v)             # children appended before parents\n        build(self)\n        self.grad = 1.0\n        for v in reversed(topo):\n            v._backward()",
+   "test": "def f_value(x, y):\n    z = x * y\n    return (z + x ** 2).tanh() + z * z + x.relu() * 0.5\n\n\ndef f_float(x, y):\n    z = x * y\n    return math.tanh(z + x ** 2) + z * z + max(x, 0.0) * 0.5\n\n\ndef num_grad(fn, args, i, eps=1e-6):\n    hi, lo = list(args), list(args)\n    hi[i] += eps\n    lo[i] -= eps\n    return (fn(*hi) - fn(*lo)) / (2 * eps)\n\n\nfor args in [(0.7, -1.3), (-0.4, 0.9), (1.2, 0.5)]:\n    x, y = Value(args[0]), Value(args[1])\n    out = f_value(x, y)\n    out.backward()\n    assert abs(out.data - f_float(*args)) < 1e-12\n    for i, v in enumerate((x, y)):\n        assert abs(v.grad - num_grad(f_float, args, i)) < 1e-6, (args, i)\n\n# a node used twice: d(x*x)/dx = 2x, d(x + x)/dx = 2\nx = Value(3.0)\n(x * x).backward()\nassert x.grad == 6.0\nx = Value(3.0)\n(x + x).backward()\nassert x.grad == 2.0\n\n# diamond: out = (x*2) * (x*3) = 6 x^2 -> grad 12 x\nx = Value(1.5)\nout = (x * 2) * (x * 3)\nout.backward()\nassert abs(x.grad - 12 * 1.5) < 1e-12\n\n# a buggy \"assign instead of accumulate\" version would give 3.0 here, not 6.0\n# int - Value goes through __rsub__\nx = Value(3.0)\n(2 - x).backward()\nassert x.grad == -1.0\nassert (2 - Value(5.0)).data == -3.0\n\n# relu is flat for negative inputs\nx = Value(-2.0)\nx.relu().backward()\nassert x.grad == 0.0\nprint(\"ok\")",
+   "setup": null
+  },
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-h0019",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "Linear scaling rule lr = 0.1*k; warmup from 0.1 to kη over 5 epochs",
+    "method": "paper",
+    "evidence": "Goyal et al. 2017 (arXiv 1706.02677): 'When the minibatch size is multiplied by k, multiply the learning rate by k'; 'starts with η = 0.1 and is linearly increased ... over 5 epochs'"
+   },
+   {
+    "claim": "Plain BN uses per-GPU batch statistics",
+    "method": "paper",
+    "evidence": "Goyal: 'the BN statistics should not be computed across all workers'; n=32 per worker kept constant"
+   },
+   {
+    "claim": "1.28M images at batch 2048: 3-5 epochs = ~1,900-3,100 steps",
+    "method": "derivation",
+    "evidence": "1.28e6/2048=625 steps/epoch -> 1875 to 3125"
+   },
+   {
+    "claim": "Executed numbers: shard-mean vs full gradient ~1e-16; ragged-chunk unweighted error ~2e-3 vs gradient magnitude ~5e-2; weighted error ~3e-17; sum = 8x",
+    "method": "executed",
+    "evidence": "max naive err 1.81e-3, max |grad| 4.57e-2; micro=1,7,5000 also match full-batch to 1e-16"
+   },
+   {
+    "claim": "Square-root scaling for Adam-type optimisers is often used",
+    "method": "background_only",
+    "evidence": "Goyal reports sqrt scaling performs worse than linear for SGD at 8k; Adam-sqrt support is from Malladi et al. 2022 (not opened). Text is hedged ('often used', 'tuned value')"
+   },
+   {
+    "claim": "Accumulation vs SyncBN/GroupNorm trade-offs, 2 GPUs x 4 x 256 = 2048",
+    "method": "derivation",
+    "evidence": "arithmetic and standard BN mechanics; hedged"
+   }
+  ],
+  "remaining_limitations": [
+   "With accumulation BN running statistics are updated 8 times per optimiser step instead of once (affects eval-time running stats slightly, not mentioned)",
+   "Sqrt-scaling-for-Adam rests on background knowledge but is hedged"
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-h0020",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Wrong-axis softmax with batch 1 gives all ones, argmax 0, loss exactly 0",
+    "method": "executed",
+    "evidence": "test passes on 3.10/3.11/3.13; np.argmax returns first max on ties"
+   },
+   {
+    "claim": "For B>1 wrong-axis loss starts near ln B (4.16 for B=64) and argmax is not always class 0",
+    "method": "executed",
+    "evidence": "B=64 small logits: loss 4.157 vs ln64 4.159; argmax histogram spread over classes"
+   },
+   {
+    "claim": "Original flags (not explaining 2.30; explicit disclaimer)",
+    "method": "executed",
+    "evidence": "answer now states it explicitly"
+   },
+   {
+    "claim": "diagnose() on constant 90/10 case: accuracy 0.9 = baseline, zero logit std",
+    "method": "executed",
+    "evidence": "test passes; also all-one-class and NaN-logit edge cases run"
+   }
+  ],
+  "remaining_limitations": [
+   "Checklist ordering is heuristic (opinion), reasonably hedged by 'cheapest and most likely first'"
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "        \"row_sums_ok\": bool(np.allclose(softmax(logits, axis=1).sum(axis=1), 1.0)),",
+    "problem": "Previously flagged, still unfixed: row_sums_ok recomputes its own softmax over axis 1, so it is always True (False only for NaN) and cannot catch a wrong-axis bug; the key name suggests otherwise.",
+    "replacement": "        \"row_sums_ok\": bool(np.allclose(softmax(logits, axis=1).sum(axis=1), 1.0)),   # recomputes its own softmax: sanity only, cannot catch a wrong-axis bug in the model"
+   }
+  ],
+  "code_patch": {
+   "solution": "import numpy as np\n\n\ndef softmax(z, axis=-1):\n    e = np.exp(z - z.max(axis=axis, keepdims=True))\n    return e / e.sum(axis=axis, keepdims=True)\n\n\ndef diagnose(logits, labels, n_classes):\n    \"\"\"First-look statistics for 'the model predicts one class'. logits: (N, C), labels: (N,).\"\"\"\n    pred = logits.argmax(axis=1)\n    pred_hist = np.bincount(pred, minlength=n_classes) / len(pred)\n    label_hist = np.bincount(labels, minlength=n_classes) / len(labels)\n    return {\n        \"pred_hist\": pred_hist,                       # does one class take ~100%?\n        \"label_hist\": label_hist,                     # is the majority-class baseline already high?\n        \"majority_baseline_acc\": float(label_hist.max()),\n        \"accuracy\": float((pred == labels).mean()),\n        \"logit_std_over_batch\": float(logits.std(axis=0).mean()),   # ~0 => output ignores the input\n        \"row_sums_ok\": bool(np.allclose(softmax(logits, axis=1).sum(axis=1), 1.0)),   # recomputes its own softmax: sanity only, cannot catch a wrong-axis bug in the model\n    }",
+   "test": null,
+   "setup": null
+  },
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-h0022",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Brute-force match, ln N for identical embeddings, ~0 for orthonormal, naive exp overflow at tau=1e-3",
+    "method": "executed",
+    "evidence": "test passes on all three; typo 'sum' reduction returned a per-sample vector (confirmed)"
+   },
+   {
+    "claim": "Duplicates give loss floor ln 2 (ln 3 for three duplicates)",
+    "method": "derivation",
+    "evidence": "identical logits for duplicate columns -> lse >= logit + ln k; executed: 1.0986 for 3 duplicates"
+   },
+   {
+    "claim": "Small tau concentrates gradient on hardest negatives",
+    "method": "executed",
+    "evidence": "row softmax mass at tau 0.05: 0.90 on one negative; tau 5: ~0.2 each"
+   },
+   {
+    "claim": "Symmetric-loss clause removed; masking keeps positive",
+    "method": "executed",
+    "evidence": "answer text now reads 'mask known same-class pairs (other than the positive itself)'"
+   },
+   {
+    "claim": "0.05-0.5 temperature starting range",
+    "method": "background_only",
+    "evidence": "hedged in text ('common starting points ... tune it')"
+   }
+  ],
+  "remaining_limitations": [
+   "Zero-norm embeddings give NaN (not claimed)"
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "    return per_sample.mean() if reduction == \"mean\" else per_sample",
+    "problem": "Previously flagged, still unfixed: any reduction other than 'mean' (typo, 'sum') silently returns the per-sample vector.",
+    "replacement": "    if reduction == \"mean\":\n        return per_sample.mean()\n    if reduction == \"none\":\n        return per_sample\n    raise ValueError(\"reduction must be 'mean' or 'none'\")"
+   }
+  ],
+  "code_patch": {
+   "solution": "import numpy as np\n\n\ndef info_nce(a, b, temperature=0.1, reduction=\"mean\"):\n    \"\"\"InfoNCE with in-batch negatives. a, b: (N, D); row i of a and row i of b are a positive pair,\n    every other row of b is a negative for a[i]. Embeddings are L2-normalised (cosine similarity).\"\"\"\n    a = a / np.linalg.norm(a, axis=1, keepdims=True)\n    b = b / np.linalg.norm(b, axis=1, keepdims=True)\n    logits = (a @ b.T) / temperature                       # (N, N); the diagonal holds the positives\n    m = logits.max(axis=1, keepdims=True)                   # log-sum-exp trick: subtract the row max\n    lse = m[:, 0] + np.log(np.exp(logits - m).sum(axis=1))\n    per_sample = lse - np.diag(logits)                      # -log softmax(row)[i]\n    if reduction == \"mean\":\n        return per_sample.mean()\n    if reduction == \"none\":\n        return per_sample\n    raise ValueError(\"reduction must be 'mean' or 'none'\")",
+   "test": "import math\n\nrng = np.random.default_rng(0)\nN, D = 6, 5\na, b = rng.normal(size=(N, D)), rng.normal(size=(N, D))\n\ndef brute(a, b, tau):\n    n, total = len(a), 0.0\n    for i in range(n):\n        sims = []\n        for j in range(n):\n            dot = sum(a[i][k] * b[j][k] for k in range(len(a[i])))\n            na = math.sqrt(sum(v * v for v in a[i]))\n            nb = math.sqrt(sum(v * v for v in b[j]))\n            sims.append(dot / (na * nb) / tau)\n        total += -math.log(math.exp(sims[i]) / sum(math.exp(s) for s in sims))\n    return total / n\n\nfor tau in (0.07, 0.5, 1.0):\n    assert abs(info_nce(a, b, tau) - brute(a, b, tau)) < 1e-10\n\n# identical embeddings for everyone -> uniform softmax -> loss = log N\nsame = np.tile(rng.normal(size=(1, D)), (N, 1))\nassert abs(info_nce(same, same, 0.1) - math.log(N)) < 1e-12\n\n# orthogonal positives, small temperature -> loss near 0\neye = np.eye(N)\nassert info_nce(eye, eye, 0.05) < 1e-6\n\n# stability: at tau = 1e-3 the logits reach 1000 and a naive exp() overflows; the stable version does not\nwith np.errstate(over=\"ignore\", invalid=\"ignore\"):\n    naive_logits = (eye @ eye.T) / 1e-3\n    naive = -np.log(np.exp(naive_logits).diagonal() / np.exp(naive_logits).sum(axis=1)).mean()\nassert not np.isfinite(naive)\nassert np.isfinite(info_nce(eye, eye, 1e-3)) and info_nce(eye, eye, 1e-3) < 1e-6\n\n# an unknown reduction is an error, not a silent per-sample vector\ntry:\n    info_nce(a, b, 0.1, reduction=\"sum\")\nexcept ValueError:\n    pass\nelse:\n    raise AssertionError(\"expected ValueError\")\n\n# false negatives: items 0 and 1 are duplicates (same class, same embedding), the others are orthogonal\na2 = np.eye(4)[[0, 0, 2, 3]]\nb2 = a2.copy()\nper = info_nce(a2, b2, 0.05, reduction=\"none\")\nassert np.allclose(per[:2], math.log(2), atol=1e-6)      # cannot beat log 2: the duplicate looks like a negative\nassert per[2] < 1e-6 and per[3] < 1e-6\nprint(\"ok\")",
+   "setup": null
+  },
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-h0025",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "Missing re-raise in @contextmanager silently suppresses; RuntimeError only if generator yields again",
+    "method": "executed",
+    "evidence": "bad(): with-block ValueError suppressed silently; yielding twice -> RuntimeError \"generator didn't stop after throw()\" (3.10, 3.11, 3.13)"
+   },
+   {
+    "claim": "Both forms: rollback on body error incl. KeyboardInterrupt/SystemExit, commit failure -> rollback + commit error propagates",
+    "method": "executed",
+    "evidence": "test + extra: events [begin, rollback] / [begin, commit, rollback]"
+   },
+   {
+    "claim": "Rollback failure chains original as __context__",
+    "method": "executed",
+    "evidence": "test asserts __context__ is ValueError; commit+rollback both failing gives RuntimeError with OSError as __context__"
+   },
+   {
+    "claim": "Original RuntimeError-vs-silent flag fixed",
+    "method": "executed",
+    "evidence": "answer now correct"
+   }
+  ],
+  "remaining_limitations": [
+   "If rollback also fails after a failed commit, the rollback error (not the commit error) propagates with the commit error as __context__; answer discloses chaining generally"
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-h0026",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "Eager ValueError, laziness (0 pulls before first next), O(n) window, tuple snapshots",
+    "method": "executed",
+    "evidence": "test passes; extras on infinite itertools.count with islice; shorter-than-n input yields nothing"
+   },
+   {
+    "claim": "Matches itertools.batched on 3.13 for ranges/strings/empty",
+    "method": "executed",
+    "evidence": "list equality on range(7),3 / '' / range(4),2; batched also raises ValueError eagerly"
+   },
+   {
+    "claim": "islice(list, n) restarts each time",
+    "method": "derivation",
+    "evidence": "islice calls iter(list) freshly; shared iter() required"
+   },
+   {
+    "claim": "itertools.batched exists from 3.12 and yields tuples",
+    "method": "executed",
+    "evidence": "present and tuple-yielding in 3.13 (3.12 introduction is background_only; docs fetch was blocked)"
+   }
+  ],
+  "remaining_limitations": [
+   "Non-int n such as 2.0 raises ValueError lazily at first next (not required)"
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-h0029",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Example [[0,25],[2,13]], matches loop and broadcast, never negative",
+    "method": "executed",
+    "evidence": "tests pass; extra: empty A gives (0,m)"
+   },
+   {
+    "claim": "25.6 GB per (5000,5000,128) float64 array; diff**2 second temporary",
+    "method": "derivation",
+    "evidence": "5000*5000*128*8 = 25.6e9 bytes"
+   },
+   {
+    "claim": "Centering reduces cancellation",
+    "method": "executed",
+    "evidence": "offset 1e8: centered err 2.5e-7, uncentered 167 with 140 negative entries; offset 1e6: 1.7e-9 vs 1.3e-2"
+   },
+   {
+    "claim": "float32 expansion error much larger",
+    "method": "executed",
+    "evidence": "float32 plain expansion max err 7.7e-6 vs float64 1.4e-14"
+   }
+  ],
+  "remaining_limitations": [
+   "Centering reduces but does not eliminate cancellation for close points (answer says 'reduces')"
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "while the expansion needs only the (n, m) output plus small vectors.",
+    "problem": "Imprecise: the expansion also materialises several (n, m) temporaries (A @ B.T, 2.0*product, a2+b2), not only the output.",
+    "replacement": "while the expansion needs a few (n, m) arrays (the product A @ B.T and its temporaries, one of which becomes the output) plus small vectors, with no n x m x d array."
+   }
+  ],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-h0032",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "Quadratic = 19,900 __eq__ calls; hash = 200 __hash__, 0 __eq__ calls",
+    "method": "executed",
+    "evidence": "19900 / 200 / 0 measured; colliding hashes force many eq calls (22355 for 200 all-colliding)"
+   },
+   {
+    "claim": "Sorted version ~n log2 n __lt__ calls",
+    "method": "executed",
+    "evidence": "1273 lt calls on shuffled 200 (bound 1529); test asserts upper bound"
+   },
+   {
+    "claim": "Same nan object: set version True, quadratic and sorted False; distinct nan objects all False",
+    "method": "executed",
+    "evidence": "confirmed on 3.13"
+   },
+   {
+    "claim": "Timsort may use ~n/2 temporary slots",
+    "method": "background_only",
+    "evidence": "CPython listsort.txt (fetch blocked); text hedged with 'up to about n/2' and 'constant factor'"
+   },
+   {
+    "claim": "1 and 1.0 are duplicates under both set and ==",
+    "method": "executed",
+    "evidence": "True for all three functions"
+   },
+   {
+    "claim": "Counting wrapper now present in answer (original major flag)",
+    "method": "executed",
+    "evidence": "fenced Counted class is identical to the one in the test"
+   }
+  ],
+  "remaining_limitations": [
+   "Timsort temp-memory claim is background_only but hedged"
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-h0033",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Unicode-digit flag fixed: [0-9] in all patterns",
+    "method": "executed",
+    "evidence": "'k=٣' stays a string; Arabic-Indic timestamp rejected"
+   },
+   {
+    "claim": "All test cases and 20 extra edge lines behave per spec (quote escapes, unterminated quote, junk between pairs, bare followed by quote, repeated keys, blank lines)",
+    "method": "executed",
+    "evidence": "see run; 3.10/3.11/3.13 ok; 20k-pair line parsed in 0.4s"
+   },
+   {
+    "claim": "Original minor flags (\\s, ensure_ascii=False U+2028, unvalidated ranges) still unfixed and undocumented",
+    "method": "executed",
+    "evidence": "NBSP/tab/U+2028 accepted as separators; '2026-13-45T99:99:99Z' accepted; splitlines gives 3 lines vs split('\\n') 1"
+   },
+   {
+    "claim": "New: bare digit string over 4300 digits raises ValueError inside parse_log",
+    "method": "executed",
+    "evidence": "int('9'*5000) ValueError on 3.10.20, 3.11, 3.13, aborting the batch, contradicting 'return a count instead of raising'"
+   }
+  ],
+  "remaining_limitations": [
+   "Timestamps and ranges are shape-checked only",
+   "Quadratic slicing in rest[pos:].strip() is harmless at realistic line lengths"
+  ],
+  "fixes": [
+   {
+    "severity": "major-ish (robustness)",
+    "claim": "            if INT_RE.fullmatch(value):\n                value = int(value)\n",
+    "problem": "A bare token of >4300 digits makes int() raise ValueError (CPython limit), aborting the batch although the design says bad input never raises.",
+    "replacement": "            if INT_RE.fullmatch(value):\n                try:\n                    value = int(value)\n                except ValueError:      # > 4300 digits: CPython's int/str conversion limit; keep the string\n                    pass\n"
+   },
+   {
+    "severity": "minor",
+    "claim": "sort_keys makes output deterministic.",
+    "problem": "Undocumented looseness previously flagged: \\s separators, unvalidated timestamp ranges, ensure_ascii=False plus splitlines.",
+    "replacement": "sort_keys makes output deterministic. Known looseness: \\s accepts tabs and other Unicode whitespace (for example NBSP) as separators although the format says space; timestamps are only shape-checked (month 13 passes); unknown escapes such as \\n are kept literally; and with ensure_ascii=False a raw U+2028 or U+0085 inside a value makes str.splitlines() split a record, so split on '\\n' when reading back (or use the default ensure_ascii=True)."
+   }
+  ],
+  "code_patch": {
+   "solution": "import json\nimport re\n\nLINE_RE = re.compile(\n    r\"^(?P<ts>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)\"\n    r\"\\s+(?P<level>DEBUG|INFO|WARNING|ERROR)\"\n    r\"(?P<rest>(?:\\s.*)?)$\"\n)\nPAIR_RE = re.compile(\n    r'\\s*(?P<key>\\w+)=(?:\"(?P<quoted>(?:[^\"\\\\]|\\\\.)*)\"|(?P<bare>[^\\s\"]+))'\n)\nUNESCAPE_RE = re.compile(r'\\\\([\"\\\\])')\nINT_RE = re.compile(r\"-?[0-9]+\")\n\ndef _parse_fields(rest):\n    fields = {}\n    pos = 0\n    while pos < len(rest):\n        if rest[pos:].strip() == \"\":\n            break\n        m = PAIR_RE.match(rest, pos)\n        if m is None:\n            return None\n        if m.group(\"quoted\") is not None:\n            value = UNESCAPE_RE.sub(r\"\\1\", m.group(\"quoted\"))\n        else:\n            value = m.group(\"bare\")\n            if INT_RE.fullmatch(value):\n                try:\n                    value = int(value)\n                except ValueError:      # > 4300 digits: CPython's int/str conversion limit; keep the string\n                    pass\n        fields[m.group(\"key\")] = value\n        pos = m.end()\n        if pos < len(rest) and not rest[pos].isspace():\n            return None\n    return fields\n\ndef parse_log(lines):\n    records = []\n    malformed = 0\n    for line in lines:\n        line = line.rstrip(\"\\r\\n\")\n        if line.strip() == \"\":\n            continue\n        m = LINE_RE.match(line)\n        fields = _parse_fields(m.group(\"rest\")) if m else None\n        if fields is None:\n            malformed += 1\n            continue\n        records.append({\"ts\": m.group(\"ts\"), \"level\": m.group(\"level\"), \"fields\": fields})\n    return records, malformed\n\ndef to_jsonl(records):\n    return \"\\n\".join(json.dumps(r, sort_keys=True, ensure_ascii=False) for r in records)",
+   "test": "\nimport json\n\nlines = [\n    '2026-03-01T12:00:05Z ERROR svc=auth msg=\"token \\\\\"abc\\\\\" expired\" latency_ms=250',\n    '2026-03-01T12:00:06Z INFO svc=api',\n    '',\n    '   ',\n    '2026-03-01T12:00:07Z DEBUG',\n    'garbage line',\n    '2026-03-01T12:00:08Z TRACE svc=x',\n    '2026-03-01T12:00:09Z INFO msg=\"unterminated',\n    '2026-03-01T12:00:10Z INFO svc=a junk svc2=b',\n    '2026-03-01T12:00:11Z WARNING a=1 a=2 neg=-5 f=1.5 q=\"7\" path=\"C:\\\\\\\\tmp\" eq=\"x=y z\"',\n    '2026-03-01T12:00:12Z INFO msg=\"ok\"extra=1',\n    '2026-03-01 12:00:13 INFO svc=a',\n]\nrecords, bad = parse_log(lines)\nassert bad == 6, bad\nassert len(records) == 4\n\nr0, r1, r2, r3 = records\nassert r0 == {\"ts\": \"2026-03-01T12:00:05Z\", \"level\": \"ERROR\",\n              \"fields\": {\"svc\": \"auth\", \"msg\": 'token \"abc\" expired', \"latency_ms\": 250}}\nassert r1[\"fields\"] == {\"svc\": \"api\"}\nassert r2 == {\"ts\": \"2026-03-01T12:00:07Z\", \"level\": \"DEBUG\", \"fields\": {}}\nassert r3[\"level\"] == \"WARNING\"\nf = r3[\"fields\"]\nassert f[\"a\"] == 2 and f[\"neg\"] == -5 and f[\"f\"] == \"1.5\"\nassert f[\"q\"] == \"7\" and isinstance(f[\"q\"], str)       # quoted stays a string\nassert f[\"path\"] == \"C:\\\\tmp\"\nassert f[\"eq\"] == \"x=y z\"\n\nout = to_jsonl(records)\nrows = [json.loads(x) for x in out.split(\"\\n\")]\nassert rows == records\nassert len(out.split(\"\\n\")) == 4\nassert to_jsonl([]) == \"\"\n\n# empty input and trailing newlines\nassert parse_log([]) == ([], 0)\nrec, bad = parse_log([\"2026-03-01T00:00:00Z INFO k=v\\n\", \"2026-03-01T00:00:00Z INFO k=v\\r\\n\"])\nassert len(rec) == 2 and bad == 0 and rec[0] == rec[1]\n\n# an absurdly long digit string must not abort the batch (CPython limits str->int to 4300 digits)\nrec, bad = parse_log([\"2026-03-01T00:00:00Z INFO big=\" + \"9\" * 5000, \"2026-03-01T00:00:00Z INFO k=1\"])\nassert bad == 0 and len(rec) == 2 and rec[0][\"fields\"][\"big\"] == \"9\" * 5000 and rec[1][\"fields\"][\"k\"] == 1\n# non-ASCII digits are not integers\nrec, bad = parse_log([\"2026-03-01T00:00:00Z INFO k=\\u0663\"])\nassert rec[0][\"fields\"][\"k\"] == \"\\u0663\"\n",
+   "setup": null
+  },
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ }
+]

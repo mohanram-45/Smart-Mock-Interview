@@ -1,0 +1,11 @@
+{#- One interviewer message. q: the item, n: its number, current: is it the live prompt (the answer box belongs to it). -#}
+{% set st = q.stage or 'core' %}
+<article class="turn turn-ai{{ ' is-current' if current }}" data-n="{{ n }}" data-stage="{{ st }}"{% if current %} aria-labelledby="qtext"{% endif %}>
+  <div class="av" aria-hidden="true"><svg viewBox="0 0 30 30" width="26" height="26"><path d="M8 10h14M8 15h9" stroke="#04150b" stroke-width="2.4" stroke-linecap="round"/><rect x="19" y="13" width="2.8" height="9" rx="1.4" fill="#04150b"/></svg></div>
+  <div class="bubble">
+    <p class="who"><span>Interviewer</span><span class="stagechip st-{{ st }}">{{ stage_label(q) }}</span>{% if st in ('core', 'practical', 'behavioural') and q.topic %}<span class="chip">{{ q.topic }}</span>{% endif %}</p>
+    {% if q.lead %}<p class="lead">{{ q.lead }}</p>{% endif %}
+    <p class="ask{{ ' long' if q.question|length > 200 }}"{% if current %} id="qtext"{% endif %}>{{ q.question }}</p>
+    {% if st != 'introduction' %}<p class="src">{{ origin_label(q) }}{% if q.domain and st in ('core', 'practical') %} · {{ q.domain }}{% endif %}</p>{% endif %}
+  </div>
+</article>

@@ -1,0 +1,1603 @@
+[
+ {
+  "plan_id": "B3-MLO-01-5",
+  "verdict": "pass",
+  "reasons": [
+   "Applied source_verifier edits ('treated as immutable by convention', 'entries that should be treated as immutable') are accurate and consistent with the page not stating immutability; concise is 76 words (<=80).",
+   "Minor non-blocking: rubric point 6 (retention/garbage collection) is not discussed in the answers, and rubric/key_concepts say 'immutable' without the 'by convention' hedge; acceptable as design guidance."
+  ],
+  "parts_answered": {
+   "all": true
+  },
+  "evidence": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "76 words, interview-ready"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "adds chain-of-links lineage, pitfalls"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Tracker vs registry plus lineage chain; design but conceptual.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "claim": "concise <=80 words",
+    "method": "executed",
+    "evidence": "76 words"
+   },
+   {
+    "claim": "MLflow docs claims",
+    "method": "doc",
+    "evidence": "WebFetch of both pages"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed ok",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none (max token Jaccard 0.15, smi-0379 unrelated)",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/ml/tracking/",
+    "status": "supported",
+    "evidence": "WebFetch: 'The MLflow Tracking is an API and UI for logging parameters, code versions, metrics, and output files'; 'Each run records metadata (... metrics, parameters, start and end times)' and 'artifacts (output files ... such as model weights...)'."
+   },
+   {
+    "url": "https://mlflow.org/docs/latest/ml/model-registry/",
+    "status": "supported",
+    "evidence": "'Model aliases allow you to assign a mutable, named reference to a particular version'; 'Each registered model version is linked to the MLflow run, logged model or notebook that produced it'. Page does not state immutability; answer now hedges that."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-02-4",
+  "verdict": "pass",
+  "reasons": [
+   "Recomputed: 0.910 vs 0.900, se 0.002 each -> se_diff 0.002828, lower bound 0.00446 (about 0.0045); 0.905 se 0.02 -> lower -0.0344 (about -0.034); accuracy 0.85, n=200 -> se 0.0252 (>2x 0.01). All match.",
+   "Applied edits: question now states 'any baseline slice of any size is missing' which matches the code (missing check precedes the n test); new slice-noise sentence is correct and hedged. Fenced code equals tested solution (verified)."
+  ],
+  "parts_answered": {
+   "all": true
+  },
+  "evidence": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "design rationale + limits"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "code + worked numbers"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-condition gate with CI, float tolerance, fail-closed handling and statistical critique.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "claim": "solution + tests pass on 3.13.16, 3.10.20, 3.11.17",
+    "method": "executed",
+    "evidence": "prints ok on all three"
+   },
+   {
+    "claim": "extra edge cases: slice n=199 regress -> needs_review; n=200 regress -> reject; missing small slice (n=50) -> reject; extra candidate slice ignored -> promote; mixed hard+review -> reject with both reasons; inf se -> reject; baseline without 'slices' key -> promote",
+    "method": "executed",
+    "evidence": "identical output on all three interpreters (md5 match)"
+   },
+   {
+    "claim": "lower-bound and standard-error numbers",
+    "method": "derivation",
+    "evidence": "recomputed"
+   }
+  ],
+  "suggested_answer_set": "",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none (max Jaccard 0.11)",
+   "same_intent": false
+  },
+  "code_findings": "stdlib only (math); no 3.11+ features; all pass on three interpreters; fence==solution.",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "WebFetch: 'Offline and online metrics correlate' and 'Model quality is sufficient on all important data slices' are listed in the Model tests section; used sentence in answer is supported."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-02-5",
+  "verdict": "pass",
+  "reasons": [
+   "Recomputed: 14% = 28/200 ~ 1 in 7 (14.3%); 0.75 is (0.762-0.75)/0.0135 = 0.89 sd below mean (within one sd); mean-3sd = 0.7215 ~ 0.72 = stated minimum; floor 0.70 below minimum 0.72; tail shares 2%/0.5%/0% consistent with min 0.72 (0.5% = 1 seed) and 0.01 accuracy granularity of a 100-row validation set.",
+   "Applied edits ('In this illustration', 'arguably worse', 3-sd sentence) are correct, consistent and properly labelled hypothetical. Numbers are not reproduced but explicitly labelled illustrative."
+  ],
+  "parts_answered": {
+   "all": true
+  },
+  "evidence": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "diagnosis, can/cannot establish, redesign"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked numbers, not in detailed"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Diagnose flakiness as noise vs threshold; redesign with measured spread; hypothetical numbers.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "claim": "hypothetical numbers internally consistent",
+    "method": "derivation",
+    "evidence": "see reasons"
+   }
+  ],
+  "suggested_answer_set": "",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0005",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "WebFetch: 'Training is reproducible' and 'The ML pipeline is Integration tested' are Infrastructure tests (section IV), as the answer says. (Supports text slightly misquotes 'Data invariants hold for inputs'; irrelevant to the answer.)"
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "'Rule #5: Test the infrastructure independently from the machine learning'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-03-3",
+  "verdict": "pass",
+  "reasons": [
+   "Recomputed 0.8% of 200,000 = 1,600. Applied float/double hedge is accurate: sklearn-onnx page says 'In most cases, float and double comparison gives the same result' and shows a regression example with significant discrepancies (max abs diff ~150.75). Wording 'casting to float produced large errors' fits the example.",
+   "Tolerances in practical (1e-6 / 1e-4 / 1e-3) are labelled as to be justified; consistent across steps 2-3. 'Float32 usually flips far fewer than 0.8%' is hedged and background."
+  ],
+  "parts_answered": {
+   "all": true
+  },
+  "evidence": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": ""
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked parity test"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-cause diagnosis of ONNX parity, numerics and test design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "claim": "1,600 rows",
+    "method": "derivation",
+    "evidence": "0.008*200000"
+   }
+  ],
+  "suggested_answer_set": "",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none (max Jaccard 0.13)",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://github.com/onnx/onnx/blob/main/docs/IR.md",
+    "status": "supported",
+    "evidence": "'ONNX specifies the portable, serialized format of a computation graph'; 'Each model MUST explicitly name the operator sets...'; 'An implementation must support all operators in the set or reject the model'; 'Operator sets other than the default ... MUST specify a domain'."
+   },
+   {
+    "url": "https://scikit-learn.org/stable/model_persistence.html",
+    "status": "supported",
+    "evidence": "'ONNX runtime does not require python'; 'not all scikit-learn models are supported'; 'arbitrary computations can be represented ... sandboxed environment'."
+   },
+   {
+    "url": "https://onnx.ai/sklearn-onnx/auto_tutorial/plot_ebegin_float_double.html",
+    "status": "supported",
+    "evidence": "'In most cases, float and double comparison gives the same result.'; 'The discrepencies are significant' (max abs diff 150.75); 'only allows float coefficients for the operator TreeEnsembleRegressor'. Now matches the hedged wording."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'loading a model does not unpickle Python objects' is background knowledge of the protobuf format"
+  ],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-03-4",
+  "verdict": "pass",
+  "reasons": [
+   "Round-two defect re-checked: MLflow source (mlflow/models/utils.py, _enforce_schema lines ~1270-1274) logs 'Found extra inputs in the model input that are not defined in the model signature ... These inputs will be ignored.' so the replaced bullet 'Extra columns are a policy choice: MLflow's schema enforcement ignores them with a warning' is correct; missing columns raise 'Model is missing inputs'.",
+   "Float->int: source lines 850-878 reject 'Can not safely convert float64 to int64', so rejecting 3.7 is correct (and the answer words it generically). String '34' (object dtype) is also rejected by MLflow, but the answer correctly leaves strict-vs-lenient as a decision. Inference claim: mlflow/types/utils.py maps int and np.int64 to DataType.long, so an integer-looking example column is inferred integer; the signatures docs page does not state it, so the claim rests on source code (added as source). Single answer, 326 words, all three clients and 'what to add' covered. No other defect found."
+  ],
+  "parts_answered": {
+   "all": true
+  },
+  "evidence": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single complete answer"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Applied knowledge of what type schemas catch vs semantic errors; MLflow specifics.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "claim": "extra columns ignored with warning in MLflow",
+    "method": "doc",
+    "evidence": "mlflow/models/utils.py _enforce_schema"
+   },
+   {
+    "claim": "float 3.7 -> long rejected",
+    "method": "doc",
+    "evidence": "utils.py _enforce_mlflow_datatype raises 'Can not safely convert float64 to int64'"
+   },
+   {
+    "claim": "int examples infer integer/long",
+    "method": "doc",
+    "evidence": "mlflow/types/utils.py SCALAR_TO_DATATYPE_MAPPING int->long, np.int64->long, np.int32->integer"
+   }
+  ],
+  "suggested_answer_set": "",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none (max Jaccard 0.09)",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/ml/model/signatures/",
+    "status": "supported",
+    "evidence": "'Defines the expected format for model inputs, outputs, and parameters.'; 'MLflow automatically generates model signatures when you provide an input_example during model logging.' Page does not state integer inference or extra-column handling."
+   },
+   {
+    "url": "https://raw.githubusercontent.com/mlflow/mlflow/master/mlflow/models/utils.py",
+    "status": "supported",
+    "evidence": "Opened: '# NB: conversion between incompatible types (e.g. floats -> ints or double -> float) are not allowed'; also supports the extra-columns-ignored-with-warning sentence (logger.warning ... 'These inputs will be ignored.')."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "MLflow source: type inference (mlflow/types/utils.py)",
+    "url": "https://raw.githubusercontent.com/mlflow/mlflow/master/mlflow/types/utils.py",
+    "supports": "Integer-valued example data (Python int, np.int64) is inferred as an integer type (long), not double.",
+    "quote": "int: DataType.long,\n    np.int64: DataType.long,\n    np.int32: DataType.integer,",
+    "type": "secondary"
+   }
+  ],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-03-5",
+  "verdict": "pass",
+  "reasons": [
+   "concise_answer 70 words. Applied edits are consistent: 'one registry write (atomic in typical database-backed registries)' in concise matches the detailed hedge 'MLflow's documentation does not state this' (verified: registry page silent on atomicity). 'v39 in this scenario' fix is OK (record shown is for v41; step 1 implies an audit date before that release).",
+   "Minor non-blocking: interview_style_note says 'registry operations are atomic' and a rubric tradeoff says 'Atomic registry pointer', slightly less hedged than the answers; not a factual error for typical DB-backed registries."
+  ],
+  "parts_answered": {
+   "all": true
+  },
+  "evidence": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "70 words"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": ""
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked audit + drill"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Audit-grade reproducibility design with atomicity nuance and trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "claim": "concise <=80 words",
+    "method": "executed",
+    "evidence": "70"
+   }
+  ],
+  "suggested_answer_set": "",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none (max Jaccard 0.11)",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/ml/model-registry/",
+    "status": "supported",
+    "evidence": "'Model aliases ... mutable, named reference to a particular version'; versions numbered from 1; lineage to run; tags and annotations. Immutability and atomicity not stated (answer hedges both)."
+   },
+   {
+    "url": "https://docs.docker.com/reference/cli/docker/image/pull/",
+    "status": "supported",
+    "evidence": "'When pulling an image by digest, you specify exactly which version of an image to pull.'"
+   },
+   {
+    "url": "https://pip.pypa.io/en/stable/topics/secure-installs/",
+    "status": "supported",
+    "evidence": "'This mode uses local hashes, embedded in a requirements.txt file, to protect against remote tampering and network issues.'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-04-1",
+  "verdict": "pass",
+  "reasons": [
+   "Applied backpressure edit is correct and better hedged (sensors cannot always be slowed; shed deliberately and count). Rest consistent: 50,000/s sizing, 100 ms budget with tens of ms for model, at-least-once implies idempotent alerts. No numbers needing recomputation; no documented-behaviour claims requiring sources."
+  ],
+  "parts_answered": {
+   "all": true
+  },
+  "evidence": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer covering a/b/c and hybrid"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mapping requirements to serving modes with hybrid reasoning; standard design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [],
+  "suggested_answer_set": "",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none (max Jaccard 0.09)",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-04-2",
+  "verdict": "correct",
+  "reasons": [
+   "Minor: the 3.05 MB / 5x JSON figure holds only when float32 values are serialised via float64 repr (numpy tolist); shortest-float32 text is ~1.75 MB (~2.9x). State the assumption.",
+   "Applied change (gRPC-Web wording) is correct and matches the page: Envoy used in the guide's example; 'generally cannot' is background but hedged."
+  ],
+  "parts_answered": {
+   "move main route to gRPC?": true,
+   "checks before": true,
+   "checks after": true,
+   "browser dashboard route": true
+  },
+  "evidence": [
+   {
+    "claim": "602,112 raw bytes; 0.18 GB/s at 300 rps",
+    "method": "executed",
+    "evidence": "150528*4=602112; *300=0.1806 GB/s"
+   },
+   {
+    "claim": "JSON 3.05 MB, ~5x, ~0.915 GB/s, ~7.3 Gbit/s",
+    "method": "executed",
+    "evidence": "3 seeds uniform float32 .tolist(): 3,050,653-3,051,011 bytes; ratio 5.07; 0.915 GB/s*8=7.3 Gbit/s"
+   },
+   {
+    "claim": "rounded to 4 decimals ~1.19 MB",
+    "method": "executed",
+    "evidence": "1,187,478-1,187,658 bytes (uniform); normal data 1.26 MB"
+   },
+   {
+    "claim": "shortest float32 repr JSON",
+    "method": "executed",
+    "evidence": "~1.750 MB, i.e. ~2.9x raw; so headline depends on serialisation"
+   },
+   {
+    "claim": "gRPC: always set deadline, none by default, propagation",
+    "method": "doc",
+    "evidence": "grpc.io deadlines guide quoted"
+   },
+   {
+    "claim": "L7 balancing spreads streams of one HTTP/2 connection",
+    "method": "doc",
+    "evidence": "grpc load-balancing blog quote"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Serialised as JSON text at full precision (random values in a local test with Python's json module)",
+    "problem": "5x depends on float32 values being written with float64 digits (numpy tolist); shortest float32 text is ~1.75 MB (~2.9x).",
+    "replacement": "Serialised as JSON text with float64 digits (random float32 values converted by numpy tolist and dumped with Python's json module; shortest float32 text would be about 1.75 MB)"
+   },
+   {
+    "severity": "minor",
+    "field": "concise_answer",
+    "claim": "150,528 random float values serialised as JSON text",
+    "problem": "same assumption unstated; replacement adds 3 words (still <=80).",
+    "replacement": "150,528 random float32 values serialised as JSON text with float64 digits"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Trade-off judgement with payload arithmetic and operational checks; no deep derivation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Fix the payload first (send encoded image or binary tensor, preprocess server-side)",
+    "tradeoff": "Largest bandwidth/CPU win vs moving preprocessing to server"
+   },
+   {
+    "decision": "Adopt gRPC/protobuf for the internal route",
+    "tradeoff": "Compact binary, typed contract, HTTP/2 vs tooling/debuggability and L7/client-side balancing needs"
+   },
+   {
+    "decision": "Set explicit deadlines (within 150 ms budget) and propagate",
+    "tradeoff": "Prevents unbounded waits vs tuning from measured latency"
+   },
+   {
+    "decision": "Keep REST (or gRPC-Web gateway) for browser dashboard",
+    "tradeoff": "Browser compatibility vs two protocols to maintain"
+   },
+   {
+    "decision": "Benchmark p50/p95/p99 and CPU per request before/after; run both routes during deprecation",
+    "tradeoff": "Evidence-based and reversible vs temporary duplicate operation"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "71 words, interview-ready verdict plus key numbers."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Adds balancing, browser, deadline, rollout checks; numbers consistent with concise (0.60 MB, 3.05 MB, 0.9 vs 0.18 GB/s)."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "All 7 specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0035",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://grpc.io/docs/guides/deadlines/",
+    "status": "supported",
+    "evidence": "'By default, gRPC does not set a deadline'; 'you should always explicitly set a realistic deadline in your clients'; propagation 'supported by some gRPC implementations'."
+   },
+   {
+    "url": "https://grpc.io/blog/grpc-load-balancing/",
+    "status": "partially",
+    "evidence": "Supports 'With HTTP/2, LB can distribute the streams from one client among multiple backends' and that L4 just copies frames to one backend; does not literally say L4 leaves replicas idle (implication only, answer wording is hedged 'can')."
+   },
+   {
+    "url": "https://grpc.io/docs/platforms/web/basics/",
+    "status": "partially",
+    "evidence": "gRPC-Web lets browsers access gRPC services; example uses Envoy to forward. Does not state native gRPC is impossible; answer says 'generally cannot', background."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "browsers generally cannot speak native gRPC directly (background; gRPC-Web page implies a proxy)",
+   "encoded image typically small fraction of raw tensor (background, hedged)"
+  ],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-04-3",
+  "verdict": "pass",
+  "reasons": [
+   "Applied change (arrival exactly at dispatch instant counts as waiting) matches code (arrivals[j] <= dispatch) and test.",
+   "Code identical to fence; all tests and my extra cases pass on 3.10/3.11/3.13; reported p95s reproduce."
+  ],
+  "parts_answered": {
+   "simulator": true,
+   "percentile nearest-rank": true,
+   "ValueErrors": true,
+   "explain 1 ms vs 20 ms with overhead=10, per_item=0.5": true
+  },
+  "evidence": [
+   {
+    "claim": "hand cases [0,1,2,3],2,5,10,2 -> [15,14,27,26]; lone request 17",
+    "method": "derivation",
+    "evidence": "batch1 dispatch t=1, 1+14=15; batch2 dispatch at free time 15, finish 29; 5+12=17"
+   },
+   {
+    "claim": "2000 arrivals 1/ms: (1,0) p95 18051, first 10.5, last 19001; (16,4) p95 260.5; (32,8) p95 38, mean batch 19.6",
+    "method": "executed",
+    "evidence": "all reproduced on 3.13/3.10/3.11"
+   },
+   {
+    "claim": "500 arrivals/20 ms: 10.5 each; (8,5) 15.5 each, batch size 1",
+    "method": "executed",
+    "evidence": "reproduced"
+   },
+   {
+    "claim": "capacity 32/26 ms = 1.23/ms >1; 1/10.5 ms <1/ms",
+    "method": "derivation",
+    "evidence": "10+0.5*32=26"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Precise event-driven dispatch semantics with boundary conditions plus load-dependent interpretation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanism, dispatch formula, edge cases, interpretation."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Code plus executed results and sizing rule; numbers match detailed (10.5 ms service, 26 ms for 32)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0035",
+   "same_intent": false
+  },
+  "code_findings": "solution.py == fenced code (exact match). test passes under python -I on 3.13.16, 3.10.20, 3.11.17. Extra cases (all passed on all three): empty arrivals -> ([],[]); three simultaneous arrivals, max_batch 2, max_wait 0 -> sizes [2,1], lat [12,12,23]; arrival exactly at dispatch instant ([0,5], wait 5) joins batch -> sizes [2], lat [19,14]; backlog with huge max_wait [0..4], batch 3 -> sizes [3,2]; max_batch 0 / negative max_wait / empty percentile raise ValueError; percentile([1,2,3,4],25/26/100) -> 1/2/4; equal arrival times accepted. stdlib only (math), no 3.11+ features.",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-04-4",
+  "verdict": "pass",
+  "reasons": [
+   "Applied change (9,000 hedge) is arithmetically right: 100 rps excess x 90 s = 9,000; caveats on ramp (lowers) and scrape/decision delay (raises) are correct directionally.",
+   "All sizing numbers recomputed and consistent across detailed and practical fields."
+  ],
+  "parts_answered": {
+   "diagnose": true,
+   "redesign scaling policy": true
+  },
+  "evidence": [
+   {
+    "claim": "4/0.12=33.3 rps/replica; 3 replicas ~100 rps; 50% busy at 50 rps",
+    "method": "derivation",
+    "evidence": "exact"
+   },
+   {
+    "claim": "9,000 backlog",
+    "method": "derivation",
+    "evidence": "(200-100)*90"
+   },
+   {
+    "claim": "Little: 200*0.12=24 in flight -> 6 replicas at 100%; 60% target 2.4 -> 10 replicas; 6/2.4=2.5 -> 3",
+    "method": "derivation",
+    "evidence": "exact"
+   },
+   {
+    "claim": "queue limit 8 ~ 240 ms",
+    "method": "derivation",
+    "evidence": "two rounds x 120 ms"
+   },
+   {
+    "claim": "saturation = how full the service is",
+    "method": "doc",
+    "evidence": "SRE book quote"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Application of Little's law and lag reasoning to a scenario; arithmetic is simple.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Diagnosis and principles."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete hypothetical config; numbers (10, 14, 2.4, 8) consistent with detailed."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0005",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "status": "supported",
+    "evidence": "Saturation: 'How \"full\" your service is'; 'distinguish between the latency of successful requests and the latency of failed requests'; mean-vs-percentile warning."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "scale up aggressively / down slowly with stabilisation window, readiness warm-up, queue bounds (standard practice; K8s HPA page could not be read in full)"
+  ],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-04-5",
+  "verdict": "pass",
+  "reasons": [
+   "Applied change (dropping 'as the SRE book recommends') is correct: the monitoring page supports distinguishing failed vs successful latency, but the wording was attributive; the remaining sentence is fine.",
+   "Amplification arithmetic recomputed: 1+.5+.25+.125=1.875; 0.8*1.875=1.5."
+  ],
+  "parts_answered": {
+   "mechanism": true,
+   "timeouts": true,
+   "retries": true,
+   "idempotency": true,
+   "fallbacks": true,
+   "server changes": true
+  },
+  "evidence": [
+   {
+    "claim": "1.875x and 150% capacity",
+    "method": "derivation",
+    "evidence": "exact"
+   },
+   {
+    "claim": "10% retry ratio",
+    "method": "doc",
+    "evidence": "'A request will only be retried as long as this ratio is below 10%'"
+   },
+   {
+    "claim": "backoff, retry limit, reject when queue full, check deadline before more work, deadline propagation, server wasting work after client deadline",
+    "method": "doc",
+    "evidence": "cascading-failures chapter quotes"
+   },
+   {
+    "claim": "circuit breaker",
+    "method": "background_only",
+    "evidence": "not mentioned in the cascading-failures chapter; standard pattern"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Positive-feedback mechanism with quantification and layered client/server mitigations.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer, ~326 words, structured; acceptable for 'single'."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0023",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://grpc.io/docs/guides/deadlines/",
+    "status": "supported",
+    "evidence": "'By default, gRPC does not set a deadline'; 'you should always explicitly set a realistic deadline in your clients'; propagation 'supported by some gRPC implementations'."
+   },
+   {
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "status": "supported",
+    "evidence": "Saturation: 'How \"full\" your service is'; 'distinguish between the latency of successful requests and the latency of failed requests'; mean-vs-percentile warning."
+   },
+   {
+    "url": "https://sre.google/sre-book/handling-overload/",
+    "status": "supported",
+    "evidence": "'A request will only be retried as long as this ratio is below 10%'; 'per-request retry budget of up to three attempts'."
+   },
+   {
+    "url": "https://sre.google/sre-book/addressing-cascading-failures/",
+    "status": "partially",
+    "evidence": "Backoff, limit retries, reject when queue full, deadline check per stage, deadline propagation, abandoned work all quoted; no circuit-breaker text."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "circuit breaker (background)",
+   "cancel in-flight inference on disconnect (partly supported by 'cancellation propagation reduces doomed work')"
+  ],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-04-6",
+  "verdict": "pass",
+  "reasons": [
+   "Applied changes verified: 14.4 burn over 1 h and 5 min for 99.9% SLO is in the Workbook table; keyed-hash/pseudonymisation caveat is correct (GDPR Recital 26).",
+   "43.2M/day and ~43 GB/day at 1 KB recomputed."
+  ],
+  "parts_answered": {
+   "what to log": true,
+   "dashboard panels from golden signals": true,
+   "alerts": true,
+   "latency statistic alerted on": true,
+   "what not to page on": true,
+   "cost and privacy": true
+  },
+  "evidence": [
+   {
+    "claim": "500*86400=43.2M; x1 KB=43.2 GB",
+    "method": "derivation",
+    "evidence": "exact"
+   },
+   {
+    "claim": "burn 14.4 / 1h+5m, 6 / 6h+30m, 1 / 3d+6h for 99.9%",
+    "method": "doc",
+    "evidence": "Workbook alerting-on-slos table"
+   },
+   {
+    "claim": "golden signals, failed vs successful latency, mean vs tail",
+    "method": "doc",
+    "evidence": "SRE book quotes"
+   },
+   {
+    "claim": "pseudonymised data is still personal data",
+    "method": "doc",
+    "evidence": "GDPR Recital 26 opening: 'Personal data which have undergone pseudonymisation, which could be attributed to a natural person...'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Broad design recall with some arithmetic; no hard derivation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Structured per-request log with request id, model+feature-set version, fallback flag, latency breakdown",
+    "tradeoff": "Enables joins with outcomes and debugging vs storage and PII exposure"
+   },
+   {
+    "decision": "Golden-signal panels split by model version/route/client",
+    "tradeoff": "Catches regressions in one version vs dashboard cardinality"
+   },
+   {
+    "decision": "Page on SLO burn (error ratio and fraction slow) over multiple windows",
+    "tradeoff": "Symptom-based, low noise vs misses slow quality drift"
+   },
+   {
+    "decision": "Do not page on drift, offline accuracy, single noisy metrics; ticket/dashboard them",
+    "tradeoff": "Avoids alert fatigue vs slower reaction to model-quality problems"
+   },
+   {
+    "decision": "Sample full features (e.g. 1%), hash identifiers, set retention and access limits",
+    "tradeoff": "Cost/privacy vs ability to debug and replay"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Log fields, signals, alerting philosophy, cost."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Example record and alert set. Latency parts 4+6+31=41 vs total 43 (illustrative, not an error)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0001",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "status": "supported",
+    "evidence": "Saturation: 'How \"full\" your service is'; 'distinguish between the latency of successful requests and the latency of failed requests'; mean-vs-percentile warning."
+   },
+   {
+    "url": "https://sre.google/workbook/alerting-on-slos/",
+    "status": "supported",
+    "evidence": "For 99.9% SLO: page at burn rate 14.4 (1 h long, 5 min short, 2% budget), 6 (6 h/30 min), ticket at 1 (3 d/6 h); 'the multiwindow, multi-burn-rate alerting technique is the most appropriate approach'."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "GDPR Recital 26 (gdpr-info.eu reproduction)",
+    "url": "https://gdpr-info.eu/recitals/no-26/",
+    "supports": "Pseudonymised data that could be attributed to a person by additional information is still information on an identifiable person.",
+    "quote": "Personal data which have undergone pseudonymisation, which could be attributed to a natural person",
+    "type": "secondary"
+   }
+  ],
+  "unsourced_claims": [
+   "a plain hash of a low-entropy identifier can be reversed (background, dictionary/brute-force)"
+  ],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-05-3",
+  "verdict": "correct",
+  "reasons": [
+   "Round-2 defect re-examined. With the real 99:1 control (n_control = 99 n), the null-variance-at-baseline formula gives n=47,692 (infinite-control 47,251) and the alternative-variance formula gives 56,979 (infinite 56,539). So 'about 48,000' and 'roughly 57,000' are both correct and mutually consistent (the first reviewer's 47,000->48,000 change is right for the stated 99:1 design, though 47,000-48,000 is the safe range).",
+   "Power at 20,000: 47.9% (null-variance formula), 38.4% (alt-variance) -> '38 to 48%' correct. 57,000 x 0.2% = 114 \u2713 (58,000 x 0.2% = 116 was the old value; change correct). 57,000/20,000=2.85 days \u2713; 57,000/100,000 <1 day \u2713.",
+   "Remaining minor: z 1.4/p 0.16 is the Wald (observed-rate) figure; with baseline variance z=1.58, p=0.113. Not significant either way, but state the range for consistency with the two-formula treatment later."
+  ],
+  "parts_answered": {
+   "evaluate colleague 1": true,
+   "evaluate colleague 2": true,
+   "design the check": true,
+   "delayed complaints": true
+  },
+  "evidence": [
+   {
+    "claim": "z=1.416, p=0.157 (observed variance); z=1.583, p=0.113 (baseline variance)",
+    "method": "executed",
+    "evidence": "statistics.NormalDist"
+   },
+   {
+    "claim": "SE diff 0.035 pp; Poisson sd 6.3; upper 95% one-sided bound 0.308% = 1.54x baseline",
+    "method": "executed",
+    "evidence": "exact"
+   },
+   {
+    "claim": "n: A=47,251 (inf ctrl) / 47,692 (99:1); B=56,539 / 56,979; C(baseline var both)=43,518",
+    "method": "executed",
+    "evidence": "za=1.95996, zb=0.84162"
+   },
+   {
+    "claim": "power at n=20,000: 47.9% / 38.4% (47.5% finite-control A)",
+    "method": "executed",
+    "evidence": "normal approx"
+   },
+   {
+    "claim": "events: 57,000*0.002=114; 20,000*0.002=40",
+    "method": "derivation",
+    "evidence": "exact"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "gives z of about 1.4 (two-sided p about 0.16)",
+    "problem": "This uses the observed-rate (Wald) variance; the baseline-variance test gives z about 1.58, p about 0.11. Conclusion unchanged but the answer later treats the formula choice explicitly.",
+    "replacement": "gives z of about 1.4 to 1.6 (two-sided p about 0.11 to 0.16, depending on whether the observed or the baseline rate sets the variance)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Statistical power and non-inferiority reasoning with multiple formulas and delayed-outcome design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single long answer (338 words); all numbers now internally consistent."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0040",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "status": "supported",
+    "evidence": "'It should be sizeable and last long enough to be representative of the overall deployment'; 'a handful of queries doesn't provide a useful signal'; the workbook explicitly avoids statistics, so power numbers are derivation-only."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "clustering by user reduces effective sample size (statistical background)"
+  ],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-05-4",
+  "verdict": "correct",
+  "reasons": [
+   "Applied change (no concurrent control after Stage 3; rollback = redeploy after 7-day warm period) is accurate and consistent with the Stage 3 line and the 14-day interim check.",
+   "All numbers recomputed: 7.5 rps -> 27,000/h, 4,500/10 min; SE sqrt(.005*.995/4500)=0.105 pp; 0.5 pp = 4.8 SE (4.6 with finite control); Stage 2 22,500/10 min, SE 0.047 pp (0.054 with 75% control).",
+   "Minor gap: Stage 3 states no gates or sample minimum, and its guardrails have no concurrent control to compare with."
+  ],
+  "parts_answered": {
+   "comparison baseline": true,
+   "guardrail metrics": true,
+   "minimum samples": true,
+   "example thresholds": true,
+   "what stays manual": true,
+   "why 'ever higher' rule is poor": true
+  },
+  "evidence": [
+   {
+    "claim": "27,000/h; 4,500/10 min; SE 0.105 pp",
+    "method": "executed",
+    "evidence": "sqrt(0.005*0.995/4500)=0.001051"
+   },
+   {
+    "claim": "22,500/10 min; SE 0.047 pp",
+    "method": "executed",
+    "evidence": "sqrt(.005*.995/22500)=0.00047"
+   },
+   {
+    "claim": "canary evaluated against rest of service as control; handful of queries gives no useful signal",
+    "method": "doc",
+    "evidence": "SRE workbook canarying quotes"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "Stage 3: 100%, with the previous model kept deployed and warm for 7 days; the rollback is a traffic switch.",
+    "problem": "No gate or sample minimum for Stage 3, and with 100% traffic there is no concurrent control for the relative thresholds above.",
+    "replacement": "Stage 3: 100%, with the previous model kept deployed and warm for 7 days; the rollback is a traffic switch. There is no concurrent control at 100%, so the same auto-rollback rules apply with absolute limits and the Stage 2 control values as reference, again over two consecutive windows."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-part policy design with statistical sizing and delayed labels.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Compare against a concurrent control with sticky assignment, not yesterday's numbers",
+    "tradeoff": "Removes time-of-day/mix effects vs needs traffic splitting"
+   },
+   {
+    "decision": "Tiered metrics: operational guardrails auto-rollback; behavioural proxies banded; outcomes verified later",
+    "tradeoff": "Fast decisions vs slow ground truth (45-day chargebacks)"
+   },
+   {
+    "decision": "Minimum samples/time per stage derived from traffic and baseline variance",
+    "tradeoff": "Statistical reliability vs longer exposure"
+   },
+   {
+    "decision": "Thresholds with margin plus persistence over consecutive windows",
+    "tradeoff": "Fewer false rollbacks vs slower detection"
+   },
+   {
+    "decision": "Automatic rollback, gated automatic promotion, human review on behavioural-band breach",
+    "tradeoff": "Speed vs risk of unintended strictness changes"
+   },
+   {
+    "decision": "Keep previous model warm and verify matured outcomes later",
+    "tradeoff": "Cheap rollback vs duplicate capacity and long tail of delayed labels"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Rationale, tiers, sample math."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete policy table, numbers consistent with detailed."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0006",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "status": "supported",
+    "evidence": "Control = remainder of the service; 'Terminating a canary deployment after receiving just a handful of queries doesn't provide a useful signal'; pause and roll back on bad canary."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "thresholds are hypothetical, labelled as such"
+  ],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-06-2",
+  "verdict": "correct",
+  "reasons": [
+   "Applied change (loader overhead folded into 0.6 GiB) is consistent: 2x1.4+0.8=3.6, +0.6=4.2, +0.5 shm=4.7; option (a) 1.4+0.4+0.6+0.5=2.9, 2.9/3.5=82.9% (~83%), 3.5/2.9=1.207 (~20% margin); option (b) 5.5/4.7=17% margin.",
+   "Minor inconsistency: detailed says set request close to steady state but the example request is 3Gi (idle steady state is ~1.8 GiB for option a)."
+  ],
+  "parts_answered": {},
+  "evidence": [
+   {
+    "claim": "arithmetic 3.6/4.2/4.7/2.9/83%/20%",
+    "method": "executed",
+    "evidence": "recomputed in python"
+   },
+   {
+    "claim": "memory limits via OOM kills; OOMKilled means exceeded limit; emptyDir Memory counts against container limit",
+    "method": "doc",
+    "evidence": "manage-resources-containers lines 48, 721; volumes line 184-186"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "set the request close to steady state so the scheduler packs nodes honestly",
+    "problem": "Example in practical_answer uses a 3Gi request, near the 2.9 GiB peak, not steady state.",
+    "replacement": "set the request from measured typical busy-state usage so the scheduler packs nodes honestly (the example below uses 3Gi, near the estimated peak, which is conservative)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-process memory accounting, tmpfs charge, resizing trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "mechanism and measurement"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked sizing and spec"
+   }
+  ],
+  "suggested_answer_set": "concise? detailed+practical",
+  "key_concepts_findings": "specific, each discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/storage/volumes/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-06-3",
+  "verdict": "pass",
+  "reasons": [
+   "The round-two probe fix is correct: with a blocking server a 350 s load exceeds 30x10=300 s so the startup probe fails and kubelet restarts; 200 s passes; when the server answers /health/live during background load, a long load only leaves the pod unready (readiness not run before startup succeeds, then fails, no kill). Validation paragraph is now internally consistent (first sentence gives both architectures, second pins the blocking one).",
+   "Timeline check: probes at 20,30,40 s with threshold 3 -> kill about 40 s (answer says 40 to 50 s, fine with timeouts).",
+   "Minor redundancy only (last sentence repeats the first branch); no change needed."
+  ],
+  "parts_answered": {},
+  "evidence": [
+   {
+    "claim": "startup budget = failureThreshold x periodSeconds = 300 s; 350 s load fails, 200 s passes",
+    "method": "derivation",
+    "evidence": "30*10; probes docs: liveness/readiness not run until startup succeeds; failed startup -> kubelet kills container"
+   },
+   {
+    "claim": "readiness runs whole lifecycle; not-ready pods get no Service traffic",
+    "method": "doc",
+    "evidence": "configure-probes lines 348-352"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Probe interplay, budget arithmetic, test design that actually exercises the failure path.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "probe roles and failure modes"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "config plus validation test"
+   }
+  ],
+  "suggested_answer_set": "concise? detailed+practical",
+  "key_concepts_findings": "specific, each discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/concepts/workloads/pods/probes/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   },
+   {
+    "url": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-06-4",
+  "verdict": "pass",
+  "reasons": [
+   "Both applied changes are correct: minReadySeconds doc says new Pod must be ready without crashing for that many seconds to count as available; proviso on readiness gating is correct.",
+   "Numbers: 4x90=360 s=6 min; 4x(90+30)=8 min; 3/3.4=88.2% (~88%).",
+   "Note (no field available, not an issue): common_mistakes item 3 states the 'still loading counts as unavailable' point without the new proviso; acceptable."
+  ],
+  "parts_answered": {},
+  "evidence": [
+   {
+    "claim": "maxSurge and maxUnavailable cannot both be 0; defaults 25%; revisionHistoryLimit default 10",
+    "method": "doc",
+    "evidence": "deployment.md lines 1206, 1217, 1359"
+   },
+   {
+    "claim": "arithmetic",
+    "method": "executed",
+    "evidence": "6.0 min, 8.0 min, 0.882"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Deadlock reasoning from rollout parameters plus capacity/time trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "deadlock cause and options"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "rollout arithmetic and spec"
+   }
+  ],
+  "suggested_answer_set": "concise? detailed+practical",
+  "key_concepts_findings": "specific, each discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-06-5",
+  "verdict": "pass",
+  "reasons": [
+   "Applied gang-scheduling hedge is accurate: gang-scheduling page shows feature-state GenericWorkload (feature-gated) and 'all-or-nothing'; priority/preemption page: preemptionPolicy defaults to PreemptLowerPriority.",
+   "GPU rules match scheduling-gpus page (limits only, request must equal limit, no request without limit); whole-number restriction and no overcommit match manage-resources page; taint page has a Dedicated Nodes use case.",
+   "Concise answer is 77 words (<=80)."
+  ],
+  "parts_answered": {},
+  "evidence": [
+   {
+    "claim": "GPU request/limit rules",
+    "method": "doc",
+    "evidence": "scheduling-gpus.md lines 43-48"
+   },
+   {
+    "claim": "gang scheduling feature-gated in core scheduler",
+    "method": "doc",
+    "evidence": "gang-scheduling.md feature-state GenericWorkload"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Rules recall plus per-node fragmentation reasoning and pool design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "distinct short answer"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "rigorous"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "layout and yaml"
+   }
+  ],
+  "suggested_answer_set": "concise? detailed+practical",
+  "key_concepts_findings": "specific, each discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/gang-scheduling/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-06-6",
+  "verdict": "correct",
+  "reasons": [
+   "Applied change matches Job doc ('the same program may sometimes be started twice').",
+   "Minor: practical_answer ids inconsistent: pipeline run 2026-10-08 but feature path run-0908."
+  ],
+  "parts_answered": {},
+  "evidence": [
+   {
+    "claim": "Job program may be started twice",
+    "method": "doc",
+    "evidence": "job.md lines 487-489"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "features/run-0908/attempt-1/",
+    "problem": "Run id contradicts the 2026-10-08 run used for the registry key.",
+    "replacement": "features/run-1008/attempt-1/"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Idempotency, atomic publication, cache keys, retry policy design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "properties and policies"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "replay of the incidents"
+   }
+  ],
+  "suggested_answer_set": "concise? detailed+practical",
+  "key_concepts_findings": "specific, each discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/concepts/workloads/controllers/job/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-07-4",
+  "verdict": "correct",
+  "reasons": [
+   "Applied changes are correct. DST example verified by derivation: with a fall-back day inside the window, 30 calendar days = 721 h so a 720 h window starts 1 h later and can miss an order in that hour; replacement text is neutral and consistent with 'window definition (calendar vs hours, timezone)'.",
+   "Feast page (opened via WebFetch): heading '[Alpha] On demand feature views' and 'executed in both the historical retrieval and online retrieval paths'; the page also says the transformations are executed locally and do not scale well to offline retrieval (optional caveat).",
+   "Minor wording: 'Feast documents (documented as an alpha feature)' is awkward."
+  ],
+  "parts_answered": {},
+  "evidence": [
+   {
+    "claim": "DST 25-hour day example",
+    "method": "derivation",
+    "evidence": "720 h vs 721 h"
+   },
+   {
+    "claim": "Feast on-demand executed in both paths, alpha",
+    "method": "doc",
+    "evidence": "WebFetch of docs.feast.dev feature-view"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Feast documents (documented as an alpha feature) on-demand",
+    "problem": "Redundant 'documents ... documented'.",
+    "replacement": "Feast documents on-demand (an alpha feature in its docs)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open design comparison plus parity-proof methodology.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Compute once, serve from store",
+    "tradeoff": "no second implementation vs cannot cover request-time inputs; freshness limited by pipeline"
+   },
+   {
+    "decision": "Shared transformation code in both paths",
+    "tradeoff": "one definition vs same runtime/version pinning and latency"
+   },
+   {
+    "decision": "Declarative spec compiled to SQL and service code",
+    "tradeoff": "language independence vs new DSL and generator risk"
+   },
+   {
+    "decision": "Two implementations with parity tests",
+    "tradeoff": "no re-architecture vs recurring cost, coverage-bound"
+   },
+   {
+    "decision": "Log served features and train on logs",
+    "tradeoff": "no skew by construction vs history wait and baked-in bugs"
+   },
+   {
+    "decision": "Explicit semantics (window, rounding, defaults, knowledge time)",
+    "tradeoff": "upfront specification effort vs silent drift"
+   },
+   {
+    "decision": "Replay-based parity test in CI incl. edge cases",
+    "tradeoff": "coverage and cost vs regression protection"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "options and trade-offs"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "parity procedure and worked bug"
+   }
+  ],
+  "suggested_answer_set": "concise? detailed+practical",
+  "key_concepts_findings": "specific, each discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://docs.feast.dev/getting-started/concepts/feature-view",
+    "status": "supported",
+    "evidence": "'executed in both the historical retrieval and online retrieval paths'; '[Alpha] On demand feature views'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-07-5",
+  "verdict": "correct",
+  "reasons": [
+   "Applied change is correct and consistent: late arrivals lower online values, deletions push the other way (online counts, backfill does not).",
+   "Recomputed: 1-0.97^4=11.47% (~11.5%), complement 88.5% (88 to 89%); Poisson(mean 4) alternative gives 88.7%, consistent. 'cancelled-then-deleted ... expect somewhat lower' consistent.",
+   "Unsourced: the TTL sentence states a generic behaviour; Feast docs only say TTL limits historical lookback, so hedge it."
+  ],
+  "parts_answered": {},
+  "evidence": [
+   {
+    "claim": "11.5% / 88.5%",
+    "method": "executed",
+    "evidence": "1-0.97**4=0.1147"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "its TTL decides when a stale value is treated as missing",
+    "problem": "Store-dependent; not verified for a specific store (Feast page only documents TTL for historical lookback).",
+    "replacement": "its TTL (in stores that enforce one) decides when a stale value is treated as missing"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Subtle bitemporal leakage with quantified diagnosis.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "mechanism and repair"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked example and audit"
+   }
+  ],
+  "suggested_answer_set": "concise? detailed+practical",
+  "key_concepts_findings": "specific, each discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "its TTL decides when a stale value is treated as missing"
+  ],
+  "code_patch": null,
+  "sources_to_drop": []
+ }
+]

@@ -1,0 +1,436 @@
+[
+ {
+  "plan_id": "B1-GEN-03-6",
+  "claims": [
+   {
+    "claim": "HyDE embeds an LLM-written hypothetical answer; draft may contain hallucinated specifics",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Encoder bottleneck filtering also stated."
+   },
+   {
+    "claim": "Multi-query retrieval with RRF fusion raises recall for ambiguous queries but multiplies load and can add off-topic results",
+    "field": "answer",
+    "status": "partially",
+    "source_index": 1,
+    "note": "Method and off-topic risk supported; recall gain and load not in abstract."
+   },
+   {
+    "claim": "Fusing results with RRF",
+    "field": "answer",
+    "status": "partially",
+    "source_index": 2,
+    "note": "Supports RRF as fusion of multiple rankings; not specifically query variants."
+   },
+   {
+    "claim": "Conversational rewriting helps follow-ups; risk of wrong context/latency",
+    "field": "answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No source opened."
+   },
+   {
+    "claim": "HyDE is weak for exact identifiers and rare facts the model does not know",
+    "field": "answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No source opened."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Precise Zero-Shot Dense Retrieval without Relevance Labels (HyDE)",
+    "url": "https://arxiv.org/abs/2212.10496",
+    "type": "paper",
+    "quote": "The document captures relevance patterns but is unreal and may contain false details. ... with the encoder's dense bottleneck filtering out the incorrect details.",
+    "supports": "HyDE embeds an LLM-written hypothetical document that may contain false details.",
+    "status": "supported"
+   },
+   {
+    "title": "RAG-Fusion: a New Take on Retrieval-Augmented Generation",
+    "url": "https://arxiv.org/abs/2402.03367",
+    "type": "paper",
+    "quote": "generating multiple queries, reranking them with reciprocal scores and fusing the documents and scores ... some answers strayed off topic when the generated queries' relevance to the original query is insufficient.",
+    "supports": "Multi-query generation with reciprocal-rank fusion is a described method, and generated queries can add off-topic results; the abstract does not itself report a recall gain or extra retrieval load.",
+    "status": "partially"
+   },
+   {
+    "title": "Reciprocal Rank Fusion outperforms Condorcet and individual Rank Learning Methods",
+    "url": "https://cormack.uwaterloo.ca/cormacksigir09-rrf.pdf",
+    "type": "paper",
+    "quote": "Reciprocal Rank Fusion (RRF), a simple method for combining the document rankings from multiple IR systems, consistently yields better results than any individual system, and better results than the standard method Condorcet Fuse.",
+    "supports": "RRF is a rank-fusion method for combining multiple rankings and generally beats the individual rankers it fuses (about systems, not query variants).",
+    "status": "partially"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Conversational query rewriting helps ellipsis/pronoun follow-ups",
+   "HyDE weak on exact identifiers/rare facts",
+   "Multi-query raises recall for ambiguous queries at extra load (recall part)"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-03-7",
+  "claims": [
+   {
+    "claim": "Post-filtering on an ANN index returns fewer than k results when the filter is selective",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "10% filter, ef_search 40 -> ~4 rows."
+   },
+   {
+    "claim": "Restrictive filter during HNSW traversal can disconnect the graph and drop recall; engines add filter-aware traversal",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Engine-dependent claim also supported: article is one engine's design."
+   },
+   {
+    "claim": "Very selective filters: brute-force/exact scan or per-tenant partition",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Exact indexes for low-match conditions; partial indexing/partitioning."
+   },
+   {
+    "claim": "Retry with deeper candidate depth until k results found",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 0,
+    "note": "pgvector iterative scans scan more of the index when needed; doubling schedule is our own."
+   },
+   {
+    "claim": "Filtered HNSW traversal behaviour is engine-dependent",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 1,
+    "note": "Documented design differs per engine; no cross-engine comparison opened."
+   },
+   {
+    "claim": "IVF filtering inside probed lists wastes scanning excluded vectors",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No source opened."
+   },
+   {
+    "claim": "Probabilities/arithmetic",
+    "field": "practical_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [
+   {
+    "title": "pgvector README (Filtering section)",
+    "url": "https://github.com/pgvector/pgvector",
+    "type": "official_doc",
+    "quote": "With approximate indexes, filtering is applied after the index is scanned. If a condition matches 10% of rows, with HNSW and the default hnsw.ef_search of 40, only 4 rows will match on average. ... Exact indexes work well for conditions that match a low percentage of rows. ... For more rows, enable iterative index scans ... If filtering by only a few distinct values, consider partial indexing. If filtering by many different values, consider partitioning.",
+    "supports": "Post-filtering on an approximate index returns fewer than requested rows for selective filters; exact search suits very selective filters; partitioning/partial indexes and iterative deeper scanning are the documented mitigations.",
+    "status": "supported"
+   },
+   {
+    "title": "Qdrant: Filterable HNSW (article)",
+    "url": "https://qdrant.tech/articles/filterable-hnsw/",
+    "type": "official_doc",
+    "quote": "This threshold is due to the decomposition of the graph into small connected components. ... A connection may be lost between two categories if they lie in different clusters.",
+    "supports": "Applying a restrictive filter during HNSW traversal can break graph connectivity and sharply reduce recall; engines add filter-aware graph construction/search (article describes a 2019 design, not Qdrant's full current behaviour).",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "IVF filtering inside probed lists wastes work"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-03-8",
+  "claims": [
+   {
+    "claim": "Unjudged documents counted non-relevant under single-system pooling understate other systems",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Shallow-pooling paper (arXiv 2109.00062) and BEIR abstract opened; neither abstract states this claim, so not cited."
+   },
+   {
+    "claim": "Paired bootstrap for per-query differences",
+    "field": "practical_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [],
+  "fixes": [],
+  "residual_background_only": [
+   "Unjudged documents counted non-relevant understate non-pool systems"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-02-1",
+  "claims": [
+   {
+    "claim": "Chunk count and token arithmetic",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [],
+  "fixes": [],
+  "residual_background_only": []
+ },
+ {
+  "plan_id": "B1-GEN-02-2",
+  "claims": [
+   {
+    "claim": "Extractors emit text in drawn/written order rather than logical reading order, causing column interleaving",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Doc says text may not be in reading order; sort option sorts top-left to bottom-right. Multi-column not covered explicitly."
+   },
+   {
+    "claim": "Repeated headers/footers detectable by position across pages",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No source opened."
+   }
+  ],
+  "sources": [
+   {
+    "title": "PyMuPDF documentation: Text recipes",
+    "url": "https://pymupdf.readthedocs.io/en/latest/recipes-text.html",
+    "type": "official_doc",
+    "quote": "may not appear in any particular reading order ... This is the responsibility of the PDF creator (software or a human). ... [sort] will sort the output from top-left to bottom-right",
+    "supports": "PDF text extraction follows how content was written to the page, not logical reading order; extractors offer positional sorting or block-level data to rebuild order.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Header/footer detection by repeated position across pages"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-02-3",
+  "claims": [
+   {
+    "claim": "Prepending heading path to chunks often helps retrieval",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source opened."
+   },
+   {
+    "claim": "Headless table fragment uninterpretable",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [],
+  "fixes": [],
+  "residual_background_only": [
+   "Heading-path prefix often helps retrieval"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-02-4",
+  "claims": [
+   {
+    "claim": "Re-insert growth arithmetic",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   },
+   {
+    "claim": "Some vector stores do not free space on delete until compaction",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Not searched."
+   }
+  ],
+  "sources": [],
+  "fixes": [],
+  "residual_background_only": [
+   "Vector stores may not free space on delete until compaction"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-02-5",
+  "claims": [
+   {
+    "claim": "Parent text kept in a docstore keyed by ID, not in the vector index",
+    "field": "detailed_answer",
+    "status": "unreachable",
+    "source_index": null,
+    "note": "LangChain parent-document pages redirected to unrelated pages; not cited."
+   },
+   {
+    "claim": "Token arithmetic",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [],
+  "fixes": [],
+  "residual_background_only": [
+   "Parent text kept in docstore, children embedded"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-02-6",
+  "claims": [
+   {
+    "claim": "Access control as retrieval-time filter",
+    "field": "answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [],
+  "fixes": [],
+  "residual_background_only": []
+ },
+ {
+  "plan_id": "B1-GEN-04-1",
+  "claims": [
+   {
+    "claim": "Cross-encoder cannot be used over millions of documents; used to re-rank a shortlist from a first stage",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": ""
+   },
+   {
+    "claim": "Late-interaction models avoid per-pair transformer passes by precomputing document representations",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": ""
+   },
+   {
+    "claim": "Late interaction stores per-token vectors, trading storage for quality over single-vector bi-encoders",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 1,
+    "note": "Abstract supports precomputation and efficiency only."
+   },
+   {
+    "claim": "Latency arithmetic",
+    "field": "concise_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [
+   {
+    "title": "Sentence-Transformers: Retrieve & Re-Rank",
+    "url": "https://sbert.net/examples/sentence_transformer/applications/retrieve_rerank/README.html",
+    "type": "official_doc",
+    "quote": "Scoring thousands or millions of (query, document)-pairs would be rather slow. ... Hence, we use the retriever to create a set of e.g. 100 possible candidates which are then re-ranked by the Cross-Encoder.",
+    "supports": "A cross-encoder is too slow to score a whole corpus and is used to re-rank a shortlist (e.g. ~100) from a first-stage retriever.",
+    "status": "supported"
+   },
+   {
+    "title": "ColBERT: Efficient and Effective Passage Search via Contextualized Late Interaction over BERT",
+    "url": "https://arxiv.org/abs/2004.12832",
+    "type": "paper",
+    "quote": "ColBERT introduces a late interaction architecture that independently encodes the query and the document using BERT ... gaining the ability to pre-compute document representations offline, considerably speeding up query processing.",
+    "supports": "Late-interaction models precompute document representations offline and avoid feeding each query-document pair through a full network; the abstract does not state the per-token storage trade-off or quality vs single-vector bi-encoders.",
+    "status": "partially"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Per-token storage trade-off and quality vs single-vector bi-encoders"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-04-2",
+  "claims": [
+   {
+    "claim": "Cross-encoder reranks a first-stage shortlist (50-200 candidates)",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 0,
+    "note": "Example shortlist ~100; 50-200 range is ours."
+   },
+   {
+    "claim": "Latency arithmetic",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [
+   {
+    "title": "Sentence-Transformers: Retrieve & Re-Rank",
+    "url": "https://sbert.net/examples/sentence_transformer/applications/retrieve_rerank/README.html",
+    "type": "official_doc",
+    "quote": "Scoring thousands or millions of (query, document)-pairs would be rather slow. ... Hence, we use the retriever to create a set of e.g. 100 possible candidates which are then re-ranked by the Cross-Encoder.",
+    "supports": "A cross-encoder is too slow to score a whole corpus and is used to re-rank a shortlist (e.g. ~100) from a first-stage retriever.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": []
+ },
+ {
+  "plan_id": "B1-GEN-04-3",
+  "claims": [
+   {
+    "claim": "Accuracy highest at start/end and degraded in the middle of long contexts; model-dependent",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": ""
+   },
+   {
+    "claim": "Mechanistic reasons: attention favours recency/leading tokens, dilution, distractor competition",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Abstract gives no cause; text already hedged ('can', 'might')."
+   },
+   {
+    "claim": "Newer models may show the effect less",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Not searched."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Lost in the Middle: How Language Models Use Long Contexts",
+    "url": "https://arxiv.org/abs/2307.03172",
+    "type": "paper",
+    "quote": "performance is often highest when relevant information occurs at the beginning or end of the input context, and significantly degrades when models must access relevant information in the middle of long contexts.",
+    "supports": "The position-dependent (U-shaped) accuracy effect for long contexts; the abstract gives no mechanism.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Attention-favours-recency/leading-tokens explanation",
+   "Newer models show effect less"
+  ]
+ }
+]

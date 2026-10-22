@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% from "_lists.html" import history_off, segs %}
+{% block title %}SMART Mock Interview · AI interview practice{% endblock %}
+{% block page %}dashboard{% endblock %}
+{% macro role_icon(r) %}<svg viewBox="0 0 24 24" aria-hidden="true">
+{%- if 'Python' in r %}<path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/>
+{%- elif 'Analyst' in r %}<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>
+{%- elif 'Machine' in r %}<circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><circle cx="12" cy="11" r="2"/><path d="M7.5 7.5l3.2 2.2M16.5 7.5l-3.2 2.2M12 13v3"/>
+{%- elif 'NLP' in r %}<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>
+{%- elif 'Scientist' in r %}<path d="M9 3h6M10 3v6l-5.5 9.5A1.5 1.5 0 0 0 5.8 21h12.4a1.5 1.5 0 0 0 1.3-2.5L14 9V3"/><path d="M7.5 15h9"/>
+{%- else %}<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/>
+{%- endif %}</svg>{% endmacro %}
+{% block body %}
+<section class="hero2" aria-labelledby="hero-h">
+  <div class="aurora" aria-hidden="true"><i class="a1"></i><i class="a2"></i><i class="a3"></i></div>
+  <div class="hero2-copy">
+    <p class="eyebrow"><span class="live" aria-hidden="true"></span>AI technical interview practice</p>
+    <h1 id="hero-h">Practise the interview <span class="grad">before it counts.</span></h1>
+    <p class="lede">A structured mock interview: a short introduction, role-based technical questions, a practical exercise and a feedback report. Choose a role, optionally paste a job description, and answer in your own words.</p>
+    <div class="cta-row">
+      <a class="btn primary lg" href="{{ url_for('demo.setup_page') }}">Start an interview <span class="arrow" aria-hidden="true">→</span></a>
+      {% if roles %}<a class="btn lg" href="#quick">Quick start by role</a>{% endif %}
+    </div>
+    <ul class="proof" aria-label="Highlights">
+      {% if bank %}<li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>{{ bank }} curated questions</li>{% endif %}
+      <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>Introduction, questions, practical, wrap-up</li>
+      <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>Private: runs on this computer</li>
+    </ul>
+  </div>
+  <div class="stage-3d" aria-hidden="true" data-stage>
+    <div class="win" data-win>
+      <div class="win-bar"><span class="tl"><i></i><i></i><i></i></span><b>interview · preview</b><span class="pill">Technical 2 of 5</span></div>
+      <div class="win-body">
+        <div class="win-meta"><span class="chip">Python</span><span class="chip chip-diff-medium">Medium</span></div>
+        <p class="win-q">What is the difference between a list and a tuple in Python?</p>
+        <div class="win-prog"><i></i></div>
+        <div class="win-a"><span id="typed" data-text="Lists are mutable and tuples are not, so a tuple can be hashed and used as a dictionary key. Tuples also signal that the data should not change.">Lists are mutable and tuples are not, so a tuple can be hashed and used as a dictionary key. Tuples also signal that the data should not change.</span><i class="caret"></i></div>
+        <div class="win-foot"><span>Sample question · your own answers are never shared</span><span class="go">Submit answer</span></div>
+      </div>
+    </div>
+    <div class="float f1"><i></i><span>Role-based plan<small>from the curated question bank</small></span></div>
+    <div class="float f2"><i></i><span>Follow-up questions<small>deterministic · from curated key concepts</small></span></div>
+    <div class="float f3"><i></i><span>Feedback report<small>your answers, topics, what to practise</small></span></div>
+  </div>
+</section>
+
+{% if not history_ok %}
+<div id="resume" class="continue hidden" role="status"></div>
+{% endif %}
+{% if history_ok and active %}
+<div class="continue" role="status"><div><strong>Pick up where you left off</strong><span>{{ active.role or 'Custom topics' }} · {{ active.answered + active.skipped }} of {{ active.asked }} technical questions done</span>{{ segs(active) }}</div>
+  <a class="btn primary" href="{{ url_for('demo.interview_page', sid=active.id) }}">Continue interview <span class="arrow" aria-hidden="true">→</span></a></div>
+{% endif %}
+
+<section class="sec" id="quick" aria-labelledby="qs-h">
+  <div class="sec-head"><div><p class="eyebrow">Quick start</p><h2 id="qs-h">Pick a role. We start in one click.</h2><p>Questions come from the curated bank, planned for the role. Every interview is saved on this computer only.</p></div>
+    <a class="link-arrow" href="{{ url_for('demo.setup_page') }}">Add a job description →</a></div>
+  {% if roles %}
+  <div id="qs-error" class="banner banner-bad hidden" role="alert"></div>
+  <div class="qs-grid" id="qs-grid">
+    {% for r, doms in roles.items() %}
+    <a class="qs" href="{{ url_for('demo.setup_page', role=r) }}" data-start-role="{{ r }}" data-tilt>
+      <span class="qs-icon">{{ role_icon(r) }}</span>
+      <strong>{{ r }}</strong>
+      <span class="topics">{{ doms|join(' · ') }}</span>
+      <span class="foot"><span class="qs-meta">Introduction + technical + practical</span><span class="go">Start <span class="arrow" aria-hidden="true">→</span></span></span>
+    </a>{% endfor %}
+    <a class="qs custom span-{{ 4 - (roles|length % 4) }}" href="{{ url_for('demo.setup_page') }}" data-tilt>
+      <span class="qs-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+      <strong>Add a job description</strong>
+      <span class="topics">Choose a role, then paste a job description to focus the topics we ask about.</span>
+      <span class="foot"><span>Full setup</span><span class="go">Set up <span class="arrow" aria-hidden="true">→</span></span></span>
+    </a>
+  </div>
+  {% else %}
+  <div class="empty"><strong>The question bank could not be loaded</strong>Open the setup page for details.<br><a class="btn primary" href="{{ url_for('demo.setup_page') }}">Open setup</a></div>
+  {% endif %}
+</section>
+
+{% if not history_ok %}
+{{ history_off() }}
+{% elif overview.interviews == 0 %}
+<div class="first-run"><strong>No interviews yet</strong><span>Your first interview takes a few minutes. Finished interviews, timings and topics you have practised will show up here. Everything stays on this computer.</span></div>
+{% else %}
+<section class="sec" aria-labelledby="pr-h">
+  <div class="sec-head"><div><p class="eyebrow">Your practice</p><h2 id="pr-h">Where you are</h2><p>Counts from interviews saved on this computer (removed after {{ '%g'|format(retention) }} days by default). Similarity results are kept in <a href="{{ url_for('demo.history_page') }}">History</a>.</p></div>
+    <a class="link-arrow" href="{{ url_for('demo.history_page') }}">All {{ overview.interviews }} interviews →</a></div>
+  <dl class="pstats" aria-label="Practice totals">
+    <div><dt>Interviews finished</dt><dd>{{ overview.finished }}<small>{% if overview.in_progress %}+{{ overview.in_progress }} in progress{% else %}saved on this computer{% endif %}</small></dd></div>
+    <div><dt>Answers given</dt><dd>{{ overview.answers }}<small>across all interviews</small></dd></div>
+    <div><dt>Practice time</dt><dd>{% if overview.seconds is not none %}{{ clock(overview.seconds) }}{% else %}—{% endif %}<small>{% if overview.seconds is not none %}{{ 'h:mm:ss' if overview.seconds >= 3600 else 'min:sec' }} on answered questions{% else %}no timed answers yet{% endif %}</small></dd></div>
+    <div><dt>Topics practised</dt><dd>{{ overview.domains|length }}<small>of the topics in the bank</small></dd></div>
+  </dl>
+  <div class="rcards">
+    {% for d in recent[:4] %}
+    <a class="rcard" href="{{ url_for('demo.summary_page' if d.status == 'finished' else 'demo.interview_page', sid=d.id) }}">
+      <span class="top"><h3>{{ d.role or (d.domains|length ~ ' chosen topics') }}</h3><span class="when">{{ short_date(d.created_at) }}</span></span>
+      <span class="meta"><span><b>{{ d.answered }}</b> / {{ d.asked }} answered{% if d.skipped %} · {{ d.skipped }} skipped{% endif %}</span><span>{{ clock(d.seconds) }}</span></span>
+      {{ segs(d) }}
+      <span class="meta">{% if d.modular_mode != 'off' %}<span class="tag exp">experimental: {{ d.modular_mode }}</span>{% endif %}{% if d.code_eval %}<span class="tag exp">code check</span>{% endif %}</span>
+      <span class="go">{{ 'Review answers' if d.status == 'finished' else 'Continue' }} →</span>
+    </a>{% endfor %}
+  </div>
+  {% if overview.domains %}
+  <div class="panel-box gap-top"><h3>Practice by topic</h3><p>How many answers you have given in each topic. This counts practice, it does not rate it.</p>
+    {% set mx = (overview.domains|map(attribute='answers')|max) %}
+    <ul class="cov">{% for d in overview.domains|sort(attribute='answers', reverse=true) %}<li><span class="n">{{ d.domain }}</span><svg viewBox="0 0 100 10" preserveAspectRatio="none" role="img" aria-label="{{ d.answers }} answer{{ '' if d.answers == 1 else 's' }}"><line class="back" x1="5" x2="95" y1="5" y2="5"/><line class="fill" x1="5" x2="{{ (5 + 90 * d.answers / mx)|round(1) }}" y1="5" y2="5"/></svg><span class="c">{{ d.answers }} answer{{ '' if d.answers == 1 else 's' }}</span></li>{% endfor %}</ul></div>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="sec" aria-labelledby="how-h">
+  <div class="sec-head"><div><p class="eyebrow">How it works</p><h2 id="how-h">A real interview shape, honest feedback</h2><p>Every part of the report says where it came from, so you know how much weight to give it.</p></div></div>
+  <ol class="steps3">
+    <li><h3>Choose</h3><p>Pick a role and, if you like, paste a job description. The plan comes from the curated bank and never changes with how you score.</p></li>
+    <li><h3>Answer</h3><p>Talk it through: an introduction, role-based questions, a follow-up now and then, and a practical exercise. Drafts are kept; Python questions get a code editor.</p></li>
+    <li><h3>Review</h3><p>Get a report with the questions asked, your answers, the topics covered and what to practise next.</p></li>
+  </ol>
+  <div class="kinds">
+    <div><h3>Similarity (Sentence-BERT) <span class="tag on">secondary</span></h3><p>How close your wording and meaning are to a reference answer. It sits in the technical details, is not a technical grade and has not been checked against human markers.</p></div>
+    <div class="exp"><h3>Concept check <span class="tag exp">experimental</span></h3><p>Opt-in. Looks for the concepts a good answer states and shows only findings it has evidence for. Not validated.</p></div>
+    <div class="code"><h3>Code reading <span class="tag exp">experimental</span></h3><p>Opt-in. Reads your Python as text against a written test plan. Your code is never executed.</p></div>
+  </div>
+</section>
+{% endblock %}

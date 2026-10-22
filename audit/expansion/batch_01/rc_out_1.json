@@ -1,0 +1,657 @@
+[
+ {
+  "plan_id": "B1-GEN-03-4",
+  "verdict": "correct",
+  "reasons": [
+   "Both applied corrections are accurate and consistent (tf_part -> k1+1 for any length; rank_bm25 statement verified by execution, including that it does not de-duplicate query terms).",
+   "Code and test pass on 3.13/3.10/3.11; fenced code equals code.solution.",
+   "One unhedged universal claim remains: tokenisation/stop-words change scores \"far more\" than k1 or b."
+  ],
+  "parts_answered": {
+   "class with idf/score/rank": true,
+   "non-negative idf and repeated query terms counted once": true,
+   "tf saturation explained": true,
+   "length normalisation explained": true,
+   "b=0 and b=1 behaviour": true
+  },
+  "evidence": [
+   {
+    "claim": "Code passes its own test",
+    "method": "executed",
+    "evidence": "OK on 3.13, 3.10 and 3.11"
+   },
+   {
+    "claim": "Matches rank_bm25 BM25Okapi when its idf is replaced with ln(1+(N-df+.5)/(df+.5))",
+    "method": "executed",
+    "evidence": "5 docs, queries [a,d],[c],[zzz]: max abs diff <=2.2e-16"
+   },
+   {
+    "claim": "rank_bm25 does not de-duplicate repeated query terms",
+    "method": "executed",
+    "evidence": "query [a,a]: diff 1.3 vs this implementation (counts a twice in rank_bm25)"
+   },
+   {
+    "claim": "tf_part -> k1+1 as f grows for any fixed length factor",
+    "method": "derivation",
+    "evidence": "f(k1+1)/(f+k1*norm) -> k1+1 as f->inf for any norm>0"
+   },
+   {
+    "claim": "tenth occurrence adds much less than second (k1=1.2,b=.75,avg length)",
+    "method": "derivation",
+    "evidence": "f=1,2: 1.00,1.375 (+0.375); f=9,10: 1.941,1.964 (+0.023)"
+   },
+   {
+    "claim": "Older idf negative when df>N/2",
+    "method": "derivation",
+    "evidence": "(N-df+.5)/(df+.5)<1 iff df>N/2"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "tokenisation and stop-word handling change scores far more than k1 or b",
+    "problem": "Unhedged universal/comparative claim; it is an empirical, corpus-dependent statement.",
+    "replacement": "tokenisation and stop-word handling can change scores as much as, or more than, tuning k1 or b"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short class from a given formula plus explaining two mechanisms and parameter extremes; no subtle trap.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Rigorous explanation of formula, idf variants, saturation, normalisation."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Tested code, not duplicated in the detailed answer; the rank_bm25 note is now accurate."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (current)",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0010",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran solution+test on 3.13, 3.10, 3.11: pass. Extra cases: ties sort to lower index; empty query scores 0; top_n=0 returns []; unknown term idf>0; matches rank_bm25 (custom idf). Edge: BM25([]) or a corpus of only empty documents raises ZeroDivisionError (avgdl=0) - not covered by the question, minor. Stdlib only, no 3.11+ features.",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-03-5",
+  "verdict": "pass",
+  "reasons": [
+   "All three applied corrections are correct and verified: at lam=0 every first-step score is 0 so index 0 is picked; \"For lam>0\" qualifier right; O(n^2 d) for the precomputed matrix and O(k n d) lazily.",
+   "Code and test pass on three interpreters; fenced code equals solution.",
+   "Only minor robustness notes (empty candidate list, float-noise ties), not worth changing for the stated spec."
+  ],
+  "parts_answered": {
+   "mmr signature and greedy rule with cosine, tie and zero-vector rules": true,
+   "how lam behaves": true,
+   "where MMR is not the right tool": true
+  },
+  "evidence": [
+   {
+    "claim": "lam=0: first pick is lowest index, then least-redundant items",
+    "method": "executed",
+    "evidence": "mmr([1,0],[[1,0],[0,1],[1,0],[0,0]],4,0.0) -> [0,1,3,2]"
+   },
+   {
+    "claim": "lam=1 equals relevance ranking with low-index ties",
+    "method": "executed",
+    "evidence": "-> [0,2,1,3]"
+   },
+   {
+    "claim": "Matches independent brute-force implementation",
+    "method": "executed",
+    "evidence": "500 random cases on 3.13/3.10/3.11: differences only where scores are mathematically tied and differ by ~1e-17 float noise"
+   },
+   {
+    "claim": "Cost O(n^2 d) precompute vs O(k n d) lazy",
+    "method": "derivation",
+    "evidence": "d@d.T is n x n x d; lazy needs only k rows"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short numpy implementation of a known greedy algorithm with several stated conventions plus conceptual discussion.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Explains lam, cost, limits."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Tested code; distinct from detailed."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (current)",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": "Passes on 3.13/3.10/3.11. Own edge cases: lam outside [0,1] raises ValueError; k=0 and k<0 return []; zero query vector with lam=0.5 returns [0,1,3] (all rel 0, low-index ties); int inputs ok; k > n clipped. Minor limitations (not worth patching): empty docs list raises a matmul ValueError; mathematically tied scores can be broken by 1e-17 float noise rather than strictly to the lower index (e.g. q=[-1,0,1], docs [2,-1,2] and [1,-1,1], lam=1 picks index 1 first). stdlib+numpy only.",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-03-7",
+  "verdict": "correct",
+  "reasons": [
+   "Numbers verified: 0.1 expected matches in top-10, 0.99^100=0.366, P(>=10 of 1000)=0.543, 2k/s=2,000 gives P(>=10)=0.995.",
+   "Both applied corrections are consistent (1% of 80M = 800,000 lands in the filter-aware/partition band).",
+   "The word selectivity is used in two opposite senses (very selective = few match; 2k/selectivity = fraction matching); clarify."
+  ],
+  "parts_answered": {
+   "why 0-2 results": true,
+   "compare post/pre/filter-aware": true,
+   "strategy as function of selectivity": true
+  },
+  "evidence": [
+   {
+    "claim": "Expected matches in top-10 = 0.1; P(0)=0.904, P(1)=0.091, P(2)=0.004",
+    "method": "executed",
+    "evidence": "binomial(10,0.01)"
+   },
+   {
+    "claim": "P(no match in 100) = 0.99^100 = 0.366",
+    "method": "executed",
+    "evidence": "0.3660"
+   },
+   {
+    "claim": "P(>=10 matches in 1000 draws) = 0.54",
+    "method": "executed",
+    "evidence": "0.5427"
+   },
+   {
+    "claim": "2k/s = 2,000 candidates gives P(>=10) ~ 0.995",
+    "method": "executed",
+    "evidence": "0.9952"
+   },
+   {
+    "claim": "1% of 80M = 800,000 chunks",
+    "method": "derivation",
+    "evidence": "80e6*0.01"
+   },
+   {
+    "claim": "Behaviour of filtered HNSW traversal is engine-dependent",
+    "method": "background_only",
+    "evidence": "Answer hedges \"implementation-dependent\"; not checked against a specific engine doc"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "oversampling to about 2k/selectivity candidates (twice the number needed on average for k survivors)",
+    "problem": "selectivity is used elsewhere as \"very selective\" = few match; here it means the matching fraction.",
+    "replacement": "oversampling to about 2k/s candidates, where s is the fraction of chunks that match the filter (twice the number needed on average for k survivors)"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "when selectivity is low",
+    "problem": "Ambiguous in the same sense; \"selective\" filters elsewhere in the answer are the restrictive ones.",
+    "replacement": "when the filter is restrictive (few vectors match)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Needs probability reasoning, understanding of ANN filtering trade-offs and a banded strategy.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanisms and strategy bands."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Quantification and an operational routine; numbers verified and distinct from detailed."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (current)",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-02-2",
+  "verdict": "pass",
+  "reasons": [
+   "Applied correction (gate framed as flag-for-review with illustrative thresholds) is accurate and consistent with the detailed answer.",
+   "Diagnosis (reading order, headers/footers, floating objects), confirmation and fixes are sound; claims are generic and appropriately hedged."
+  ],
+  "parts_answered": {
+   "diagnose extraction problems": true,
+   "how to confirm each": true,
+   "pipeline changes": true
+  },
+  "evidence": [
+   {
+    "claim": "Extractors emit draw order / y-sorted text, causing column interleaving",
+    "method": "background_only",
+    "evidence": "widely documented behaviour of PDF text extraction; no tool-specific claim"
+   },
+   {
+    "claim": "Repeated header/footer detection by position across pages, digits normalised",
+    "method": "background_only",
+    "evidence": "standard technique"
+   },
+   {
+    "claim": "Titles survive interleaving because single short line",
+    "method": "derivation",
+    "evidence": "a short line cannot be interleaved with another column"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Diagnostic reasoning from a symptom string with several standard causes and fixes.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Causes, confirmation, gating."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete triage steps and thresholds, not a paraphrase."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (current)",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-02-4",
+  "verdict": "correct",
+  "reasons": [
+   "The rewritten diagnosis is better but introduces two wrong statements: \"index would roughly double each night\" (re-inserting every page adds ~1x the original size per night, i.e. linear, +100% of baseline) and \"Boundary shifts make it worse\" (in an append-only job that already re-inserts the whole page, boundary shifts add nothing; they matter for the hash-diff redesign).",
+   "Minor off-by-one: a paragraph that survived three edits exists four times, not three.",
+   "Practical answer mixes in-place per-document upserts with validation against a \"staged index\" without saying the changes go to a staged version.",
+   "Concise answer is 73 words and consistent with detailed."
+  ],
+  "parts_answered": {
+   "likely bug": true,
+   "idempotent re-ingestion": true,
+   "edits and deletions": true,
+   "rollback": true
+  },
+  "evidence": [
+   {
+    "claim": "Re-inserting all N chunks nightly gives (t+1)N after t nights, not doubling",
+    "method": "derivation",
+    "evidence": "increments of N per night: +100%, +50%, +33% of the running size"
+   },
+   {
+    "claim": "After e edits of a page (full re-insert, no delete) a surviving paragraph exists e+1 times",
+    "method": "derivation",
+    "evidence": "original + e copies"
+   },
+   {
+    "claim": "Concise answer word count",
+    "method": "executed",
+    "evidence": "73 words"
+   },
+   {
+    "claim": "3 weeks at 4%/night compounds to ~2.3x (1.04^21)",
+    "method": "executed",
+    "evidence": "2.28"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "detailed_answer",
+    "claim": "the index would roughly double each night",
+    "problem": "Wrong: re-inserting every unchanged page with new IDs adds one baseline copy per night (linear growth), it does not double each night.",
+    "replacement": "the index would grow by about its original size every night (+100% of the baseline per night, not 4%)"
+   },
+   {
+    "severity": "major",
+    "field": "detailed_answer",
+    "claim": "Boundary shifts make it worse: an edit near the start of a document can move every following fixed-size chunk boundary, so even untouched text gets new chunk hashes and is re-inserted.",
+    "problem": "Not a worsening of the append-only bug (the whole changed page is already re-inserted); the effect applies to the hash-diff redesign.",
+    "replacement": "Boundary shifts matter for the redesign: with fixed-size chunking an edit near the start of a document can move every following chunk boundary, so even untouched text gets new chunk hashes and is re-embedded; structure-aware chunking (headings, paragraphs) keeps diffs small."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "a paragraph that survived three edits exists three times (duplicates)",
+    "problem": "Off by one: original plus three re-inserted copies is four.",
+    "replacement": "a paragraph that survived two edits of its page exists three times (the original plus two re-inserted copies, i.e. duplicates)"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "Run validation queries against the staged index;",
+    "problem": "The steps above upsert/delete in place; staging is never described.",
+    "replacement": "Apply the adds and deletes to a staged index version (new collection or copy-on-write), not the live one, then run validation queries against it;"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open-ended pipeline redesign needing idempotency, deletion safety, rollback and quantitative reasoning about growth.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Genuinely shorter interview-ready answer (73 words), consistent with the corrected detailed text."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Full diagnosis and redesign."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Step-by-step nightly algorithm with thresholds, labelled hypothetical."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical (current)",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-04-6",
+  "verdict": "correct",
+  "reasons": [
+   "Arithmetic fully verified (5,292; 11 chunks; 12 spare; running totals; 292 remaining).",
+   "The applied truncation correction is right in substance but grammatically garbled, and it now contradicts step 5 (\"where truncation cannot reach them\") because truncation may hit either end.",
+   "Minor: trimmed tenth chunk window includes its 30 formatting tokens; no safety margin for chat-template/special tokens."
+  ],
+  "parts_answered": {
+   "how many chunks fit": true,
+   "long chunks": true,
+   "graceful token budget design": true
+  },
+  "evidence": [
+   {
+    "claim": "8192-600-100-1200-1000 = 5,292; 5,292/480 = 11.025 -> 11 chunks, 5,280 used, 12 spare",
+    "method": "executed",
+    "evidence": "python arithmetic"
+   },
+   {
+    "claim": "Running totals 480,1000,2020,2490,2970,3460,4070,4520,5000; chunk 10 -> 5,700; room 292",
+    "method": "executed",
+    "evidence": "cumulative sum of listed costs"
+   },
+   {
+    "claim": "Concise answer length",
+    "method": "executed",
+    "evidence": "67 words"
+   },
+   {
+    "claim": "Providers either reject or (some stacks) truncate over-length prompts",
+    "method": "background_only",
+    "evidence": "behaviour varies by API/framework; answer hedges it"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "truncates silently, depending on the stack by cutting the start or the end of the prompt",
+    "problem": "Garbled grammar introduced by the correction.",
+    "replacement": "truncates silently (depending on the stack, by cutting the start or the end of the prompt)"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Put the question and key instructions where truncation cannot reach them, and always verify the final token count before the call.",
+    "problem": "Contradicts the corrected statement that truncation may cut either end; no position is safe.",
+    "replacement": "Since truncation may hit either end, do not rely on position to protect the question and instructions: guarantee they fit by exact counting, and always verify the final token count before the call (reject or trim rather than send an over-budget prompt)."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "counted exactly.",
+    "problem": "No margin for chat-template or special tokens.",
+    "replacement": "counted exactly, plus a small safety margin for chat-template and special tokens."
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "trim chunk 10 to its best 292-token window (total exactly 5,292)",
+    "problem": "Chunk costs include 30 formatting tokens, so the text window is about 262 tokens; exact fill leaves no margin.",
+    "replacement": "trim chunk 10 to the best window that fits in 292 tokens including its 30 formatting tokens (about 262 tokens of text; total exactly 5,292, so keep a few tokens of margin in practice)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Straight arithmetic then a standard greedy-fill and degradation policy; open-ended part is modest.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Reserve fixed parts (system, answer budget) first, counted with the real tokenizer",
+    "tradeoff": "Guaranteed room for answer vs less context"
+   },
+   {
+    "decision": "Cap and truncate/summarise history oldest-first",
+    "tradeoff": "Context room vs lost conversational continuity"
+   },
+   {
+    "decision": "Fill chunks by running token count in rank order, not fixed k",
+    "tradeoff": "No overflow vs variable chunk count"
+   },
+   {
+    "decision": "Trim or skip a chunk that does not fit (best-window trimming)",
+    "tradeoff": "Uses leftover budget vs possible cut-off qualifiers"
+   },
+   {
+    "decision": "Relevance threshold: use fewer chunks than fit",
+    "tradeoff": "Less distraction and cost vs possible recall loss"
+   },
+   {
+    "decision": "Final exact recount and monitoring of cap-hit rate",
+    "tradeoff": "Safety vs small overhead"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Shorter answer with the key number and cut priority."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanisms and design."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked greedy fill with verified numbers."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical (current)",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0005",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-07-1",
+  "verdict": "correct",
+  "reasons": [
+   "Both applied corrections are accurate (recall vs precision wording; chunk-removed ablation conclusion is properly hedged).",
+   "Gaps remain: cause 5 (prompt instructions) has no discriminating experiment although the question asks for one per cause; the gold-only run that returns 30 (true parametric override) is not stated.",
+   "Hypothetical ablation numbers are internally consistent."
+  ],
+  "parts_answered": {
+   "step-by-step triage": true,
+   "experiment that separates each cause": "partial (cause 5 has none)"
+  },
+  "evidence": [
+   {
+    "claim": "Ablation ladder numbers consistent with causes",
+    "method": "derivation",
+    "evidence": "A 11/20, B 19/20 (generator can read gold), C 14/20 (+3 for position), D 18/20 (conflicts main cause)"
+   },
+   {
+    "claim": "Position effects are model-dependent",
+    "method": "background_only",
+    "evidence": "answer hedges \"model-dependent effect, so test\""
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(for example 'be concise' leading to dropping conditions).",
+    "problem": "No discriminating experiment for this cause.",
+    "replacement": "(for example 'be concise' leading to dropping conditions). Check: re-run with a strict 'answer only from the context, say not found otherwise' instruction and compare."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "If it then answers 60, distractors are the problem.",
+    "problem": "Missing the opposite outcome that separates parametric override from distractors.",
+    "replacement": "If it then answers 60, distractors are the problem; if it still answers 30 with only the gold chunk, the model is overriding or misreading the context (see 6)."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Structured diagnostic reasoning with several standard hypotheses; no calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Causes and checks."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked ablation ladder with numbers; labelled hypothetical."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (current)",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0003",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-07-4",
+  "verdict": "correct",
+  "reasons": [
+   "Applied correction (answer-span scoring across chunk sizes; same k covers half the text) is correct and important.",
+   "Practical numbers verified: model effect +2 points at both chunk sizes, chunk effect -7 at both models, new/256 vs baseline -5.",
+   "Minor wording: \"The interaction is also visible\" introduces model-prefix/normalisation points that are not interactions; the half-text-per-k point is now stated twice (steps 2 and 4)."
+  ],
+  "parts_answered": {
+   "isolate the cause": true,
+   "what to do before migration": true
+  },
+  "evidence": [
+   {
+    "claim": "model effect +2 (0.90-0.88, 0.83-0.81); chunk effect -7 (0.81-0.88, 0.83-0.90); net -5",
+    "method": "executed",
+    "evidence": "arithmetic on the 2x2 table"
+   },
+   {
+    "claim": "256-token chunks double the chunk count per document",
+    "method": "derivation",
+    "evidence": "512/256 = 2 (approximately)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "The interaction is also visible: the new model may need",
+    "problem": "Mislabelled; the listed items are model-specific requirements, not interaction effects.",
+    "replacement": "Interactions matter too, and the new model may need"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Experiment design with confounded changes plus pipeline-bug hunting and release-process prevention.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Procedure, bug checklist, prevention."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Verified 2x2 result table and reading; labelled hypothetical."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (current)",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0003",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ }
+]

@@ -1,0 +1,287 @@
+[
+ {
+  "id": "smi-gen-nlp-01",
+  "verdict": "accept",
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Vocabulary-size trade-off:",
+    "problem": "Question asks what changes from 8k to 128k; answer gives the generic two-sided trade-off, which covers it, but typos like 'refundd' are not discussed explicitly.",
+    "replacement": null
+   }
+  ],
+  "code_rerun": "n/a",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [
+   {
+    "url": "https://huggingface.co/docs/transformers/tokenizer_summary",
+    "status": "supported",
+    "note": "Page quotes BPE iterative merging of most frequent pair to target size, byte-level 256 base so no <unk>, word-level <unk>/huge embedding matrix, WordPiece likelihood-based merge score."
+   }
+  ],
+  "notes": "No near-duplicate in existing_questions (only generic items). Question realistic, self-contained."
+ },
+ {
+  "id": "smi-gen-nlp-02",
+  "verdict": "accept",
+  "issues": [],
+  "code_rerun": "passed (matches sklearn on 3-doc corpus; extra edge with accents, apostrophes, digits, empty doc and 1-char tokens also matches TfidfVectorizer vocab and matrix; answer code == code.solution)",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [
+   {
+    "url": "https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.TfidfTransformer.html",
+    "status": "supported",
+    "note": "idf = log[(1+n)/(1+df)]+1 with smooth_idf default True, tf-idf = tf*idf, norm default l2; example confirms natural log."
+   },
+   {
+    "url": "https://scikit-learn.org/stable/modules/feature_extraction.html",
+    "status": "supported",
+    "note": "Says default tokenizer extracts words of at least 2 letters and lists known issues with the 'english' stop-word list (informative words)."
+   }
+  ],
+  "notes": "Near-dup only vs generic smi-0341 'What is TF-IDF?'; distinct. Edge attempted to break: none found."
+ },
+ {
+  "id": "smi-gen-nlp-03",
+  "verdict": "fix",
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "5) Drift: new products and vocabulary;",
+    "problem": "Omits a plausible cause: the production 'agreement with agents' may not measure the same thing as offline macro-F1 (agents' initial routing vs the final resolved queue label; accuracy vs macro-F1; small noisy sample).",
+    "replacement": "5) Drift and metric mismatch: new products and vocabulary, and check that the production check measures the same thing (agents' initial routing versus the final resolved queue, accuracy versus macro-F1, and a large enough sample);"
+   }
+  ],
+  "code_rerun": "n/a",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [],
+  "notes": "Realistic debugging question; Hard is reasonable (ranked hypotheses with diagnostics). No duplicate."
+ },
+ {
+  "id": "smi-gen-nlp-04",
+  "verdict": "accept",
+  "issues": [],
+  "code_rerun": "n/a",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [
+   {
+    "url": "https://arxiv.org/pdf/1310.4546",
+    "status": "supported",
+    "note": "Eq. 4 NEG objective matches; noise U(w)^{3/4}/Z; k 5-20 small, 2-5 large."
+   }
+  ],
+  "notes": "Objective is stated as maximisation (negative of it is the loss); fine. 'subsampling frequent words' is only mentioned in one sentence, marginal but acceptable."
+ },
+ {
+  "id": "smi-gen-nlp-05",
+  "verdict": "fix",
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Zero-probability tokens give infinity, so smoothing is needed.",
+    "problem": "Statement is conceptually right but the shown code raises ValueError (math.log(0)) rather than returning inf; inconsistent with the prose.",
+    "replacement": "A zero-probability token makes perplexity infinite (this code raises ValueError from math.log(0)), so smoothing is needed."
+   }
+  ],
+  "code_rerun": "passed (PPL 10.0 vs 2.1544 for same joint prob; extra edge p=0 raises ValueError; answer code == code.solution)",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [],
+  "notes": "Arithmetic verified: 10^(4/12)=2.154."
+ },
+ {
+  "id": "smi-gen-nlp-06",
+  "verdict": "accept",
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Pitfalls: masking after the softmax without renormalising, masking with 0 instead of \u2212inf, and scaling by sqrt(T) instead of sqrt(d_k).",
+    "problem": "Fine in the answer; but common_mistakes entry 'large finite fill value' is overstated since a large negative finite value (e.g. -1e9) works in practice. Suggest rewording common_mistakes to 'zero fill value'.",
+    "replacement": null
+   }
+  ],
+  "code_rerun": "passed (variance 4/64/1024 unscaled, ~1 scaled; extra edge T=1 returns weight 1; answer code == code.solution; absurd 1e308 inputs overflow, not a real concern)",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [
+   {
+    "url": "https://arxiv.org/pdf/1706.03762",
+    "status": "supported",
+    "note": "Footnote 4 variance d_k for mean 0/var 1 components; small-gradient softmax regions; masking to -inf."
+   }
+  ],
+  "notes": "No duplicate."
+ },
+ {
+  "id": "smi-gen-nlp-07",
+  "verdict": "fix",
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "which gives spans with character offsets and no hallucination.",
+    "problem": "Question says 'or something else': for highly regular invoice fields a regex/rule baseline is a standard first answer and is missing.",
+    "replacement": "which gives spans with character offsets and no hallucination; for highly regular fields (invoice numbers, dates, totals) start with regex/rules as a baseline."
+   },
+   {
+    "severity": "minor",
+    "claim": "It is cheap, fast on CPU, and works well with a few thousand labels.",
+    "problem": "No mention of a TF-IDF + linear baseline, which comfortably meets 50 ms on CPU with 2,000 labels and is the usual first step.",
+    "replacement": "It is cheap, fast on CPU, and works well with a few thousand labels; a TF-IDF + logistic regression baseline is also worth running first and easily meets 50 ms."
+   }
+  ],
+  "code_rerun": "n/a",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [],
+  "notes": "Medium/design OK."
+ },
+ {
+  "id": "smi-gen-nlp-08",
+  "verdict": "accept",
+  "issues": [],
+  "code_rerun": "passed (P=0.5, R=1/3, F1=0.4; token acc 0.9, all-O 0.7; answer code == code.solution). Extra edges: ['B-PER','I-PER','I-PER'] -> one span; ['I-PER','B-PER'] -> two spans; type with hyphen 'A-B' ok; bare tag 'B' (no hyphen) raises ValueError (minor, malformed input).",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [],
+  "notes": "conlleval leniency claim correct (I-X after O or other type starts a chunk)."
+ },
+ {
+  "id": "smi-gen-nlp-09",
+  "verdict": "accept",
+  "issues": [],
+  "code_rerun": "n/a",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [],
+  "notes": "Arithmetic verified: 180 TP, 490 FP, precision 26.9%. 'Class weights mostly shift boundary like threshold' hedged adequately. NLP label acceptable (text classification), though content is general ML evaluation."
+ },
+ {
+  "id": "smi-gen-nlp-10",
+  "verdict": "fix",
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Filter by locale/permissions as metadata;",
+    "problem": "Question stresses several locales; answer never addresses multilingual embedding model / per-locale lexical analysers for BM25.",
+    "replacement": "Filter by locale/permissions as metadata, and use a multilingual embedding model plus per-locale BM25 analysers (stemming/tokenisation) if users may search across or within several languages;"
+   }
+  ],
+  "code_rerun": "n/a",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [],
+  "notes": "Hard/design OK."
+ },
+ {
+  "id": "smi-gen-nlp-11",
+  "verdict": "accept",
+  "issues": [],
+  "code_rerun": "n/a",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [],
+  "notes": "Overlaps topically with nlp-10 (retrieval) but distinct question."
+ },
+ {
+  "id": "smi-gen-nlp-12",
+  "verdict": "accept",
+  "issues": [],
+  "code_rerun": "passed (2/7, 5/7, 4/6, NLTK modified_precision agreement; extra: 2000 random multi-reference cases vs NLTK modified_precision and brevity_penalty/closest_ref_length: 0 mismatches; answer code == code.solution)",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [],
+  "notes": "Tie-break on closest reference length (shorter) matches NLTK."
+ },
+ {
+  "id": "smi-gen-nlp-13",
+  "verdict": "accept",
+  "issues": [],
+  "code_rerun": "n/a",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [
+   {
+    "url": "https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.LatentDirichletAllocation.html",
+    "status": "supported",
+    "note": "Priors default to 1/n_components; perplexity = exp(-1 * log-likelihood per word), approximate."
+   }
+  ],
+  "notes": "Held-out likelihood vs interpretability claim is well established (Chang et al. 2009)."
+ },
+ {
+  "id": "smi-gen-nlp-14",
+  "verdict": "accept",
+  "issues": [],
+  "code_rerun": "passed (stop-word list contains not/no/never/nor/cannot; broken predictions [0,0,0,0], fixed [1,0,1,1]; answer code == code.solution). Note: fixed model predicts 'bad' as 1 on the toy data, so it is a demo only, which the answer already says.",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [
+   {
+    "url": "https://scikit-learn.org/stable/modules/feature_extraction.html",
+    "status": "supported",
+    "note": "Default tokenizer extracts words of at least 2 letters; 'english' stop-word list has known issues and may drop informative words."
+   }
+  ],
+  "notes": "Near-dup only vs generic smi-0340 'What are stop words?'."
+ }
+]

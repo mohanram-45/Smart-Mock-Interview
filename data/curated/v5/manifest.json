@@ -1,0 +1,170 @@
+{
+ "dataset": "smart-mock-interview curated knowledge base",
+ "version": "v5",
+ "status": "frozen for the first RAG prototype (no human review yet)",
+ "built_by": "audit/remediation/build_curated_v5.py",
+ "derived_from": [
+  "data/curated/v1",
+  "data/curated/v2",
+  "data/curated/v3",
+  "data/curated/v4"
+ ],
+ "record_count": 487,
+ "domain_counts": {
+  "Data Analysis": 75,
+  "Deep Learning": 86,
+  "Machine Learning": 174,
+  "NLP": 53,
+  "Python": 45,
+  "SQL": 54
+ },
+ "difficulty_counts": {
+  "Easy": 121,
+  "Hard": 53,
+  "Medium": 313
+ },
+ "domain_x_difficulty": {
+  "Data Analysis": {
+   "Medium": 48,
+   "Easy": 16,
+   "Hard": 11
+  },
+  "Deep Learning": {
+   "Medium": 56,
+   "Easy": 28,
+   "Hard": 2
+  },
+  "Machine Learning": {
+   "Medium": 118,
+   "Easy": 37,
+   "Hard": 19
+  },
+  "NLP": {
+   "Easy": 11,
+   "Medium": 35,
+   "Hard": 7
+  },
+  "Python": {
+   "Medium": 27,
+   "Easy": 12,
+   "Hard": 6
+  },
+  "SQL": {
+   "Easy": 17,
+   "Medium": 29,
+   "Hard": 8
+  }
+ },
+ "question_type_counts": {
+  "(not typed - seed record)": 360,
+  "concept": 16,
+  "coding": 45,
+  "debugging": 16,
+  "design": 8,
+  "scenario": 22,
+  "sql_exercise": 20
+ },
+ "introduced_in_counts": {
+  "v1": 316,
+  "v2": 44,
+  "v3-batch02": 46,
+  "v3-pilot01": 41,
+  "v4-batch03": 40
+ },
+ "topic_count": 86,
+ "records_with_code_test": 146,
+ "records_with_sources": 35,
+ "known_label_inconsistencies": [
+  {
+   "id": "smi-0063",
+   "issue": "verification label says code_executed (set in Stage 1A) but no reference test is recorded in code_tests.json; the record is left unchanged to keep the v4 regression identical"
+  }
+ ],
+ "quarantined": 0,
+ "review_queue": 0,
+ "review_archive": 2,
+ "excluded_by_owner": [
+  "smi-0457",
+  "smi-0459"
+ ],
+ "verification": {
+  "human_reviewed_records": 0,
+  "verification_labels": {
+   "ai_generated+ai_reviewed": 29,
+   "ai_generated+ai_reviewed+code_executed": 67,
+   "ai_generated+ai_reviewed+code_executed+source_opened": 20,
+   "ai_generated+ai_reviewed+source_opened": 11,
+   "ai_reviewed": 182,
+   "ai_reviewed+code_executed": 13,
+   "ai_rewritten+ai_reviewed": 114,
+   "ai_rewritten+ai_reviewed+code_executed": 47,
+   "ai_rewritten+ai_reviewed+source_opened": 4
+  },
+  "v4_verification": {
+   "(not re-verified in v4)": 441,
+   "independent_review_v3_only": 20,
+   "reverified_v4_verified": 10,
+   "reverified_v4_corrected": 16
+  },
+  "v5_verification": {
+   "(not part of the v5 recheck)": 447,
+   "independent_review_v4_only": 21,
+   "rechecked_v5_verified": 13,
+   "rechecked_v5_corrected": 6
+  }
+ },
+ "verification_limitations": [
+  "No record has been reviewed by a human subject-matter expert; every label is AI-generated or AI-reviewed.",
+  "Only 26 batch-02 and 19 batch-03 records were re-verified with per-claim evidence; the other 442 rely on earlier single AI reviews (see v4_verification / v5_verification).",
+  "Reviewers are the same model family as the authors, so shared blind spots are possible.",
+  "Claims supported only by background knowledge, and remaining limitations, are listed in unverified_claims.csv (73 entries).",
+  "Only 35 records carry a cited source; 146 records have executed reference code; the 360 seed-derived records have no question_type.",
+  "Key-concept grounding is checked by a token heuristic plus agent review, not by a domain expert.",
+  "The device has no scikit-learn/spaCy/nltk/scipy/pytest, so 23 older tests are skipped there and run only in the build sandbox."
+ ],
+ "human_review_queue_tiers": {
+  "1": 24,
+  "2": 41,
+  "3": 62,
+  "4": 298,
+  "5": 62
+ },
+ "fingerprint": {
+  "algorithm": "sha256",
+  "content_sha256": "d981f446496382513926750d16c8b95d66fead99f6644d44c686f1b7784c24ea",
+  "code_tests_sha256": "894fe9327172000598a0b6b436368ad3bd03928a29fa492c7030b1674085cee2",
+  "combined_sha256": "9eb94d8fe8bc83486dd401c5651878ebef0c4d0bd2c359d6e58fe12ba4637123",
+  "content_definition": "sha256 of the compact JSON (ensure_ascii=False, separators=(',',':')) list of [id, domain, topic, difficulty, question_type, question, answer, key_concepts, common_mistakes] (all strings, exactly as in curated_questions.csv; key_concepts '; '-joined; common_mistakes JSON string) for records sorted by id",
+  "code_tests_definition": "sha256 of json.dumps(code_tests.json content, ensure_ascii=False, sort_keys=True, separators=(',',':'))",
+  "combined_definition": "sha256 of content_sha256 + code_tests_sha256 (hex strings concatenated)",
+  "reproduce": "python audit/remediation/validate_curated_v5.py recomputes it from the files"
+ },
+ "predecessor_manifest_sha256": {
+  "v1": "84359de5d5ad8726a91364612fadc538728cb16964943eb68140c630088350f3",
+  "v2": "85ed5cea317331efc4ef643865189f2317eab63f627a2a83b9ebc1996a2a7cfc",
+  "v3": "6fa3e6538680d9168dcaf7cd4865f70c82f76d157e1eab784f75b6a3afde89fa",
+  "v4": "9ab39de15bb72c6b76a3ccbf12e99055f106b9a7269e0fb0e8edb850f688a78a"
+ },
+ "files": {
+  "README.md": "a984ea822f9b5c44ef37535ae65b68b164f5d96ced55913e359d618a63ef14e1",
+  "batch02_corrections.csv": "f64e58b3a30e4e22f4d0aed76041f06c732cb06f13d44598219de5f5d1ee63d2",
+  "batch02_verification.json": "3aed4ca2c0c19d598ff98dd4628baef3b3939fccbce05b6e511531b446557ab5",
+  "batch03_recheck.json": "21100292b2ce2e18db5f6b317916a0dd58fac202104e983b9adbaf72a126c088",
+  "batch03_review.json": "4a9dcd897f03e3b207a5574f5d0e948134e8a282f9293428a2c8ba97254fc84c",
+  "batch03_v5_corrections.csv": "1728f8ce9bb026d68be870dbc5ca3509625987b3cbfda602d4e62b64c4e02efe",
+  "code_tests.json": "6dbe462a1588cdc1e9046400101f7082024e1b1e86b2d11fb235259c052f7cd8",
+  "cross_version_results.json": "bfffef2274b7f81b8b5fbf444ab75b45a29539224ee0a86d56324f9c1c349065",
+  "curated_questions.csv": "7d7287a73f96276c5455c7949a8e7a8dc236b1515798f5a2b4a817f8a99fec94",
+  "curated_questions.json": "4b3336e0cfede78d3f138d313294478312a5a9d5cb45afd98df164a06e9d6a7e",
+  "gap_analysis_v5.md": "7ae9f0790f3061a209e592cd72b56b6a21dc0fa4fe19a45de90620e913aa4280",
+  "human_review_queue.csv": "a6432d345c71bee0b8dca128234b097ea0187f047c669d788f61478438fdeb7c",
+  "lineage.csv": "263ef34ad3a3ac1013b81548fb9d49be4fa0f1c22f2ac5ebf1fa752fb9227350",
+  "quarantine.csv": "6faa75529164ca308ee2fc3c037690823ac10fcbad16f428917453a9cb855322",
+  "rag_readiness.json": "3a44d0c40e8170c31e9b8fc80c52639e27d89fb2b9328a2e36d674775c799c9d",
+  "rag_readiness.md": "da8de08356ef6cee3818895460ebe7f46f6cf65d1c6c55a0ca94a0440c16351d",
+  "removed_duplicates.csv": "59d29034c82f77426841035d2a809ff6778277ae759cb5f00cd9e9c96b54d900",
+  "review_archive.csv": "6e7edefe5703d528331ee1c5284c1b00c1fca31138981474c0addfee5c20a141",
+  "review_queue.csv": "434627c866053868afd978ba33634d35edd5d154eeca4ef68d9dd861e5df5202",
+  "unverified_claims.csv": "d732a88d9b1b70a7d9d6fc5674905240e0b3f8cf0d719f82561d5162d4bfcfb4"
+ }
+}

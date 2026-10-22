@@ -1,0 +1,56 @@
+schema: '2.0'
+stages:
+  build_index:
+    cmd: python scripts/check_integrity.py && python -m src.retrieval.cli build 
+      --backend minilm --doc-mode qk_concise --model 
+      sentence-transformers/all-MiniLM-L6-v2 --local-files-only
+    deps:
+    - path: data/curated/v5/code_tests.json
+      hash: md5
+      md5: 88463cb4f2b9114fc8a482876a4f150e
+      size: 272509
+    - path: data/curated/v5/curated_questions.csv
+      hash: md5
+      md5: 44fdd487e415f6b9cad0eccc177cf643
+      size: 952167
+    - path: data/expansion/batch_01/batch_01_accepted.csv
+      hash: md5
+      md5: dd2af22995810be9aab26e55969c9357
+      size: 314065
+    - path: data/expansion/batch_02/batch_02_accepted.csv
+      hash: md5
+      md5: eef9570f35fac838889e4acfee3a163f
+      size: 297736
+    - path: data/expansion/batch_03/batch_03_accepted.csv
+      hash: md5
+      md5: cf62f3029332ad1d49c90f9f4128be02
+      size: 332873
+    - path: data/expansion/batch_04/batch_04_accepted.csv
+      hash: md5
+      md5: 3d90a5d3d151b9dab7860c221690e068
+      size: 309061
+    - path: data/retrieval/corpus_manifest.json
+      hash: md5
+      md5: 50c6d919ad8edfc4e27bb3c49cda4ff6
+      size: 2408
+    - path: src/retrieval
+      hash: md5
+      md5: e573ba7c3818c594821a0ec945f6023b.dir
+      size: 113118
+      nfiles: 20
+    params:
+      params.yaml:
+        embedding.backend: minilm
+        embedding.doc_mode: qk_concise
+        embedding.model: sentence-transformers/all-MiniLM-L6-v2
+    outs:
+    - path: data/retrieval/cache
+      hash: md5
+      md5: 71103c53aa80396c7119d162c37885c6.dir
+      size: 9824984
+      nfiles: 4
+    - path: data/retrieval/index
+      hash: md5
+      md5: 2c414b12da3d9c844e6a8e8439ba5661.dir
+      size: 4727745
+      nfiles: 10

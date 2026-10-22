@@ -1,0 +1,1237 @@
+{
+ "B4-MLO-14-6": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "major",
+     "field": "detailed_answer",
+     "problem": "The whole B result (and so 'A has the higher expected net') rests on one reading of 'each costing about 2% of the model's margin until noticed': a loss RATE of 2% while the incident lasts. The other natural reading (2% of annual margin = 480,000 is the pre-detection cost of an incident) gives a saving of 24M x 0.02 x (1 - 3/42) = about 445,700 per incident, roughly 9x larger, and flips the ranking. The answer states its reading but never shows the sensitivity to it, although it is the assumption the data least pin down and the question asks for sensitivity to the least-trusted assumptions. Also 51,400 is inconsistent with the other rounded figures (55,400 - 3,900 = 51,500; unrounded 51,439)."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Rounded to 100 here but 55,400 - 3,900 = 51,500 does not give the stated saving; unrounded value is 55,385."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Unrounded 3,945; with the 55,385 above gives 51,440 as the stated saving."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Use the same saving figure as elsewhere (120,000/51,439 = 2.33)."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "4 incidents: 4 x 51,439 - 120,000 = 85,758, which rounds to 85,800 (85,700 is a truncation/mixed-rounding artefact; 1 incident -68,561 -> -68,600 is correct)."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Sculley et al. only say the external world is rarely stable; silent degradations also come from pipeline/feature bugs, so the paper supports a hedge, not a prediction about the incident rate."
+    },
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "Third different value for the same saving (51,400 in detailed, unrounded 51,439)."
+    },
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "See detailed_answer: exact 85,758."
+    },
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "Consistency with 51,440."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv2"
+  }
+ ],
+ "B4-MLO-08-1": [
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  }
+ ],
+ "B4-MLO-08-8": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "'Easy to miss' is not general: 0.2 sd is a z-score above 10 at the 7,200 rows/day the answer itself uses for B, so a sensitive test would flag it every day; it is missed only when seasonal swings (weekend about 17% above the pool) and tolerance are of similar size. Also the offset persists, so it can be mistaken for a stable level difference."
+    },
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "'Higher' is ambiguous: higher than C's 7-day pool (4 days of rows vs 7), but lower than B's single day."
+    }
+   ],
+   "difficulty_blind": "Hard",
+   "round": "fv"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Hard",
+   "round": "fv2"
+  }
+ ],
+ "B4-MLO-10-1": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "code.solution",
+     "problem": "perturb receives a live view of X[:, col]. A perturb function that works in place (c *= -1; return c) mutates the caller's evaluation matrix, then X2 and X are identical and the check silently passes with 0 failures (reproduced: 50 rows, 0 failures, X mutated). This contradicts the answer's own 'never mutate the evaluation set in place' and 'a test that can never fail' warnings."
+    },
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "Same change so the fenced code equals code.solution."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "'Usually at or near zero' for invariance is a recommendation, not a universal; also repeated later ('fix thresholds before looking at the candidate's results')."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "Test has several further assertions, not one; the in-place-mutation guard (perturb that mutates its argument cannot corrupt X or hide the failure) is tested but not described."
+    }
+   ],
+   "difficulty_blind": "Hard",
+   "round": "fv2"
+  },
+  {
+   "verdict": "correct",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv3"
+  }
+ ],
+ "B4-MLO-11-1": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Overstated as worded: if the stolen identity can also launch pipeline jobs, the pipeline identity will register whatever that code produces (including a pickle with a payload), so the token can still get a malicious artifact to the approval step. Production is then protected only by the approval and the integrity/loader controls, which the answer covers only generically. Also experiment-namespace artifacts remain a lateral-movement path between notebooks."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "The rubric point (and a useful control) is alerting on production-alias moves; the answer's audit item describes only a passive log."
+    }
+   ],
+   "difficulty_blind": "Hard",
+   "round": "fv"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Hard",
+   "round": "fv2"
+  }
+ ],
+ "B4-MLO-11-5": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "major",
+     "field": "detailed_answer",
+     "problem": "'Adding noise to outputs' is grouped with DP training and then covered by 'the strongest option'. Output noise that leaves the label unchanged is confidence masking, which label-only attacks defeat (the answer says so two bullets earlier). Only DP training (and, per the same paper, strong L2 regularisation) stopped all attacks tested."
+    },
+    {
+     "severity": "major",
+     "field": "concise_answer",
+     "problem": "Presents score-masking and rate limits as mitigations without their limits; contradicts the canonical statement that they should not be relied on alone and omits the 'do not achieve' half of the question."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "The question gives 10,000 calls per key per day but the answer never says what that allows."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Risk factors (overfitting, small data, outliers, rich outputs) are empirical tendencies, not universal, and are not stated in the cited OWASP page."
+    },
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "If non-members come from a later period or different population the AUC will reflect drift, not membership."
+    },
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "Estimating a 0.1% FPR needs at least a few thousand non-members just to see a handful of false positives."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Body of the paper says these are the only defences that meaningfully decrease leakage, strong L2 underfits, and DP at useful accuracy needed epsilon > 100 (weak formal guarantee); 'stopped all' is stronger than the evidence for a RAG reference."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Off-question aside; trimming it offsets the hedge above (detailed 439 -> 432 words, under the 450 limit)."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv2"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv3"
+  }
+ ],
+ "B4-MLO-12-7": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "major",
+     "field": "detailed_answer",
+     "problem": "A shadow model has no click outcomes, so it cannot give a CTR counterfactual; contradicts smi-l0029. A holdout only exists if one was set up."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Unsupported explanation; if the default applied to every user at once the loss would normally be a step, so the ramp should be explained rather than assumed."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "An upstream column rename breaks both the old and new model equally, so a canary against the previous model would not have detected this fault."
+    },
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "In this incident the feature already falls back to a default, so disabling it only reproduces the degraded state unless the model was trained or validated with that feature missing."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "Dangling 'so it is' after the edit; reads as a non sequitur"
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv2"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv3"
+  }
+ ],
+ "B4-MLO-13-3": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Cost scales with both; the point is that 8% more requests cannot explain +40%. The 30% figure used later is never derived in this field."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Quantify: under this hypothetical the tenant would need about 85% of traffic."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "'Byte-identical' and 'many providers' go beyond the cited OpenAI page."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Holds only at unchanged unit prices/discounts; a price or model change would also move the bill."
+    },
+    {
+     "severity": "minor",
+     "field": "concise_answer",
+     "problem": "Same unchanged-price condition (the replacement keeps the concise answer at 79 words)."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv2"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv3"
+  }
+ ],
+ "B4-MLO-14-4": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "Sculley et al. only suggest 'some amount of randomization' or isolating data; 'the clean mitigation' is stronger than the source."
+    }
+   ],
+   "difficulty_blind": "Hard",
+   "round": "fv"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Hard",
+   "round": "fv2"
+  }
+ ],
+ "B4-MLO-14-5": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "major",
+     "field": "practical_answer",
+     "problem": "The query compares numbers only. For text ids or categories the subtraction yields 0 so a changed value is never counted as a mismatch, although the design requires exact comparison for ids and categories. This was reproduced."
+    },
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "Of the 11 sampled values one has no recomputation, so 4 of the 10 recomputed values were off by one."
+    },
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "The 14:00 hour contains 10 requests plus two extra requests (one NULL-served, one without recomputation), and 4 of the 10 are faulty."
+    },
+    {
+     "severity": "minor",
+     "field": "rubric_points",
+     "problem": "Rubric point is not discussed in the answer."
+    }
+   ],
+   "difficulty_blind": "Hard",
+   "round": "fv"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Hard",
+   "round": "fv2"
+  }
+ ],
+ "B4-MLO-08-2": [
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  }
+ ],
+ "B4-MLO-08-3": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Null-rate and schema checks are causes/invariants, not user-visible symptoms in the SRE sense; wording overstates the SRE citation."
+    },
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "Prior smi-l0026 says 'Do not page on drift statistics'; here a drift statistic is paged. Not wrong (model-output symptom, persistence) but should be made explicit."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "Tier table pages only on null rate of the top 10 features; a null-rate regression in any other feature falls to 'dashboard only', i.e. the original missed-incident class can recur, yet the answer says the design fixes it and promises 'one page for the null-rate class of incident'."
+    },
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "The question describes a daily job; two consecutive daily windows means a two-day delay before a null-rate page."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv2"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "Paging on a score-distribution drift statistic conflicts with earlier answer smi-l0026 (do not page on drift statistics) unless justified; the record presents it as unconditional."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv3"
+  }
+ ],
+ "B4-MLO-08-4": [
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  }
+ ],
+ "B4-MLO-08-5": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "Unsourced and slightly loose: tree ensembles predict a constant beyond the training range, which is the accurate statement."
+    },
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "Independent resampling breaks correlations with other features and can create off-manifold rows; result is a sensitivity check only."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "Permutation importance needs labels, which the recent unlabelled sample does not have; the recent sample can only support label-free attribution."
+    },
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "Scores shifting or rows outside support are signs that drift may be harmful, not proof; a shifted score can be a correct response to a legitimately different population."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv2"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "Overstated: a retrain on mixed data makes attribution harder (the campaign cohort and the model change are confounded) but a held-out campaign slice and the pre-retrain comparison still allow some attribution."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv3"
+  }
+ ],
+ "B4-MLO-08-6": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "Paper's sentence is about prediction bias (Monitor 7), not prediction quality in general."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "Simulated value is 0.00016-0.00018, which rounds to 0.0002"
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv2"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv3"
+  }
+ ],
+ "B4-MLO-08-7": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Holds only if request IDs are random, not derived from user or feature data (answer later asks to validate, but claim is unconditional)."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Chi-square approximation understates at ~5 rows per bin; simulation gives about 0.24."
+    },
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "Security team wants less raw data retained; full logging needs their agreement."
+    }
+   ],
+   "difficulty_blind": "Hard",
+   "round": "fv"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Item 1 already computes exact per-slice histograms over all traffic, so hourly slice PSI does not require raw capture; the 100% raw capture is for investigation and weighted analysis. As worded it implies raw capture is needed for the PSI. The noise floor of ~0.02 applies either way because it is set by the 417 rows an hour that exist."
+    }
+   ],
+   "difficulty_blind": "Hard",
+   "round": "fv2"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Assumes uniform traffic across the day; overnight the slice has far fewer rows per hour and the floor is higher."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Exact value depends on bin edges and smoothing; my simulation (decile bins, floor 1e-4) gave about 0.22."
+    }
+   ],
+   "difficulty_blind": "Hard",
+   "round": "fv3"
+  }
+ ],
+ "B4-MLO-09-1": [
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Easy",
+   "round": "fv"
+  }
+ ],
+ "B4-MLO-09-2": [
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Hard",
+   "round": "fv"
+  }
+ ],
+ "B4-MLO-09-3": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "major",
+     "field": "answer",
+     "problem": "Misleading: guardrail 1 (quality alerts block retraining) or 2 (data validation with quarantine) alone would very likely have prevented the incident; the layers are defence in depth, not each necessary."
+    }
+   ],
+   "difficulty_blind": "Hard",
+   "round": "fv"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Hard",
+   "round": "fv2"
+  }
+ ],
+ "B4-MLO-09-4": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "Unclear phrase."
+    },
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "At 14 h per full retrain, 60 daily full retrains is ~35 days of cluster time; the answer should say how to cut cost."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "major",
+     "field": "answer",
+     "problem": "Warm start is path dependent: its risks (forgetting, error persistence) accumulate over consecutive updates. Sampling 10-15 isolated origin days tests only single-step warm starts from a fresh checkpoint, hides exactly the failure modes the answer lists, and makes the 'day-to-day stability' and 'injected bad batch recovery' checks impossible. The warm-start chain is cheap (about 40 min per day), only the full-retrain baseline needs sampling."
+    },
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "Vague and unsourced; the meaning is unclear to a grader"
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv2"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "The full-retrain baseline is run only on a sample of days, so stability can be compared only for the warm-start chain (or between sampled days)."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv3"
+  }
+ ],
+ "B4-MLO-09-5": [
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  }
+ ],
+ "B4-MLO-10-2": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "The answer interprets numbers from a four-row example that appears only in code.test; a reader of the answer text cannot reproduce or check them."
+    },
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "No test is shown below in the answer text; it lives in code.test."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Missing limitation: rows whose label_ts is NULL (unlabelled) are never counted in rows_after_label, so the label check silently skips them."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv2"
+  }
+ ],
+ "B4-MLO-10-3": [
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  }
+ ],
+ "B4-MLO-10-4": [
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  }
+ ],
+ "B4-MLO-12-1": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "If all traffic is moved to v11, the later instruction to split latency by model version has no v12 data to compare. The practical decision rule (keep traffic on v11 and continue offline with a replay) has the same gap."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv2"
+  }
+ ],
+ "B4-MLO-12-3": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Per-request cost presumes growth is proportional to requests; at flat traffic growth per hour and per request cannot be told apart, which the staging halving test is meant to check."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "This does not separate a leak from allocator retention (both stay high) and is listed only under the leak bullet."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Sawtooth is an unsupported characterisation; fragmentation typically makes resident size plateau high rather than climb linearly without end, which matters for this question."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Stated without a source and without the condition that the tensors must be stored."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv2"
+  }
+ ],
+ "B4-MLO-12-4": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Quoted item title does not match the rubric, which reads 'Models can be quickly and safely rolled back to a previous serving version' and asks that rollback be practised outside emergencies."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "The question only says the new feature has been written for 30 minutes; it does not say inputs were replaced or dropped, so this presents a condition as given."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Shifting traffic back to the old model is a form of rollback; the faster options are changing traffic weight or flipping a flag rather than redeploying either build."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Misses that 30 minutes of values from the buggy pipeline may have been written to online/offline stores and logs; rollback does not remove them."
+    },
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "Ordering differs from the canonical first-five-minutes list (which shifts traffic first); both fit in five minutes but should be stated as parallel."
+    }
+   ],
+   "difficulty_blind": "Hard",
+   "round": "fv"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Contradicts smi-l0013 (which says compare against a concurrent control rather than last week, because of seasonality and concurrent changes). Same-hour-last-week is a fallback baseline, not the best one. Smi-l0013 is right."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Flipping the flag only helps if the model handles the default; smi-l0032 shows a model collapsing to near-default predictions when an input is defaulted. The practical answer covers this but the first-five-minutes list does not."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv2"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv3"
+  }
+ ],
+ "B4-MLO-12-5": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Omits the error-budget arithmetic that motivates the design: 99.95% over 30 days is 21.6 minutes, which last month's 22-minute outage alone exceeded."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Recovery is addressed only in the practical field (gradual circuit re-close). Missing: features written during the outage must be backfilled or confirmed fresh before leaving fallback."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Weaker than smi-l0027, which says a valid in-time fallback response is good for the availability SLO while the fallback rate is tracked as its own SLI."
+    },
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "Mode numbers (0-3) differ from the canonical ladder (1-4)."
+    },
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "Renumber to match canonical ladder."
+    },
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "Renumber to match canonical ladder."
+    },
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "Renumber to match canonical ladder."
+    },
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "Mode reference after renumbering."
+    },
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "Mode reference after renumbering."
+    }
+   ],
+   "difficulty_blind": "Hard",
+   "round": "fv"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Assumes a 30-day month and that every request failed for the full 22 minutes; neither is stated in the question."
+    }
+   ],
+   "difficulty_blind": "Hard",
+   "round": "fv2"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Hard",
+   "round": "fv3"
+  }
+ ],
+ "B4-MLO-12-6": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "With labels three weeks late, the label-based budget cannot trigger a timely freeze; the answer should say the proxy budget drives immediate action and the label budget confirms it."
+    }
+   ],
+   "difficulty_blind": "Hard",
+   "round": "fv"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "The new sentence introduces a proxy budget and a matured-label budget, then says 'the quality budget' without saying which; the 99%-fresh SLO defined above is the proxy one."
+    }
+   ],
+   "difficulty_blind": "Hard",
+   "round": "fv2"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "concise_answer",
+     "problem": "Detailed answer defines the freeze trigger as the proxy quality budget; concise is vaguer and could be read as waiting for label-based budget (three weeks late)."
+    }
+   ],
+   "difficulty_blind": "Hard",
+   "round": "fv3"
+  }
+ ],
+ "B4-MLO-12-8": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "major",
+     "field": "detailed_answer",
+     "problem": "The question gives only the daily total, the peak and \"low overnight\". Savings (a)-(c) depend on an assumed hourly profile that appears only in the practical field, so the canonical answer presents profile-dependent figures as results."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "The question does not say how 4 replicas were chosen; this is an inference stated as fact."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "The question never says the replicas use accelerators."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Assumes accelerator-backed replicas."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Assumes GPUs."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "major",
+     "field": "detailed_answer",
+     "problem": "Sign reversed: the cache lowers cost from 612 to 576, a saving of 36 units; \"adds\" says the opposite and a grader could teach that caching costs more."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv2"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv3"
+  }
+ ],
+ "B4-MLO-11-2": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Central legal-ish claim is unsourced (listed as unverified). Regulator guidance can be cited, and the relevant nuance is who holds the additional information. Same text is the canonical_answer (detailed == canonical), so apply to both."
+    },
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Sweeney's cited finding is about US 5-digit ZIP + gender + date of birth; stating it without that scope overstates source fit for a UK postcode."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "Omits that the estimate comes from 1990 census data and US 5-digit ZIPs (a full UK postcode and no gender field differ)"
+    },
+    {
+     "severity": "minor",
+     "field": "concise_answer",
+     "problem": "Concise lacks the hedge that the detailed answer has on erasure; implies deletion is always owed"
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv2"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv3"
+  }
+ ],
+ "B4-MLO-11-3": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "major",
+     "field": "answer",
+     "problem": "The cited Secret Sharer paper explicitly says unintended memorisation is not due to overtraining and occurs early in training; 'small data' is not supported by it. A RAG grader would teach 'memorisation = overfitting', which the source contradicts."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "Supported only by an appendix experiment caption; stated as a general finding of the study it is stronger than the paper's main text, which stresses memorisation even in small models."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv2"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "Ambiguous: it is the first run that reads the tombstone list (which may be tonight's) that excludes the person; 'from tomorrow' asserts a date the scenario does not give."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv3"
+  }
+ ],
+ "B4-MLO-11-4": [
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  }
+ ],
+ "B4-MLO-12-2": [
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  }
+ ],
+ "B4-MLO-12-9": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "Overhead of writing a checkpoint should be compared with the checkpoint interval (and total job time), not with a single training step; as worded the criterion is wrong/uninformative."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "major",
+     "field": "answer",
+     "problem": "question_type is 'design' (open-ended, several acceptable strategies) but rubric_points is null, violating the schema; a RAG grader has no decision/trade-off list. Add the supplied rubric_points (or change type to 'scenario')."
+    },
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "Not a bound if replacement capacity is slow to arrive."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv2"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv3"
+  }
+ ],
+ "B4-MLO-13-1": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "If the request used an alias the logged identifier is just the alias; it reveals a change only if the resolved snapshot reported in the response is what is recorded."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv2"
+  }
+ ],
+ "B4-MLO-13-2": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "detailed_answer",
+     "problem": "The text then says labelling yields the share of the 2.7 extra points; with 50-100 labels that estimate is rough, which a reader may not realise."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv2"
+  }
+ ],
+ "B4-MLO-14-1": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "In the scenario click-through is still up after six weeks, so a fading click lift is not what is observed; the relevant mechanism is cumulative narrowing/fatigue, with novelty relevant mainly to the A/B window."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  },
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "The question says click-through is still up, not by how much; 'has not faded' is unsupported."
+    },
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "Vague, unsupported claim about test-window representativeness that follows a clause saying the click lift has not faded; drop it."
+    },
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "No mapping from evidence to mechanism although the question asks what would separate them."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv2"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Medium",
+   "round": "fv3"
+  }
+ ],
+ "B4-MLO-14-2": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "answer",
+     "problem": "Rule 29 recommends logging serving features to use at training time (train like you serve); consistency checking is a consequence, not the stated purpose."
+    }
+   ],
+   "difficulty_blind": "Hard",
+   "round": "fv"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Hard",
+   "round": "fv2"
+  }
+ ],
+ "B4-MLO-14-3": [
+  {
+   "verdict": "correct",
+   "issues": [
+    {
+     "severity": "minor",
+     "field": "practical_answer",
+     "problem": "Two identical arms will show p < 0.05 about 5% of the time by chance, so one A/A 'difference' is not proof of a platform problem."
+    }
+   ],
+   "difficulty_blind": "Medium",
+   "round": "fv"
+  },
+  {
+   "verdict": "pass",
+   "issues": [],
+   "difficulty_blind": "Hard",
+   "round": "fv2"
+  }
+ ]
+}

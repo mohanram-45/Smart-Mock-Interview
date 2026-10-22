@@ -1,0 +1,903 @@
+[
+ {
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "answer": "A schema or constrained decoder only guarantees syntax and types: the value is valid JSON of the right shape, not a true statement about the document.\n\nStructured-output features (JSON mode, schema-constrained decoding, function-calling formats) restrict what token sequences can be produced, so the result parses and has the declared types and enum values. They say nothing about whether a number was read from the right place. The model still chooses the value by the same probabilistic process as free text, and a constraint can even push it to emit something plausible for a required field it could not find: if due_date is a required string, an invented date is the only schema-valid way to comply.\n\nSo treat the output as untrusted data and add layers.\n1. Make absence representable: allow null or an explicit 'not_found' marker, and say in the prompt when to use it. Required-and-non-nullable fields invite fabrication.\n2. Cross-field invariants checked in code: sum(line_items) + tax should equal total within a rounding tolerance; due_date should not precede issue_date; currency should match the symbol in the source. Violations trigger a retry with the error message or human review.\n3. Grounding checks: for extraction tasks the value (normalised) should occur in the source text; a total that appears nowhere in the document is suspect. This catches invention but not 'picked the wrong number that does appear'.\n4. Disambiguating schema design: separate fields (subtotal, tax, total_due) force the model to place each number, which often reduces confusion versus a single ambiguous 'amount'. Field descriptions help, though how much is model-dependent.\n5. Evaluate per field on a labelled sample (exact match for total, not just 'valid JSON rate'), and track it as a regression metric.\n6. Route by risk: records failing any check, or where two independent extractions disagree, go to review.\n\nPitfall: reporting 'valid JSON rate = 100%' as quality. Syntactic validity and semantic accuracy are different metrics.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "code": null,
+  "sources": [],
+  "time_sensitive": false,
+  "plan_id": "B2-GEN-08-1",
+  "cell_id": "GEN-08",
+  "topic": "Prompting and structured output (few-shot, CoT caveats, schemas, determinism)",
+  "question_type": "concept",
+  "difficulty": "Medium",
+  "question": "An invoice-extraction service forces the model to emit JSON that matches a schema (total: number, currency: one of three enum values, due_date: string). Parse errors fell to zero, yet finance still finds about 4% of records with a wrong total (usually the pre-tax subtotal was picked) and some due dates that are invented when the invoice shows none. Why does schema enforcement not fix this, and which extra layers would you add?",
+  "answer_set": "single",
+  "key_concepts": [
+   "constrained decoding",
+   "schema validity vs semantic correctness",
+   "nullable fields",
+   "cross-field invariants",
+   "grounding check",
+   "field-level accuracy",
+   "human review routing"
+  ],
+  "common_mistakes": [
+   "Believing that a schema-constrained output is therefore factually correct",
+   "Making every field required and non-nullable, which pushes the model to fabricate missing values",
+   "Measuring only parse success rate instead of per-field accuracy against labels"
+  ],
+  "interview_style_note": "Separates syntactic guarantees from semantic correctness and proposes checks in code, a representable 'missing' value and a per-field metric.",
+  "tags": [
+   "structured-output",
+   "json",
+   "validation",
+   "extraction"
+  ],
+  "change_notes": "Distinct from smi-h0011/smi-h0033 (classification logits, log parsing): this is about the gap between format guarantees and value correctness in LLM extraction. No existing question covers constrained-output semantics.",
+  "confidence": "high",
+  "related_domains": [
+   "NLP"
+  ]
+ },
+ {
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Design points.\n- Extraction: scan for '{' or '[', find the bracket-balanced end with a string-aware pass (track quotes and backslash escapes so a '}' inside a string value does not end the object), then json.loads the slice. A conservative repair strips trailing commas outside strings. Truncated output has no balanced end, so it is skipped rather than 'completed': guessing the missing tail can turn a cut-off reply into a plausible but wrong record.\n- All candidates, not the first: a model often quotes an example object before its answer. Returning every parsed value lets the caller pick the first one that passes the schema instead of the first one that parses.\n- Validation is a separate, explicit step. The subset covers type (with bool excluded from integer, since bool is an int subclass in Python), enum, required, additionalProperties false, numeric bounds, string length and array items. Errors carry a path such as $.priority so they can be fed back to the model.\n- Retry loop: on failure, append the concrete violations to the original prompt (not to the previous, already polluted prompt) and ask for corrected JSON. Attempts are capped, max_attempts is validated, and invalid data is never returned.\n\nLimits. A retry can fix format and constraint violations; it cannot make the values true, so semantic checks (cross-field rules, grounding) still belong after validation. Retries cost latency and tokens, and sampling means attempt 2 is not guaranteed to differ. A hand-rolled subset validator is acceptable for a closed schema; for broad schemas use a full JSON-Schema library, which is outside this stdlib-only exercise. Log the failure reasons per attempt: a rising retry rate is an early signal of a prompt or model regression.",
+  "practical_answer": "Reference implementation (tested on Python 3.10, 3.11 and 3.13):\n\n```python\nimport json\n\n\nclass ParseFailure(Exception):\n    def __init__(self, message, errors):\n        super().__init__(message)\n        self.errors = errors\n\n\ndef _end_of_value(text, start):\n    \"\"\"Index just past the bracket-balanced value starting at text[start], string-aware.\"\"\"\n    depth, in_str, esc = 0, False, False\n    for i in range(start, len(text)):\n        ch = text[i]\n        if in_str:\n            if esc:\n                esc = False\n            elif ch == \"\\\\\":\n                esc = True\n            elif ch == '\"':\n                in_str = False\n        elif ch == '\"':\n            in_str = True\n        elif ch in \"{[\":\n            depth += 1\n        elif ch in \"}]\":\n            depth -= 1\n            if depth == 0:\n                return i + 1\n    return None\n\n\ndef _strip_trailing_commas(s):\n    out, in_str, esc = [], False, False\n    for i, ch in enumerate(s):\n        if in_str:\n            out.append(ch)\n            if esc:\n                esc = False\n            elif ch == \"\\\\\":\n                esc = True\n            elif ch == '\"':\n                in_str = False\n            continue\n        if ch == '\"':\n            in_str = True\n        elif ch == \",\":\n            j = i + 1\n            while j < len(s) and s[j].isspace():\n                j += 1\n            if j < len(s) and s[j] in \"}]\":\n                continue  # drop trailing comma\n        out.append(ch)\n    return \"\".join(out)\n\n\ndef extract_json_values(text):\n    \"\"\"Return every top-level JSON object/array found in free text, in order.\n    Handles prose around it, code fences, braces inside strings and trailing commas.\n    Truncated values are NOT completed (they are skipped).\"\"\"\n    values, pos = [], 0\n    while pos < len(text):\n        starts = [p for p in (text.find(\"{\", pos), text.find(\"[\", pos)) if p != -1]\n        if not starts:\n            break\n        s = min(starts)\n        e = _end_of_value(text, s)\n        if e is None:\n            pos = s + 1\n            continue\n        chunk = text[s:e]\n        for candidate in (chunk, _strip_trailing_commas(chunk)):\n            try:\n                values.append(json.loads(candidate))\n                pos = e\n                break\n            except ValueError:\n                continue\n        else:\n            pos = s + 1\n    return values\n\n\ndef _type_ok(v, t):\n    if t == \"object\":\n        return isinstance(v, dict)\n    if t == \"array\":\n        return isinstance(v, list)\n    if t == \"string\":\n        return isinstance(v, str)\n    if t == \"boolean\":\n        return isinstance(v, bool)\n    if t == \"null\":\n        return v is None\n    if t == \"integer\":\n        return isinstance(v, int) and not isinstance(v, bool)\n    if t == \"number\":\n        return isinstance(v, (int, float)) and not isinstance(v, bool)\n    raise ValueError(\"unsupported type in schema: %r\" % (t,))\n\n\ndef validate(value, schema, path=\"$\"):\n    \"\"\"Return a list of human-readable violations (empty list = valid).\n    Supported keywords: type, enum, required, properties, additionalProperties (False),\n    minimum, maximum, minLength, maxLength, items, minItems, maxItems.\"\"\"\n    errs = []\n    t = schema.get(\"type\")\n    if t is not None and not _type_ok(value, t):\n        return [\"%s: expected %s, got %s\" % (path, t, type(value).__name__)]\n    if \"enum\" in schema and value not in schema[\"enum\"]:\n        errs.append(\"%s: %r not in %r\" % (path, value, schema[\"enum\"]))\n    if isinstance(value, (int, float)) and not isinstance(value, bool):\n        if \"minimum\" in schema and value < schema[\"minimum\"]:\n            errs.append(\"%s: %r < minimum %r\" % (path, value, schema[\"minimum\"]))\n        if \"maximum\" in schema and value > schema[\"maximum\"]:\n            errs.append(\"%s: %r > maximum %r\" % (path, value, schema[\"maximum\"]))\n    if isinstance(value, str):\n        if \"minLength\" in schema and len(value) < schema[\"minLength\"]:\n            errs.append(\"%s: shorter than %d\" % (path, schema[\"minLength\"]))\n        if \"maxLength\" in schema and len(value) > schema[\"maxLength\"]:\n            errs.append(\"%s: longer than %d\" % (path, schema[\"maxLength\"]))\n    if isinstance(value, dict):\n        props = schema.get(\"properties\", {})\n        for k in schema.get(\"required\", []):\n            if k not in value:\n                errs.append(\"%s: missing required key %r\" % (path, k))\n        for k, v in value.items():\n            if k in props:\n                errs.extend(validate(v, props[k], \"%s.%s\" % (path, k)))\n            elif schema.get(\"additionalProperties\") is False:\n                errs.append(\"%s: unexpected key %r\" % (path, k))\n    if isinstance(value, list):\n        if \"minItems\" in schema and len(value) < schema[\"minItems\"]:\n            errs.append(\"%s: fewer than %d items\" % (path, schema[\"minItems\"]))\n        if \"maxItems\" in schema and len(value) > schema[\"maxItems\"]:\n            errs.append(\"%s: more than %d items\" % (path, schema[\"maxItems\"]))\n        if \"items\" in schema:\n            for i, v in enumerate(value):\n                errs.extend(validate(v, schema[\"items\"], \"%s[%d]\" % (path, i)))\n    return errs\n\n\ndef parse_with_retries(call_model, prompt, schema, max_attempts=3):\n    \"\"\"call_model(prompt) -> str. Returns (value, attempts_used).\n    On failure the violations are appended to the next prompt. Raises ParseFailure\n    after max_attempts; nothing invalid is ever returned.\"\"\"\n    if not isinstance(max_attempts, int) or max_attempts < 1:\n        raise ValueError(\"max_attempts must be an integer >= 1\")\n    current, last_errors = prompt, []\n    for attempt in range(1, max_attempts + 1):\n        raw = call_model(current)\n        values = extract_json_values(raw)\n        if not values:\n            last_errors = [\"no JSON object or array found in the reply\"]\n        else:\n            per_candidate = [validate(v, schema) for v in values]\n            for v, errs in zip(values, per_candidate):\n                if not errs:\n                    return v, attempt\n            last_errors = per_candidate[0]\n        current = (prompt + \"\\n\\nYour previous reply was rejected:\\n- \"\n                   + \"\\n- \".join(last_errors)\n                   + \"\\nReturn only corrected JSON.\")\n    raise ParseFailure(\"gave up after %d attempts\" % max_attempts, last_errors)\n```\n\nThe accompanying test script checks fenced and prose-wrapped input, braces inside strings, trailing commas, truncated input, bool-vs-integer, an example object that precedes the real answer, feedback of violations into the retry prompt, and that ParseFailure is raised after the attempt cap.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import json\n\n\nclass ParseFailure(Exception):\n    def __init__(self, message, errors):\n        super().__init__(message)\n        self.errors = errors\n\n\ndef _end_of_value(text, start):\n    \"\"\"Index just past the bracket-balanced value starting at text[start], string-aware.\"\"\"\n    depth, in_str, esc = 0, False, False\n    for i in range(start, len(text)):\n        ch = text[i]\n        if in_str:\n            if esc:\n                esc = False\n            elif ch == \"\\\\\":\n                esc = True\n            elif ch == '\"':\n                in_str = False\n        elif ch == '\"':\n            in_str = True\n        elif ch in \"{[\":\n            depth += 1\n        elif ch in \"}]\":\n            depth -= 1\n            if depth == 0:\n                return i + 1\n    return None\n\n\ndef _strip_trailing_commas(s):\n    out, in_str, esc = [], False, False\n    for i, ch in enumerate(s):\n        if in_str:\n            out.append(ch)\n            if esc:\n                esc = False\n            elif ch == \"\\\\\":\n                esc = True\n            elif ch == '\"':\n                in_str = False\n            continue\n        if ch == '\"':\n            in_str = True\n        elif ch == \",\":\n            j = i + 1\n            while j < len(s) and s[j].isspace():\n                j += 1\n            if j < len(s) and s[j] in \"}]\":\n                continue  # drop trailing comma\n        out.append(ch)\n    return \"\".join(out)\n\n\ndef extract_json_values(text):\n    \"\"\"Return every top-level JSON object/array found in free text, in order.\n    Handles prose around it, code fences, braces inside strings and trailing commas.\n    Truncated values are NOT completed (they are skipped).\"\"\"\n    values, pos = [], 0\n    while pos < len(text):\n        starts = [p for p in (text.find(\"{\", pos), text.find(\"[\", pos)) if p != -1]\n        if not starts:\n            break\n        s = min(starts)\n        e = _end_of_value(text, s)\n        if e is None:\n            pos = s + 1\n            continue\n        chunk = text[s:e]\n        for candidate in (chunk, _strip_trailing_commas(chunk)):\n            try:\n                values.append(json.loads(candidate))\n                pos = e\n                break\n            except ValueError:\n                continue\n        else:\n            pos = s + 1\n    return values\n\n\ndef _type_ok(v, t):\n    if t == \"object\":\n        return isinstance(v, dict)\n    if t == \"array\":\n        return isinstance(v, list)\n    if t == \"string\":\n        return isinstance(v, str)\n    if t == \"boolean\":\n        return isinstance(v, bool)\n    if t == \"null\":\n        return v is None\n    if t == \"integer\":\n        return isinstance(v, int) and not isinstance(v, bool)\n    if t == \"number\":\n        return isinstance(v, (int, float)) and not isinstance(v, bool)\n    raise ValueError(\"unsupported type in schema: %r\" % (t,))\n\n\ndef validate(value, schema, path=\"$\"):\n    \"\"\"Return a list of human-readable violations (empty list = valid).\n    Supported keywords: type, enum, required, properties, additionalProperties (False),\n    minimum, maximum, minLength, maxLength, items, minItems, maxItems.\"\"\"\n    errs = []\n    t = schema.get(\"type\")\n    if t is not None and not _type_ok(value, t):\n        return [\"%s: expected %s, got %s\" % (path, t, type(value).__name__)]\n    if \"enum\" in schema and value not in schema[\"enum\"]:\n        errs.append(\"%s: %r not in %r\" % (path, value, schema[\"enum\"]))\n    if isinstance(value, (int, float)) and not isinstance(value, bool):\n        if \"minimum\" in schema and value < schema[\"minimum\"]:\n            errs.append(\"%s: %r < minimum %r\" % (path, value, schema[\"minimum\"]))\n        if \"maximum\" in schema and value > schema[\"maximum\"]:\n            errs.append(\"%s: %r > maximum %r\" % (path, value, schema[\"maximum\"]))\n    if isinstance(value, str):\n        if \"minLength\" in schema and len(value) < schema[\"minLength\"]:\n            errs.append(\"%s: shorter than %d\" % (path, schema[\"minLength\"]))\n        if \"maxLength\" in schema and len(value) > schema[\"maxLength\"]:\n            errs.append(\"%s: longer than %d\" % (path, schema[\"maxLength\"]))\n    if isinstance(value, dict):\n        props = schema.get(\"properties\", {})\n        for k in schema.get(\"required\", []):\n            if k not in value:\n                errs.append(\"%s: missing required key %r\" % (path, k))\n        for k, v in value.items():\n            if k in props:\n                errs.extend(validate(v, props[k], \"%s.%s\" % (path, k)))\n            elif schema.get(\"additionalProperties\") is False:\n                errs.append(\"%s: unexpected key %r\" % (path, k))\n    if isinstance(value, list):\n        if \"minItems\" in schema and len(value) < schema[\"minItems\"]:\n            errs.append(\"%s: fewer than %d items\" % (path, schema[\"minItems\"]))\n        if \"maxItems\" in schema and len(value) > schema[\"maxItems\"]:\n            errs.append(\"%s: more than %d items\" % (path, schema[\"maxItems\"]))\n        if \"items\" in schema:\n            for i, v in enumerate(value):\n                errs.extend(validate(v, schema[\"items\"], \"%s[%d]\" % (path, i)))\n    return errs\n\n\ndef parse_with_retries(call_model, prompt, schema, max_attempts=3):\n    \"\"\"call_model(prompt) -> str. Returns (value, attempts_used).\n    On failure the violations are appended to the next prompt. Raises ParseFailure\n    after max_attempts; nothing invalid is ever returned.\"\"\"\n    if not isinstance(max_attempts, int) or max_attempts < 1:\n        raise ValueError(\"max_attempts must be an integer >= 1\")\n    current, last_errors = prompt, []\n    for attempt in range(1, max_attempts + 1):\n        raw = call_model(current)\n        values = extract_json_values(raw)\n        if not values:\n            last_errors = [\"no JSON object or array found in the reply\"]\n        else:\n            per_candidate = [validate(v, schema) for v in values]\n            for v, errs in zip(values, per_candidate):\n                if not errs:\n                    return v, attempt\n            last_errors = per_candidate[0]\n        current = (prompt + \"\\n\\nYour previous reply was rejected:\\n- \"\n                   + \"\\n- \".join(last_errors)\n                   + \"\\nReturn only corrected JSON.\")\n    raise ParseFailure(\"gave up after %d attempts\" % max_attempts, last_errors)",
+   "test": "\nSCHEMA = {\n    \"type\": \"object\",\n    \"required\": [\"category\", \"priority\", \"refund_amount\"],\n    \"additionalProperties\": False,\n    \"properties\": {\n        \"category\": {\"type\": \"string\", \"enum\": [\"billing\", \"bug\", \"other\"]},\n        \"priority\": {\"type\": \"integer\", \"minimum\": 1, \"maximum\": 3},\n        \"refund_amount\": {\"type\": \"number\", \"minimum\": 0},\n        \"note\": {\"type\": \"string\", \"maxLength\": 20},\n    },\n}\n\n# extraction: fences, prose, braces inside strings, trailing commas\nt = 'Sure! Here you go:\\n```json\\n{\"category\": \"bug\", \"priority\": 2, \"refund_amount\": 0, \"note\": \"a } b\",}\\n```\\nHope it helps'\nvals = extract_json_values(t)\nassert len(vals) == 1 and vals[0][\"note\"] == \"a } b\" and validate(vals[0], SCHEMA) == []\nassert extract_json_values(\"no json here\") == []\nassert extract_json_values('{\"a\": 1') == []          # truncated output is not completed\nassert extract_json_values('x {\"a\":1} y [1,2,] z') == [{\"a\": 1}, [1, 2]]\n\n# validation: bool is not an integer, extra keys, range, enum, nesting paths\nbad = {\"category\": \"spam\", \"priority\": True, \"refund_amount\": -5, \"extra\": 1}\nerrs = validate(bad, SCHEMA)\nassert len(errs) == 4, errs\nassert any(\"priority\" in e and \"expected integer\" in e for e in errs)\nassert validate({\"category\": \"bug\", \"priority\": 3, \"refund_amount\": 1.5}, SCHEMA) == []\nassert validate([{\"x\": \"a\"}], {\"type\": \"array\", \"items\": {\"type\": \"object\", \"properties\": {\"x\": {\"type\": \"integer\"}}}}) == [\n    \"$[0].x: expected integer, got str\"]\n\n# a valid example in the prose must not win over the real, schema-valid answer\nreplies = ['Example format: {\"category\": \"x\"}\\nAnswer: {\"category\": \"billing\", \"priority\": 1, \"refund_amount\": 12.5}']\nv, n = parse_with_retries(lambda p: replies[0], \"classify\", SCHEMA)\nassert v[\"category\"] == \"billing\" and n == 1\n\n# retries: bad reply, then reply with violations fed back, then success on attempt 3\nseen = []\nscript = iter(['I cannot do that', '{\"category\": \"bug\", \"priority\": 9, \"refund_amount\": 0}',\n               '{\"category\": \"bug\", \"priority\": 3, \"refund_amount\": 0}'])\ndef model(p):\n    seen.append(p)\n    return next(script)\nv, n = parse_with_retries(model, \"classify\", SCHEMA, max_attempts=3)\nassert n == 3 and v[\"priority\"] == 3\nassert \"no JSON\" in seen[1] and \"maximum\" in seen[2]\n\n# giving up raises and never returns invalid data\ntry:\n    parse_with_retries(lambda p: '{\"category\": \"bug\"}', \"classify\", SCHEMA, max_attempts=2)\n    raise AssertionError(\"should have raised\")\nexcept ParseFailure as e:\n    assert any(\"missing required key 'priority'\" in x for x in e.errors)\ntry:\n    parse_with_retries(lambda p: \"{}\", \"x\", SCHEMA, max_attempts=0)\n    raise AssertionError(\"should have raised\")\nexcept ValueError:\n    pass\nprint(\"ok\")\n",
+   "expected": null
+  },
+  "sources": [],
+  "time_sensitive": false,
+  "plan_id": "B2-GEN-08-2",
+  "cell_id": "GEN-08",
+  "topic": "Prompting and structured output (few-shot, CoT caveats, schemas, determinism)",
+  "question_type": "coding",
+  "difficulty": "Hard",
+  "question": "Model replies are sometimes wrapped in prose or Markdown fences, sometimes contain a trailing comma, sometimes quote an example object before the real answer, and sometimes violate the requested schema. Implement, with the standard library only and no network, (1) extract_json_values(text) returning every top-level JSON object/array found in free text (braces inside strings must not confuse it, a truncated value must not be silently completed), (2) validate(value, schema) for a small JSON-Schema subset returning a list of readable violations, and (3) parse_with_retries(call_model, prompt, schema, max_attempts=3) that feeds the violations back to the model on retry, returns (value, attempts) only for schema-valid data and otherwise raises ParseFailure. Explain your design choices and what the retry loop cannot guarantee.",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "string-aware bracket matching",
+   "trailing-comma repair",
+   "schema validation",
+   "error feedback retry",
+   "bounded retries",
+   "truncation handling",
+   "bool vs integer"
+  ],
+  "common_mistakes": [
+   "Using a greedy regex such as {.*} that breaks on braces inside strings or on several objects in one reply",
+   "Completing truncated JSON by guessing closing brackets, which can silently produce wrong data",
+   "Retrying without telling the model what was wrong, or looping without an attempt cap"
+  ],
+  "interview_style_note": "Writes defensive parsing with explicit failure behaviour, validates before trusting, and states that valid structure still does not prove correct content.",
+  "tags": [
+   "json",
+   "parsing",
+   "validation",
+   "retries",
+   "coding"
+  ],
+  "change_notes": "Nearest existing: smi-h0027 (generic retry decorator) and smi-h0033 (log-line parser). This one extracts and schema-validates model output and feeds violations back; neither covers that.",
+  "confidence": "high"
+ },
+ {
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": "Part of the 5-point swing can be sampling noise on 300 items (a binomial standard error near 2.3 points at 80%), but published work reports that example order and choice can change few-shot accuracy substantially, so ordering sensitivity is plausible and model-dependent. Test with many random permutations on a held-out set, report mean and spread, and compare retrieved-example selection against a fixed set with paired analysis on unseen data.",
+  "detailed_answer": "Reading the numbers. On 300 items at about 80% accuracy the binomial standard error is sqrt(0.8*0.2/300), roughly 2.3 points, and treating the two scores as independent the standard error of a 5-point difference is about 3.3 points (1.5 standard errors). The two runs share the same items, so a paired comparison is the right tool and is more sensitive, but 300 items alone cannot settle a 5-point gap. The literature on in-context learning reports that accuracy can depend on prompt format, which examples are chosen and their order, with effects that persist across model sizes in those studies; the size of the effect for your model is an empirical question. Commonly proposed mechanisms are bias toward labels that are frequent in the examples, toward the label of the last example (recency), and toward tokens common in pre-training data. Treat these as hypotheses to check, not guarantees.\n\nHow to test.\n1. Fix everything except order. Run K random permutations of the same 10 examples (for instance K=20) on a dev set not used to choose the examples, and report mean, standard deviation and worst case. If the spread is large, a single 'good' order is a lucky draw, and shipping it means a prompt that is brittle to small edits.\n2. Check label balance: count each class among the 10 examples and the label of the final example; test a version with balanced classes and shuffled order.\n3. Compare selection strategies fairly: fixed set vs similarity-retrieved vs random-retrieved, on a separate test split, with paired differences and a confidence interval. Retrieved examples can win because they leak near-duplicates of the test item; check that the example pool and test set do not overlap.\n4. Remember retrieved selection makes the prompt vary per request, which hurts prompt caching, reproducibility and debugging; include that cost in the decision.\n5. Decide using the unseen test split, and keep the winning prompt as a versioned artifact with the permutation spread recorded.",
+  "practical_answer": null,
+  "code": null,
+  "sources": [
+   {
+    "title": "Calibrate Before Use: Improving Few-Shot Performance of Language Models (arXiv:2102.09690)",
+    "url": "https://arxiv.org/abs/2102.09690",
+    "supports": "Few-shot accuracy can vary a lot with prompt format, the choice of training examples and their order; the abstract attributes this to biases toward certain answers, such as those placed near the end of the prompt or common in pre-training data."
+   },
+   {
+    "title": "Fantastically Ordered Prompts and Where to Find Them (arXiv:2104.08786)",
+    "url": "https://arxiv.org/abs/2104.08786",
+    "supports": "The order of few-shot samples can make the difference between strong and near-random performance, and this sensitivity is present across model sizes."
+   }
+  ],
+  "time_sensitive": false,
+  "plan_id": "B2-GEN-08-3",
+  "cell_id": "GEN-08",
+  "topic": "Prompting and structured output (few-shot, CoT caveats, schemas, determinism)",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "A 5-class ticket-routing prompt uses 10 fixed few-shot examples and scores 81% on a 300-item dev set. A colleague merely reorders the same 10 examples and gets 76%. Another colleague replaces them with 10 examples retrieved per query by similarity and gets 85%. How do you interpret these numbers, and how would you test for ordering and example-selection effects before shipping?",
+  "answer_set": "concise+detailed",
+  "key_concepts": [
+   "example ordering sensitivity",
+   "recency bias",
+   "label balance in demonstrations",
+   "similarity-based example retrieval",
+   "permutation testing",
+   "paired comparison",
+   "near-duplicate leakage"
+  ],
+  "common_mistakes": [
+   "Picking the best of several orderings on the dev set and reporting that score as expected performance",
+   "Ignoring sampling noise on a few hundred items when comparing two prompts",
+   "Evaluating retrieved examples from a pool that contains near-duplicates of the test items"
+  ],
+  "interview_style_note": "Combines a quick noise estimate with a concrete permutation experiment and flags leakage and caching costs of retrieved examples; hedges that effect sizes are model-dependent.",
+  "tags": [
+   "few-shot",
+   "in-context-learning",
+   "prompt-sensitivity",
+   "evaluation"
+  ],
+  "change_notes": "No existing question on few-shot behaviour. Nearest: smi-h0002 (decoding/temperature arithmetic), which is unrelated to example selection.",
+  "confidence": "high",
+  "related_domains": [
+   "NLP"
+  ]
+ },
+ {
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": "Generated reasoning is text the model produced, not a verified trace of why it answered; studies show it can omit or misstate the real influence on the answer, so do not present it as an audit explanation. For simple tasks, chain-of-thought often adds tokens and latency with little accuracy gain. Decide by an A/B on labelled data: compare accuracy with a confidence interval against extra tokens and latency.",
+  "detailed_answer": "(a) Explanation. A chain of thought is generated text conditioned on the input, like any other output. Research on chain-of-thought faithfulness reports cases where the stated reasoning does not mention a factor that demonstrably changed the answer (for example a bias introduced through the prompt) and where models produce a fluent justification for a wrong answer. That does not mean the reasoning is always misleading, and it often does help accuracy on multi-step problems; it means it cannot be relied on as evidence of the actual decision process. For a regulated decision like lending this matters: showing it as 'the reason' can give officers false confidence and can misstate grounds. Better options: base the recommendation on features you can inspect, show cited evidence (fields and documents the answer relied on), keep reasoning text as a convenience labelled as model-generated, and keep a human accountable. Check any legal requirements with the relevant experts rather than assuming the text satisfies them.\n\n(b) Cost-benefit. Reasoning tokens are generated sequentially, so output tokens, cost and latency rise roughly with their number, and parsing gets harder because the label has to be separated from the prose. For a coarse classification the answer may not need intermediate steps, and extra text can sometimes introduce errors. Whether it helps is task- and model-dependent, so measure it rather than assume it.\n\nDecision rule: adopt chain-of-thought only if the accuracy gain, with its confidence interval, justifies the added latency and cost for the product's budget, and if the extra parsing failures do not cancel the gain.",
+  "practical_answer": "Experiment plan with hypothetical numbers.\n- Data: 400 labelled reviews, stratified by class, not used for prompt tuning.\n- Arms: direct (answer with a label only) vs reasoning-then-label, same examples and a fixed final-answer line to parse.\n- Record per item: correct or not, parse failure, output tokens, end-to-end latency.\n- Analysis: paired accuracy difference with a CI (count items where only one arm is correct), median and p95 latency, tokens per request.\n- Illustration: suppose direct gets 352/400 correct (88.0%) and reasoning gets 356/400 (89.0%), with 14 items fixed and 10 broken by reasoning. That is a +1.0 point difference with an interval that comfortably includes 0, while output tokens rise from about 3 to about 150 per request. Decision: stay direct.\n- Faithfulness probe for (a): take 50 items, add an irrelevant-looking cue to the input that nudges toward one label (for example reorder the options), and check how often the answer flips and, when it flips, whether the stated reasoning mentions the cue. A low mention rate is evidence the text is not a reliable account.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Language Models Don't Always Say What They Think: Unfaithful Explanations in Chain-of-Thought Prompting (arXiv:2305.04388)",
+    "url": "https://arxiv.org/abs/2305.04388",
+    "supports": "Chain-of-thought explanations can systematically misrepresent the true reason for a model's prediction and can be heavily influenced by biasing features added to the input."
+   }
+  ],
+  "time_sensitive": false,
+  "plan_id": "B2-GEN-08-4",
+  "cell_id": "GEN-08",
+  "topic": "Prompting and structured output (few-shot, CoT caveats, schemas, determinism)",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "Your team plans to (a) show the model's step-by-step reasoning to loan officers as 'the explanation' for a triage recommendation, and (b) switch on chain-of-thought for a simple three-class sentiment tagger 'to be safe'. What are the caveats for each, and how would you decide with data whether chain-of-thought is worth it for (b)?",
+  "answer_set": "concise+detailed+practical",
+  "key_concepts": [
+   "chain-of-thought faithfulness",
+   "post-hoc rationalisation",
+   "output-token latency cost",
+   "paired A/B on labelled data",
+   "explanation vs evidence citation",
+   "parse failures from free-text reasoning"
+  ],
+  "common_mistakes": [
+   "Presenting generated reasoning as an audit trail of the true decision process",
+   "Enabling chain-of-thought everywhere without measuring accuracy, latency and parse failures",
+   "Concluding from a +1 point difference on 400 items that one arm is better"
+  ],
+  "interview_style_note": "Distinguishes useful-for-accuracy from faithful-as-explanation, and backs the cost decision with a paired experiment and numbers.",
+  "tags": [
+   "chain-of-thought",
+   "explainability",
+   "faithfulness",
+   "latency"
+  ],
+  "change_notes": "No existing CoT question. Nearest: smi-h0002 (decoding mechanics). Focus here is on explanation faithfulness and cost-benefit of reasoning text.",
+  "confidence": "high"
+ },
+ {
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Temperature 0 means 'pick the highest-probability token' (greedy), but the probabilities themselves can differ slightly between runs, and greedy decoding is a discontinuous function: if two top candidates are within floating-point noise, a tiny change flips the choice and every later token conditions on it, so the text diverges.\n\nWhere the noise can come from (which apply depends on the serving stack):\n- Floating-point addition is not associative. In plain Python, (0.1 + 0.2) + 0.3 gives 0.6000000000000001 while 0.1 + (0.2 + 0.3) gives 0.6. Parallel reductions on accelerators sum in orders that can depend on kernel choice, batch size or how work is split, so the same input can give slightly different logits.\n- Batching: your request is processed alongside other, varying requests, which can change kernel shapes and reduction order.\n- Different hardware, library versions or replicas behind a load balancer.\n- The provider may update the model or serving stack behind a fixed name; some APIs only offer 'best effort' seed behaviour or none.\n- Tokenisation or prompt template differences (whitespace, timestamps, ordering of retrieved items) are deterministic but easy to overlook: diff the exact prompts first.\n\nSo the test is wrong, not necessarily the code: it asserts something the system never promised. Redesign.\n1. Unit tests of your own code should not call the live model. Record real responses once and replay them (a cassette or stub), so parsing, routing and prompt assembly are tested deterministically.\n2. Tests that do call the model assert properties, not strings: valid schema, required fields, label equals expected class, contains a citation, within a length bound.\n3. Quantify flakiness: run each prompt N times and track pass rate per prompt; quarantine prompts with unstable outcomes and look at them as prompt-design problems (borderline cases).\n4. Pin model identifiers where possible, and rerun the suite on a schedule to detect silent upstream changes.",
+  "practical_answer": "Measurement procedure and gate, with hypothetical numbers.\n1. Take the 50 prompts and call each 20 times in CI (1,000 calls). Record the number of distinct replies per prompt and the pass rate of the property assertion.\n2. Suppose 44 prompts give one distinct reply, and 6 give 2 to 5. Of those 6, 4 still pass the property check 20/20, while 2 pass only 13/20 and 16/20. Reading: exact-string failures were mostly cosmetic divergence, but two prompts are genuinely borderline for the model.\n3. Action: switch exact-match assertions to property assertions; put the 2 unstable prompts in a 'flaky' bucket reported separately, with a rule such as 'fail the build if a stable prompt falls below 19/20 or the overall property pass rate drops by more than 2 points versus the last accepted run'.\n4. Keep a small replay set of recorded responses for tests that must be byte-exact (parsers, formatters).\nThe exact thresholds are a team choice; the point is to use repeated measurement and properties instead of one-shot string equality.",
+  "code": null,
+  "sources": [],
+  "time_sensitive": false,
+  "plan_id": "B2-GEN-08-5",
+  "cell_id": "GEN-08",
+  "topic": "Prompting and structured output (few-shot, CoT caveats, schemas, determinism)",
+  "question_type": "debugging",
+  "difficulty": "Medium",
+  "question": "A CI job sends 50 fixed prompts at temperature 0 and asserts that each reply equals a stored string. It passes locally but fails on about 3 of 50 prompts at random in CI, and the failing replies diverge at some token and then differ in wording. A teammate insists 'temperature 0 is deterministic, so this is a bug in our code'. Diagnose it and redesign the tests.",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "greedy decoding",
+   "floating-point non-associativity",
+   "batch-dependent numerics",
+   "record and replay tests",
+   "property-based assertions",
+   "flake rate measurement",
+   "model version pinning"
+  ],
+  "common_mistakes": [
+   "Assuming temperature 0 guarantees bit-identical outputs across runs, batches and hardware",
+   "Fixing flakiness by loosening the assertion to the point where it no longer detects regressions",
+   "Calling the live model in unit tests of parsing or routing code"
+  ],
+  "interview_style_note": "Explains why greedy decoding can still diverge, then separates deterministic unit tests (replay) from statistical tests of live model behaviour.",
+  "tags": [
+   "determinism",
+   "temperature",
+   "testing",
+   "flaky-tests"
+  ],
+  "change_notes": "Nearest: smi-h0002 explains temperature/top-p mechanics on a toy vocabulary; this one is about reproducibility of tests and numerical non-determinism. The float example was executed.",
+  "confidence": "high",
+  "related_domains": [
+   "Software Engineering"
+  ]
+ },
+ {
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "answer": "Treat prompts as code: store them in version control with a content hash or version id, render them from typed templates, log the id with every request, and require every change to pass an automated regression suite (parse rate, field accuracy, safety checks) before a staged rollout with a quick rollback.\n\nFailure analysis: there was no version identity (cannot attribute), no pre-deployment test (the change shipped untested), no online monitoring on a cheap proxy metric (parse failure rate), and no rollback path.\n\nDesign.\n1. Source of truth: prompt templates live in the repository, reviewed like code. The admin page may exist but should create a pull request or a draft that goes through the same gate, not edit production in place.\n2. Identity: each rendered prompt has a version id (for example the hash of template text plus the template parameters plus the model identifier and sampling settings). Log this id on every request, with the model identifier. A change to any of those counts as a new version, because model or setting changes can break prompts that did not change.\n3. Templates with explicit variables: validate that all placeholders are filled and that untrusted text goes only in data slots; this prevents silent breakage like an empty variable.\n4. Regression gate in CI: a fixed set of cases (typical, edge and previously failed examples) run on the candidate and the current version, checking cheap deterministic properties first (valid schema, parse rate), then task accuracy or judge scores, with paired comparison and thresholds that fail the build. Add every production incident as a new case.\n5. Staged rollout: shadow or small-percentage canary comparing online metrics (parse failures, retries, latency, token counts, thumbs-down) between versions; automatic rollback when a guardrail metric crosses its threshold.\n6. Observability and ownership: dashboards per prompt version, alerts on parse-failure rate and retry rate, a changelog with the reason for each edit, and a named owner.\n\nTrade-off: heavier process slows small edits; keep the suite fast (minutes) and tier it so cheap checks run on every change and the expensive judge-based run on release candidates.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "code": null,
+  "sources": [],
+  "time_sensitive": false,
+  "plan_id": "B2-GEN-08-6",
+  "cell_id": "GEN-08",
+  "topic": "Prompting and structured output (few-shot, CoT caveats, schemas, determinism)",
+  "question_type": "design",
+  "difficulty": "Medium",
+  "question": "Three people edit the production system prompt through an admin page. After one 'small wording tweak', downstream JSON parse failures rose from 0.5% to 3% and nobody noticed for two days; nobody could even say which prompt text served which request. Design prompt versioning, change control and a regression gate for this system.",
+  "answer_set": "single",
+  "key_concepts": [
+   "prompt versioning",
+   "content hash",
+   "regression gate",
+   "canary rollout",
+   "rollback",
+   "online guardrail metrics",
+   "prompt changelog"
+  ],
+  "common_mistakes": [
+   "Editing the live prompt without a version id, so incidents cannot be attributed",
+   "Versioning only the template text and ignoring the model identifier and sampling settings",
+   "Gating only on an LLM-judge score and not on cheap deterministic checks such as parse rate"
+  ],
+  "interview_style_note": "Treats a prompt as a deployable artifact with identity, tests, staged rollout and monitoring, and keeps the process proportionate.",
+  "tags": [
+   "prompt-management",
+   "mlops",
+   "regression-testing",
+   "versioning"
+  ],
+  "change_notes": "Nearest: smi-h0027 (retry decorator) and smi-g0003 (NLP in production, offline/online gap). This is prompt-artifact change control; statistical design of the regression suite is covered separately in B2-GEN-10-2.",
+  "confidence": "high"
+ },
+ {
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "answer": "The model chooses tools from names, descriptions and parameter schemas, so overlapping tools with vague descriptions cause confusion.\n\nDiagnosis. Function calling gives the model a list of tool names, descriptions and argument schemas, and it picks by matching the request to that text. lookup_order and get_order overlap, 'query' is free text so a bare order number looks acceptable, and nothing tells the model that get_order wants a specific id format. The errors are a design problem more than a model problem.\n\nRedesign.\n1. Reduce overlap: fewer, clearly separated tools. Perhaps one find_orders tool with explicit mutually exclusive parameters (order_id or customer_email or free-text search), or keep separate tools with disjoint inputs.\n2. Descriptions that say when to use it AND when not to: 'Use when the user supplies an order number such as ORD-123456. Do not use to search by customer name; use get_customer_orders with an email.' Put the distinguishing facts early; descriptions are the model's only documentation.\n3. Constrain arguments in the schema: a pattern for order ids, enums for status values, units and formats stated (currency, ISO dates), required vs optional marked. Validate server-side anyway; a schema in the prompt is a hint, not enforcement.\n4. Informative errors: return 'order_id must match ORD-######; for a name use get_customer_orders(email)' rather than a bare 400, so the next step can self-correct (and count self-corrections as a metric).\n5. Keep side-effecting tools (cancel) separate and clearly marked, with their confirmation requirement in the description and enforced in code.\n6. Tool count and description length cost context tokens and can degrade selection when the list gets long; prune or route to a subset of tools per task.\n\nVerification: build 100 to 200 labelled requests including ambiguous ones (name only, number plus typo, two identifiers), record which tool and arguments an ideal call would use, and measure tool-choice accuracy, argument validity and error rate before and after, using the same sampling settings and several runs per request.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "code": null,
+  "sources": [],
+  "time_sensitive": false,
+  "plan_id": "B2-GEN-09-1",
+  "cell_id": "GEN-09",
+  "topic": "Tool use and agents (function calling, loops, failure modes, action guardrails)",
+  "question_type": "design",
+  "difficulty": "Medium",
+  "question": "A support agent has four tools: get_order(order_id), lookup_order(query), get_customer_orders(email) and cancel(order_id). In logs, about 30% of the time the model calls lookup_order with a bare order number, and about 10% of the time it calls get_order with a customer's name, which errors. How would you redesign the tool definitions so the model picks the right tool and arguments, and how would you verify the fix?",
+  "answer_set": "single",
+  "key_concepts": [
+   "tool descriptions",
+   "overlapping tools",
+   "argument schema constraints",
+   "server-side validation",
+   "actionable error messages",
+   "tool-selection accuracy",
+   "tool subset per task"
+  ],
+  "common_mistakes": [
+   "Adding more tools with similar purposes instead of sharpening or merging them",
+   "Relying on the schema in the prompt as enforcement rather than validating arguments in code",
+   "Returning opaque errors that give the model nothing to correct with"
+  ],
+  "interview_style_note": "Treats tool definitions as an interface for the model, writes disambiguating descriptions and constraints, and measures tool-selection accuracy on a labelled set.",
+  "tags": [
+   "function-calling",
+   "tool-schema",
+   "agents",
+   "evaluation"
+  ],
+  "change_notes": "No existing question on tool interfaces. Nearest: smi-h0027 (retry decorator) which is unrelated. Focus: description/schema design and measuring tool choice.",
+  "confidence": "high"
+ },
+ {
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Two problems compound.\n\n1. Loop without progress. The model has no built-in notion of 'I already tried this'. If results do not satisfy it, rewording the query is a locally reasonable next action. Nothing in the loop enforces termination, so the stopping condition is only the model's own judgement.\n\n2. Context growth makes cost superlinear in steps. If the whole transcript is resent each step (no truncation, and ignoring any provider-side prompt caching, which can reduce price or latency but not the size of the context the model must attend to), step k processes about base + k x 1,500 tokens, so total input over n steps grows roughly with n squared. Long, repetitive contexts can also make the model less likely to use the useful parts, an effect that depends on the model.\n\nGuards, in the orchestration code rather than in the prompt:\n- Hard step limit and wall-clock/token/cost budgets per task, with a defined end state when they are hit (return best partial result and say so).\n- Repeat detection: hash normalised (tool, arguments) and block or warn on exact repeats; add near-duplicate detection for reworded queries (for example high overlap of tokens or embedding similarity with earlier queries).\n- No-progress check: if the last K results added no new URLs or facts, force a different strategy or stop.\n- Return structured, actionable tool errors and distinguish retryable errors (timeout) from non-retryable ones (invalid argument, not found) so the agent does not retry blindly.\n- Context management: truncate or summarise old tool outputs, keep only the extracted facts, cap tool-result size.\n- Escalation: after the budget, hand off to a human or return what is known rather than looping.\n\nMonitor distributions (steps per task, repeated calls, budget hits), because a few runaway runs can dominate cost.",
+  "practical_answer": "Worked cost arithmetic (hypothetical, no caching or truncation): base prompt 2,000 tokens, each step adds 1,500.\n- Input at step k = 2,000 + 1,500k tokens. At step 20 that is 32,000.\n- Cumulative input over 5 steps: 3,500 + 5,000 + 6,500 + 8,000 + 9,500 = 32,500 tokens.\n- Cumulative input over 20 steps: 355,000 tokens, about 10.9 times the 5-step total for 4 times the steps.\n- A 40-step run is therefore far more expensive than two 20-step runs, so cutting long tails matters more than shaving average steps.\nGuard configuration to try first: max_steps 15, token budget of about 150,000 input tokens per task, exact-repeat block after 2 identical calls, summarise tool results beyond 800 tokens, and a no-new-information stop after 3 steps. Then replay the logged 40-step runs through the new loop and check that the answer quality on a labelled sample does not drop, since over-aggressive budgets can cut off legitimate hard tasks.",
+  "code": null,
+  "sources": [],
+  "time_sensitive": false,
+  "plan_id": "B2-GEN-09-2",
+  "cell_id": "GEN-09",
+  "topic": "Tool use and agents (function calling, loops, failure modes, action guardrails)",
+  "question_type": "debugging",
+  "difficulty": "Medium",
+  "question": "A research agent sometimes runs 40+ steps, repeating essentially the same web_search with slightly reworded queries. Each tool result adds about 1,500 tokens and the full history is resent at every step. Explain what is going wrong in cost and quality terms, and which guards you would add to the loop.",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "agent loop termination",
+   "step and token budgets",
+   "repeated-call detection",
+   "quadratic context cost",
+   "tool-result truncation",
+   "retryable vs non-retryable errors",
+   "no-progress detection"
+  ],
+  "common_mistakes": [
+   "Relying on the prompt ('do not repeat yourself') instead of enforcing limits in code",
+   "Treating cost as linear in steps although the history is re-sent every step",
+   "Setting budgets without replaying real long runs to check that hard tasks are not cut off"
+  ],
+  "interview_style_note": "Quantifies the context-growth cost and puts enforceable guards in the orchestrator, including what happens when a budget is hit.",
+  "tags": [
+   "agents",
+   "loops",
+   "budgets",
+   "context-growth",
+   "cost"
+  ],
+  "change_notes": "Nearest: smi-j0027 (prompt token budget arithmetic for a single RAG call). This question is about multi-step agent loops and cumulative cost.",
+  "confidence": "high"
+ },
+ {
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Two different failure classes.\n\n1. Duplicates after ambiguous failure. A timeout means 'unknown outcome', not 'failed'. Blind retry of a non-idempotent call can repeat the side effect. Fix: make the operation idempotent. The orchestrator (not the model) generates an idempotency key per intended action, for example derived from the conversation id, order id and refund intent, and passes it with the call. The payment service stores the key with the result and returns the stored result on repeats. On timeout, the agent must query the status ('is there a refund for this key/order?') before any retry.\n\n2. Wrong or unauthorised action. The model's decision is probabilistic and can be steered by user text or tool output, so authorisation must not live in the prompt. Enforce in code:\n- Server-side eligibility rules: order delivered or not, refund window, remaining refundable amount (order total minus prior refunds), one refund per line item. The tool rejects violations regardless of what the model asked.\n- Narrow the tool: no free-form amount beyond the remaining balance; the credential used by the agent may only issue refunds up to a per-transaction and per-day cap.\n- Two-step propose/commit: the agent proposes an action; the system shows the exact order, amount and reason, and commits only after confirmation. Confirmation can be the end user for low-risk cases, and a human reviewer above a threshold or when risk signals fire (high amount, new account, repeated refunds, injected-looking content in the conversation).\n- Audit log of every proposal, approval and result, with the key.\n\nHuman placement: the more irreversible and costly the action, the earlier the human; review the exact structured action, not the model's prose summary, and tune thresholds from measured error costs. Reversible low-value actions can be automatic with after-the-fact sampling.\n\nResidual risk: confirmation fatigue (people click through), and rules that are too tight create escalations. Measure both.",
+  "practical_answer": "Worked trace of the duplicate case after the fix.\n1. Orchestrator creates key K = hash(conv-481, ORD-9915, 'refund', 18.50) and calls issue_refund(ORD-9915, 18.50, key=K).\n2. Payment service records K, executes the refund, but the response is lost; the client sees a timeout.\n3. Agent loop rule: on timeout for a mutating tool do not re-issue; call get_refund_status(key=K) first. It returns 'completed, 18.50'. The agent reports success. No second refund.\n4. If status had returned 'not found', retrying with the same K is safe: the service would execute once, or return the stored result if the first attempt was still in flight.\nEligibility check in the service for the second incident: delivered=True, within 30 days, refunded_so_far=0, but reason code 'not received' conflicts with the delivery scan, so the rule says 'needs review' and the request goes to a human queue with the order data rather than being executed. Policy example (hypothetical): auto-approve at most 25 per refund and 100 per customer per month when all checks pass, otherwise human review.",
+  "code": null,
+  "sources": [],
+  "time_sensitive": false,
+  "plan_id": "B2-GEN-09-3",
+  "cell_id": "GEN-09",
+  "topic": "Tool use and agents (function calling, loops, failure modes, action guardrails)",
+  "question_type": "scenario",
+  "difficulty": "Hard",
+  "question": "A refund agent calls issue_refund(order_id, amount). Last week a tool call timed out at the payment service although the refund had actually gone through; the agent retried, and the customer was refunded twice. In a separate case a prompt-confused agent refunded an order that had been delivered fine. Redesign the action path so duplicate and unauthorised refunds are prevented, and say where a human should be in the loop.",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "idempotency key",
+   "ambiguous timeout",
+   "status check before retry",
+   "server-side authorisation",
+   "propose and commit",
+   "approval thresholds",
+   "audit log"
+  ],
+  "common_mistakes": [
+   "Letting the model generate or reuse idempotency keys and decide on retries",
+   "Enforcing refund policy only in the system prompt",
+   "Asking for confirmation on every action, which causes confirmation fatigue and no real review"
+  ],
+  "interview_style_note": "Separates the retry/idempotency problem from the authorisation problem, enforces both outside the model, and places humans by risk and reversibility.",
+  "tags": [
+   "agents",
+   "idempotency",
+   "guardrails",
+   "human-in-the-loop",
+   "payments"
+  ],
+  "change_notes": "No existing question on side-effecting tool calls. Nearest: smi-h0027 (retry decorator), which does not address idempotency or unknown-outcome failures.",
+  "confidence": "high",
+  "related_domains": [
+   "Software Engineering"
+  ]
+ },
+ {
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": "In an agent loop, every tool result is appended to the model's context and the model chooses the next tool call from that context. The model has no reliable channel separating the user's instructions from text found in data, so attacker-written page text can influence which tool is called next and with what arguments. Limit damage structurally: once untrusted content is in context, restrict the available tools to non-exfiltrating, non-side-effecting ones or require human confirmation.",
+  "detailed_answer": "Control-flow view. The loop is: model reads context, emits a tool call, the runtime executes it, the result is appended, repeat. Untrusted content (a web page, an email body, a file) enters at the 'append result' step and is then processed by the same model, with the same authority to choose the next call, as the user's request. The research on indirect prompt injection describes this as LLM-integrated applications blurring the line between data and instructions, with injected text in retrieved data able to influence how and whether other tools or APIs are called. The model is trained to follow instructions in text, and instruction-like text inside a page is still text in its context; there is no dependable in-band marker that the model will always honour as 'this is only data'.\n\nWhy the damage is possible: it needs three ingredients together. (1) Exposure to untrusted content (the web tool). (2) Access to sensitive data (the inbox). (3) An outward channel (send email, or a call whose arguments reach an attacker). With all three in one session, a successful steering of the model can move data out. Removing the web tool removes the feature, so cut a different leg.\n\nDesign rules.\n- Treat the session as tainted after untrusted content enters; after that point, tools that read private data or communicate externally are disabled or need explicit user confirmation showing the exact recipient and content.\n- Split roles: a quarantined sub-agent reads untrusted pages and returns only a constrained, validated summary (fixed schema, no free-form instructions), while the privileged agent that can send mail never sees the raw page.\n- Fix recipients from an allowlist or the user's own address book; arguments are validated by code.\n- Least privilege per task: a 'summarise this page' task gets no send tool at all.\nHonest limit: filtering prompts for suspicious phrases is unreliable, since attackers can phrase injections in endless ways; structural limits on what a compromised model can do are more dependable, though they cost usability.",
+  "practical_answer": null,
+  "code": null,
+  "sources": [
+   {
+    "title": "Not what you've signed up for: Compromising Real-World LLM-Integrated Applications with Indirect Prompt Injection (arXiv:2302.12173)",
+    "url": "https://arxiv.org/abs/2302.12173",
+    "supports": "The abstract argues that LLM-integrated applications blur the line between data and instructions, and that prompts injected into data likely to be retrieved can influence how and whether other APIs are called."
+   }
+  ],
+  "time_sensitive": false,
+  "plan_id": "B2-GEN-09-4",
+  "cell_id": "GEN-09",
+  "topic": "Tool use and agents (function calling, loops, failure modes, action guardrails)",
+  "question_type": "concept",
+  "difficulty": "Hard",
+  "question": "An email-and-web agent can read web pages, read the user's inbox and send email. Explain, in terms of the agent's control flow, why a web page that the agent merely 'reads' can end up causing the agent to send mail to an outside address, and what design rule would limit the damage without removing the web tool.",
+  "answer_set": "concise+detailed",
+  "key_concepts": [
+   "indirect prompt injection",
+   "tool-result append",
+   "data vs instruction confusion",
+   "lethal combination of exposure, sensitive data and outward channel",
+   "tainted session",
+   "quarantined sub-agent",
+   "recipient allowlist"
+  ],
+  "common_mistakes": [
+   "Believing that a system-prompt line saying 'ignore instructions in documents' reliably prevents steering",
+   "Defending only with keyword filters on the page text",
+   "Granting the reading agent the same tools and privileges as the acting agent"
+  ],
+  "interview_style_note": "Explains the loop mechanics that make tool output an instruction channel and proposes structural controls instead of relying on prompt wording; admits limits.",
+  "tags": [
+   "agents",
+   "prompt-injection",
+   "control-flow",
+   "least-privilege"
+  ],
+  "change_notes": "Agent control-flow framing only; RAG/email data-protection angle is separate in GEN-12. No existing injection question in the 533 list.",
+  "confidence": "high",
+  "related_domains": [
+   "Security"
+  ]
+ },
+ {
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": "When the steps are known and fixed, prefer a deterministic workflow in which code controls the order and the model is used only for bounded subtasks (extract receipt fields, classify against policy). It is cheaper, faster, easier to test and to bound than an agent that decides its own steps. Use an agent where the path really depends on intermediate findings and cannot be enumerated.",
+  "detailed_answer": "Agent versus workflow is a choice about who controls the sequence. A workflow is code that calls the model at fixed points; an agent lets the model decide which tool to call next, how often, and when to stop. Autonomy buys flexibility for open-ended tasks and costs predictability.\n\nFor expense claims the sequence is known: extract fields, validate (date, currency, amount, category), look up the policy, compare, decide, route. Reasons to use a workflow:\n- Testability: each step has a defined input and output and can be unit-tested and evaluated separately (extraction accuracy, policy-match accuracy), and failures can be located.\n- Bounded cost and latency: the number of model calls is fixed, no runaway loops.\n- Determinism where possible: the policy comparison (amount over a cap, missing receipt) can be plain code rather than model judgement.\n- Smaller attack surface and simpler permissions: the model never chooses to call a payment tool.\n- Auditability: the path is the same each time.\n\nRough reliability argument: if a free-running agent must get 6 decisions right in sequence and each is right with probability 0.95 independently, and any error spoils the result, the end-to-end success is 0.95^6, about 0.74. A workflow does not repair per-step accuracy, but it can add targeted checks (schema validation, rules, a second extraction on low confidence) at the weak steps, and the risky ones can be done in code, whereas in an agent the error rate of the planning itself adds to the product. The independence assumption is rough and optimistic or pessimistic depending on the setting, so treat the number as an illustration.\n\nWhen the agent is the right tool: investigations where which tool comes next depends on what was found (debugging an incident, open-ended research), many possible tools and paths, tolerance for variable cost, and strong guardrails. A good pattern is workflow by default, with an agentic step inside it for the genuinely open part (for example 'ambiguous receipt, investigate'), under a step budget.",
+  "practical_answer": null,
+  "code": null,
+  "sources": [],
+  "time_sensitive": false,
+  "plan_id": "B2-GEN-09-5",
+  "cell_id": "GEN-09",
+  "topic": "Tool use and agents (function calling, loops, failure modes, action guardrails)",
+  "question_type": "design",
+  "difficulty": "Medium",
+  "question": "A product manager wants an 'autonomous AI agent' to process expense claims: read the receipt, check it against the policy, then approve, reject or flag. The steps and their order are the same for every claim. Argue for or against building it as a free-running agent, and describe the alternative, including a rough reliability argument.",
+  "answer_set": "concise+detailed",
+  "key_concepts": [
+   "workflow vs agent",
+   "control of sequence",
+   "per-step testability",
+   "compounding error",
+   "bounded cost and latency",
+   "agentic step inside workflow",
+   "audit trail"
+  ],
+  "common_mistakes": [
+   "Choosing an agent because it sounds modern although the path is fixed",
+   "Applying the 0.95^6 figure as an exact prediction rather than an illustration under an independence assumption",
+   "Letting the model handle rules that plain code can check exactly"
+  ],
+  "interview_style_note": "Frames the decision as who controls the sequence, justifies a workflow with testability and bounds, and names the conditions where an agent is justified.",
+  "tags": [
+   "agents",
+   "workflows",
+   "architecture",
+   "reliability"
+  ],
+  "change_notes": "No existing agent-vs-workflow question; nearest smi-g0011 compares prompting/RAG/fine-tuning, a different decision. Arithmetic 0.95^6=0.735 was computed.",
+  "confidence": "high"
+ },
+ {
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "A correct final message does not show that the right things happened. The agent may have changed the wrong record, issued an unauthorised credit, taken 11 calls where 3 suffice, or got lucky; and a wrong message may follow a correct state change. For agents with side effects, evaluate three layers.\n\n1. Outcome in the environment. Check the end state, not the prose: ticket status, credit ledger, no unintended changes. Build a sandbox with a known initial state and a function that compares the final state with the expected one (a state diff). This is more reliable than judging the reply text.\n2. Trajectory quality. Log each step and score: tool-call validity (schema errors, wrong tool), policy violations (any forbidden action, even if the result was fine; usually a hard fail), number of steps and tokens versus a reference, repeated or unnecessary calls, recovery from tool errors. Use deterministic checks where possible; an LLM judge for subjective parts is an AI label and should itself be validated on human-labelled examples. Do not require an exact reference trajectory when several valid paths exist; check required milestones and forbidden actions instead.\n3. Final answer quality: correctness, grounding in tool results, tone.\n\nVariation. The same task can succeed or fail across runs because sampling and tool timing vary. Run each task several times (for example 5) and report both the average success and a stricter 'all runs succeed' rate. If per-run success is p and runs were independent, all 5 pass with probability p^5, so a task suite that looks fine on a single run can hide an unreliable agent. Report confidence intervals over tasks (not runs of the same task) since tasks are the sampling unit.\n\nAlso keep the suite honest: mock tools deterministically, cover error and adversarial cases (tool failure, ambiguous request, injected text in a ticket), and split safety metrics from helpfulness.",
+  "practical_answer": "Worked example with hypothetical numbers. 200 tasks, 5 runs each.\n- Mean final-reply correctness 80% (800 of 1,000 runs). Per-task pass counts: 130 tasks pass 5/5, 20 pass 4/5, 20 pass 2/5, 30 pass 1/5 (130x5 + 20x4 + 20x2 + 30x1 = 800).\n- 'All 5 pass' rate = 130/200 = 65%. A user who repeats the same request experiences that gap.\n- If an agent really passed each run with independent probability 0.8, 5/5 would be 0.8^5 = 0.328; the observed 0.65 is higher because success is task-dependent, which shows reliability varies by task type and is where to look.\n- Trajectory view: among the 800 runs with a correct-looking reply, suppose 24 claimed a credit that is not in the ledger and 9 involved a forbidden action (a credit above the limit). A text-only grader would count all 33 as passes. Policy violations are reported separately and gate release at zero tolerance (hypothetical), regardless of the success mean.\n- Cost view: median 4 tool calls, p95 14; flag tasks above 10 calls for review.\nRelease gate (example): outcome success not below the current agent's by more than the paired CI allows, 0 policy violations, p95 steps within budget.",
+  "code": null,
+  "sources": [],
+  "time_sensitive": false,
+  "plan_id": "B2-GEN-09-6",
+  "cell_id": "GEN-09",
+  "topic": "Tool use and agents (function calling, loops, failure modes, action guardrails)",
+  "question_type": "evaluation",
+  "difficulty": "Hard",
+  "question": "You evaluate a ticket-resolution agent that can read a customer database, update ticket status and issue credits. In a 200-task suite it ends with the correct final reply 80% of the time. Why is that number insufficient, how would you evaluate trajectories as well as outcomes, and how do you handle run-to-run variation?",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "state-diff evaluation",
+   "trajectory metrics",
+   "policy-violation gate",
+   "run-to-run variance",
+   "all-runs-pass rate",
+   "tool error recovery",
+   "sandboxed deterministic tools"
+  ],
+  "common_mistakes": [
+   "Scoring only the final text, so claimed-but-not-performed actions pass",
+   "Requiring a single exact reference trajectory when multiple valid paths exist",
+   "Reporting average success from one run per task and ignoring consistency"
+  ],
+  "interview_style_note": "Checks the world state, scores process and forbidden actions separately, and handles sampling variance with repeated runs and task-level intervals.",
+  "tags": [
+   "agent-evaluation",
+   "trajectory",
+   "reliability",
+   "safety"
+  ],
+  "change_notes": "No existing agent evaluation question. Nearest: smi-j0044 (RAG offline vs user feedback), which is about retrieval pipelines. Numbers in practical_answer: 0.8^5=0.328 was computed; the task counts are hypothetical and sum to 200 (130+20+20+30).",
+  "confidence": "high"
+ },
+ {
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "answer": "Do not make the prompt the access-control layer. The model's behaviour is probabilistic and can be influenced by user text and by anything it reads, so every permission must be enforced by the tools and the systems behind them, as if the model were an untrusted client that might emit any call.\n\nConcrete design:\n- Act as the user, not as a superuser. Pass the end user's identity or a scoped token derived from it to the tool, so the database applies that user's row-level and table permissions. A single broad service account turns any steering of the model into access to everyone's data (a confused-deputy problem).\n- Least privilege per tool. run_sql uses a read-only role limited to the needed schemas; deny DDL and writes at the database level; add statement timeouts, row limits and cost limits. read_file is confined to an allowed directory with path normalisation to block traversal. send_report_email may only send to the user's own address or an approved domain list, with attachments produced by the system.\n- Per-task tool set. A request to 'explain this query result' needs no email tool; grant tools for the task at hand rather than everything always.\n- Validate arguments in code, independently of the schema shown to the model: parse SQL or use parameterised, pre-approved query templates for sensitive tables; check recipient addresses; reject unexpected arguments.\n- Rate limits and quotas per user and per session, to bound the damage of a runaway or hijacked loop.\n- Confirmation for outward or irreversible effects (email with data), showing the exact recipient and content.\n- Audit log tying every call to the user, session and prompt version, with alerting on unusual volume.\n- Secrets never in the prompt or tool output.\n\nTrade-offs: finer scoping means more engineering and sometimes refused legitimate queries; start with the highest-impact controls (user-scoped read-only data access and a recipient allowlist) and expand. No scoping removes all risk, but it bounds what a mistaken or manipulated model can do.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "code": null,
+  "sources": [],
+  "time_sensitive": false,
+  "plan_id": "B2-GEN-09-7",
+  "cell_id": "GEN-09",
+  "topic": "Tool use and agents (function calling, loops, failure modes, action guardrails)",
+  "question_type": "design",
+  "difficulty": "Medium",
+  "question": "A data-analyst assistant is given three tools: run_sql, read_file and send_report_email. The team plans to use one service account with broad access for all users because 'the prompt tells the model to stay within the user's data'. How would you scope permissions properly?",
+  "answer_set": "single",
+  "key_concepts": [
+   "least privilege",
+   "confused deputy",
+   "user-scoped credentials",
+   "read-only database role",
+   "argument validation in code",
+   "recipient allowlist",
+   "audit logging"
+  ],
+  "common_mistakes": [
+   "Using the prompt instruction as the access-control mechanism",
+   "Sharing one powerful service account across all users",
+   "Validating arguments only through the schema shown to the model"
+  ],
+  "interview_style_note": "Treats the model as an untrusted caller, puts enforcement in the tools and data layer, and ranks controls by impact.",
+  "tags": [
+   "agents",
+   "permissions",
+   "least-privilege",
+   "security"
+  ],
+  "change_notes": "Different from B2-GEN-09-3 (idempotency/approval of one irreversible action) and B2-GEN-09-4 (injection control flow): this is identity and permission scoping across several tools.",
+  "confidence": "high",
+  "related_domains": [
+   "Security"
+  ]
+ },
+ {
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "answer": "Public scores measure the benchmark's task mix, prompt format, answer extraction and scoring, not your task.\n\nReasons a benchmark gain may not transfer.\n1. Different distribution and skill: a reasoning benchmark of short puzzles exercises different abilities from locating and normalising clauses in 40-page contracts (long-context use, formatting fidelity, domain vocabulary, refusal behaviour).\n2. Contamination or overfitting to the benchmark: if test items or close variants appear in training or in tuning data, scores overstate general ability. You usually cannot verify this from outside; treat it as a risk, not as a conclusion.\n3. Evaluation protocol differences: the reported number depends on the prompt template, number of shots, answer-extraction rules, sampling settings and sometimes multiple attempts. Your pipeline's prompt differs, and models can differ in prompt sensitivity.\n4. Noise and saturation: a 4-point gap on a few hundred items may be within sampling error, and benchmarks near the ceiling separate models poorly.\n5. Metric mismatch: the benchmark measures accuracy; you care about field-level precision and recall, calibrated abstention, latency, cost and failure severity (a missed termination clause matters more than a missed footnote).\n6. Behavioural changes unrelated to capability: different output formatting, verbosity or instruction following can break your parser even if the model is 'better'.\n\nWhat to do.\n- Build or reuse a labelled, representative eval set of real documents (stratified by contract type and length, kept out of any prompt tuning), with an agreed labelling guide.\n- Run both models with the same pipeline, and also with per-model prompt tuning if you plan to tune, to avoid favouring the incumbent.\n- Report per-field precision/recall with paired bootstrap or paired-test intervals, plus parse failure rate, latency and cost per document.\n- Check slices (long documents, scanned text, rare clause types) and safety/regression cases.\n- Use public benchmarks only as a shortlist signal. Decide with a gate defined in advance, for example 'no field drops by more than X and the overall gain exceeds the interval'.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "code": null,
+  "sources": [],
+  "time_sensitive": false,
+  "plan_id": "B2-GEN-10-1",
+  "cell_id": "GEN-10",
+  "topic": "LLM evaluation (benchmarks, contamination, LLM-as-judge bias, regression suites)",
+  "question_type": "evaluation",
+  "difficulty": "Medium",
+  "question": "A new model scores 4 points higher than your current one on a public reasoning benchmark, and leadership wants to swap it into your contract-clause extraction pipeline. Why might that gain not carry over, and what would you do before agreeing?",
+  "answer_set": "single",
+  "key_concepts": [
+   "benchmark transfer",
+   "contamination risk",
+   "evaluation protocol sensitivity",
+   "paired confidence interval",
+   "representative held-out set",
+   "slice analysis",
+   "decision gate defined in advance"
+  ],
+  "common_mistakes": [
+   "Treating a leaderboard difference as proof of better performance on your task",
+   "Comparing models with a prompt tuned for only one of them",
+   "Evaluating on the same documents used to tune the prompt"
+  ],
+  "interview_style_note": "Gives concrete reasons a public gain may not transfer and replaces trust in the leaderboard with a task-specific, paired, pre-registered comparison.",
+  "tags": [
+   "benchmarks",
+   "contamination",
+   "model-selection",
+   "evaluation"
+  ],
+  "change_notes": "smi-h0012 implements n-gram contamination detection; this question is the decision-level view of why public benchmark gains fail to transfer and how to evaluate on your own task. Not about the contamination algorithm.",
+  "confidence": "high"
+ },
+ {
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "The headline +6 (84.0% to 87.0%) is a difference between two numbers computed on the same 200 cases, so it should be analysed as a paired comparison. Only the discordant cases carry information about which prompt is better: cases both pass or both fail do not. Here 15 cases favour the new prompt and 9 favour the old one. Under the null hypothesis that each discordant case is equally likely to go either way, the count of wins is Binomial(24, 0.5); an exact two-sided sign (McNemar-type) test gives p of about 0.31. So +6 is not distinguishable from noise at this sample size, and the 9 regressions deserve inspection regardless of the p-value, because users experience the broken cases.\n\nVariance sources specific to LLM suites:\n- Sampling randomness: if temperature is above 0, a case can pass in one run and fail in another. Run each case several times (for example 3 to 5) and score the pass fraction, or classify cases as stable pass, stable fail or flaky. A comparison on single runs mixes real change with sampling noise.\n- Non-determinism even at temperature 0 (batching, numerics), so the same applies.\n- Judge noise if an LLM judge scores outcomes: judge variance adds to the total, and the judge's labels are AI labels that need validation against human ones.\n- Case-sampling variance: the suite is a sample from the real traffic distribution, so use bootstrap over cases for intervals, not over repeated runs of the same case.\n\nHow big? The detectable effect depends on the discordant rate. If about 12% of cases flip either way (as here, 24 of 200), then detecting a true net improvement of 3 points with reasonable power needs far more than 200 cases; likely well over a thousand, or a stricter focus on a smaller set of high-value cases. For a regression gate, a different rule is also legitimate: do not try to prove superiority; require that no critical case breaks and that the estimated change is not worse than a tolerance, with a one-sided interval.\n\nPractical policy: tier cases (must-pass critical, standard, exploratory), triage every regression, keep flaky cases out of the pass/fail gate but track them, and add new production failures to the suite.",
+  "practical_answer": "Exact computation (verified by running the binomial sum). Discordant pairs: b = 15 (new passes, old fails), c = 9 (old passes, new fails), n = b + c = 24.\n- Two-sided exact p = 2 x P(X <= 9 | X ~ Bin(24, 0.5)) = 0.3075.\n- If the split had been 30 vs 12 (n = 42), p = 0.0079, which would be convincing; the same +18 net gain on 200 cases would then meet a 5% threshold.\n- Triage list for the 9 regressions: group by failure type (format break, refusal, missing citation, factual error), mark which are critical-tier, and rerun each 5 times with the new prompt to see whether they fail reliably (3 of 5 or more) or only sometimes.\nGate example (hypothetical): ship if (a) zero critical-tier regressions that fail in 3 or more of 5 reruns, (b) no category loses more than 3 cases net, and (c) the paired one-sided lower bound of the net change is above -2 points. Otherwise iterate on the prompt and re-run.",
+  "code": null,
+  "sources": [],
+  "time_sensitive": false,
+  "plan_id": "B2-GEN-10-2",
+  "cell_id": "GEN-10",
+  "topic": "LLM evaluation (benchmarks, contamination, LLM-as-judge bias, regression suites)",
+  "question_type": "evaluation",
+  "difficulty": "Hard",
+  "question": "You have a 200-case regression suite for a support-answer prompt. The old prompt passes 168 cases; the new prompt passes 174. Looking case by case, the new prompt fixes 15 cases and breaks 9. Is the new prompt better? Explain how to analyse this properly, how sampling variance and flaky cases change the picture, and how many cases you would want for a regression gate.",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "paired comparison",
+   "discordant pairs",
+   "exact sign test",
+   "sampling variance",
+   "flaky cases",
+   "bootstrap over cases",
+   "tiered regression gate"
+  ],
+  "common_mistakes": [
+   "Comparing two pass rates as if they were independent samples",
+   "Ignoring the 9 regressions because the net change is positive",
+   "Bootstrapping over repeated runs of the same case instead of over cases"
+  ],
+  "interview_style_note": "Uses only discordant pairs, computes the exact test, accounts for sampling and judge variance, and proposes a gate that protects critical cases instead of chasing significance.",
+  "tags": [
+   "regression-testing",
+   "mcnemar",
+   "paired-test",
+   "variance",
+   "prompt-evaluation"
+  ],
+  "change_notes": "Nearest: smi-j0028 (paired hit@5 comparison of two retrievers) and smi-j0021 (MRR improvement significance). This one targets LLM prompt regression suites: sampling variance, flaky cases, tiered gates; verified p-values 0.3075 and 0.0079 computed by code.",
+  "confidence": "high",
+  "related_domains": [
+   "Statistics"
+  ]
+ },
+ {
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": "Pairwise comparison is usually easier for a judge to be consistent with and more sensitive to small differences, while absolute scales tend to compress into a few values and drift with rubric wording. Judge each pair in both orders, count disagreement between orders as a tie, allow an explicit tie option, and aggregate into win rates. Pairwise cost grows with the number of candidate pairs, so use absolute screening first for many candidates.",
+  "detailed_answer": "Absolute (pointwise) scoring gives each answer a score against a rubric. It scales linearly with the number of answers, can be tracked over time and supports thresholds ('must score at least 4'). Weaknesses: scores often cluster (most answers get 4), different judge prompts or judge versions shift the scale, and small quality differences between candidates vanish.\n\nPairwise comparison asks which of two answers is better. Relative judgments are often easier and more discriminating for close candidates, but give no absolute quality level, scale with the number of pairs (4 candidates need 6 pairs, 20 need 190), and need aggregation. The MT-Bench paper examines the usage and limitations of LLM judges and names position, verbosity and self-enhancement biases; the size of each bias depends on the judge and the task.\n\nPractical protocol for pairwise.\n- Position: run each pair in both orders (A,B) and (B,A). If the judge picks the same underlying answer both times, record that answer as the winner; if it flips with the order, record a tie (or exclude and report the rate of such cases, since a high rate means the judge cannot separate these answers).\n- Ties: provide an explicit 'tie' option in the prompt, score a tie as half a win, and report win/tie/loss counts, not just a win rate.\n- Aggregation: with more than two candidates, fit a Bradley-Terry or Elo-style ranking from the pairwise outcomes, or simply report a win-rate matrix; include bootstrap intervals over prompts.\n- Bias controls: control or normalise length (compare length-matched pairs or report length alongside), do not use a judge from the same family as one candidate without checking self-preference, and randomise answer labels.\n- Validate against humans on a sample before trusting the ranking, and remember the judge's output is an AI label.\n\nChoice: for 4 candidates, pairwise with order swaps is affordable (6 pairs x 2 orders per prompt). For many candidates or continuous monitoring, use pointwise scoring with a calibrated rubric as a screen and pairwise only for the finalists.",
+  "practical_answer": null,
+  "code": null,
+  "sources": [
+   {
+    "title": "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena (arXiv:2306.05685)",
+    "url": "https://arxiv.org/abs/2306.05685",
+    "supports": "The abstract examines usage and limitations of LLM-as-a-judge, including position, verbosity and self-enhancement biases, and reports that strong LLM judges can match human preferences with over 80% agreement on the benchmarks studied."
+   }
+  ],
+  "time_sensitive": false,
+  "plan_id": "B2-GEN-10-3",
+  "cell_id": "GEN-10",
+  "topic": "LLM evaluation (benchmarks, contamination, LLM-as-judge bias, regression suites)",
+  "question_type": "evaluation",
+  "difficulty": "Medium",
+  "question": "You must compare four candidate answer styles for a help-centre assistant using an LLM judge. Should the judge score each answer on an absolute 1-5 scale or compare pairs? How would you treat ties and judge inconsistency, and what are the cost implications?",
+  "answer_set": "concise+detailed",
+  "key_concepts": [
+   "pointwise vs pairwise judging",
+   "order swap",
+   "position bias",
+   "tie handling",
+   "Bradley-Terry aggregation",
+   "length bias",
+   "pair-count growth"
+  ],
+  "common_mistakes": [
+   "Judging each pair in only one order and reporting the win rate",
+   "Forcing a winner when the judge flips with answer order",
+   "Using absolute 1-5 scores and reporting differences of 0.1 as meaningful without variance"
+  ],
+  "interview_style_note": "Chooses the judging format by candidate count and sensitivity needs, and designs tie and inconsistency handling explicitly.",
+  "tags": [
+   "llm-as-judge",
+   "pairwise-evaluation",
+   "bias",
+   "aggregation"
+  ],
+  "change_notes": "smi-j0031 asks about position bias in a pairwise judge on 200 questions; this question is about choosing absolute vs pairwise, tie and inconsistency policy, and pair-count cost, not position bias diagnosis.",
+  "confidence": "high"
+ },
+ {
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Raw agreement is 135/150 = 90%, but it is a weak summary here because the classes are imbalanced: the judge accepts 130 of 150 answers and the human accepts 125. A judge that always said 'acceptable' would agree with this human 125/150, about 83%, so 90% is less impressive than it sounds. Chance-corrected agreement (Cohen's kappa) is about 0.61, 'moderate to substantial', depending on the scale you use. More important for use are error-type rates: of the 25 answers humans rejected, the judge accepted 10 (40%). If the judge is used as a quality gate, 40% of bad answers slip through; its recall for unacceptable answers is 60% (15/25).\n\nCalibration procedure.\n1. Write the rubric with concrete criteria and examples of borderline cases; have two humans label independently on a sample and measure human-human agreement. That is the realistic ceiling; if humans agree only 85% of the time, a judge at 90% to one of them is not meaningful on its own.\n2. Compare the judge with the human consensus on a sample that over-represents the rare class (bad answers), since 25 negatives give a very wide interval for judge recall.\n3. Study disagreements by category (the 15 off-diagonal cases plus more): length preference, missed unsupported claims, leniency toward fluent text, rubric ambiguity. Revise the rubric or add a structured step (list claims, check each against the source), then re-measure on a fresh sample, not the one used for tuning.\n4. Pick an operating point from costs: if a bad answer is costly, require a stricter threshold, use a second judge or a human check on borderline scores.\n5. Monitor drift: re-audit a random sample of judged items regularly and whenever the judge model or prompt changes.\n\nHonest labelling: the human labels are the reference but are themselves noisy and subjective; the judge's labels are model predictions (AI labels), and any dataset or metric built on them should say so and carry the measured error rates.",
+  "practical_answer": "Worked arithmetic (computed by running the formulas). Table: both acceptable 120 (TP), judge acceptable / human not 10 (FP), judge not / human acceptable 5 (FN), both not 15 (TN), n = 150.\n- Observed agreement p_o = (120 + 15)/150 = 0.900.\n- Judge says acceptable: 130/150 = 0.867; human says acceptable: 125/150 = 0.833.\n- Expected chance agreement p_e = 0.867 x 0.833 + 0.133 x 0.167 = 0.744.\n- Kappa = (0.900 - 0.744)/(1 - 0.744) = 0.609.\n- Judge precision for 'acceptable' = 120/130 = 0.92; its rate of letting bad answers through = 10/25 = 0.40.\nIllustration of the follow-up: after rubric revision, collect 200 new answers stratified to include 80 human-rejected ones, label them by two humans, and report kappa, the pass-through rate of bad answers with a Wilson interval, and the agreement between the two humans next to the judge-human agreement. Set an acceptance rule such as 'bad-answer pass-through at or below 15% with the upper interval bound below 25%' (hypothetical) before looking at the data.",
+  "code": null,
+  "sources": [],
+  "time_sensitive": false,
+  "plan_id": "B2-GEN-10-4",
+  "cell_id": "GEN-10",
+  "topic": "LLM evaluation (benchmarks, contamination, LLM-as-judge bias, regression suites)",
+  "question_type": "evaluation",
+  "difficulty": "Hard",
+  "question": "You want to use an LLM judge to label support answers as 'acceptable' or 'not acceptable'. On 150 answers that a human reviewer also labelled, the counts are: both acceptable 120, judge acceptable but human not 10, judge not acceptable but human acceptable 5, both not acceptable 15. The vendor says '90% agreement, so it's good enough'. Evaluate that claim, state how you would calibrate the judge, and say how to treat the two kinds of labels honestly.",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "Cohen's kappa",
+   "class imbalance and raw agreement",
+   "judge false-accept rate",
+   "human-human agreement ceiling",
+   "stratified calibration sample",
+   "disagreement analysis",
+   "AI label vs human label"
+  ],
+  "common_mistakes": [
+   "Treating raw percent agreement as quality when classes are imbalanced",
+   "Calibrating and reporting on the same sample",
+   "Ignoring that the human labels also contain disagreement and noise"
+  ],
+  "interview_style_note": "Goes beyond raw agreement to kappa and error-type rates, designs an iterative calibration with a fresh test sample, and is explicit that judge labels are AI labels.",
+  "tags": [
+   "llm-as-judge",
+   "calibration",
+   "cohen-kappa",
+   "human-labels",
+   "evaluation"
+  ],
+  "change_notes": "smi-j0029 is a 91/100 agreement question about faithfulness judge; this one uses kappa, false-accept rate, human-human ceiling and calibration procedure on a different count table. Nearest existing: smi-j0029. Kappa 0.609 and rates were computed by code.",
+  "confidence": "high"
+ },
+ {
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "answer": "This looks like Goodhart's law: optimising a proxy until it stops tracking the goal.\n\nGoodhart's law says that when a measure becomes a target it ceases to be a good measure. Three mechanisms probably combine here.\n1. Overfitting to the dev set: with dozens of prompt edits evaluated on the same 300 items, each edit that happens to help those items is kept. The final score is a biased estimate, like tuning hyperparameters on the test set. Part of the 3.1 to 4.2 rise can be adaptation to those items.\n2. Judge exploitation: LLM judges can prefer longer, more detailed or more confident-sounding answers; studies of LLM judges report verbosity and other biases, with magnitude depending on judge and task. If edits pushed the answers longer (up 40%), the judge may reward length that users do not want, which fits flat thumbs-up and could even harm latency and cost.\n3. Proxy-goal gap: a score of overall quality ignores what the thumbs-up captures (directness, correct handling of the user's actual need, tone), and the dev set may not match production traffic.\n\nProcess fixes.\n- Split data: a dev set for iteration and a locked test set that is used rarely, plus a periodically refreshed sample of recent production queries.\n- Report multiple metrics together: judge score, length, groundedness or correctness checks that do not depend on style, latency and cost, and a length-controlled comparison (compare answers of similar length or regress the score on length).\n- Validate the judge on human labels, and audit a random sample of improvements by humans, particularly those the judge liked most.\n- Make the primary decision metric one that connects to users: A/B tests or shadow comparisons with thumbs-up, task completion, escalation rate.\n- Limit the number of edits evaluated on one set, or use correction for repeated looks.\n- Keep adversarial and counter-metric cases (short correct answers should win) in the suite.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "code": null,
+  "sources": [
+   {
+    "title": "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena (arXiv:2306.05685)",
+    "url": "https://arxiv.org/abs/2306.05685",
+    "supports": "The abstract examines usage and limitations of LLM-as-a-judge, including position, verbosity and self-enhancement biases, and reports that strong LLM judges can match human preferences with over 80% agreement on the benchmarks studied."
+   }
+  ],
+  "time_sensitive": false,
+  "plan_id": "B2-GEN-10-5",
+  "cell_id": "GEN-10",
+  "topic": "LLM evaluation (benchmarks, contamination, LLM-as-judge bias, regression suites)",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "Over six weeks a team iterated its assistant prompt against a fixed 300-item dev set scored by an LLM judge. The judge score rose from 3.1 to 4.2 out of 5, but thumbs-up rate in production is flat and the average answer length is up 40%. What happened, and how do you change the evaluation process so improvements are real?",
+  "answer_set": "single",
+  "key_concepts": [
+   "Goodhart's law",
+   "dev set overfitting",
+   "locked test set",
+   "judge verbosity bias",
+   "length-controlled comparison",
+   "guardrail metrics",
+   "online validation"
+  ],
+  "common_mistakes": [
+   "Declaring success from the offline judge score alone",
+   "Reusing the same dev set for every iteration without a locked holdout",
+   "Treating length growth as harmless improvement in detail"
+  ],
+  "interview_style_note": "Names the mechanisms behind proxy drift, separates dev from locked test data, controls for length, and links offline metrics back to user outcomes.",
+  "tags": [
+   "goodhart",
+   "metric-gaming",
+   "llm-as-judge",
+   "overfitting",
+   "evaluation"
+  ],
+  "change_notes": "smi-j0031 (position bias) and smi-j0029 (agreement) are about judge diagnostics; this one is about iterative optimisation against a proxy, dev-set overfitting and the offline/online gap.",
+  "confidence": "high"
+ },
+ {
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "answer": "Safety and helpfulness trade off, so report both.\n\nReading the numbers. Harmful set: refusals 188/200 (94.0%, Wilson 95% interval roughly 89.8% to 96.5%) to 196/200 (98.0%, roughly 95.0% to 99.2%). Benign-sensitive set: false refusals 8/200 (4.0%, roughly 2.0% to 7.7%) to 22/200 (11.0%, roughly 7.4% to 16.1%). The two harmful-set intervals overlap, and since the same prompts were used you should compare them with a paired method; the change there is +8 prompts. The benign-set change is +14 refusals, a larger and more clearly visible move. The stricter prompt therefore trades a small safety gain for a bigger helpfulness loss on this set.\n\nBuilding the evaluation.\n1. Maintain at least three sets: (a) clearly disallowed requests where refusal is desired, (b) benign requests, including borderline-looking ones, where refusal is a failure ('over-refusal'), and (c) ordinary tasks for general helpfulness. Label each item with the desired behaviour, and for borderline items allow a safe-completion option (answer with limits or redirect) rather than a binary answer.\n2. Metrics: harmful compliance rate (lower is better), false-refusal rate, and the quality of helpful answers; report slices by category and by user context because the right behaviour varies.\n3. Measurement of 'refusal' itself is noisy: refusals are detected by patterns or a judge, partial refusals and safe completions are ambiguous, and judge labels are AI labels. Validate on a human-labelled sample.\n4. Weight by real traffic: harmful requests may be 0.1% of production while sensitive-but-legitimate ones are far more common; an intervention that looks good on balanced test sets can cost many legitimate users. Compute expected impact per 10,000 requests under assumed prevalences.\n5. Prefer layered mitigations to a single stricter prompt: classifiers or policies at input and output, narrower tool permissions, and human escalation for high-risk categories.\n6. Treat the test sets as living: add real incidents and avoid overfitting to the fixed sets; keep a held-out portion.\n\nThis is defensive evaluation; the test prompts are kept access-controlled.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "code": null,
+  "sources": [],
+  "time_sensitive": false,
+  "plan_id": "B2-GEN-10-6",
+  "cell_id": "GEN-10",
+  "topic": "LLM evaluation (benchmarks, contamination, LLM-as-judge bias, regression suites)",
+  "question_type": "evaluation",
+  "difficulty": "Medium",
+  "question": "A stricter system prompt raises the refusal rate on your 200 clearly harmful test requests from 188 to 196 (94% to 98%). The team celebrates. Your 200 benign-but-sensitive requests (for example medical or security questions with legitimate purposes) show refusals going from 8 to 22. Evaluate the change and describe how you would build and report safety and helpfulness measures together.",
+  "answer_set": "single",
+  "key_concepts": [
+   "false refusal rate",
+   "harmful compliance rate",
+   "paired comparison",
+   "Wilson interval",
+   "safe completion",
+   "traffic-weighted impact",
+   "layered mitigation"
+  ],
+  "common_mistakes": [
+   "Reporting only refusal rate on harmful prompts and calling the stricter prompt better",
+   "Comparing overlapping intervals from the same prompts as if they were independent samples",
+   "Using balanced test sets to estimate production impact without weighting by real prevalence"
+  ],
+  "interview_style_note": "Insists on measuring over-refusal next to harm prevention, with intervals and traffic weighting, and stays honest that refusal detection is itself imperfect.",
+  "tags": [
+   "safety-evaluation",
+   "refusal",
+   "over-refusal",
+   "helpfulness",
+   "trade-off"
+  ],
+  "change_notes": "No existing safety-evaluation question. Intervals computed with the Wilson function from B2-GEN-10-7 (188/200, 196/200, 8/200, 22/200).",
+  "confidence": "high",
+  "related_domains": [
+   "Security"
+  ]
+ },
+ {
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "A pass rate on n cases is an estimate from a sample, so it should be reported with an interval. For 27/30 the point estimate is 0.90, but the 95% Wilson score interval is about 74.4% to 96.5%: the true pass rate on the underlying distribution could plausibly be well below the point estimate. The naive Wald (normal approximation) interval p +/- z sqrt(p(1-p)/n) gives about 79.3% to 100.7%, which exceeds 1 and shows why it is poor at small n or when p is near 0 or 1. At 30/30 the Wald interval collapses to a zero-width [1, 1], claiming certainty; Wilson gives a lower bound of about 88.6%, which is consistent with 'we saw no failures in 30 cases, so the failure rate could still be a few percent'. In many settings Wilson has better coverage than Wald for small n; Clopper-Pearson is a more conservative exact alternative.\n\nWhat the interval does not tell you: it assumes the cases are an independent random sample from the traffic you care about. A hand-picked smoke test of 30 cases is not that, and repeated near-duplicate cases make the effective n smaller. It also covers sampling error only, not judge error or label noise. And two overlapping intervals for two prompts do not mean the prompts are the same; for comparing prompts on the same cases use a paired test on discordant cases.\n\nPlanning sample size (normal approximation, planning only): n is about z^2 p(1-p)/h^2. For p about 0.9 and half-width h = 0.03, n = 1.96^2 x 0.09/0.0009, about 385 cases; the worst case p = 0.5 with h = 0.05 also gives 385. If you expect p near 0.9 but are unsure, plan with the more conservative value.",
+  "practical_answer": "Reference implementation (tested on Python 3.10, 3.11 and 3.13):\n\n```python\nimport math\n\n\ndef wilson_interval(successes, n, z=1.96):\n    \"\"\"Wilson score interval for a binomial proportion. Returns (low, high).\"\"\"\n    if not isinstance(n, int) or n <= 0:\n        raise ValueError(\"n must be a positive integer\")\n    if not isinstance(successes, int) or not 0 <= successes <= n:\n        raise ValueError(\"successes must be an integer in [0, n]\")\n    if z <= 0:\n        raise ValueError(\"z must be positive\")\n    p = successes / n\n    z2 = z * z\n    denom = 1 + z2 / n\n    centre = (p + z2 / (2 * n)) / denom\n    half = z * math.sqrt(p * (1 - p) / n + z2 / (4 * n * n)) / denom\n    return max(0.0, centre - half), min(1.0, centre + half)\n\n\ndef wald_interval(successes, n, z=1.96):\n    \"\"\"Textbook normal-approximation interval, kept only for comparison.\"\"\"\n    p = successes / n\n    half = z * math.sqrt(p * (1 - p) / n)\n    return p - half, p + half\n\n\ndef n_for_halfwidth(p_guess, halfwidth, z=1.96):\n    \"\"\"Smallest n whose normal-approximation half-width is <= halfwidth (planning only).\"\"\"\n    if not 0 < halfwidth < 1 or not 0 <= p_guess <= 1:\n        raise ValueError(\"bad arguments\")\n    return math.ceil(z * z * p_guess * (1 - p_guess) / (halfwidth * halfwidth))\n```\n\nResults from running it: wilson_interval(27, 30) = (0.7438, 0.9654); wald_interval(27, 30) = (0.7926, 1.0074); wilson_interval(30, 30) = (0.8865, 1.0); wilson_interval(270, 300) = (0.8608, 0.9291), so ten times more cases at the same 90% rate narrows the interval from about 22 points wide to about 7 points wide. Note n_for_halfwidth(0.9, 0.03) returns 385 and n_for_halfwidth(0.5, 0.05) also returns 385; the first figure uses the normal approximation, which is only a planning estimate.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import math\n\n\ndef wilson_interval(successes, n, z=1.96):\n    \"\"\"Wilson score interval for a binomial proportion. Returns (low, high).\"\"\"\n    if not isinstance(n, int) or n <= 0:\n        raise ValueError(\"n must be a positive integer\")\n    if not isinstance(successes, int) or not 0 <= successes <= n:\n        raise ValueError(\"successes must be an integer in [0, n]\")\n    if z <= 0:\n        raise ValueError(\"z must be positive\")\n    p = successes / n\n    z2 = z * z\n    denom = 1 + z2 / n\n    centre = (p + z2 / (2 * n)) / denom\n    half = z * math.sqrt(p * (1 - p) / n + z2 / (4 * n * n)) / denom\n    return max(0.0, centre - half), min(1.0, centre + half)\n\n\ndef wald_interval(successes, n, z=1.96):\n    \"\"\"Textbook normal-approximation interval, kept only for comparison.\"\"\"\n    p = successes / n\n    half = z * math.sqrt(p * (1 - p) / n)\n    return p - half, p + half\n\n\ndef n_for_halfwidth(p_guess, halfwidth, z=1.96):\n    \"\"\"Smallest n whose normal-approximation half-width is <= halfwidth (planning only).\"\"\"\n    if not 0 < halfwidth < 1 or not 0 <= p_guess <= 1:\n        raise ValueError(\"bad arguments\")\n    return math.ceil(z * z * p_guess * (1 - p_guess) / (halfwidth * halfwidth))",
+   "test": "\nlo, hi = wilson_interval(27, 30)\nw_lo, w_hi = wald_interval(27, 30)\nassert abs(lo - 0.7438) < 5e-4 and abs(hi - 0.9654) < 5e-4\nassert w_hi > 1.0 and 0.0 <= hi <= 1.0   # Wald can leave [0, 1]; Wilson cannot\nassert wald_interval(30, 30) == (1.0, 1.0)          # degenerate zero-width interval\nl, h = wilson_interval(30, 30)\nassert h == 1.0 and 0.88 < l < 0.89\nassert wilson_interval(0, 30)[0] == 0.0\nfor bad in [(5, 0), (-1, 10), (11, 10)]:\n    try:\n        wilson_interval(*bad); raise AssertionError\n    except ValueError:\n        pass\nassert n_for_halfwidth(0.5, 0.05) == 385\n",
+   "expected": null
+  },
+  "sources": [],
+  "time_sensitive": false,
+  "plan_id": "B2-GEN-10-7",
+  "cell_id": "GEN-10",
+  "topic": "LLM evaluation (benchmarks, contamination, LLM-as-judge bias, regression suites)",
+  "question_type": "coding",
+  "difficulty": "Medium",
+  "question": "A prompt change passes 27 of 30 smoke-test cases and an engineer reports '90% pass rate'. Implement in Python (standard library only) a function wilson_interval(successes, n, z=1.96) with input validation, compare it with the naive normal-approximation interval on this data, and explain what the interval does and does not tell you at n=30, and how many cases you would need for a +/-3 point interval at about 90%.",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "Wilson score interval",
+   "Wald interval failure at small n",
+   "binomial proportion",
+   "sample size planning",
+   "interval width vs n",
+   "independence assumption",
+   "paired comparison for prompts"
+  ],
+  "common_mistakes": [
+   "Reporting 27/30 as a '90% pass rate' without any uncertainty",
+   "Using the Wald interval at n=30 or near 0%/100%",
+   "Concluding that two prompts are the same because their intervals overlap"
+  ],
+  "interview_style_note": "Implements a robust interval with validation, shows concretely why the naive formula fails, and states the independence and sampling assumptions.",
+  "tags": [
+   "confidence-interval",
+   "wilson",
+   "pass-rate",
+   "small-sample",
+   "coding"
+  ],
+  "change_notes": "Nearest: smi-j0021 / smi-j0028 (significance of retrieval metric differences) which do not implement binomial intervals. Interval values come from executing the tested function and were cross-checked by solving the score equation |p-q|/sqrt(q(1-q)/n)=z at both bounds.",
+  "confidence": "high",
+  "related_domains": [
+   "Statistics"
+  ]
+ }
+]

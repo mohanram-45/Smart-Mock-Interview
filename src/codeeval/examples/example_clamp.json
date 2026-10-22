@@ -1,0 +1,16 @@
+{
+ "schema": 1,
+ "spec_id": "example_clamp/1",
+ "question_id": "example-clamp",
+ "title": "Example: clamp a number into a range (documentation example, not a corpus question)",
+ "limitations": ["This is a documentation example for the declarative spec format; it is not attached to any interview question."],
+ "requirements": [
+  {"id": "f_inside", "kind": "functional", "label": "clamp(5, 0, 10) returns 5", "case": {"function": "clamp", "args": [5, 0, 10], "expect": {"equals": 5}}},
+  {"id": "f_below", "kind": "functional", "label": "clamp(-3, 0, 10) returns 0", "case": {"function": "clamp", "args": [-3, 0, 10], "expect": {"equals": 0}}},
+  {"id": "f_above", "kind": "functional", "label": "clamp(99, 0, 10) returns 10", "case": {"function": "clamp", "args": [99, 0, 10], "expect": {"equals": 10}}},
+  {"id": "f_bad_range", "kind": "functional", "label": "a reversed range raises ValueError", "case": {"function": "clamp", "args": [1, 10, 0], "expect": {"raises": "ValueError"}}},
+  {"id": "s_defines", "kind": "structure", "label": "Defines clamp()", "rule": {"type": "defines_function", "name": "clamp"}},
+  {"id": "s_noloops", "kind": "structure", "label": "No loops in clamp()", "rule": {"type": "function_has_no_loops", "function": "clamp"}},
+  {"id": "e_edge", "kind": "explanation", "label": "Explains what happens when low > high", "topic": [["low\\s*>\\s*high", "reversed", "invalid range"], ["error", "raise", "exception"]]}
+ ]
+}

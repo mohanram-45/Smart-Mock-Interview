@@ -1,0 +1,2 @@
+Verbatim copies of the Windows run `tmp/stage10_opps_20261018_183718` (llama3.2:3b, Ollama 0.32.13, prompt 10.fu4, 2026-10-18): `results.json`, `key.json`, `review_sheet.csv`.
+The benchmark answers are the synthetic fixed set in `src/demo/eval_data/stage10f_opportunities_v1.json`, so no candidate text is here. Do not edit these files: `scripts/stage10g_replay_windows.py` and the 10G tests read them as the "before" evidence.

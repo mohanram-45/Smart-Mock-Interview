@@ -1,0 +1,1046 @@
+[
+ {
+  "plan_id": "B4-MLO-09-5",
+  "id": "smi-m0013",
+  "verdict": "pass",
+  "reasons": [
+   "All six items are sound practice and answer both halves of the question (restore the previous state; stop recurrence on the next automated retrain).",
+   "No numbers, code or cited sources; claims are general MLOps practice and are consistent with smi-l0013, smi-l0015 and smi-l0032."
+  ],
+  "parts_answered": {
+   "what else must be checked/changed for rollback to restore state": true,
+   "how to prevent recurrence on next automated retrain": true
+  },
+  "evidence": [
+   {
+    "claim": "Rollback must restore thresholds/calibration/config/feature definitions released with v12",
+    "method": "background_only",
+    "evidence": "General release-engineering practice; same position as smi-l0013 and smi-l0032 (whole bundle, feature compatibility)."
+   },
+   {
+    "claim": "Pause automatic promotion/trigger until cause known",
+    "method": "background_only",
+    "evidence": "Same position as smi-l0015 item 5."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Multi-item scenario requiring judgement but no calculation or subtle mechanism.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single-field answer is appropriate; no variants to compare."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All seven are discussed in the answer. \"registry status\" maps to item 6 and item 4.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0013",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Registry/canary practices are general MLOps practice (already listed)."
+  ],
+  "code_patch": null,
+  "contradictions": [],
+  "duplicate_check": "Nearest smi-l0013 (rollback criteria and rollback safety before/at a promotion) and smi-l0032 (rollback blocked by feature change). This record is about the post-rollback follow-up (data window, trigger, gate) so intent differs."
+ },
+ {
+  "plan_id": "B4-MLO-10-2",
+  "id": "smi-m0015",
+  "verdict": "correct",
+  "reasons": [
+   "SQL and Python test re-run on 3.13/3.10/3.11 (SQLite 3.45.1): identical output [(\"refund_flag\",4,4,1.0,470.0,4),(\"days_since_login\",4,3,0.75,15.0,0)]; fenced SQL equals config content and the SQL inside code.solution.",
+   "Numbers in the prose recompute exactly (470 h = 19 d 14 h; 15 h = 23:59 vs 09:00 on 2 March; orders_30d absent).",
+   "Only issue: the prose interprets an example dataset that is never shown in the answer text, and one limitation (NULL label_ts) is missing."
+  ],
+  "parts_answered": {
+   "one SQLite query with n_rows/rows_from_future/share/max hours ahead/rows after label, offenders only": true,
+   "interpret on a small example": "yes but the example data is only in code.test",
+   "what the query cannot catch": true
+  },
+  "evidence": [
+   {
+    "claim": "refund_flag max_hours_ahead 470.0 (2026-03-21 00:00 vs 2026-03-01 10:00)",
+    "method": "executed",
+    "evidence": "19 d 14 h = 470 h; rows_after_label 4 (03-21>03-20, 03-21>03-20, 03-12>03-10, 03-03 06:00>03-03 00:00)."
+   },
+   {
+    "claim": "days_since_login 3 of 4 future, max 15.0 h, none after label",
+    "method": "executed",
+    "evidence": "23:59 vs 10:00 = 13.98 h, 23:59 vs 15:00 = 8.98 h, 03-02 23:59 vs 09:00 = 14.98 h -> 15.0; row 4 at 17:30 < 18:00 prediction."
+   },
+   {
+    "claim": "Mixed ISO formats break string comparison",
+    "method": "executed",
+    "evidence": "Own edge test: feature_ts \"2026-03-01T09:59:00\" vs prediction_ts \"2026-03-01 10:00:00\" counts as future by string compare (T > space) yet julianday gives max_hours_ahead 0.0 -> the answer's format caveat is correct and important."
+   },
+   {
+    "claim": "label_ts NULL rows are never counted in rows_after_label",
+    "method": "executed",
+    "evidence": "Own edge test: row with NULL label_ts and feature_ts after prediction counted in rows_from_future but not in rows_after_label."
+   },
+   {
+    "claim": "feature_ts == prediction_ts is not flagged; HAVING alias accepted by SQLite",
+    "method": "executed",
+    "evidence": "Own edge test \"eq\" feature absent from output."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "On the example run (SQLite dialect, executed in the test): refund_flag has all 4 rows from the future",
+    "problem": "The answer interprets numbers from a four-row example that appears only in code.test; a reader of the answer text cannot reproduce or check them.",
+    "replacement": "On the example run (SQLite dialect, executed in the test on 4 training rows and 12 feature values, where refund_flag is stamped between 12 hours and about 20 days after prediction time and days_since_login is stamped 23:59 on the prediction day for three of the four rows): refund_flag has all 4 rows from the future"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "run in the test below against a four-row in-memory dataset",
+    "problem": "No test is shown below in the answer text; it lives in code.test.",
+    "replacement": "run in the test (code.test) against a four-row in-memory dataset"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Features with no timestamp, leakage that is not temporal",
+    "problem": "Missing limitation: rows whose label_ts is NULL (unlabelled) are never counted in rows_after_label, so the label check silently skips them.",
+    "replacement": "Features with no timestamp, rows whose label_ts is NULL (they are never counted in rows_after_label), leakage that is not temporal"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Single aggregate query with conditional sums and a time-difference calculation plus interpretation; not multi-step design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Explains the two-timestamp logic, reads the numbers and lists limits."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Holds the runnable query, outputs and gating policy; no paraphrase of the detailed field."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All seven discussed. \"nightly snapshot\" and \"as-of join\" are covered in the example paragraph.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0041",
+   "same_intent": false
+  },
+  "code_findings": "Re-run with python -I on 3.13.16, 3.10.20 and 3.11.17: same assert-passing output. stdlib only (sqlite3), no 3.11+ features. Fenced SQL == configs[0].content == SQL in solution. SQLite validated by execution (sqlite3 CLI not installed; python sqlite3 3.45.1 used). Extra edge cases: equal timestamps (not flagged), NULL label_ts (not counted after label), orphan feature rows with no training row (silently dropped by inner join), mixed \"T\"/space formats (string compare disagrees with julianday). Share denominator is rows that have that feature, not all training rows.",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Nightly-snapshot-joined-by-date mechanism is illustrative (already listed)."
+  ],
+  "code_patch": null,
+  "contradictions": [],
+  "duplicate_check": "smi-l0041 implements a Python point-in-time join; this record is a SQL audit query that detects violations. Related, different intent."
+ },
+ {
+  "plan_id": "B4-MLO-10-3",
+  "id": "smi-m0016",
+  "verdict": "pass",
+  "reasons": [
+   "All four silent-pass paths in the question are explained correctly; the NaN and all([]) statements match the Python docs.",
+   "Test suite in the practical answer exercises every path including exit status.",
+   "Rules of ML Rule #5 sentence is supported as worded."
+  ],
+  "parts_answered": {
+   "how it can pass silently": true,
+   "how to fix": true,
+   "how to test the validator itself": true
+  },
+  "evidence": [
+   {
+    "claim": "Any ordered comparison with NaN is False so `NaN > limit` never fails",
+    "method": "doc",
+    "evidence": "Python reference, Value comparisons: \"Any ordered comparison of a number to a not-a-number value is false ... compliant with IEEE 754.\""
+   },
+   {
+    "claim": "all([]) is True",
+    "method": "doc",
+    "evidence": "Python built-ins: all() \"Return True if all elements of the iterable are true (or if the iterable is empty).\""
+   },
+   {
+    "claim": "Rules of ML: test getting data into the algorithm / check populated columns",
+    "method": "doc",
+    "evidence": "developers.google.com rules-of-ml Rule #5 first bullet \"Test getting data into the algorithm\" -> \"Check that feature columns that should be populated are populated.\""
+   },
+   {
+    "claim": "`if not (value <= limit): fail` makes NaN fail",
+    "method": "derivation",
+    "evidence": "NaN <= limit is False so not(False) is True -> fail."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Debugging from four stated symptoms plus test design; mechanisms are standard once NaN semantics are known.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Diagnosis and fixes."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Broken-batch test suite and run-time guards, not in the detailed field."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All seven discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0009",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule #5 \"Test the infrastructure independently from the machine learning\": first bullet \"Test getting data into the algorithm\"; \"Check that feature columns that should be populated are populated.\""
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Python Language Reference: Value comparisons (NaN)",
+    "url": "https://docs.python.org/3/reference/expressions.html",
+    "supports": "`NaN > limit` never fails; any ordered comparison with NaN is False.",
+    "quote": "Any ordered comparison of a number to a not-a-number value is false.",
+    "type": "official_doc"
+   },
+   {
+    "title": "Python built-in functions: all()",
+    "url": "https://docs.python.org/3/library/functions.html",
+    "supports": "all([]) is True, so zero checks executed looks healthy.",
+    "quote": "Return True if all elements of the iterable are true (or if the iterable is empty).",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "contradictions": [],
+  "duplicate_check": "smi-l0009 writes validate_batch; smi-l0008 places validation; this record debugs a validator that is vacuous. Different intent."
+ },
+ {
+  "plan_id": "B4-MLO-10-4",
+  "id": "smi-m0017",
+  "verdict": "pass",
+  "reasons": [
+   "TFDV page fetched: \"uses conservative heuristics ... strongly advised to review the inferred schema and refine it\" matches the wording; the page does not claim numeric min/max inference and the answer correctly hedges \"(not every tool does)\".",
+   "ML Test Score items Data 1 (feature expectations in a schema) and Monitor 2 (data invariants hold in training and serving inputs) are separate items as stated.",
+   "Concise (60 words) is a genuinely shorter version."
+  ],
+  "parts_answered": {
+   "which parts of an inferred schema need human review": true,
+   "what must be added that single-snapshot inference cannot supply": true
+  },
+  "evidence": [
+   {
+    "claim": "TFDV inference is conservative and review is strongly advised",
+    "method": "doc",
+    "evidence": "tensorflow.org/tfx/data_validation/get_started: \"TFDV uses conservative heuristics to infer stable data properties ... It is strongly advised to review the inferred schema and refine it as needed, to capture any domain knowledge about the data that TFDV's heuristics might have missed.\""
+   },
+   {
+    "claim": "Skew comparator thresholds are set in the schema",
+    "method": "doc",
+    "evidence": "Same page: skew_comparator.infinity_norm.threshold = 0.01 / jensen_shannon_divergence option."
+   },
+   {
+    "claim": "ML Test Score lists schema and train/serve invariants separately",
+    "method": "doc",
+    "evidence": "PDF: Data 1 \"Feature expectations are captured in a schema\"; Monitor 2 \"Data invariants hold in training and serving inputs\"."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Conceptual comparison of inferred vs reviewed schema; breadth rather than depth.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "60 words, interview-ready."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Adds examples, validation of the baseline and the sources."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "All eight discussed. \"observed min/max ranges\" is hedged in the answer because TFDV does not infer them by default; keep as is.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0019",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://www.tensorflow.org/tfx/data_validation/get_started",
+    "status": "supported",
+    "evidence": "Quote above; skew comparator thresholds shown in the schema."
+   },
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Data 1 and Monitor 2 titles found verbatim; they are separate items."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Category sets from observed values / types inferred too narrowly are general inference artefacts (illustrative, not stated on the TFDV page)."
+  ],
+  "code_patch": null,
+  "contradictions": [],
+  "duplicate_check": "smi-l0019 (signature checks, what type checks cannot catch) and smi-l0008 (where to validate) overlap in theme only; this asks what to review/add in an auto-inferred schema. Different intent."
+ },
+ {
+  "plan_id": "B4-MLO-12-1",
+  "id": "smi-m0023",
+  "verdict": "correct",
+  "reasons": [
+   "Arithmetic checks out (p50 +3 ms; p99 410/120 = 3.4x, \"more than tripled\").",
+   "Kernel CFS bandwidth page supports quota exhaustion -> throttling and cpu.stat counters.",
+   "One internal inconsistency: moving traffic back to v11 while step 1 says to split latency by model version."
+  ],
+  "parts_answered": {
+   "investigation order": true,
+   "what each observation rules in/out": true
+  },
+  "evidence": [
+   {
+    "claim": "p99 410 ms is 3.4x 120 ms; p50 +3 ms",
+    "method": "derivation",
+    "evidence": "410/120 = 3.42; 41-38 = 3."
+   },
+   {
+    "claim": "CPU quota exhaustion throttles threads; counters in cpu.stat",
+    "method": "doc",
+    "evidence": "docs.kernel.org sched-bwc: \"Once all quota has been assigned any additional requests for quota will result in those threads being throttled\"; cpu.stat nr_throttled, throttled_time."
+   },
+   {
+    "claim": "Warm-up, batching wait, GC and dependency tails as tail-latency causes",
+    "method": "background_only",
+    "evidence": "Standard operational background; consistent with smi-l0023 (batching wait) and smi-l0024 (warm-up)."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "shifting traffic back to v11 buys time for the investigation;",
+    "problem": "If all traffic is moved to v11, the later instruction to split latency by model version has no v12 data to compare. The practical decision rule (keep traffic on v11 and continue offline with a replay) has the same gap.",
+    "replacement": "shifting most traffic back to v11 buys time for the investigation (keep a small slice or a replay on v12 so versions can still be compared);"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Ordered diagnosis with several plausible mechanisms; no calculation beyond reading percentiles.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Reasoning from the p50/p99 pattern and ordered steps."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Runbook table with quick tests and time-boxed decision rule; some overlap with the six steps but the quick-test column is new."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All eight discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0024",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://docs.kernel.org/scheduler/sched-bwc.html",
+    "status": "supported",
+    "evidence": "Throttling once quota is used up within a period; cpu.stat nr_throttled (\"Number of times the group has been throttled/limited\") and throttled_time."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Warm-up, batching wait, GC, dependency-tail effects (already listed as background)."
+  ],
+  "code_patch": null,
+  "contradictions": [],
+  "duplicate_check": "smi-l0024 diagnoses scale-out failure; smi-l0023 simulates micro-batching. This is a post-release p99 regression triage. Different intent."
+ },
+ {
+  "plan_id": "B4-MLO-12-3",
+  "id": "smi-m0025",
+  "verdict": "correct",
+  "reasons": [
+   "All arithmetic recomputed and correct (1.1 GiB/11 h = 0.1 GiB/h = 102.4 MiB/h; 36,000 req/h; 2.91 KiB/request; alert at 1.7 GiB; 200,000 req = 20,000 s = 5.56 h).",
+   "tracemalloc snapshot comparison is supported by the Python docs.",
+   "Three wording problems: the \"stays high when traffic stops\" test does not separate leak from fragmentation, fragmentation is described as a sawtooth (unsupported, and a linear 11-hour climb fits fragmentation poorly), and per-request cost is asserted before showing it depends on growth tracking requests."
+  ],
+  "parts_answered": {
+   "tell leak vs bounded cache vs fragmentation": true,
+   "find the source": true,
+   "keep service healthy meanwhile": true
+  },
+  "evidence": [
+   {
+    "claim": "~102 MiB/h and ~2.9 KiB per request",
+    "method": "executed",
+    "evidence": "python: 1.1 GiB/11 h = 0.1 GiB/h = 102.4 MiB/h; /36,000 req = 2982 B = 2.91 KiB."
+   },
+   {
+    "claim": "Alert at 3 h remaining = 1.7 GiB; recycle at 200,000 req = 5.56 h at 10 rps",
+    "method": "derivation",
+    "evidence": "2 - 0.1*3 = 1.7; 200000/10/3600 = 5.56."
+   },
+   {
+    "claim": "tracemalloc compare_to between two snapshots shows where memory grew",
+    "method": "doc",
+    "evidence": "docs.python.org tracemalloc \"Compute differences\": snapshot2.compare_to(snapshot1, \"lineno\"); module traces Python allocations only (native allocations need other tools, as the answer says)."
+   },
+   {
+    "claim": "Retained output tensors keep autograd history unless gradients are off",
+    "method": "background_only",
+    "evidence": "Known PyTorch behaviour; torch.no_grad page returned only a redirect/navigation shell when fetched."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "so about 2.9 KiB of memory retained per request.",
+    "problem": "Per-request cost presumes growth is proportional to requests; at flat traffic growth per hour and per request cannot be told apart, which the staging halving test is meant to check.",
+    "replacement": "so about 2.9 KiB of memory per request if growth is proportional to requests (at flat traffic growth per hour and per request look identical, so confirm with the traffic test below)."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "and whether memory stays high when traffic stops",
+    "problem": "This does not separate a leak from allocator retention (both stay high) and is listed only under the leak bullet.",
+    "replacement": "and whether memory stays high when traffic stops (a leak and allocator retention both do, so use the live-object comparison below to tell them apart)"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "It is usually bounded and shows as a sawtooth that never returns to baseline.",
+    "problem": "Sawtooth is an unsupported characterisation; fragmentation typically makes resident size plateau high rather than climb linearly without end, which matters for this question.",
+    "replacement": "It is usually bounded, so resident size tends to plateau high rather than climb linearly without end; a steady linear climb at flat traffic fits a leak or an unbounded cache better."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "and output tensors retained with their gradient history because gradients were not disabled at inference",
+    "problem": "Stated without a source and without the condition that the tensors must be stored.",
+    "replacement": "and, in PyTorch services, stored output tensors that still carry autograd history because inference ran with gradient tracking on"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Quantitative reading of a memory slope plus a standard leak-vs-cache-vs-fragmentation experiment ladder; could be Hard if a candidate must reason without a profiler, but the answer path is conventional.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanisms and diagnosis."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Restates the baseline numbers (some paraphrase) but adds alert threshold, experiment ladder and recycle sizing; keep."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All eight discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0035",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://docs.python.org/3/library/tracemalloc.html",
+    "status": "supported",
+    "evidence": "Compute differences example with compare_to; \"The tracemalloc module is a debug tool to trace memory blocks allocated by Python.\""
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Gradient-history retention (PyTorch no_grad page not readable).",
+   "Fragmentation being usually bounded (hedged)."
+  ],
+  "code_patch": null,
+  "contradictions": [],
+  "duplicate_check": "smi-l0035 explains an OOMKilled pod from a limit that is too low; this is a leak-vs-cache-vs-fragmentation diagnosis from a slope. Different intent."
+ },
+ {
+  "plan_id": "B4-MLO-12-4",
+  "id": "smi-m0026",
+  "verdict": "correct",
+  "reasons": [
+   "Decision framework is sound and consistent with smi-l0013 and smi-l0032.",
+   "The SRE postmortem-trigger claim is supported verbatim (\"On-call engineer intervention (release rollback, rerouting of traffic, etc.)\").",
+   "Three precision problems: ML Test Score item is quoted with the wrong wording, the answer claims the question says the feature pipeline replaced inputs (it does not), and \"traffic shifting is faster than either\" blurs rollback and traffic shifting."
+  ],
+  "parts_answered": {
+   "how to decide between rollback and roll-forward": true,
+   "what you need to know": true,
+   "first five minutes": true
+  },
+  "evidence": [
+   {
+    "claim": "ML Test Score rollback item",
+    "method": "doc",
+    "evidence": "PDF Infra 7 is \"Models can be quickly and safely rolled back to a previous serving version\", with text that operators should practise rollback when not in emergency conditions; the answer's quoted title \"Serving models can be rolled back\" is not the item text."
+   },
+   {
+    "claim": "Rollback / traffic reroute is a postmortem trigger",
+    "method": "doc",
+    "evidence": "sre.google postmortem-culture list: \"On-call engineer intervention (release rollback, rerouting of traffic, etc.)\"."
+   },
+   {
+    "claim": "Time figures: 25 min CI vs 5 min rollback vs 2 min replay",
+    "method": "background_only",
+    "evidence": "Example values the answer labels as examples; internally consistent."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "The ML Test Score rubric lists 'Serving models can be rolled back' as a test, which means rehearsed, not assumed.",
+    "problem": "Quoted item title does not match the rubric, which reads 'Models can be quickly and safely rolled back to a previous serving version' and asks that rollback be practised outside emergencies.",
+    "replacement": "The ML Test Score rubric lists 'Models can be quickly and safely rolled back to a previous serving version' as a test and says rollback should be practised outside emergencies, so rehearsed, not assumed."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(as in the question, where 30 minutes of data was written under the new feature)",
+    "problem": "The question only says the new feature has been written for 30 minutes; it does not say inputs were replaced or dropped, so this presents a condition as given.",
+    "replacement": "(the question notes that the new feature has been written for 30 minutes, so check whether the old model can still read those rows)"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "traffic shifting is often faster than either.",
+    "problem": "Shifting traffic back to the old model is a form of rollback; the faster options are changing traffic weight or flipping a flag rather than redeploying either build.",
+    "replacement": "shifting traffic weight back to the old bundle, or turning the new feature off with a flag, is often faster than redeploying either build."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "record the timeline, and confirm recovery",
+    "problem": "Misses that 30 minutes of values from the buggy pipeline may have been written to online/offline stores and logs; rollback does not remove them.",
+    "replacement": "record the timeline, quarantine or mark the feature values written in the last 30 minutes so they are not served or reused for training, and confirm recovery"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "Decision rule: run the 2-minute replay of recent requests through the old bundle. If outputs look normal, roll back;",
+    "problem": "Ordering differs from the canonical first-five-minutes list (which shifts traffic first); both fit in five minutes but should be stated as parallel.",
+    "replacement": "Decision rule: while you freeze deployments and start shifting a small share of traffic to the old bundle, run the 2-minute replay of recent requests through it. If outputs look normal, roll back fully;"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Decision under uncertainty with competing hypotheses, time pressure and coupled state (model plus new feature data); trade-off reasoning rather than recall. Label says Medium.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Decision inputs and policy."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Scoring grid and replay-based decision rule; overlaps with decision inputs 3-4 but adds the concrete branch logic."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All eight discussed (incident lead and feature flag appear in the five-minute list).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0013",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "partially",
+    "evidence": "Infra 7 exists and says practise rollback; the answer's quoted wording differs from the item title. The sources entry's `supports` text repeats the wrong title and should read \"Models can be quickly and safely rolled back to a previous serving version\"."
+   },
+   {
+    "url": "https://sre.google/sre-book/postmortem-culture/",
+    "status": "supported",
+    "evidence": "\"On-call engineer intervention (release rollback, rerouting of traffic, etc.)\" is in the trigger list."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'Traffic shifting is often faster than either' and the 2-minute replay are practical judgement (already listed)."
+  ],
+  "code_patch": null,
+  "contradictions": [],
+  "duplicate_check": "smi-l0013 (rollback criteria and safe rollback) and smi-l0031 (canary policy) are adjacent; this record is the rollback vs roll-forward choice with a ready fix. Different intent."
+ },
+ {
+  "plan_id": "B4-MLO-12-5",
+  "id": "smi-m0027",
+  "verdict": "correct",
+  "reasons": [
+   "Design is sound; rubric_points (7) map to statements in the answer with trade-offs.",
+   "SRE cascading-failures page supports \"the code path you never use is the code path that (often) doesn't work\" and regular exercise of the degraded path (in the context of overload).",
+   "Gaps: the 99.95% budget arithmetic is missing (the 22-minute outage alone exceeds 21.6 minutes), recovery of feature freshness after the store returns is not covered, mode numbering differs between canonical (1-4) and practical (0-3), and the fallback-as-good-event wording is weaker than smi-l0027."
+  ],
+  "parts_answered": {
+   "degradation strategy for feature store": true,
+   "degradation/recovery strategy for registry": true,
+   "recovery": "partly (circuit re-close only)",
+   "what to log so retraining is not polluted": true,
+   "how to test": true
+  },
+  "evidence": [
+   {
+    "claim": "99.95% over 30 days allows 21.6 min",
+    "method": "derivation",
+    "evidence": "0.0005 x 43,200 min = 21.6 min; the 22-minute outage alone exceeds it."
+   },
+   {
+    "claim": "Untested degraded code paths fail",
+    "method": "doc",
+    "evidence": "SRE Book cascading failures: \"Remember that the code path you never use is the code path that (often) doesn't work.\"; recommends \"regularly running a small subset of servers near overload in order to exercise this code path.\""
+   },
+   {
+    "claim": "Jitter with backoff spreads retries",
+    "method": "doc",
+    "evidence": "AWS Builders' Library: \"Jitter adds some amount of randomness to the backoff to spread the retries around in time.\""
+   },
+   {
+    "claim": "Circuit breaker, stale-cache and request-only model ladder",
+    "method": "background_only",
+    "evidence": "Generic engineering practice, consistent with smi-l0025 and smi-l0036."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "The two dependencies have different roles, so they need different designs.",
+    "problem": "Omits the error-budget arithmetic that motivates the design: 99.95% over 30 days is 21.6 minutes, which last month's 22-minute outage alone exceeded.",
+    "replacement": "At 99.95% over 30 days the error budget is only 0.0005 x 43,200 = 21.6 minutes, so last month's 22-minute feature-store outage alone used all of it. The two dependencies have different roles, so they need different designs."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "and bounded retries with jitter.",
+    "problem": "Recovery is addressed only in the practical field (gradual circuit re-close). Missing: features written during the outage must be backfilled or confirmed fresh before leaving fallback.",
+    "replacement": "and bounded retries with jitter. On recovery, close the circuit gradually and confirm that feature writes missed during the outage are backfilled (or the features are fresh again) before leaving the fallback modes."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(decide in advance whether fallback responses count as good events)",
+    "problem": "Weaker than smi-l0027, which says a valid in-time fallback response is good for the availability SLO while the fallback rate is tracked as its own SLI.",
+    "replacement": "(a valid, in-time fallback response normally counts as good for the availability SLO, which is why the fallback rate needs its own objective; decide this in advance)"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "| 0 normal |",
+    "problem": "Mode numbers (0-3) differ from the canonical ladder (1-4).",
+    "replacement": "| 1 normal |"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "| 1 stale cache |",
+    "problem": "Renumber to match canonical ladder.",
+    "replacement": "| 2 stale cache |"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "| 2 request-only model |",
+    "problem": "Renumber to match canonical ladder.",
+    "replacement": "| 3 request-only model |"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "| 3 safe default |",
+    "problem": "Renumber to match canonical ladder.",
+    "replacement": "| 4 safe default |"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "a miss or older entry sends that request to mode 2",
+    "problem": "Mode reference after renumbering.",
+    "replacement": "a miss or older entry sends that request to mode 3"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "recovery back to mode 0 happens without a thundering herd",
+    "problem": "Mode reference after renumbering.",
+    "replacement": "recovery back to mode 1 happens without a thundering herd"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Two dependency classes, graded degradation, observability and test design with trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Take the registry off the scale-up path: bake the approved model into the image or use a regional read-through cache keyed by digest",
+    "tradeoff": "Larger images and coupling of model and deploy vs scaling that survives a registry outage"
+   },
+   {
+    "decision": "On registry outage start from the last known good verified artifact; refuse unverified ones",
+    "tradeoff": "May serve a slightly older model vs safety and availability"
+   },
+   {
+    "decision": "Feature store degradation ladder: stale cache with per-feature age bound, request-only fallback model, business-defined safe default",
+    "tradeoff": "Prediction quality vs availability; cost of building and maintaining a fallback model"
+   },
+   {
+    "decision": "Short timeouts, circuit breaker, bounded retries with jitter, gradual re-close",
+    "tradeoff": "Fast failover vs flapping and thundering herd on recovery"
+   },
+   {
+    "decision": "Keep fallback defaults identical to training-time missing-value handling; tag each prediction with its mode; exclude or mark degraded predictions from retraining and evaluation",
+    "tradeoff": "Lost training rows vs learning from degraded behaviour as normal"
+   },
+   {
+    "decision": "Treat fallback rate as its own SLI and decide in advance whether fallback responses count as good events",
+    "tradeoff": "Honest quality measurement vs availability numbers"
+   },
+   {
+    "decision": "Test with registry-block drill and feature-store fault-injection game days; keep warm headroom replicas",
+    "tradeoff": "Engineering time and risk of tests vs confidence the rarely used paths work"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Design."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Table with thresholds and drills; not a paraphrase."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All eight discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0036",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/addressing-cascading-failures/",
+    "status": "supported",
+    "evidence": "\"Remember that the code path you never use is the code path that (often) doesn't work.\" and the recommendation to exercise it regularly; context is overload but the principle is the one cited."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Timeouts, retries and backoff with jitter (AWS Builders' Library)",
+    "url": "https://builder.aws.com/content/3EumjoZascWd1oZiEgL8ORlv3qE/timeouts-retries-and-backoff-with-jitter",
+    "supports": "bounded retries with jitter",
+    "quote": "Jitter adds some amount of randomness to the backoff to spread the retries around in time.",
+    "type": "secondary"
+   }
+  ],
+  "unsourced_claims": [
+   "Circuit breaker practice (already listed)."
+  ],
+  "code_patch": null,
+  "contradictions": [
+   {
+    "this_claim": "smi-m0027: \"decide in advance whether fallback responses count as good events\"",
+    "other_id": "smi-l0027",
+    "other_claim": "\"A valid, in-time response from the fallback is good for the availability SLO, but ... track the fallback rate as its own SLI\"",
+    "which_is_right": "Not a hard contradiction; smi-l0027 is the clearer default (good = what the user receives) and m0027 should align, see issue 3."
+   }
+  ],
+  "duplicate_check": "smi-l0036 (probes) and smi-l0025 (retry storms) are adjacent; this is dependency-failure degradation plus data hygiene. Different intent."
+ },
+ {
+  "plan_id": "B4-MLO-12-6",
+  "id": "smi-m0028",
+  "verdict": "correct",
+  "reasons": [
+   "SRE Workbook policy claims verified: halt \"all changes and releases other than P0 issues or security fixes until the service is back within its SLO\"; exemptions exist; postmortem when a single incident consumes more than 20% of budget over four weeks.",
+   "Concise (70 words) is a genuinely shorter answer; rubric (7 points) is covered by the answer.",
+   "Gap: the policy does not say which budget (proxy or matured-label) triggers the freeze given the three-week label delay, which is the heart of \"what should the policy say when the quality budget is burning\"."
+  ],
+  "parts_answered": {
+   "extend SLIs": true,
+   "extend SLOs": true,
+   "extend budget policy": true,
+   "what policy says when quality budget burns": "yes, but trigger source not specified"
+  },
+  "evidence": [
+   {
+    "claim": "Workbook example policy halts changes other than P0/security until back within SLO",
+    "method": "doc",
+    "evidence": "sre.google/workbook/error-budget-policy: \"we will halt all changes and releases other than P0 issues or security fixes until the service is back within its SLO.\""
+   },
+   {
+    "claim": "Postmortem if one incident consumes >20% of budget over four weeks",
+    "method": "doc",
+    "evidence": "Same page: \"If a single incident consumes more than 20% of error budget over four weeks, then the team must conduct a postmortem.\""
+   },
+   {
+    "claim": "Error budget = allowed unreliability; releases halted when spent",
+    "method": "doc",
+    "evidence": "SRE Book Embracing Risk: budget is the difference between SLO and measured reliability; releases continue while budget remains and are temporarily halted when spent."
+   },
+   {
+    "claim": "Short and long window burn-rate alerting",
+    "method": "doc",
+    "evidence": "SRE Workbook Alerting on SLOs: short window added \"to check if the error budget is still being consumed\"; 1 h long / 5 min short example at 14.4x."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Adapt that to quality: when the quality budget is exhausted,",
+    "problem": "With labels three weeks late, the label-based budget cannot trigger a timely freeze; the answer should say the proxy budget drives immediate action and the label budget confirms it.",
+    "replacement": "Adapt that to quality: let the proxy budget drive the immediate freeze and paging, and the matured-label budget confirm, extend or lift it; when the quality budget is exhausted,"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Design across SLI definition, delayed ground truth, burn-rate alerting and policy wording with trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Define quality as countable good/bad events (fresh, non-defaulted, in-range inputs, intended model)",
+    "tradeoff": "Countable and fast but only a proxy for true quality"
+   },
+   {
+    "decision": "Fast label-free proxy SLIs: input drift, score-distribution shape, agreement with shadow/previous model; thresholds calibrated on healthy history",
+    "tradeoff": "Early detection vs false alarms"
+   },
+   {
+    "decision": "Slow ground-truth SLI on matured cohorts (e.g. share of weekly cohorts above a floor), accounted retroactively",
+    "tradeoff": "Truth but three weeks late; used to audit proxies"
+   },
+   {
+    "decision": "SLO targets over a window (e.g. 99% over 28 days) with multiwindow burn-rate alerts",
+    "tradeoff": "Detection speed vs paging noise"
+   },
+   {
+    "decision": "Policy text: freeze non-urgent model/feature releases when quality budget is spent, explicit exemptions, postmortem for large single burns",
+    "tradeoff": "Release velocity vs quality protection; fairness to teams for upstream causes"
+   },
+   {
+    "decision": "Assign accountability for upstream data (freshness checks, data contracts)",
+    "tradeoff": "Cross-team friction vs clear ownership"
+   },
+   {
+    "decision": "Review proxies against matured labels each quarter",
+    "tradeoff": "Ongoing effort vs drift of proxy meaning"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "70 words; shorter and self-contained."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Adds definitions, SLO example and policy wording."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "All eight discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0027",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/workbook/error-budget-policy/",
+    "status": "supported",
+    "evidence": "Halt policy, exemptions and 20% postmortem rule found. Note the page says \"single incident\"; the answer's \"more than a set share\" is compatible."
+   },
+   {
+    "url": "https://sre.google/sre-book/embracing-risk/",
+    "status": "supported",
+    "evidence": "Budget and halting statements found."
+   },
+   {
+    "url": "https://sre.google/workbook/alerting-on-slos/",
+    "status": "supported",
+    "evidence": "Short window added to the long-window burn-rate check; 1 h / 5 min at 14.4x."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Proxy SLI definitions are practitioner design (already listed and flagged as proxies)."
+  ],
+  "code_patch": null,
+  "contradictions": [],
+  "duplicate_check": "smi-l0027 computes burn rates for a latency/availability SLO; this extends SLOs to model quality with delayed labels. Different intent."
+ },
+ {
+  "plan_id": "B4-MLO-12-8",
+  "id": "smi-m0030",
+  "verdict": "correct",
+  "reasons": [
+   "Code re-run on 3.13.16, 3.10.20, 3.11.17: identical (1152.0, 4302000, 0.26778...), 792.0, 612.0, 576.0; every number in the prose recomputes (0.268, 0.184, 0.142, 0.134 per 1,000; 31.25% saving; 49.8 rps average; 31% loaded; 576 is the 2-replica floor; cache adds only 36 units).",
+   "Fenced code equals code.solution; stdlib only, no 3.11+ features.",
+   "Major: the question gives no hourly profile; (a)-(c) depend entirely on an invented 24-hour profile that the canonical answer never discloses, so a grader would treat 792/612/576 as the answer."
+  ],
+  "parts_answered": {
+   "cost per 1,000 today": true,
+   "(a) autoscaling floor 2, 70% target": "yes but profile-dependent",
+   "(b) quantised 1.6x": "yes but profile-dependent",
+   "(c) 20% cache": "yes but profile-dependent",
+   "what to report": true,
+   "what to verify": true
+  },
+  "evidence": [
+   {
+    "claim": "Today: 4 x 24 x 12 = 1,152 units; 0.268 per 1,000",
+    "method": "executed",
+    "evidence": "1152 / 4302 = 0.26778 (0.26791 with exactly 4.3 M)."
+   },
+   {
+    "claim": "(a) 792, (b) 612, (c) 576 units; 0.184 / 0.142 / 0.134 per 1,000",
+    "method": "executed",
+    "evidence": "Profile [8,6,5,5,6,10,20,35,55,70,80,85,90,88,80,75,70,85,95,100,60,35,20,12]; per-hour replicas ceil(rps/28), ceil(rps/44.8), ceil(0.8 rps/44.8) with floor 2."
+   },
+   {
+    "claim": "Average 49.8 rps, 31% of 160 rps capacity; 100/28 = 3.6 -> 4 replicas",
+    "method": "derivation",
+    "evidence": "4,302,000/86,400 = 49.79; /160 = 0.311."
+   },
+   {
+    "claim": "Floor of 3 raises autoscaled cost; floor of 1 lowers it",
+    "method": "executed",
+    "evidence": "Own edge runs: floor 3 -> 936 units (0.2176/1k); floor 1 -> 684 units (0.1590/1k); flat 50 rps profile -> static 1152, autoscaled 576; cache_hit=1.0 -> 576 (floor)."
+   },
+   {
+    "claim": "Dependence on profile",
+    "method": "executed",
+    "evidence": "Flat profile at the same daily volume gives 576 units for autoscaling versus 792 for the answer's profile, confirming results are shape-dependent."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "detailed_answer",
+    "claim": "Results from the executed model (abstract units): the daily traffic is 4,302,000 requests.",
+    "problem": "The question gives only the daily total, the peak and \"low overnight\". Savings (a)-(c) depend on an assumed hourly profile that appears only in the practical field, so the canonical answer presents profile-dependent figures as results.",
+    "replacement": "Results from an executed model that uses an assumed hourly profile of average requests/s (about 5 to 8 overnight, rising to the 100 requests/s peak at 19:00 and summing to 4,302,000 requests a day; the profile is an illustration, not data from the question, so (a) to (c) change with a different shape): the daily traffic is 4,302,000 requests."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "so the fleet is on average about 31% loaded; it is sized for the peak of 100 requests/s at 70% target utilisation (28 requests/s per replica gives 4 replicas).",
+    "problem": "The question does not say how 4 replicas were chosen; this is an inference stated as fact.",
+    "replacement": "so the fleet is on average about 31% loaded; 4 replicas is consistent with sizing for the peak of 100 requests/s at 70% target utilisation (100 / 28 = 3.6, rounded up), although the question does not say how 4 was chosen."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "accelerators plus supporting services such as feature reads, logging and network",
+    "problem": "The question never says the replicas use accelerators.",
+    "replacement": "replicas (CPU or accelerator) plus supporting services such as feature reads, logging and network"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "or scale on a metric that reflects the accelerator's queue rather than CPU",
+    "problem": "Assumes accelerator-backed replicas.",
+    "replacement": "or scale on a metric that reflects saturation, such as in-flight requests or queue wait (CPU is a poor signal if the work runs on an accelerator)"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Include non-GPU costs and the engineering time the change costs.",
+    "problem": "Assumes GPUs.",
+    "replacement": "Include costs beyond the replicas (feature reads, logging, network, cache storage) and the engineering time the change costs."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Multi-step arithmetic with an hourly model and a small function, plus verification judgement; not subtle design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Numbers, interpretation and verification list."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Runnable model and the profile; distinct from the detailed field."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All seven discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0024",
+   "same_intent": false
+  },
+  "code_findings": "Re-run with python -I on 3.13.16, 3.10.20, 3.11.17: asserts pass, identical output. stdlib only (math). Fenced python in practical_answer equals code.solution exactly. Extra edge cases: flat 50 rps profile (static 1152, autoscaled 576, 0.2667/1k), cache_hit=1.0 (floor only, 576), min_replicas=3 (936.0), min_replicas=1 (684.0). static_replicas ignores floor and cache_hit by design (cache hit does not reduce a static fleet cost, as expected). Fixed-point behaviour: quantised peak hour 100 rps needs ceil(100/44.8)=3 replicas, cached needs 2 throughout.",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "1.6x quantisation throughput and 20% cache hit rate are question assumptions, correctly labelled assumed."
+  ],
+  "code_patch": null,
+  "contradictions": [],
+  "duplicate_check": "smi-l0024 sizes replicas for a ramp; smi-k0036 and smi-k0042 compute LLM serving costs. This is a fraud-endpoint cost-per-1,000 with autoscaling/quantisation/cache. Different intent."
+ }
+]

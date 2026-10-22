@@ -1,0 +1,361 @@
+[
+ {
+  "id": "P3-PY-01",
+  "verdict": "pass",
+  "reasons": [
+   "Self-contained, specific scenario; answer covers read() memory, iteration, with, encoding, errors policy, newline translation, test; all claims verified."
+  ],
+  "parts_answered": {
+   "what is wrong with read().splitlines()": true,
+   "how to write it": true,
+   "function": true,
+   "test": true,
+   "handles invalid bytes and CRLF": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "count the lines containing ' ERROR '",
+    "problem": "Literal ' ERROR ' needs a trailing space, so a line ending 'x ERROR\\n' is not counted (verified: b'x ERROR\\n' -> 0). Question wording makes this the spec, so it is only an ambiguity; also a bytes-mode count (b' ERROR ' in line on 'rb') would avoid decoding altogether and is not mentioned.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Scenario with mechanism (lazy iteration, decoding policy, newline translation) and short code; no multi-step design.",
+  "key_concepts_findings": "All seven concepts are discussed in the answer; no weak ones.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "code_findings": "Ran solution+test on sandbox 3.13.16, /home/claude/work/v310 (3.10.20) and v311 (3.11.17) via xrun.py: all ok. Fenced block in answer is byte-identical to the tested solution. Own edge cases (3.13 and 3.10): empty file ->0; ' ERROR ' only, no newline ->1; two lines ' ERROR \\n ERROR ' ->2; UTF-8 BOM prefix ->1; 'a\\x00 ERROR \\x80' ->1; two matches on one line counted once ->1 (line count, as asked); missing file -> FileNotFoundError. No break found.",
+  "sources_findings": []
+ },
+ {
+  "id": "P3-PY-02",
+  "verdict": "correct",
+  "reasons": [
+   "Answer argues for pathlib correctly, but does not address the failure direction in the question (Linux-style paths failing on Windows) and ends with an overstated 'no functional gap' claim."
+  ],
+  "parts_answered": {
+   "argue for or against pathlib": true,
+   "concrete things Path gives you": true,
+   "cases needing care": true,
+   "explains the Windows failure described": false
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "That is the usual reason Windows-style strings break on Linux.",
+    "problem": "The question describes the opposite direction (paths copied from Linux fail on a Windows machine). Windows accepts '/' as separator, so the typical causes are Linux absolute paths such as /home/u/data.csv (no drive letter; verified PureWindowsPath('/home/u/data.csv').is_absolute() is False), hard-coded separators in strings, and case/separator assumptions. pathlib does not fix hard-coded absolute Linux paths.",
+    "replacement": "That is the usual reason Windows-style strings break on Linux. In the opposite direction (Linux paths on Windows), '/' separators mostly work, so the failures come from absolute paths like /home/u/data.csv (no drive, so not absolute on Windows), hard-coded locations and case assumptions; pathlib does not fix those, so keep base directories in configuration and build everything below them with / ."
+   },
+   {
+    "severity": "minor",
+    "claim": "there is no functional gap that forces you to keep it",
+    "problem": "Overstated: os.path.expandvars, os.path.relpath (Path.relative_to refuses '..' walks before 3.12; verified error on 3.10) and os.path.commonpath have no exact Path equivalents.",
+    "replacement": "os.path remains fine for quick string work, and a few helpers (expandvars, relpath with '..', commonpath) have no exact Path equivalent, but nothing forces you to keep it for new code."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Comparison/argument with concrete API facts; no multi-step reasoning.",
+  "key_concepts_findings": "Concepts are discussed (suffix vs suffixes, with_suffix, glob/rglob, Pure* paths, fspath). 'os.fspath' is a one-line mention only.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "code_findings": "No code field. Claims run on 3.13 and 3.10: PurePosixPath('a')/'/b' -> /b; PurePosixPath('a\\\\b').parts -> single part; b.tar.gz suffix .gz stem b.tar; .bashrc suffix ''; PureWindowsPath case-insensitive equal. All true.",
+  "sources_findings": []
+ },
+ {
+  "id": "P3-PY-03",
+  "verdict": "pass",
+  "reasons": [
+   "Correct write-then-replace pattern with honest durability caveats; test and answer code verified."
+  ],
+  "parts_answered": {
+   "why the file is empty": true,
+   "safer function": true,
+   "test that old file survives a failed write": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Ownership, ACLs and hard links are not preserved either.",
+    "problem": "Symlinks are also not followed: atomic_write_text('link.json') replaces the symlink with a regular file and leaves the target untouched (verified). Worth one clause.",
+    "replacement": "Ownership, ACLs, hard links and symlinks are not preserved either (a symlink at the destination is replaced by a regular file; resolve it first with os.path.realpath if that matters)."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Non-trivial implementation with subtle correctness conditions (same filesystem, fsync, permissions, cleanup, platform differences).",
+  "key_concepts_findings": "Concepts all covered. The test simulates failure by an encoding error, not a kill, which is acceptable and stated.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "code_findings": "Ran solution+test on sandbox 3.13.16, /home/claude/work/v310 (3.10.20) and v311 (3.11.17) via xrun.py: all ok. Fenced block in answer is byte-identical to the tested solution. Own edge cases (3.13 and 3.10): relative path ok; destination is a directory -> IsADirectoryError and temp file cleaned; missing parent dir -> FileNotFoundError; empty text -> 0-byte file; non-str text -> TypeError, old content kept, no temp left; symlink replaced rather than followed (caveat above). Permission copy verified by test on POSIX only (skipped on Windows).",
+  "sources_findings": []
+ },
+ {
+  "id": "P3-PY-04",
+  "verdict": "pass",
+  "reasons": [
+   "Correct diagnosis of both failure modes, newline='' explanation matches csv docs, test genuinely exercises them."
+  ],
+  "parts_answered": {
+   "explain what is going wrong": true,
+   "correct reading code": true,
+   "why newline=''": true,
+   "test": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "return list(csv.DictReader(f))",
+    "problem": "Materialises all rows; fine for the stated export but not for huge files. Ragged rows give None values / a None key (verified: '1' -> {'a':'1','b':None}).",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism explanation plus short code and a round-trip test.",
+  "key_concepts_findings": "All seven concepts discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "code_findings": "Ran solution+test on sandbox 3.13.16, /home/claude/work/v310 (3.10.20) and v311 (3.11.17) via xrun.py: all ok. Fenced block in answer is byte-identical to the tested solution. Own edge cases (3.13 and 3.10): empty file ->[]; header only ->[]; short row -> None filler, long row -> extra under None key; BOM file -> first key '\\ufeffa' (confirms the utf-8-sig advice); doubled quotes + embedded newline parsed right; blank line skipped; duplicate header names -> later column wins silently.",
+  "sources_findings": []
+ },
+ {
+  "id": "P3-PY-05",
+  "verdict": "correct",
+  "reasons": [
+   "Explanation of sys.modules / partial initialisation is right; fix 2 as stated is incomplete (applying it on one side only may not work)."
+  ],
+  "parts_answered": {
+   "why the error occurs": true,
+   "three fixes": true,
+   "in order of preference": true
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "2. Import the module, not the name: import customers, then call customers.get_customer(...) inside functions.",
+    "problem": "Changing only one side is not enough. Verified: with both modules using from-imports, switching only orders to 'import customers' still fails for 'import orders'. It works only if the module that executes second (the one whose from-import hits a partially initialised module) switches, and since either may be the entry point, both should.",
+    "replacement": "2. Import the module, not the name, on both sides (or at least in the module that is executed second): import customers in orders.py and import orders in customers.py, then call customers.get_customer(...) inside functions. If only one side is changed, it works only for the entry order where the changed module is the second one loaded."
+   },
+   {
+    "severity": "minor",
+    "claim": "ImportError: cannot import name 'latest_order' from partially initialized module 'orders'",
+    "problem": "Exact wording is version-dependent. Verified identical on 3.10.20 and 3.11.17; the sandbox 3.13.16 printed \"cannot import name 'latest_order' from 'orders' (consider renaming ...)\" for the same files. Worth stating 'wording varies by version'.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism explanation plus a ranked set of remedies; no code required.",
+  "key_concepts_findings": "All seven concepts covered; TYPE_CHECKING is a one-sentence mention.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "code_findings": "No code field. Reproduced the cycle in files: error on 3.10/3.11 as quoted; import customers entry names customers/get_customer as the answer says; one-sided fix behaviour as described in the issue.",
+  "sources_findings": []
+ },
+ {
+  "id": "P3-PY-06",
+  "verdict": "correct",
+  "reasons": [
+   "Substantively right (verified by running), one imprecise statement about __package__."
+  ],
+  "parts_answered": {
+   "why python shop/cli.py fails": true,
+   "why python -m works": true,
+   "what __init__.py is for": true,
+   "what __name__=='__main__' tests": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "it has no package (__package__ is empty)",
+    "problem": "Verified: for a script run, __package__ is None (not an empty string); under -m it is 'shop'.",
+    "replacement": "it has no package (__package__ is None)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism explanation across import system and entry-point semantics; no code.",
+  "key_concepts_findings": "All seven concepts discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "code_findings": "No code field. Ran files: python shop/cli.py -> 'attempted relative import with no known parent package'; script prints __name__ '__main__', __package__ None, sys.path[0]=shop dir; python -m shop.cli from the parent prints '__main__' 'shop' and sys.path[0]=cwd; running -m from inside shop/ fails (ModuleNotFoundError), confirming the cwd caveat; namespace package without __init__.py imports fine.",
+  "sources_findings": []
+ },
+ {
+  "id": "P3-PY-07",
+  "verdict": "correct",
+  "reasons": [
+   "Library vs service pinning advice is sound, but the answer contains a process-leak sentence, a misleading 'pip freeze ... with hashes', and a thin account of what goes in pyproject.toml."
+  ],
+  "parts_answered": {
+   "virtual environments": true,
+   "what goes in pyproject.toml": true,
+   "pin differently for service vs library": true
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "The format is defined by PyPA specifications, but I did not open them in this task, so check the packaging guide for the exact field list.",
+    "problem": "First-person process note does not belong in a reference answer and leaves the pyproject part of the question under-answered. WebFetch of packaging.python.org was refused here, so I checked by parsing a sample with tomllib only (structure valid), not against the spec text.",
+    "replacement": "The format is defined by the PyPA pyproject.toml specification (see the 'Writing your pyproject.toml' guide). For the library, [project] holds name, version, requires-python, dependencies (abstract ranges), optional-dependencies (e.g. a 'dev' or 'test' extra) and [project.scripts] for entry points; for the service, keep the same table with loose requirements and a lock file beside it."
+   },
+   {
+    "severity": "minor",
+    "claim": "(pip-compile, uv, poetry or pip freeze from a clean venv; ideally with hashes)",
+    "problem": "pip freeze cannot emit hashes (no hash option, verified in pip 24.0 help); hashes come from pip-compile --generate-hashes, uv or poetry.",
+    "replacement": "(pip-compile, uv or poetry; or pip freeze from a clean venv, which records versions but no hashes; ideally with hashes where the tool supports them)"
+   },
+   {
+    "severity": "minor",
+    "claim": "Many Linux distributions now mark the system Python as externally managed",
+    "problem": "True (PEP 668; /usr/lib/python3.12/EXTERNALLY-MANAGED exists in the sandbox) but supported only by background knowledge and a local file check, not official docs.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Practical comparison of tooling and pinning strategies; no code, moderate breadth.",
+  "key_concepts_findings": "Concepts present, but 'requires-python' and 'build backend' get a single line each.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "code_findings": "No code field.",
+  "sources_findings": [
+   {
+    "url": "(none in record)",
+    "status": "unreachable",
+    "evidence": "No sources listed; WebFetch refused (permission), so PyPA claims rest on local checks and background knowledge."
+   }
+  ]
+ },
+ {
+  "id": "P3-PY-08",
+  "verdict": "correct",
+  "reasons": [
+   "Traces and semantics all correct (re-run), but the answer says swallow() returns 'done' while its fenced code and test use 'finally wins'; the question's own code was not what got tested."
+  ],
+  "parts_answered": {
+   "what f('ok') prints/returns": true,
+   "f('raise')": true,
+   "f('return')": true,
+   "swallow() return": true,
+   "order of try/except/else/finally": true,
+   "why return in finally is dangerous": true,
+   "why bare except is harmful": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "return \"finally wins\"   # discards the in-flight RuntimeError",
+    "problem": "Answer text and question say swallow() returns 'done'; the fenced code returns 'finally wins'. Tested code therefore differs from the question's. (test must change in step: assert swallow() == \"finally wins\")",
+    "replacement": "return \"done\"   # discards the in-flight RuntimeError"
+   },
+   {
+    "severity": "minor",
+    "claim": "Avoid it; linters flag it.",
+    "problem": "Hedge/currency: since Python 3.14 (PEP 765) return/break/continue in finally emits a SyntaxWarning. Background knowledge, not run (no 3.14 available).",
+    "replacement": "Avoid it; linters flag it, and Python 3.14 emits a SyntaxWarning for it."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Tracing control flow with several interacting clauses; recall plus prediction, not multi-step design.",
+  "key_concepts_findings": "All seven concepts discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "code_findings": "Ran solution+test on sandbox 3.13.16, /home/claude/work/v310 (3.10.20) and v311 (3.11.17) via xrun.py: all ok. Fenced block in answer is byte-identical to the tested solution. Also ran the question's exact f/swallow code on 3.13: outputs match the answer (ok: try/else/finally 'from else'; raise: try/except/finally; return: try/finally 'from try'; swallow 'done'). Fenced block in answer is the logging variant, equal to tested solution.",
+  "sources_findings": []
+ },
+ {
+  "id": "P3-PY-09",
+  "verdict": "correct",
+  "reasons": [
+   "Chaining semantics all verified; but the hierarchy shown in code has no file-related error even though the question requires distinguishing a bad value from a missing file."
+  ],
+  "parts_answered": {
+   "hierarchy with single catch-all base": true,
+   "bad value vs missing file handled differently": false,
+   "re-raise int() failure keeping original": true,
+   "__cause__ vs __context__": true,
+   "when from None is appropriate": true
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "class ConfigValueError(ConfigError):\n    pass",
+    "problem": "Code defines only one subclass; the file-problem class is mentioned in prose only, so the 'missing file vs bad value' requirement is not demonstrated.",
+    "replacement": "class ConfigValueError(ConfigError):\n    pass\n\n\nclass ConfigFileError(ConfigError):\n    \"\"\"The config file is missing or unreadable.\"\"\"\n    pass"
+   },
+   {
+    "severity": "minor",
+    "claim": "def parse_port(text):",
+    "problem": "Exceptions outside the hierarchy leak: parse_port(None) raises TypeError (not a ConfigError), and parse_port('\uff18\uff10'), ' 80 ', '1_000', 80.5 are accepted (int() semantics). Verified on 3.13 and 3.10. Fine for the question, but undermines 'catch anything this library raised' unless inputs are validated.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Design with a few trade-offs plus precise exception-chaining semantics; code is short.",
+  "key_concepts_findings": "All seven concepts discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "code_findings": "Ran solution+test on sandbox 3.13.16, /home/claude/work/v310 (3.10.20) and v311 (3.11.17) via xrun.py: all ok. Fenced block in answer is byte-identical to the tested solution. Own edge cases: '', '0x10', '8e3', '80.0' -> ConfigValueError with ValueError cause; '0', '65536', '-1' -> out-of-range with no cause/context; None -> TypeError escapes; True -> 1.",
+  "sources_findings": []
+ },
+ {
+  "id": "P3-PY-10",
+  "verdict": "pass",
+  "reasons": [
+   "Disciplined, accurate debugging method; the off-by-one claim is correct and tested; code equals answer."
+  ],
+  "parts_answered": {
+   "step-by-step find and prove": true,
+   "minimal reproduction": true,
+   "fix": true,
+   "test": true,
+   "traceback": true,
+   "logging vs print": true,
+   "breakpoint()": true,
+   "assertions": true,
+   "shrinking input": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Buggy code: range(0, len(items) - size, size)",
+    "problem": "Correct and in fact always drops exactly the final batch (derived: the last start index is the largest multiple of size below n, which is never < n-size). The buggy function appears only in prose and the test, not in a code block.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Process question with a small off-by-one fix; breadth over depth, no subtle algorithm.",
+  "key_concepts_findings": "All seven concepts discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "code_findings": "Ran solution+test on sandbox 3.13.16, /home/claude/work/v310 (3.10.20) and v311 (3.11.17) via xrun.py: all ok. Fenced block in answer is byte-identical to the tested solution. Own edge cases (3.13 and 3.10): [] ->[]; size 1; size == len; size > len; str/tuple/range inputs sliced correctly; size 0/-1 -> ValueError; size 2.0 -> TypeError; None -> TypeError. No break found.",
+  "sources_findings": []
+ }
+]

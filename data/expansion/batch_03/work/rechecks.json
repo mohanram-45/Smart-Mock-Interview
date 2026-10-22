@@ -1,0 +1,2769 @@
+[
+ {
+  "plan_id": "B3-MLO-01-2",
+  "verdict": "pass",
+  "reasons": [
+   "Applied fix ('many of' for 'most of') is correct and removes an unquantified overstatement; answer is internally consistent, ~236 words, single answer appropriate for a concept question."
+  ],
+  "parts_answered": {
+   "why ML 'works on my machine' is worse": true,
+   "silent failure vs crash": true,
+   "sources of difference": true,
+   "remedies": true
+  },
+  "evidence": [
+   {
+    "claim": "Unpinned deps/hardware/data/randomness/hidden state can change a metric without crashing",
+    "method": "background_only",
+    "evidence": "Standard reproducibility folklore, qualitatively stated, no numeric claims"
+   },
+   {
+    "claim": "Pin container by digest rather than moving tag",
+    "method": "background_only",
+    "evidence": "Common container practice; digest is immutable, tags are movable"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Easy",
+  "difficulty_rationale": "Single-concept explanation with a list of causes.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer, sufficient"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "ok, all discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0335",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "General reproducibility causes (background knowledge, uncontroversial)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-01-3",
+  "verdict": "pass",
+  "reasons": [
+   "Both applied corrections verified: 0.013/0.005=2.6; 0.005*sqrt(2)=0.00707, 0.013/0.00707=1.84 (about 1.8); SE of difference of two 5-seed means 0.005*sqrt(2/5)=0.00316; 0.011/0.00316=3.48 (about 3.5). Table, prose and decision rule are consistent (A 0.841 reproduces 0.842, B no change, C -0.011, D = C)."
+  ],
+  "parts_answered": {
+   "ordered checklist": true,
+   "how to decide if real regression": true
+  },
+  "evidence": [
+   {
+    "claim": "0.013 gap = 2.6 seed SDs / 1.8 SDs if both single runs",
+    "method": "executed",
+    "evidence": "numpy: 0.013/0.005=2.6; 0.013/(0.005*sqrt2)=1.84"
+   },
+   {
+    "claim": "0.011 drop = 3.5 SE of 5-seed mean difference",
+    "method": "executed",
+    "evidence": "0.005*sqrt(2/5)=0.003162; 0.011/0.003162=3.48"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-factor debugging plus noise-floor reasoning and a decision rule.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "checklist + decision rule"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked bisection table with numbers not in the detailed answer"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok, all discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0002",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Debugging order is practitioner judgement, hypothetical numbers labelled as such"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-01-4",
+  "verdict": "pass",
+  "reasons": [
+   "PYTHONHASHSEED correction is right (dict order is insertion-ordered; only str/bytes hashing is randomised). All source-backed claims verified on the live pages. Concise answer 59 words, distinct from detailed; fenced code identical to tested solution."
+  ],
+  "parts_answered": {
+   "why seed not sufficient": true,
+   "what to control": true,
+   "what to accept": true
+  },
+  "evidence": [
+   {
+    "claim": "Completely reproducible results not guaranteed across releases, commits, platforms; CPU vs GPU may differ with identical seeds",
+    "method": "doc",
+    "evidence": "PyTorch randomness notes: 'Completely reproducible results are not guaranteed across PyTorch releases, individual commits, or different platforms.' / 'results may not be reproducible between CPU and GPU executions, even when using identical seeds.'"
+   },
+   {
+    "claim": "cudnn.benchmark may pick different algorithms; disabling gives deterministic selection, maybe slower",
+    "method": "doc",
+    "evidence": "'the benchmark may select different algorithms on subsequent runs, even on the same machine.' / 'causes cuDNN to deterministically select an algorithm, possibly at the cost of reduced performance.'"
+   },
+   {
+    "claim": "worker_init_fn + generator",
+    "method": "doc",
+    "evidence": "'Use worker_init_fn() and generator to preserve reproducibility'"
+   },
+   {
+    "claim": "root_seed+worker_id overlaps -> bias",
+    "method": "doc",
+    "evidence": "NumPy parallel page: 'multiple invocations ... will get overlapping sets of worker seeds ... causing a bias in the overall ensemble of results.'"
+   },
+   {
+    "claim": "order_demo -> (0.0, 1.0); spawn streams independent of worker count",
+    "method": "executed",
+    "evidence": "Passes on 3.13, 3.10, 3.11"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism explanation plus small demos.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "59-word interview answer"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "mechanisms with doc support"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "runnable demos, not in detailed"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "ok, all discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0009",
+   "same_intent": false
+  },
+  "code_findings": "Fenced block == code.solution (checked). Test passes on 3.13/3.10/3.11 with identical output. Extra edge cases: worker_draws(42,0)==[], worker_draws(7,3) reproducible and differs from worker_draws(8,3) (covered by existing asserts d1!=worker_draws(43,4)). stdlib+numpy only, no 3.11+ features.",
+  "sources_findings": [
+   {
+    "url": "https://docs.pytorch.org/docs/stable/notes/randomness.html",
+    "status": "supported",
+    "evidence": "Redirects to docs/2.14; all quoted behaviours present incl. use_deterministic_algorithms raising for ops without deterministic implementation"
+   },
+   {
+    "url": "https://numpy.org/doc/stable/reference/random/parallel.html",
+    "status": "supported",
+    "evidence": "spawn() gives independent (very high probability) streams; root_seed+worker_id warned against"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'Differences ... can compound over many training steps' (hedged with 'can')"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-01-5",
+  "verdict": "pass",
+  "reasons": [
+   "Hedge added to the file-bucket sentence is accurate (object lock/versioning exist). Concise answer 78 words (within 80) and consistent with detailed. Lineage chain complete."
+  ],
+  "parts_answered": {
+   "why not one tool": true,
+   "what belongs in tracker": true,
+   "what belongs in registry": true,
+   "serving-time lineage chain": true
+  },
+  "evidence": [
+   {
+    "claim": "MLflow tracking logs params, code versions, metrics, output files; run records metadata + artifacts",
+    "method": "doc",
+    "evidence": "'an API and UI for logging parameters, code versions, metrics, and output files'; 'Each run records metadata ... artifacts'"
+   },
+   {
+    "claim": "Registry aliases mutable, lineage to run",
+    "method": "doc",
+    "evidence": "'assign a mutable, named reference to a particular version'; 'lineage (i.e., which MLflow experiment and run produced the model)'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Comparison of two systems plus a lineage chain.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Tracker vs registry roles",
+    "tradeoff": "exploration volume vs governed releases"
+   },
+   {
+    "decision": "Immutable versions + movable alias",
+    "tradeoff": "process overhead vs auditability/rollback"
+   },
+   {
+    "decision": "Carry run id/commit/data hash to registry and version+checksum to serving logs",
+    "tradeoff": "logging cost vs broken lineage"
+   },
+   {
+    "decision": "Register full bundle",
+    "tradeoff": "size vs servability"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "78 words, interview-ready"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "adds pitfalls, bucket contrast, chain"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "ok, all discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0009",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/ml/tracking/",
+    "status": "supported",
+    "evidence": "quotes found"
+   },
+   {
+    "url": "https://mlflow.org/docs/latest/ml/model-registry/",
+    "status": "supported",
+    "evidence": "alias and lineage sentences found; page does not state versions are immutable or that stages are deprecated"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'immutable' registry versions is a design recommendation, not stated on the MLflow page",
+   "Rubric item on retention/GC is not discussed in the answer text (minor)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-01-6",
+  "verdict": "pass",
+  "reasons": [
+   "Both corrections verified: .dir manifest wording matches DVC internal-files page; 52x400=20.8 TB, +400 GB = 21.2 TB; 400+52x8=816 GB; ratios 25.5x (vs 20.8 TB) and 26x (vs 21.2 TB), 'roughly 25 times' fine."
+  ],
+  "parts_answered": {
+   "compare weekly copies vs content-hash": true,
+   "what a run records": true,
+   "what can go wrong": true,
+   "arithmetic": true
+  },
+  "evidence": [
+   {
+    "claim": "Storage arithmetic",
+    "method": "executed",
+    "evidence": "20800 GB, 21200 GB, 816 GB, ratio 25.5/26"
+   },
+   {
+    "claim": ".dvc file in Git with MD5, git checkout then dvc checkout",
+    "method": "doc",
+    "evidence": "'a placeholder for the original data for the purpose of Git tracking'; git checkout then dvc checkout"
+   },
+   {
+    "claim": ".dir mapping files to hashes",
+    "method": "doc",
+    "evidence": "'It contains the mapping of files inside (as a JSON array), identified by their hash values'"
+   },
+   {
+    "claim": "gc removes unreferenced cache objects by scope",
+    "method": "doc",
+    "evidence": "'doesn't do anything unless one or a combination of scope options are provided'; --all-commits preserves entire history"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Trade-off comparison with simple arithmetic.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "mechanism and failure modes"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "arithmetic and pointer-file sketch"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok, all discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0021",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://doc.dvc.org/start/data-management/data-versioning",
+    "status": "supported",
+    "evidence": "as above"
+   },
+   {
+    "url": "https://doc.dvc.org/command-reference/gc",
+    "status": "supported",
+    "evidence": "scope options and --all-commits found (the attached quote string itself was not verbatim on the page, claim is)"
+   },
+   {
+    "url": "https://doc.dvc.org/user-guide/project-structure/internal-files",
+    "status": "supported",
+    "evidence": ".dir entry quote verbatim"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Many-small-files slowness and legal deletion remarks are general engineering judgement"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-01-7",
+  "verdict": "pass",
+  "reasons": [
+   "Recomputed: A mean 0.9118 sd 0.00507, B 0.9156 sd 0.00518, diff 0.0038, independent SE 0.00324 (1.17 SE), paired SE 0.000374 (10.2 SE), sign test 2*(1/2)^5=0.0625. Applied interval text verified: paired 95% t-interval [0.00276, 0.00484] so lower end about 0.0028; Welch interval lower end 0.0038-2.306*0.00324=-0.0037 (about -0.004)."
+  ],
+  "parts_answered": {
+   "fair comparison": true,
+   "paired vs independent": true,
+   "strength of evidence": true
+  },
+  "evidence": [
+   {
+    "claim": "All statistics",
+    "method": "executed",
+    "evidence": "numpy computation above; t(4)=2.776, t(8)=2.306"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Paired vs unpaired reasoning with caveats on n, split noise, selection.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "analysis"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "decision procedure with threshold and intervals"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok, all discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0002",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Statistics are derivation/executed; no sources needed"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-02-2",
+  "verdict": "pass",
+  "reasons": [
+   "Code change ('v != v' null test, '(n - len)/n' null rate) is correct and fenced code equals tested solution. Behaviour matches detailed claims and the worked example (2 range, 1 unseen country, 6/100 nulls -> warn). No major defects."
+  ],
+  "parts_answered": {
+   "function with all listed checks": true,
+   "deterministic order": true,
+   "has_errors": true,
+   "pipeline wiring": true
+  },
+  "evidence": [
+   {
+    "claim": "Solution + test pass",
+    "method": "executed",
+    "evidence": "prints ok on 3.13, 3.10, 3.11"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Non-trivial implementation with several edge-case interactions (bool, NaN, missing key, check short-circuits).",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "design decisions and limitations"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "code, wiring, output example"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok, all discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0002",
+   "same_intent": false
+  },
+  "code_findings": "Fenced == solution. Test passes on all three interpreters. My extra cases (identical output on all three): inf without bounds -> [] (documented limitation), inf with max -> range; True in float column -> type; True in untyped range column -> range; empty schema -> []; 3 in float OK, 3.0 in int -> type error; unknown type with a non-null value raises ValueError; severity 'warn' keeps range warn but type stays error; output ordered by sorted column. Minor gaps, not worth changing: unhashable value in a column with 'allowed' and no 'type' raises TypeError; unknown type with only nulls does not raise; non-sortable mixed-type column names raise TypeError; numpy ints would fail type 'int' (stdlib-only scope).",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Paper contains 'Feature expectations are captured in a schema' (Data 1), 'Data invariants hold for inputs' (Monitor 2), slices, canary, rollback; only the schema and invariants items are relevant here, rest of listed tests is padding but accurate"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Pipeline wiring advice is practitioner judgement"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-02-3",
+  "verdict": "pass",
+  "reasons": [
+   "Applied edits are accurate: interval hypothetical stated as such, AUC-not-weighted-average caveat is true. Numbers consistent: 6% of 80,000 = 4,800; drop 0.03 matches 0.790->0.760; ECE +0.025 > 0.01 fails; +0.005 >= 0.003 gain rule. Source claims verified (Rules of ML #9; ML Test Score slices and simple-baseline tests)."
+  ],
+  "parts_answered": {
+   "extra checks": true,
+   "order": true,
+   "example of hidden regression": true
+  },
+  "evidence": [
+   {
+    "claim": "Rules of ML rule 9: sanity checks right before export",
+    "method": "doc",
+    "evidence": "'Do sanity checks right before you export the model.'"
+   },
+   {
+    "claim": "ML Test Score lists slices and simple baseline tests",
+    "method": "paper",
+    "evidence": "Model 6 'Model quality is sufficient on all important data slices'; Model 5 'A simpler model is not better'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Application of a multi-gate checklist with a worked example.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "ordered checks"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "gate report table not in detailed"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok, all discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0002",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "slices and simple-baseline tests present"
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule 5, 8, 9, 29 titles/sentences present; only rule 9 is used in the answer"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "The hidden-slice example is hypothetical; whether overall AUC rises while a 6% slice falls 0.03 requires gains in cross-slice ranking (answer now says so)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-02-4",
+  "verdict": "correct",
+  "reasons": [
+   "Applied corrections (NaN/inf fail-closed, eps at exact thresholds, baseline-n slice rule) are correct, consistent and tested on 3.10/3.11/3.13; fenced code equals code.solution.",
+   "Two minor residual points: question wording attaches the min_slice_n qualifier ambiguously to the missing-slice rule, and the limitation list omits that slice regressions are judged on point estimates."
+  ],
+  "parts_answered": {
+   "implement gate with all decision rules": true,
+   "overall gain >= min_improvement AND lower bound > 0 with independent SEs": true,
+   "reject large-slice regression or missing slice": true,
+   "needs_review for small-slice-only regression": true,
+   "return {'decision','reasons'}": true,
+   "discuss what the rule does not protect against": true
+  },
+  "evidence": [
+   {
+    "claim": "Fenced code in practical_answer is identical to code.solution",
+    "method": "executed",
+    "evidence": "string compare of fenced block vs solution: equal"
+   },
+   {
+    "claim": "code.test passes",
+    "method": "executed",
+    "evidence": "prints ok on Python 3.13.16 (dep venv), 3.10.20, 3.11.17"
+   },
+   {
+    "claim": "Extra edge cases: n exactly 200 -> reject, 199 -> needs_review; large+small regress -> reject with 2 reasons; inf overall, NaN se, NaN baseline, -inf slice -> reject; missing small slice -> reject; extra candidate slice ignored; no 'slices' key -> promote; min_improvement=0 with se=0 and diff=0 -> reject ('not distinguishable'), diff 0.0001 -> promote",
+    "method": "executed",
+    "evidence": "all asserted/printed as expected on all three interpreters"
+   },
+   {
+    "claim": "0.910 vs 0.900, se 0.002 each: lower bound about 0.0045",
+    "method": "derivation",
+    "evidence": "se_diff=sqrt(2)*0.002=0.002828; 1.96*0.002828=0.00554; 0.01-0.00554=0.00446"
+   },
+   {
+    "claim": "0.905 with se 0.02: lower bound about -0.034",
+    "method": "derivation",
+    "evidence": "se_diff=sqrt(0.02^2+0.002^2)=0.02010; diff 0.005-1.96*0.0201=-0.0344"
+   },
+   {
+    "claim": "Positively correlated errors on shared examples make the true SE of the difference smaller, so independent-SE gate is conservative",
+    "method": "derivation",
+    "evidence": "Var(A-B)=Va+Vb-2Cov; Cov>0 -> smaller"
+   },
+   {
+    "claim": "'Offline and online metrics correlate' is its own ML Test Score test",
+    "method": "paper",
+    "evidence": "WebFetch of the PDF lists Model Tests item 2 'Offline and online metrics correlate.'"
+   },
+   {
+    "claim": "A 200-example slice at 0.85 has SE about 0.025",
+    "method": "derivation",
+    "evidence": "sqrt(0.85*0.15/200)=0.0252"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "question",
+    "claim": "regresses by more than slice_tolerance or is missing from the candidate",
+    "problem": "Ambiguous: the qualifier 'with at least min_slice_n examples' can be read as also restricting the missing-slice rule; the code and answer reject a missing slice of any size.",
+    "replacement": "regresses by more than slice_tolerance, or if any baseline slice of any size is missing from the candidate"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "label leakage in the holdout",
+    "problem": "Limitation list omits that slice regressions are judged on point estimates; at the default min_slice_n=200 the slice SE (about 0.025 at 0.85) exceeds the 0.01 tolerance, so the slice rule is noisy.",
+    "replacement": "slice regressions judged on point estimates (a 200-example slice at accuracy 0.85 has a standard error near 0.025, over twice the 0.01 tolerance, so the slice rule is noisy at the default minimum size); label leakage in the holdout"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Several interacting rules and float/NaN edge cases, but standard control flow and a single formula; discussion part is recall plus judgement.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Design rationale and limitations; no code."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Reference implementation plus worked numbers matching the tests; numbers consistent with detailed (0.0015 / 0.005 with se 0.02)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (unchanged)",
+  "key_concepts_findings": "All 7 are discussed in the answer (multiple comparisons in limitations; fail closed in NaN/missing bullet). None weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0020",
+   "same_intent": false
+  },
+  "code_findings": "Re-run from scratch on 3.13/3.10/3.11: ok. 12 extra edge cases of my own all behave as specified. stdlib only (math), no 3.11+ features. eps=1e-12 correctly lets a drop of exactly slice_tolerance (0.85-0.84) and a gain of exactly min_improvement pass. Unused c_n variable is harmless.",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Opened via WebFetch: Model Tests lists 'Offline and online metrics correlate', 'The impact of model staleness is known', 'A simpler model is not better', 'Model quality is sufficient on important data slices'; Infrastructure lists 'Training is reproducible', 'The ML pipeline is Integration tested', 'Model quality is validated before serving', 'Models are canaried before serving', 'Serving models can be rolled back'; Data/Monitoring list 'Feature expectations are captured in a schema', 'Data invariants hold for inputs', 'Training and serving are not skewed'. All 12 named tests present (the page capitalises 'Integration')."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Gate design choices (thresholds, three outcomes, paired bootstrap) are derivation/engineering judgement, not documented behaviour."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-02-5",
+  "verdict": "correct",
+  "reasons": [
+   "Relabelling the toy numbers as hypothetical is correct and they are internally consistent (14% = about 1 in 7; tail percentages match mean 0.762, sd 0.0135 on a 100-row set).",
+   "Residual: past-tense narration still reads as a measurement, the 'stricter bound' advice is ambiguous (3 sd below the mean already equals the worst seed), and 'worse than having none' is stated as fact."
+  ],
+  "parts_answered": {
+   "diagnose flakiness": true,
+   "redesign the check": true,
+   "what a PR test can establish": true,
+   "what it cannot establish": true
+  },
+  "evidence": [
+   {
+    "claim": "Hypothetical numbers consistent: P(acc<=0.74) with mean .762 sd .0135 is about 10-19% (continuity-corrected 10%, uncorrected 19%), reported 14%",
+    "method": "derivation",
+    "evidence": "normal approx on discrete 0.01 grid; 0.745 -> z=-1.26 (10%), 0.75 -> z=-0.89 (19%)"
+   },
+   {
+    "claim": "P(<=0.73) about 2% and P(<=0.72) about 0.5%, min 0.72 and none below 0.72",
+    "method": "derivation",
+    "evidence": "z(0.735)=-2.0 -> 2.3%; z(0.725)=-2.74 -> 0.3%; consistent with min 0.72 in 200 draws"
+   },
+   {
+    "claim": "3 sd below mean = 0.7215, above the stated minimum 0.72",
+    "method": "derivation",
+    "evidence": "0.762-3*0.0135=0.7215"
+   },
+   {
+    "claim": "ML Test Score lists 'Training is reproducible' and 'The ML pipeline is Integration tested' under ML Infrastructure tests",
+    "method": "paper",
+    "evidence": "WebFetch of PDF: ML Infrastructure Tests items 1 and 3"
+   },
+   {
+    "claim": "Rules of ML Rule 5: test the infrastructure independently from the machine learning",
+    "method": "doc",
+    "evidence": "WebFetch: 'Rule #5: Test the infrastructure independently from the machine learning'; body: check feature columns populated; model in training environment gives same score as serving"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "So 0.75 sits within one standard deviation of the mean and fails often, while a floor of 0.70 was never reached in 200 seeds.",
+    "problem": "Past tense reads as a real measurement although the block is declared hypothetical.",
+    "replacement": "In this illustration 0.75 sits within one standard deviation of the mean and fails often, while a floor of 0.70 is never reached in 200 seeds."
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "If a stricter bound is wanted, set it from a larger multiple of the measured standard deviation below the mean, and re-measure when the fixture or the model changes.",
+    "problem": "Ambiguous; with these numbers 3 sd below the mean (about 0.72) already equals the worst of 200 seeds, so a 'stricter' bound will flake.",
+    "replacement": "If a stricter bound is wanted, note that 3 standard deviations below the mean (about 0.72 here) already equals the worst of 200 seeds, so collect more seeds or enlarge the validation set first, and re-measure when the fixture or the model changes."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "which is worse than having none",
+    "problem": "Opinion stated as fact.",
+    "replacement": "which is arguably worse than having none"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Diagnosis is straightforward (noise vs threshold); the redesign needs judgement about what a PR test can claim.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Diagnosis, capability boundary, redesign."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked spread numbers and a concrete floor; not a paraphrase. Numbers are consistent with the 'one in seven' premise."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (unchanged)",
+  "key_concepts_findings": "All discussed; 'quarantining flaky tests' appears only as step (4) but is present.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0005",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Infrastructure tests 'Training is reproducible' and 'The ML pipeline is Integration tested' present; the 12-test list in `supports` is accurate."
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule #5 'Test the infrastructure independently from the machine learning'; Rule #8 'Know the freshness requirements of your system'; Rule #9 'Detect problems before exporting models: Do sanity checks right before you export the model'; Rule #29 about saving the set of features used at serving time. Rules 8/9/29 are not used in the answer (padding but accurate)."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Overfit-a-tiny-batch and loss-decrease property tests are standard practice; no authoritative page opened for them."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-02-7",
+  "verdict": "pass",
+  "reasons": [
+   "Rewritten fault 5 is correct and no longer overlaps fault 4; cache-key definition and worked example are consistent. Only addition: an Airflow source for the idempotency/retry claims."
+  ],
+  "parts_answered": {
+   "list design faults": true,
+   "fix for each": true,
+   "how cache key is formed": true,
+   "duplicates after retry": true,
+   "duplicate model version tag": true,
+   "backfill divergence": true
+  },
+  "evidence": [
+   {
+    "claim": "Retried tasks must give the same outcome; INSERT on re-run can duplicate rows; use UPSERT",
+    "method": "doc",
+    "evidence": "Airflow best practices: 'the tasks should produce the same outcome on every re-run'; 'Do not use INSERT during a task re-run, an INSERT statement might lead to duplicate rows in your database.'"
+   },
+   {
+    "claim": "Changing window_days changes build_features key and (via input content hashes) all downstream keys; changing only the seed changes only train+later keys",
+    "method": "derivation",
+    "evidence": "downstream keys include content hashes of upstream outputs"
+   },
+   {
+    "claim": "Identical keys with different outputs imply an undeclared input or nondeterminism",
+    "method": "derivation",
+    "evidence": "by definition of the key if it covers all declared inputs"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Several coupled symptoms to map onto pipeline properties plus a correct content-addressed cache key design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Fault-by-fault fixes and cache-key principle."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked key tuple, invalidation behaviour, backfill diff procedure, idempotency acceptance test."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (unchanged)",
+  "key_concepts_findings": "All 8 discussed. Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0008",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "Apache Airflow Best Practices (idempotent tasks, UPSERT on re-run)",
+    "url": "https://airflow.apache.org/docs/apache-airflow/stable/best-practices.html",
+    "supports": "Tasks that can be retried should produce the same outcome on every re-run, and inserting on a re-run can create duplicate rows (use upsert/overwrite).",
+    "quote": "Airflow can retry a task if it fails. Thus, the tasks should produce the same outcome on every re-run.",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Cache-key composition (step name, code hash, params, input content hashes) is design reasoning, not a documented orchestrator default.",
+   "'duplicated rows for 3 days' (why 3 days) is not explained; harmless."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-03-1",
+  "verdict": "pass",
+  "reasons": [
+   "Both corrections are accurate hedges: the MLflow page documents the incrementing version number, aliases as mutable references, run lineage and tags; it only mentions auditability briefly and RBAC for managed backends."
+  ],
+  "parts_answered": {
+   "what a registry adds beyond a folder": true,
+   "when the folder is enough": true
+  },
+  "evidence": [
+   {
+    "claim": "Each new registration under the same name increments the version number",
+    "method": "doc",
+    "evidence": "MLflow registry page: 'Each new model registered to the same model name increments the version number.'"
+   },
+   {
+    "claim": "Aliases are mutable named references",
+    "method": "doc",
+    "evidence": "'Model aliases allow you to assign a mutable, named reference to a particular version of a registered model.'"
+   },
+   {
+    "claim": "Lineage to the producing run",
+    "method": "doc",
+    "evidence": "'provides lineage (i.e., which MLflow experiment and run produced the model)'"
+   },
+   {
+    "claim": "Tags and annotations on versions",
+    "method": "doc",
+    "evidence": "'Tags are key-value pairs that you associate with registered models and model versions'"
+   },
+   {
+    "claim": "Access control/approvals",
+    "method": "doc",
+    "evidence": "Page mentions role-based access controls only for Databricks/managed backends; answer says 'typically adds', acceptable"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Easy",
+  "difficulty_rationale": "Conceptual contrast with clear checklist; the 'when is a folder enough' part adds mild judgement (Easy-Medium).",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer, about 260 words; no duplication."
+   }
+  ],
+  "suggested_answer_set": "single answer (unchanged)",
+  "key_concepts_findings": "All 7 discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0209",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/ml/model-registry/",
+    "status": "supported",
+    "evidence": "Versioning increments, lineage to run, tags/annotations, aliases mutable: all quoted on the opened page. Immutability of versions is not stated and the answer now says so."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Governance/approval workflow is described generically ('typically adds'); fine."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-03-3",
+  "verdict": "correct",
+  "reasons": [
+   "Reviewer's major correction (0.8% is probably not rounding alone) is right and I reproduced it empirically; the practical-answer caveat about 1e-4 margins is consistent.",
+   "Residual minor: the skl2onnx page is cited one-sidedly; the same page shows float casting causing large discrepancies in a regression-tree example."
+  ],
+  "parts_answered": {
+   "what ONNX fixes": true,
+   "what can still differ": true,
+   "how to test export": true,
+   "does ONNX guarantee identical behaviour (no)": true
+  },
+  "evidence": [
+   {
+    "claim": "Experiment: sklearn StandardScaler+GradientBoostingClassifier(300 trees, depth 4) on 20k test rows converted with skl2onnx (float32 input), run in onnxruntime",
+    "method": "executed",
+    "evidence": "label flips 0.0 of 20,000 rows; max |p_orig-p_onnx| = 3.2e-07 (skl2onnx/onnxruntime in a 3.13 venv). Supports 'float32 rounding alone usually flips far fewer than 0.8%'."
+   },
+   {
+    "claim": "skl2onnx: 'In most cases, float and double comparison gives the same result.' but also 'the probability that both comparisons give different results is not null' and 'The discrepencies are significant' (regression example, max abs error about 150.75 until the normalizer kept double)",
+    "method": "doc",
+    "evidence": "WebFetch of the sklearn-onnx float/double page"
+   },
+   {
+    "claim": "scikit-learn guide: ONNX runtime does not require Python; not all estimators supported; custom converters are hard; arbitrary computation can be represented so sandbox",
+    "method": "doc",
+    "evidence": "WebFetch of model_persistence page, sections 11.1/11.2/11.5"
+   },
+   {
+    "claim": "ONNX IR: model must name operator sets; implementation must support all operators or reject the model; non-default sets must specify a domain",
+    "method": "doc",
+    "evidence": "WebFetch of IR.md: 'An implementation must support all operators in the set or reject the model.'; 'Operator sets other than the default operator set MUST specify a domain.'"
+   },
+   {
+    "claim": "Tolerances and 1,600 flips = 0.8% of 200,000",
+    "method": "derivation",
+    "evidence": "200000*0.008=1600"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "the skl2onnx documentation says float and double comparisons give the same result in most cases)",
+    "problem": "One-sided citation: the same page warns that the probability of differing results is not null and shows large discrepancies for a regression tree when inputs are cast to float.",
+    "replacement": "the skl2onnx documentation says float and double comparisons give the same result in most cases, though the same page shows a regression example where casting to float produced large errors, so this is an expectation, not a guarantee)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Needs knowledge of ONNX scope and a sensible parity-testing plan; numerics reasoning is moderate.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Concepts and failure modes."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Stepwise parity procedure with numbers; consistent with the corrected detailed text (1,600 flips unlikely to be ties)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (unchanged)",
+  "key_concepts_findings": "All 7 are discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0003",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://github.com/onnx/onnx/blob/main/docs/IR.md",
+    "status": "supported",
+    "evidence": "'ONNX specifies the portable, serialized format of a computation graph.' 'Each model MUST explicitly name the operator sets...' 'An implementation must support all operators in the set or reject the model.' 'Operator sets other than the default operator set MUST specify a domain.'"
+   },
+   {
+    "url": "https://scikit-learn.org/stable/model_persistence.html",
+    "status": "supported",
+    "evidence": "ONNX runtime does not require python; 'not all scikit-learn models are supported'; 'arbitrary computations can be represented using the ONNX format ... sandboxed environment'; pickle security; InconsistentVersionWarning all quoted."
+   },
+   {
+    "url": "https://onnx.ai/sklearn-onnx/auto_tutorial/plot_ebegin_float_double.html",
+    "status": "supported",
+    "evidence": "'In most cases, float and double comparison gives the same result.' Also 'the probability that both comparisons give different results is not null' and 'The discrepencies are significant' (regression example). The quote supports the sentence but the one-sided use is flagged."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'A runtime that is too old fails loudly' is consistent with the IR reject rule but is runtime-specific; acceptable.",
+   "Specific tolerances (1e-4, 1e-6, 99.9%) are labelled hypothetical/judgement."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-03-4",
+  "verdict": "correct",
+  "reasons": [
+   "Applied inference-wording fix is correct (verified on MLflow 3.17: pandas int64 and Python ints infer long; whole-number floats stay double).",
+   "New major found: 'Missing columns, extra columns' is listed as something the signature check catches, but MLflow's schema enforcement ignores extra columns with a warning."
+  ],
+  "parts_answered": {
+   "string '34' for double": true,
+   "3.7 for long": true,
+   "hours vs days": true,
+   "what a signature can catch": true,
+   "what it cannot": true,
+   "what to add around it": true
+  },
+  "evidence": [
+   {
+    "claim": "MLflow 3.17 _enforce_schema: str '34' -> double raises 'Can not safely convert str to float64'",
+    "method": "executed",
+    "evidence": "venv run of mlflow-skinny 3.17.0"
+   },
+   {
+    "claim": "3.7 (and even 3.0 float) -> long raises 'Can not safely convert float64 to int64'; reject, not truncate",
+    "method": "executed",
+    "evidence": "same run"
+   },
+   {
+    "claim": "hours-instead-of-days with correct dtype passes unchanged; out-of-range values with right dtype pass",
+    "method": "executed",
+    "evidence": "same run (days_active=72 OK)"
+   },
+   {
+    "claim": "Missing column raises 'Model is missing inputs'; extra column only logs a warning 'These inputs will be ignored.' and passes",
+    "method": "executed",
+    "evidence": "same run; also source docstring 'Any extra columns are ignored.' (mlflow/models/utils.py l.1146)"
+   },
+   {
+    "claim": "infer_signature on pandas int64 column or python int -> long; float column -> double",
+    "method": "executed",
+    "evidence": "infer_signature output: age long when ints given"
+   },
+   {
+    "claim": "Signature can be inferred from input_example",
+    "method": "doc",
+    "evidence": "MLflow signatures page: 'MLflow automatically generates model signatures when you provide an input_example during model logging.'"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "answer",
+    "claim": "- Missing columns, extra columns, wrong shapes.",
+    "problem": "For the MLflow signatures the answer is built around, extra columns are not rejected: _enforce_schema ignores them with a warning, so listing them as caught is wrong without a qualifier.",
+    "replacement": "- Missing columns and wrong shapes. Extra columns are a policy choice: MLflow's schema enforcement ignores them with a warning, so reject them explicitly if you want strictness."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Application of schema-vs-semantic validation to three concrete cases plus a layered mitigation plan.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer about 300 words."
+   }
+  ],
+  "suggested_answer_set": "single answer (unchanged)",
+  "key_concepts_findings": "All 6 discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0012",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/ml/model/signatures/",
+    "status": "partially",
+    "evidence": "Page states automatic generation from input_example and shows long/double ColSpecs, but does not describe integer inference, type enforcement rules or extra-column behaviour. The sentence in `supports` (inferred from input_example; helps validate requests) is supported; the integer-inference claim in the answer rests on the executed run, not this page."
+   },
+   {
+    "url": "https://raw.githubusercontent.com/mlflow/mlflow/master/mlflow/models/utils.py",
+    "status": "supported",
+    "evidence": "Opened: '# NB: conversion between incompatible types (e.g. floats -> ints or double -> float) are not allowed.' and error text 'Can not safely convert {values.dtype} to {numpy_type}.' Source code of the project (type 'secondary' is reasonable)."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "MLflow source: _enforce_schema (mlflow/models/utils.py)",
+    "url": "https://raw.githubusercontent.com/mlflow/mlflow/master/mlflow/models/utils.py",
+    "supports": "MLflow schema enforcement ignores extra input columns (with a warning) and rejects missing inputs.",
+    "quote": "Any extra columns are ignored.",
+    "type": "secondary"
+   }
+  ],
+  "unsourced_claims": [
+   "Constraint checks, unit naming conventions, per-client logging are engineering practice, not documented MLflow behaviour."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-03-5",
+  "verdict": "correct",
+  "reasons": [
+   "Both applied corrections are accurate hedges, but they now conflict with the unhedged concise_answer ('atomic in the registry') and the interview note.",
+   "Practical scenario mixes v41 (record shown) with v39 (audit lookup) without saying so."
+  ],
+  "parts_answered": {
+   "what each version must record": true,
+   "how model is packaged": true,
+   "promotion with aliases": true,
+   "rollback with aliases": true,
+   "what is/is not atomic": true,
+   "14-month reproduction path": true
+  },
+  "evidence": [
+   {
+    "claim": "MLflow links each version to the producing run; aliases are mutable named references",
+    "method": "doc",
+    "evidence": "MLflow registry page quotes: 'Each registered model version is linked to the MLflow run, logged model or notebook that produced it'; 'mutable, named reference to a particular version'"
+   },
+   {
+    "claim": "Pulling by digest pins an exact image",
+    "method": "doc",
+    "evidence": "Docker docs: 'When pulling an image by digest, you specify exactly which version of an image to pull.' (page does not itself say tags are mutable)"
+   },
+   {
+    "claim": "pip hash-checking mode protects against tampering/network issues",
+    "method": "doc",
+    "evidence": "pip secure-installs: 'This mode uses local hashes, embedded in a requirements.txt file, to protect against remote tampering and network issues.'"
+   },
+   {
+    "claim": "concise_answer length",
+    "method": "executed",
+    "evidence": "66 words (<=80)"
+   },
+   {
+    "claim": "Alias update atomicity is registry-implementation dependent",
+    "method": "background_only",
+    "evidence": "MLflow page does not state it; the corrected detailed text hedges, concise does not"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "concise_answer",
+    "claim": "Promotion moves an alias: atomic in the registry, but replicas change only when redeployed.",
+    "problem": "Unhedged 'atomic' now contradicts the corrected detailed answer, which says the page does not state atomicity.",
+    "replacement": "Promotion moves an alias: one registry write (atomic in typical database-backed registries), but replicas change only when redeployed."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(atomic in typical database-backed registries, though the cited page does not state it)",
+    "problem": "'the cited page' is meaningless to a reader of the answer.",
+    "replacement": "(atomic in typical database-backed registries; MLflow's documentation does not state this)"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "take model v39 and its image digest.",
+    "problem": "The record shown above is for v41; the audit lookup silently switches to v39.",
+    "replacement": "take the model version it names (v39 in this scenario) and its image digest."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-part design: provenance, environment pinning, equivalence definition, alias semantics and retention interplay.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Immutable versions with content digest of artifact",
+    "tradeoff": "Guarantees 'v39' is one artifact vs storage cost and need for retention policy"
+   },
+   {
+    "decision": "Record lineage: commit, data snapshot id, config, seeds, feature-definition version",
+    "tradeoff": "Enables rebuild/audit vs discipline to log it at training time"
+   },
+   {
+    "decision": "Package or version preprocessing with the model",
+    "tradeoff": "Behavioural equivalence vs coupling model releases to feature code"
+   },
+   {
+    "decision": "Lockfile with hashes plus base image by digest, retain images (or rebuild path)",
+    "tradeoff": "Reproducible environment vs registry storage and cleanup-job risk"
+   },
+   {
+    "decision": "Promote by moving an alias; record resolved version+image digest in the deployment record",
+    "tradeoff": "Atomic registry pointer vs replicas only change on redeploy/re-resolve"
+   },
+   {
+    "decision": "Define equivalence as agreement within tolerance on a replay set; rehearse rollback",
+    "tradeoff": "Realistic across hardware vs bit-exactness"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "66-word interview-ready summary; needs the atomic hedge."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Rationale and trade-offs."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Audit replay walkthrough with concrete numbers; adds a rollback drill."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical (unchanged)",
+  "key_concepts_findings": "All 7 discussed. rubric_points (6) cover the main decisions with trade-offs; adequate.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0016",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/ml/model-registry/",
+    "status": "supported",
+    "evidence": "Lineage to run and mutable aliases quoted; page says nothing about immutability of versions or atomicity of alias updates, which the answer correctly now hedges."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "docker image pull: pull an image by digest",
+    "url": "https://docs.docker.com/reference/cli/docker/image/pull/",
+    "supports": "Pulling by digest specifies exactly which image version is used, supporting 'base image referenced by digest'.",
+    "quote": "When pulling an image by digest, you specify exactly which version of an image to pull.",
+    "type": "official_doc"
+   },
+   {
+    "title": "pip secure installs: hash-checking mode",
+    "url": "https://pip.pypa.io/en/stable/topics/secure-installs/",
+    "supports": "A dependency lockfile with hashes lets pip verify downloaded packages.",
+    "quote": "This mode uses local hashes, embedded in a requirements.txt file, to protect against remote tampering and network issues.",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "'tags are mutable' is not stated on the Docker page I opened; widely known but unsourced.",
+   "Replay tolerance (99.9% within 1e-6) is hypothetical."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-04-1",
+  "verdict": "correct",
+  "reasons": [
+   "Added cost sentence for (c) is correct and completes the four-criteria coverage. One hedge: backpressure is not always available for sensors."
+  ],
+  "parts_answered": {
+   "(a) choice+latency/freshness/cost/failure": true,
+   "(b) choice+criteria": true,
+   "(c) choice+criteria (cost now added)": true,
+   "where hybrid beats pure": true
+  },
+  "evidence": [
+   {
+    "claim": "100 ms budget leaves only a few tens of ms for the model after network, feature lookup and overhead",
+    "method": "background_only",
+    "evidence": "engineering judgement, labelled 'for example'"
+   },
+   {
+    "claim": "At-least-once delivery implies duplicates, so alerts need dedup/idempotency",
+    "method": "derivation",
+    "evidence": "redelivery after failure/checkpoint restore"
+   },
+   {
+    "claim": "Weekly 3M-page job idempotent via overwrite-by-partition/upsert",
+    "method": "derivation",
+    "evidence": "reruns replace, not append (cf. Airflow guidance on UPSERT)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "Apply backpressure rather than dropping data silently.",
+    "problem": "Sensors usually cannot be slowed; stated as the only option.",
+    "replacement": "Prefer backpressure or a durable buffer to silent drops (sensors often cannot be slowed, so if load must be shed, do it deliberately and count it)."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Standard serving-pattern mapping across three cases; hybrid insight is common but requires synthesis.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "(a) Scheduled batch with partitioned, retried, idempotent writes",
+    "tradeoff": "Cheapest and simplest; week-old freshness acceptable, failure leaves last output in place"
+   },
+   {
+    "decision": "(b) Online endpoint with latency budget and precomputed slow features in a key-value store",
+    "tradeoff": "Meets 100 ms but pays for peak capacity and feature-store complexity"
+   },
+   {
+    "decision": "(b) Streaming job maintaining 10-minute aggregates into the store",
+    "tradeoff": "Freshness vs operating a streaming pipeline and training/serving skew risk"
+   },
+   {
+    "decision": "(b) Pre-agreed fallback decision on timeout",
+    "tradeoff": "Checkout availability vs fraud risk during degraded scoring"
+   },
+   {
+    "decision": "(c) Stateful stream processor with windows, event time, checkpointing, dedup of alerts",
+    "tradeoff": "Seconds-level alerts vs complexity of late/out-of-order data and at-least-once delivery"
+   },
+   {
+    "decision": "Hybrid: batch heavy features/embeddings + light online model; or lookup of precomputed predictions",
+    "tradeoff": "Removes inference from the request path vs staleness"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer about 320 words; rubric_points (6) are acceptable and cover each case's key decision plus trade-off."
+   }
+  ],
+  "suggested_answer_set": "single answer (unchanged)",
+  "key_concepts_findings": "All 7 discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0036",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Serving-mode choices, 100 ms budget split, hybrid patterns and streaming concerns (event time, checkpointing, at-least-once) are design judgement/background; no official page opened. An optional source would be the Flink or Beam docs on event time and checkpointing."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-04-3",
+  "verdict": "correct",
+  "reasons": [
+   "Applied correction (max_wait=0 edge case wording; practical test sentence) is correct and consistent with executed behaviour: [0,0,0] with max_wait=0, max_batch=2 batches as [2,1].",
+   "Code, fenced copy and every quoted number reproduce exactly on 3.10/3.11/3.13.",
+   "Only residual: question leaves the tie case (arrival exactly at dispatch instant) unspecified; the solution counts it as waiting, so a different valid reading gives different numbers."
+  ],
+  "parts_answered": {
+   "simulate_microbatch with validation": true,
+   "dispatch rule (free AND full-or-timeout), FIFO": true,
+   "service time and latency definition": true,
+   "nearest-rank percentile": true,
+   "explain load dependence at 1 ms and 20 ms with overhead 10 / per_item 0.5": true
+  },
+  "evidence": [
+   {
+    "claim": "Fenced code in practical_answer equals code.solution",
+    "method": "executed",
+    "evidence": "regex-extracted fence == solution: True"
+   },
+   {
+    "claim": "[0,1,2,3], mb2, mw5, ovh10, pi2 -> [15,14,27,26]",
+    "method": "derivation",
+    "evidence": "batch1 dispatch t=1, finish 1+10+4=15 -> 15,14; batch2 full at 3 but worker free at 15, finish 29 -> 27,26; also asserted by test"
+   },
+   {
+    "claim": "2000 arrivals/1 ms: mb1 p95=18,051 (first 10.5, last 19,001); mb16/mw4 p95=260.5; mb32/mw8 p95=38, mean batch ~19.6",
+    "method": "executed",
+    "evidence": "outputs (18051.0,...,10.5,19001.0), 260.5 (mean batch 15.87), 38.0 (mean 19.61) on 3.10/3.11/3.13"
+   },
+   {
+    "claim": "500 arrivals/20 ms: mb1 -> 10.5 each; mb8/mw5 -> 15.5 each, all batches size 1",
+    "method": "executed",
+    "evidence": "(10.5,1.0,...) and (15.5,1.0,...)"
+   },
+   {
+    "claim": "max_batch 32 handles 32 requests per 26 ms (>1/ms); capacity formula n/(overhead+per_item*n)",
+    "method": "derivation",
+    "evidence": "10+0.5*32=26 ms -> 1.23 req/ms; mb16: 16/18=0.89 <1 so queue grows (matches p95 260.5)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "question",
+    "claim": "It contains the waiting requests up to max_batch.",
+    "problem": "Tie case unspecified: the reference counts a request arriving exactly at the dispatch instant as waiting (arrivals[j] <= dispatch). Another reader could exclude it and get different latencies at boundaries.",
+    "replacement": "It contains the waiting requests up to max_batch (a request arriving exactly at the dispatch instant counts as waiting)."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Needs a correct event-driven dispatch rule combining worker-free time, fullness and timeout, plus load-dependent interpretation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Derives the closed-form dispatch rule, edge cases and the load interpretation."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Full tested code plus observed results; not duplicated in detailed."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (unchanged)",
+  "key_concepts_findings": "All 7 specific and discussed (head-of-line wait appears via oldest-request timeout).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0035",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran solution+test on /home/claude/work/dep/v/bin/python (3.13.16), v310 (3.10.20), v311 (3.11.17): 'ok' on all. Own edge cases, identical on all three: empty arrivals -> ([],[]); [0,0,0] mb2 mw0 -> lat [12,12,23], sizes [2,1]; five simultaneous arrivals mb2 mw5 -> sizes [2,2,1]; [0,1,2] mb3 mw100 dispatches at t=2 (full) -> [15,14,13]; arrival exactly at window edge [0,5,5.0001] mw5 -> sizes [2,1]; backlog [0..6] mb2 mw1 -> sizes [2,2,2,1]; max_batch=0 and max_wait=-1 raise ValueError; percentile([1,2,3,4],50)=2, 25->1, 100->4, empty raises ValueError. percentile with p>100 would IndexError and p=0 returns the minimum (outside documented (0,100] domain, harmless). Stdlib only, no 3.11+ features.",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Accelerator cost model (fixed overhead + per-item) is a stated modelling assumption, not a sourced fact"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-04-4",
+  "verdict": "correct",
+  "reasons": [
+   "Applied correction 'up to roughly 9,000 (fewer while the ramp is still climbing)' is directionally right but still loose: it is 100 req/s excess x 90 s only if demand were already 200/s for the whole 90 s.",
+   "Applied practical correction (scheduled minimum 10 replicas from 08:45, 3 otherwise) is correct and now consistent with 24/2.4=10 and max 14.",
+   "All other arithmetic reproduces."
+  ],
+  "parts_answered": {
+   "diagnose failure (CPU signal, startup lag, capacity shortfall)": true,
+   "redesign scaling policy": true
+  },
+  "evidence": [
+   {
+    "claim": "Per-replica 4/0.12=33.3 rps; 3 replicas ~100 rps; 50 rps = 50% busy",
+    "method": "derivation",
+    "evidence": "4/0.12=33.33; x3=100"
+   },
+   {
+    "claim": "Little's law: 200 x 0.12 = 24 in flight -> 6 replicas at 100%, 10 at 60% (2.4 each); 3 at 50 rps (6/2.4=2.5)",
+    "method": "derivation",
+    "evidence": "24/4=6; 24/2.4=10; 6/2.4=2.5->3"
+   },
+   {
+    "claim": "Excess ~100 rps x 90 s = 9,000 requests",
+    "method": "derivation",
+    "evidence": "Holds for a step to 200 rps. With the stated 2-minute linear ramp from 50 to 200 and no scale-out until 90 s, backlog beyond capacity is only ~1,600 at t=90 s, ~4,000 at t=120 s and ~7,000 at t=150 s; 9,000 is the step-load upper figure."
+   },
+   {
+    "claim": "Saturation is a golden signal: 'How full your service is'",
+    "method": "doc",
+    "evidence": "SRE book: Saturation: 'How \"full\" your service is.'"
+   },
+   {
+    "claim": "Queue limit 8 = two rounds of 4 x 120 ms = ~240 ms",
+    "method": "derivation",
+    "evidence": "2 x 120 = 240 ms"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "so up to roughly 9,000 requests (fewer while the ramp is still climbing) arrive faster than they can be served",
+    "problem": "9,000 assumes demand already at 200 rps for 90 s; with the stated two-minute ramp the shortfall at 90 s is a few thousand, and scrape/decision delay pushes it back up. Wording should say what the 9,000 is.",
+    "replacement": "so on the order of 9,000 requests (100 requests/s of excess times 90 s, an upper figure that assumes demand is already at 200 requests/s; the two-minute ramp lowers it, scrape and decision delay raise it) arrive faster than they can be served"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Multi-step capacity arithmetic plus a standard autoscaling redesign; no subtle trap.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Diagnosis and design principles with sizing."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete policy numbers consistent with the sizing (10 replicas, 14 max, queue 8)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (unchanged)",
+  "key_concepts_findings": "All 7 specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "status": "supported",
+    "evidence": "Saturation: 'How \"full\" your service is.' Source only backs the golden-signal remark; the other supports-text items (latency of successes vs failures, percentiles) are not used in this answer."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Little's law application and replica sizing (derivation, fine)",
+   "'Scale up aggressively, down slowly with a stabilisation window' is general autoscaler practice (Kubernetes HPA has configurable behavior/stabilizationWindowSeconds) - not opened this session"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-04-6",
+  "verdict": "correct",
+  "reasons": [
+   "Applied detailed correction (alert on fraction slower than objective, not the mean) is correct and answers the 'which latency statistic' part.",
+   "Applied practical correction introduced a redundant phrase: 'over a long and a short window (burn-rate rules over a long and a short window, ...)'. Replace with the verified SRE Workbook parameters.",
+   "Volume arithmetic correct: 500 x 86,400 = 43.2M/day; x1 KB = 43.2 GB."
+  ],
+  "parts_answered": {
+   "per-prediction log fields": true,
+   "dashboard panels from four golden signals": true,
+   "which latency statistic is alerted": true,
+   "what not to page on": true,
+   "cost and privacy of logging": true
+  },
+  "evidence": [
+   {
+    "claim": "43.2 M requests/day, ~43 GB/day at 1 KB",
+    "method": "derivation",
+    "evidence": "500*86400=43,200,000"
+   },
+   {
+    "claim": "Four golden signals; distinguish latency of successful vs failed requests; errors include implicit and policy-based (slower than a committed threshold)",
+    "method": "doc",
+    "evidence": "SRE book (WebFetch): 'It's important to distinguish between the latency of successful requests and the latency of failed requests'; errors explicit/implicit/policy-based"
+   },
+   {
+    "claim": "Mean hides the tail",
+    "method": "doc",
+    "evidence": "SRE book 'Worrying About Your Tail': designing monitoring around the mean is misleading; recommends latency-bucketed counts (histograms)"
+   },
+   {
+    "claim": "Multiwindow multi-burn-rate paging for a 99.9% SLO",
+    "method": "doc",
+    "evidence": "SRE Workbook Alerting on SLOs Table 5-8: page at burn 14.4 over 1 h and 5 min; burn 6 over 6 h and 30 min; ticket at burn 1 over 3 d and 6 h"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "above an SLO burn threshold over a long and a short window (burn-rate rules over a long and a short window, as in a standard 99.9% SLO policy)",
+    "problem": "Phrase repeats itself and is vague.",
+    "replacement": "above an SLO burn-rate threshold over both a long and a short window (for a 99.9% SLO the SRE Workbook's starting point pages at burn rate 14.4 over 1 h and 5 min)"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "avoid raw identifiers or free text where a hash is enough",
+    "problem": "A hash of an identifier is still personal data if it can be re-identified (low-entropy inputs are reversible by lookup); overstated as a privacy fix.",
+    "replacement": "avoid raw identifiers or free text where a keyed hash is enough (a plain hash of a low-entropy identifier can be reversed, and pseudonymised data is still personal data)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Broad design recall (golden signals, SLO alerting, logging) with limited calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Structured per-request log with request id, model+feature-set version, fallback flag, latency breakdown",
+    "tradeoff": "Joins to later outcomes and debugging vs storage and PII exposure"
+   },
+   {
+    "decision": "Golden-signal panels split by model version/route/client",
+    "tradeoff": "Catches single-version regressions vs dashboard cardinality"
+   },
+   {
+    "decision": "Alert on SLO burn (error ratio and fraction slower than objective) over long and short windows, not on mean latency",
+    "tradeoff": "Symptom-based and low noise vs misses slow quality drift"
+   },
+   {
+    "decision": "Do not page on drift, offline accuracy or single noisy metrics; ticket/dashboard them",
+    "tradeoff": "Avoids alert fatigue vs slower reaction to model-quality problems"
+   },
+   {
+    "decision": "Sample full features (e.g. 1%), pseudonymise identifiers, set retention and access limits",
+    "tradeoff": "Cost/privacy vs ability to debug and replay"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Rationale for log fields, signals, alerts, volume."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete record and starter alert set; small overlap with detailed alert text is acceptable."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (unchanged)",
+  "key_concepts_findings": "All 7 specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "status": "supported",
+    "evidence": "Latency of successes vs failures, four signals, tail/mean warning all present; 'percentiles' specifically: book recommends latency-bucketed histograms, which supports distribution-over-mean."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Alerting on SLOs (Google SRE Workbook)",
+    "url": "https://sre.google/workbook/alerting-on-slos/",
+    "supports": "Multiwindow, multi-burn-rate alerts for a 99.9% SLO: page at burn rate 14.4 (1 h long / 5 min short window) and 6 (6 h / 30 min); ticket at burn rate 1 (3 d / 6 h).",
+    "quote": "the multiwindow, multi-burn-rate alerting technique is the most appropriate approach",
+    "type": "official_doc"
+   },
+   {
+    "title": "Monitoring Distributed Systems (Google SRE Book)",
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "supports": "Page on symptoms rather than causes.",
+    "quote": "it's better to spend much more effort on catching symptoms than causes",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Choice of 2% fallback ticket threshold and 1% feature sampling are illustrative"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-05-3",
+  "verdict": "correct",
+  "reasons": [
+   "Applied change to '57,000' is right for the conservative formula but the new parenthetical '(about 47,000 if the baseline variance is used for both hypotheses)' is mislabeled: baseline variance for both gives ~43,500; ~47,000-48,000 is the standard null-variance/alt-variance formula.",
+   "The first reviewer's edit left a downstream inconsistency: 'about 116 complaints ... across 58,000 requests' (57,000 x 0.2% = 114).",
+   "The 38% power figure belongs to the conservative formula; the standard formula gives ~47%.",
+   "Core argument (neither colleague right; z 1.4; upper bound 0.31%; non-inferiority) is correct."
+  ],
+  "parts_answered": {
+   "evaluate 'not significant so safe'": true,
+   "evaluate 'close enough, ship'": true,
+   "how to design the check (power/events, non-inferiority)": true,
+   "delayed complaints (known after a week)": true
+  },
+  "evidence": [
+   {
+    "claim": "Expected 40 at baseline, Poisson SD 6.3",
+    "method": "executed",
+    "evidence": "0.002*20000=40; sqrt(40)=6.32"
+   },
+   {
+    "claim": "SE of difference 0.035 pp; z 1.41; two-sided p 0.16",
+    "method": "executed",
+    "evidence": "sqrt(.0025*.9975/20000+.002*.998/1.98e6)=3.545e-4; z=1.41; p=0.1585"
+   },
+   {
+    "claim": "One-sided 95% upper bound on canary ~0.31%, ~54% above baseline",
+    "method": "executed",
+    "evidence": "0.0025+1.645*3.531e-4=0.00308 -> 1.54x"
+   },
+   {
+    "claim": "Sample size to detect 0.20%->0.26%, 80% power, two-sided 5%",
+    "method": "executed",
+    "evidence": "control 99x: standard (null var for alpha) n=47,692; conservative (alt variance everywhere) n=56,979 (~57,000); baseline variance for both 43,957; control ignored: 47,251 / 56,539 / 43,518"
+   },
+   {
+    "claim": "Power at 20,000 canary requests",
+    "method": "executed",
+    "evidence": "conservative formula 38.2%; standard formula 47.5%"
+   },
+   {
+    "claim": "57,000/20,000 ~ 3 days at 1%; 100,000/day at 5%",
+    "method": "derivation",
+    "evidence": "2.85 days; 5% of 2M = 100,000"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "answer",
+    "claim": "(about 47,000 if the baseline variance is used for both hypotheses)",
+    "problem": "Wrong label/number: baseline variance for both hypotheses gives ~44,000; ~47,000-48,000 is the usual formula (baseline variance under the null, 0.26% variance under the alternative); 57,000 is the conservative version using the alternative variance throughout (two-sided 5%, 80% power, control 99x larger).",
+    "replacement": "(about 48,000 with the usual formula that uses baseline variance under the null; two-sided 5% test, 80% power)"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "One day at 1% (20,000) gives only about 38% power",
+    "problem": "38% belongs to the conservative formula; the usual formula gives ~47%. Say so.",
+    "replacement": "One day at 1% (20,000) gives only about 38 to 48% power depending on the formula"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "about 116 complaints expected at baseline across 58,000 requests",
+    "problem": "Inconsistent with the corrected 57,000 (57,000 x 0.2% = 114).",
+    "replacement": "about 114 complaints expected at baseline across 57,000 requests"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Needs power calculation, interval reasoning with small event counts, non-inferiority framing and delayed-label design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single-answer record; no duplicate fields."
+   }
+  ],
+  "suggested_answer_set": "single (unchanged)",
+  "key_concepts_findings": "All 7 specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "status": "supported",
+    "evidence": "'We define canarying as a partial and time-limited deployment of a change in a service and its evaluation'; 'the remainder of the service is the control'; 'sizeable and last long enough to be representative'; 'just a handful of queries doesn't provide a useful signal'. Note the chapter explicitly avoids statistics, so the power/non-inferiority numbers are derivation, not sourced."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Non-inferiority framing and sample-size formulas (standard statistics, derived and executed here)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-05-4",
+  "verdict": "correct",
+  "reasons": [
+   "Applied outcome-check correction is right that 14 days is too early for 45-day chargebacks, but introduces two gaps: after Stage 3 (100%) there is no concurrent old-model cohort, so the comparison can only use Stage 1-2 cohorts (or a holdout), and the old model is only kept warm 7 days, so a later rollback is a redeploy not 'a traffic switch'.",
+   "All traffic arithmetic reproduces: 7.5 rps, 27,000/h, 4,500 per 10 min, SE 0.105 pp; 25%: 22,500 per window, SE 0.047 pp."
+  ],
+  "parts_answered": {
+   "comparison baseline": true,
+   "guardrail metrics": true,
+   "minimum samples per stage": true,
+   "example thresholds": true,
+   "what stays manual": true,
+   "why 'ever higher than control' is a poor rule": true
+  },
+  "evidence": [
+   {
+    "claim": "5% of 150 rps = 7.5 rps = 27,000/h = 4,500 per 10 min",
+    "method": "derivation",
+    "evidence": "7.5*3600=27,000; 7.5*600=4,500"
+   },
+   {
+    "claim": "SE at 0.5% baseline, n=4,500 is ~0.1 pp; 0.5 pp ~ 5 SE",
+    "method": "executed",
+    "evidence": "sqrt(.005*.995/4500)=0.001051; 0.005/0.00105=4.8 (diff-vs-control SE 0.00108 incl. control)"
+   },
+   {
+    "claim": "25%: 22,500 per 10 min, SE ~0.05 pp, 0.3 pp margin",
+    "method": "executed",
+    "evidence": "37.5 rps*600=22,500; SE 0.00047; 0.3pp=6.4 SE"
+   },
+   {
+    "claim": "Canary = partial time-limited deployment, rest is control; handful of queries gives no useful signal",
+    "method": "doc",
+    "evidence": "SRE Workbook quotes above"
+   },
+   {
+    "claim": "No-difference canary exceeds control by chance ~half the time",
+    "method": "derivation",
+    "evidence": "symmetric null distribution"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "Any breach triggers a review and, if needed, rollback.",
+    "problem": "After Stage 3 there is no concurrent control and the old model is warm only 7 days, so late outcome checks rely on Stage 1-2 cohorts (or a small old-model holdout) and a rollback then is a redeploy, not a traffic switch; Stage 1-2 cohorts are small, so a 0.1%-ish chargeback rate yields few events.",
+    "replacement": "Any breach triggers a review and, if needed, rollback. After Stage 3 there is no concurrent control, so these comparisons use the Stage 1-2 cohorts (or a small old-model holdout if you keep one), which have few chargeback events; and once the 7-day warm period ends a rollback means redeploying the registered old model rather than flipping traffic."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-constraint policy design with sample-size derivation, delayed labels and automation boundaries.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Concurrent control with sticky assignment, not yesterday's numbers",
+    "tradeoff": "Removes time-of-day/mix effects vs requires traffic splitting"
+   },
+   {
+    "decision": "Tiered metrics: operational guardrails auto-rollback; behavioural proxies banded; outcomes verified later",
+    "tradeoff": "Fast decisions vs slow ground truth (45-day chargebacks)"
+   },
+   {
+    "decision": "Minimum samples and time per stage derived from traffic and baseline variance",
+    "tradeoff": "Statistical reliability vs longer exposure"
+   },
+   {
+    "decision": "Margin plus persistence over consecutive windows",
+    "tradeoff": "Fewer false rollbacks vs slower detection"
+   },
+   {
+    "decision": "Automatic rollback, gated automatic promotion, human review on behavioural-band breach",
+    "tradeoff": "Speed vs risk of unintended strictness change"
+   },
+   {
+    "decision": "Keep previous model warm; verify matured outcomes later",
+    "tradeoff": "Cheap rollback vs duplicate capacity and long tail of labels"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Reasoning and sample-size derivation."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete staged policy table."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (unchanged)",
+  "key_concepts_findings": "All 8 specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "status": "supported",
+    "evidence": "Control = remainder of the service; 'just a handful of queries doesn't provide a useful signal'; 'pause and roll back the deployment, or perhaps contact a human'; 'no more than a dozen' metrics."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Thresholds and window lengths are hypothetical and labelled so"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-05-5",
+  "verdict": "pass",
+  "reasons": [
+   "Applied correction (gate would have blocked the column drop because v6 still declares it; at rollback time it fails loudly) is correct and consistent with the expand-contract timeline.",
+   "Concise is 72 words, no number conflicts across fields; timeline arithmetic ok (Day 5 + 21 = Day 26; delete Day 33).",
+   "Expand-contract claims match Fowler's description."
+  ],
+  "parts_answered": {
+   "why rollback failed": true,
+   "how to structure release so rollback is safe": true
+  },
+  "evidence": [
+   {
+    "claim": "Expand/migrate/contract: augment interface to support both versions, migrate clients, then remove old",
+    "method": "doc",
+    "evidence": "Fowler: 'In the expand phase you augment the interface to support both the old and the new versions.' ... 'perform the contract phase to remove the old version'"
+   },
+   {
+    "claim": "Timeline numbers",
+    "method": "derivation",
+    "evidence": "Day 5 v7 at 100% + 21 days = Day 26; Day 33 delete; consistent with 'few weeks' rollback window"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "One core insight (model rollback does not roll back data contract) plus a standard migration pattern.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Genuinely shorter interview answer (72 words)."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanism, steps and controls."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Day-by-day timeline and gate; not in detailed."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical (unchanged)",
+  "key_concepts_findings": "All 7 specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0006",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://martinfowler.com/bliki/ParallelChange.html",
+    "status": "supported",
+    "evidence": "'In the expand phase you augment the interface to support both the old and the new versions.' (verified)"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Feature-store compatibility check and registry feature_set declaration are engineering practice, not documented behaviour of a named product"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-06-2",
+  "verdict": "correct",
+  "reasons": [
+   "Applied change from 80% to 85% is arithmetically consistent: 2.9/3.5 = 82.9%.",
+   "Applied loader-overhead insertion leaves the sizing unclear: the 3.6/4.2/2.9 GiB sums exclude the 4 data-loader workers, yet the text says the measurement 'should include' them.",
+   "Other numbers reproduce: 2x1.4+0.8=3.6; +0.6=4.2; +0.5=4.7; option (a) 1.4+0.4+0.6+0.5=2.9; 3.5/2.9=1.21; 4.7*1.17=5.5."
+  ],
+  "parts_answered": {
+   "why it did not fail locally": true,
+   "how to find real memory need": true,
+   "what to change": true
+  },
+  "evidence": [
+   {
+    "claim": "Memory limits enforced by kernel OOM kills; CPU limits by throttling; OOMKilled means container tried to use more memory than limit",
+    "method": "doc",
+    "evidence": "K8s: '`memory` limits are enforced by the kernel with out of memory (OOM) kills'; '`cpu` limits are enforced by CPU throttling'; 'The `OOMKilled` reason shows that the container tried to use more memory than its limit.'"
+   },
+   {
+    "claim": "emptyDir medium Memory counts against the writing container's memory limit",
+    "method": "doc",
+    "evidence": "K8s volumes: 'files you write count against the memory limit of the container that wrote them.'"
+   },
+   {
+    "claim": "Sizing arithmetic",
+    "method": "derivation",
+    "evidence": "3.6, 4.2, 4.7, 2.9 GiB; 2.9/3.5=82.9%; 3.5/2.9-1=20.7%"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "the 4 data-loader workers add their own overhead, which the measurement should include",
+    "problem": "The idle (3.6) and peak (4.2) sums exclude these 4 processes, so the worked numbers are a lower bound unless their overhead is counted somewhere.",
+    "replacement": "the 4 data-loader workers run only during batch calls, so assume their own interpreter overhead is folded into the 0.6 GiB request-peak figure below, and confirm by measuring every process"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Per-process memory accounting plus knowledge of K8s limit semantics and shm; straightforward once the model is known.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanism and method."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked sizing and pod spec."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (unchanged)",
+  "key_concepts_findings": "8 concepts; 'memory request' is only briefly discussed (request 3Gi in YAML vs 'request close to steady state' in text: option (a) steady state is nearer 2 to 2.5 GiB; consider 2.5Gi). Not a correctness fault.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+    "status": "supported",
+    "evidence": "Quotes above (kubernetes.io page body was truncated in WebFetch; verified against the page's source markdown in the kubernetes/website repo, fetched via raw.githubusercontent.com). The 'Pending' and extended-resource claims in the supports text are not used in the answer and were not checked."
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/storage/volumes/",
+    "status": "supported",
+    "evidence": "'If you set the emptyDir.medium field to \"Memory\", Kubernetes mounts a tmpfs (RAM-backed filesystem)... files you write count against the memory limit of the container that wrote them.' (kubernetes.io page body was truncated in WebFetch; verified against the page's source markdown in the kubernetes/website repo, fetched via raw.githubusercontent.com)"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Forked workers may or may not share model pages (hedged correctly in the answer)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-06-3",
+  "verdict": "correct",
+  "reasons": [
+   "Applied correction #1 (lengthen load to 350 s, not 200 s) is correct: 30 x 10 s = 300 s budget.",
+   "Applied correction #2 (conditional validation) is good but the next sentence, kept from the original, tests a 350 s load and 'confirms the startup probe fails'; that only happens when loading blocks the HTTP server. In the background-load branch just described, a longer load only leaves the pod unready. Internal contradiction in the test procedure.",
+   "Liveness timing ok: probes at 20, 30, 40 s -> kill ~40 s (plus timeout), stated 40 to 50 s.",
+   "common_mistakes[2] 'Using one /health endpoint for liveness and readiness' is overstated: Kubernetes docs describe a shared low-cost endpoint with a higher liveness failureThreshold as a common pattern; the real mistake is a shared endpoint that includes model loading or dependencies. Suggest rewording to that (field not in the exact-replacement schema)."
+  ],
+  "parts_answered": {
+   "explain what is happening": true,
+   "design probe configuration": true,
+   "what each endpoint checks": true,
+   "one way design could still go wrong": true
+  },
+  "evidence": [
+   {
+    "claim": "Liveness first check at 20 s, 3 consecutive failures at 10 s -> ~40 s",
+    "method": "derivation",
+    "evidence": "checks at t=20,30,40"
+   },
+   {
+    "claim": "Startup budget = failureThreshold x periodSeconds = 300 s; killed if never succeeds",
+    "method": "doc",
+    "evidence": "K8s configure page: '(30 * 10 = 300s) to finish its startup.' 'If the startup probe never succeeds, the container is killed after 300s and subject to the pod's restartPolicy.'"
+   },
+   {
+    "claim": "Liveness/readiness not executed until startup succeeds; startup suits slow containers; failed startup -> kill subject to restart policy",
+    "method": "doc",
+    "evidence": "K8s probes: 'Kubernetes does not execute liveness or readiness probes until the startup probe succeeds'; 'If the startup probe fails, the kubelet kills the container...'"
+   },
+   {
+    "claim": "Startup probe should check the same endpoint as liveness",
+    "method": "doc",
+    "evidence": "K8s probes: 'you should specify a startup probe that checks the same endpoint as the liveness probe'"
+   },
+   {
+    "claim": "Readiness-failed pods get no Service traffic; readiness runs for whole lifecycle",
+    "method": "doc",
+    "evidence": "K8s configure page: 'the pod will be marked unready and will not receive traffic'; 'Readiness probes run on the container during its whole lifecycle.'"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "practical_answer",
+    "claim": "Then lengthen the simulated load beyond the budget (for example 350 s) and confirm the startup probe fails and the pod is restarted, proving the budget is enforced; a 200 s load would still pass inside the 300 s budget.",
+    "problem": "Only true if loading blocks /health/live; in the background-loading branch described just before, the startup probe succeeds immediately and a 350 s load merely keeps the pod unready.",
+    "replacement": "Then, in a setup where loading blocks the HTTP server (so /health/live is unanswered), lengthen the simulated load beyond the budget (for example 350 s) and confirm the startup probe fails and the pod is restarted, proving the budget is enforced; a 200 s load would still pass inside the 300 s budget. If the server answers during background loading, a longer load only keeps the pod unready, not restarted."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Needs the three probe roles and budget arithmetic; one subtle design caveat.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Diagnosis, design, risks."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "YAML plus validation plan."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (unchanged)",
+  "key_concepts_findings": "All 8 specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/concepts/workloads/pods/probes/",
+    "status": "supported",
+    "evidence": "Startup/liveness/readiness gating, kill on failed startup, 'Liveness probes do not wait for readiness probes to succeed', 'startup probe that checks the same endpoint as the liveness probe' (kubernetes.io page body was truncated in WebFetch; verified against the page's source markdown in the kubernetes/website repo, fetched via raw.githubusercontent.com)"
+   },
+   {
+    "url": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/",
+    "status": "supported",
+    "evidence": "300 s example, readiness whole lifecycle, unready pod gets no traffic (kubernetes.io page body was truncated in WebFetch; verified against the page's source markdown in the kubernetes/website repo, fetched via raw.githubusercontent.com)"
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Kubernetes Docs: Liveness, Readiness and Startup Probes",
+    "url": "https://kubernetes.io/docs/concepts/workloads/pods/probes/",
+    "supports": "Liveness should report app health; readiness additionally checks required back-end services (basis for keeping dependency checks out of liveness).",
+    "quote": "The liveness probe passes when the app itself is healthy, but the readiness probe additionally checks that each required back-end service is available.",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Claim that a dependency outage in liveness restarts every pod is inference from the above, not stated in the docs"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-06-4",
+  "verdict": "correct",
+  "reasons": [
+   "Core deadlock diagnosis and arithmetic verified; applied 8-minute rollback fix is right (4 x (90+30) = 480 s) and consistent with minReadySeconds 30 in the YAML.",
+   "Two minor overstatements remain."
+  ],
+  "parts_answered": {
+   "why it deadlocks": true,
+   "options": true,
+   "cost of each": true,
+   "90 s load assumption used": true
+  },
+  "evidence": [
+   {
+    "claim": "maxSurge 1 + maxUnavailable 0 with 4/4 GPUs used leaves surge pod Pending, old pods cannot be removed",
+    "method": "derivation",
+    "evidence": "Surge pod needs 1 GPU, 0 free; maxUnavailable 0 forbids removing an old pod until a new one is available. Deadlock."
+   },
+   {
+    "claim": "maxSurge/maxUnavailable cannot both be 0; default 25%; revisionHistoryLimit default 10; minReadySeconds definition",
+    "method": "doc",
+    "evidence": "Deployment doc: 'The value cannot be 0 if .spec.strategy.rollingUpdate.maxSurge is 0.' ; 'By default, 10 old ReplicaSets will be kept'; minReadySeconds 'minimum number of seconds for which a newly created Pod should be ready without any of its containers crashing'."
+   },
+   {
+    "claim": "3/3.4 = 88%",
+    "method": "executed",
+    "evidence": "3/3.4=0.882"
+   },
+   {
+    "claim": "4x90=360 s=6 min; 4x120=480 s=8 min",
+    "method": "executed",
+    "evidence": "arithmetic"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "catches crash-on-first-request failures",
+    "problem": "minReadySeconds only requires the pod to stay up without container crashes for N seconds after becoming ready; it does not exercise requests.",
+    "replacement": "gives a window that catches pods which crash shortly after becoming ready"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(a pod that is still loading its model counts as unavailable)",
+    "problem": "True only if the readiness probe passes after model load; not stated.",
+    "replacement": "(a pod that is still loading its model counts as unavailable, provided readiness is gated on model load)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Needs the surge/unavailable mechanics, GPU capacity reasoning and cost trade-offs; no heavy computation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "diagnosis + three options with costs"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "capacity arithmetic, strategy YAML and rollback timing not in detailed"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "all discussed in the answer",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none (smi-0406 is Uber surge pricing, unrelated)",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+    "status": "supported",
+    "evidence": "'The value cannot be 0 if .spec.strategy.rollingUpdate.maxSurge is 0. The default value is 25%.'; 'By default, 10 old ReplicaSets will be kept'; minReadySeconds definition (WebFetch of raw page source; rendered page body not returned)."
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+    "status": "supported",
+    "evidence": "'The Pod remains in the PENDING state as long as the resource request cannot be satisfied.' (line 544 of page source) (opened via the kubernetes/website or feast/tfx repo source of the page; the rendered kubernetes.io/WebFetch view returned only navigation text)"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Termination grace period delays GPU release, so '6 minutes' is a lower bound (answer says 'at least')."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-06-5",
+  "verdict": "correct",
+  "reasons": [
+   "Whole-number / equal limit rules, per-node fragmentation and taint design all verified against docs.",
+   "Applied edit about gang scheduling is hedged but now out of date: current Kubernetes docs describe a feature-gated gang-scheduling feature in the core scheduler."
+  ],
+  "parts_answered": {
+   "GPU resource rules (0.5, requests1/limits2)": true,
+   "why 8-GPU job stuck": true,
+   "organising scheduling": true
+  },
+  "evidence": [
+   {
+    "claim": "GPU in limits; limit alone used as request; both must be equal; requests without limits not allowed",
+    "method": "doc",
+    "evidence": "scheduling-gpus: 'You can specify GPU limits without specifying requests...', 'these two values must be equal', 'You cannot specify GPU requests without specifying limits.'"
+   },
+   {
+    "claim": "extended resources whole numbers, no overcommit",
+    "method": "doc",
+    "evidence": "manage-resources: 'The API server restricts quantities of extended resources to whole numbers... 0.5 ... invalid'; 'Extended resources cannot be overcommitted, so request and limit must be equal'."
+   },
+   {
+    "claim": "taints dedicate GPU nodes; node selectors target GPU types",
+    "method": "doc",
+    "evidence": "taint page 'Nodes with Special Hardware' and 'Dedicated Nodes'; gpus page 'use Node Labels and Node Selectors to schedule pods to appropriate nodes'."
+   },
+   {
+    "claim": "priority/preemption are core",
+    "method": "doc",
+    "evidence": "pod-priority-preemption: 'preemptionPolicy defaults to PreemptLowerPriority'."
+   },
+   {
+    "claim": "gang scheduling is an add-on beyond the core scheduler",
+    "method": "doc",
+    "evidence": "Gang Scheduling page: 'Gang scheduling ensures that a group of Pods are scheduled on an all-or-nothing basis' with a GangScheduling scheduler plugin behind the GenericWorkload feature gate -> claim outdated as an absolute."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "and are add-ons beyond the core scheduler",
+    "problem": "Recent Kubernetes versions document feature-gated gang scheduling in the core scheduler (Workload/PodGroup APIs); 'add-ons' is no longer universally true.",
+    "replacement": "and have mostly been provided by add-ons beyond the core scheduler (recent Kubernetes versions are adding feature-gated gang scheduling to the core scheduler, so check your cluster version)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Several rules plus fragmentation reasoning; application level.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "77 words, interview-ready, consistent with detailed"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "rules, fragmentation, design"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "pool layout, YAML and verification test"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "all discussed in the answer",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close (smi-k0025 is QLoRA/GPU count)",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus/",
+    "status": "supported",
+    "evidence": "'GPUs are only supposed to be specified in the limits section... You can specify GPU in both limits and requests but these two values must be equal.' ; 'use Node Labels and Node Selectors' (opened via the kubernetes/website or feast/tfx repo source of the page; the rendered kubernetes.io/WebFetch view returned only navigation text)"
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+    "status": "supported",
+    "evidence": "'The API server restricts quantities of extended resources to whole numbers.' ; 'Extended resources cannot be overcommitted, so request and limit must be equal' (opened via the kubernetes/website or feast/tfx repo source of the page; the rendered kubernetes.io/WebFetch view returned only navigation text)"
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/",
+    "status": "supported",
+    "evidence": "'Dedicated Nodes ... add a taint ... then add a corresponding toleration' and 'Nodes with Special Hardware (for example GPUs)' (opened via the kubernetes/website or feast/tfx repo source of the page; the rendered kubernetes.io/WebFetch view returned only navigation text)"
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Kubernetes Docs: Gang Scheduling",
+    "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/gang-scheduling/",
+    "supports": "Gang scheduling (all-or-nothing placement of a pod group) is now a feature-gated capability of the Kubernetes scheduler.",
+    "quote": "Gang scheduling ensures that a group of Pods are scheduled on an \"all-or-nothing\" basis.",
+    "type": "official_doc"
+   },
+   {
+    "title": "Kubernetes Docs: Pod Priority and Preemption",
+    "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/",
+    "supports": "Pod priority and preemption are core scheduler features and allow higher-priority pods to preempt lower-priority ones.",
+    "quote": "preemptionPolicy defaults to PreemptLowerPriority, which will allow pods of that PriorityClass to preempt lower-priority pods",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Fractional GPU sharing via time-slicing/partitioning is vendor-specific (already hedged)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-06-6",
+  "verdict": "correct",
+  "reasons": [
+   "All three applied hedges are correct and consistent with the practical replay (retry with higher memory request; manifest).",
+   "One sentence over-paraphrases the Jobs doc."
+  ],
+  "parts_answered": {
+   "properties each step needs": true,
+   "passing artifacts": true,
+   "caching": true,
+   "retries": true
+  },
+  "evidence": [
+   {
+    "claim": "same Job program may sometimes be started twice",
+    "method": "doc",
+    "evidence": "Job page: 'even if you specify .spec.parallelism = 1 and .spec.completions = 1 and restartPolicy = Never, the same program may sometimes be started twice.'"
+   },
+   {
+    "claim": "idempotency-key registration yields one version on duplicate call",
+    "method": "derivation",
+    "evidence": "get-or-create on key hash(run, artifact) returns existing version; the practical replay is consistent."
+   },
+   {
+    "claim": "object stores lack atomic directory rename",
+    "method": "background_only",
+    "evidence": "General storage knowledge; answer now conditions the claim."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "and the application must cope with being restarted",
+    "problem": "The Jobs page says the program may be started twice and that pods must be tolerant of concurrency when parallelism>1; it does not say that sentence. 'At-least-once' is the answer's own framing.",
+    "replacement": "so a step must tolerate duplicate runs"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Applied pipeline-reliability design with several interacting mechanisms but no deep derivation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "properties, artifacts, caching, retries"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "replay of both incidents with ids and keys"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "all discussed in the answer",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0009 (agent refund retry/idempotency) - different context",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/concepts/workloads/controllers/job/",
+    "status": "partially",
+    "evidence": "'the same program may sometimes be started twice' supported; 'applications must handle being restarted' is not stated verbatim (opened via the kubernetes/website or feast/tfx repo source of the page; the rendered kubernetes.io/WebFetch view returned only navigation text)"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Atomic rename guarantees per filesystem / object store; idempotency-key and cache-key patterns are engineering practice (hedged)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-07-1",
+  "verdict": "pass",
+  "reasons": [
+   "Applied hedges ('usually', 'typically') are correct and keep concise (78 words) consistent with detailed.",
+   "TFDV skew/drift definitions verified."
+  ],
+  "parts_answered": {
+   "definition of skew": true,
+   "definition of drift": true,
+   "concrete example": true,
+   "how to tell which": true
+  },
+  "evidence": [
+   {
+    "claim": "TFDV: skew between training and serving data; drift between consecutive spans",
+    "method": "doc",
+    "evidence": "'TensorFlow Data Validation can detect distribution skew between training and serving data.' ; 'Drift detection is supported between consecutive spans of data (i.e., between span N and span N+1)'; drift as L-infinity distance."
+   },
+   {
+    "claim": "row-by-row comparison of raw events through both paths isolates skew",
+    "method": "derivation",
+    "evidence": "Same inputs, different outputs implies pipeline difference, independent of the world changing."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Concept comparison plus a diagnostic procedure; short.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "78 words"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "diagnostic tests beyond concise"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "all discussed in the answer",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0005",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://www.tensorflow.org/tfx/guide/tfdv",
+    "status": "supported",
+    "evidence": "quotes above (tfx repo source of the page)"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-07-2",
+  "verdict": "pass",
+  "reasons": [
+   "Code re-run on 3.13, 3.10, 3.11: shipped test and my extras pass; fenced code identical to code.solution.",
+   "Correction to the detailed text is accurate."
+  ],
+  "parts_answered": {
+   "what is wrong": true,
+   "implementation": true,
+   "tie treatment": true
+  },
+  "evidence": [
+   {
+    "claim": "naive join leaks future rows",
+    "method": "executed",
+    "evidence": "naive_latest_join gives 9 for all u1 events in the test."
+   },
+   {
+    "claim": "Feast PIT join scans backward up to TTL",
+    "method": "doc",
+    "evidence": "'Feast will scan backward in time from the entity dataframe timestamp up to a maximum of the TTL time specified.'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short as-of join with bisect, TTL boundary and tie rule; standard pattern.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "leakage explanation, design and tie convention"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "tested code plus naive contrast"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "all discussed in the answer",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0001/smi-i0002 (leakage concept)",
+   "same_intent": false
+  },
+  "code_findings": "Ran sol+test on /home/claude/work/dep/v/bin/python (3.13.16), v310 (3.10.20), v311 (3.11.17): all 'ok'. My extra edges (all passed on all three): single-row ttl=0 exact match; 3-way timestamp tie, last wins; future-only row -> None; negative timestamps; float ttl boundary inclusive; stored value None; generator input for feature_rows; randomized comparison against brute force for ttl 0/5/100 over 60 events. Only stdlib (bisect, collections, random in test); no 3.11+ features. Limitation: a stored None is indistinguishable from 'missing' (acceptable, not stated).",
+  "sources_findings": [
+   {
+    "url": "https://docs.feast.dev/getting-started/concepts/point-in-time-joins",
+    "status": "supported",
+    "evidence": "'Feast is able to join features ... onto an entity dataframe in a point-in-time correct way.' ; 'Feast will scan backward in time ... up to a maximum of the TTL time specified.'"
+   },
+   {
+    "url": "https://docs.feast.dev/getting-started/concepts/feature-view",
+    "status": "supported",
+    "evidence": "'a TTL, which limits how far back Feast will look when generating historical datasets'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-07-3",
+  "verdict": "pass",
+  "reasons": [
+   "Applied wording edits are fine (concise 74 words; key concept 'shared feature definitions' matches).",
+   "Reasoned 'not yet' with explicit triggers; Feast claims supported."
+  ],
+  "parts_answered": {
+   "problems solved": true,
+   "why two stores": true,
+   "adopt here?": true,
+   "what would change answer": true
+  },
+  "evidence": [
+   {
+    "claim": "Feast ingests values into online store for real-time low-latency serving",
+    "method": "doc",
+    "evidence": "'Feast uses a Push Model to ingest data ... and store feature values in the online store. This allows Feast to serve features in real-time with low latency.'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Trade-off judgement with conceptual explanation; no computation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "74 words, gives the verdict"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "full rationale and triggers"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "all discussed in the answer",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010 (unrelated semantic-search design)",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://docs.feast.dev/getting-started/concepts/point-in-time-joins",
+    "status": "supported",
+    "evidence": "PIT-correct join onto entity dataframe"
+   },
+   {
+    "url": "https://docs.feast.dev/getting-started/architecture/overview",
+    "status": "supported",
+    "evidence": "push model ingestion to online store for 'real-time with low latency'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'materialization' as a generic term (Feast uses it; acceptable)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-07-4",
+  "verdict": "correct",
+  "reasons": [
+   "Corrections (key_concepts, DST wording, Feast alpha hedge) are accurate; the 25-hour-day explanation is right.",
+   "Two minor wording points in new text."
+  ],
+  "parts_answered": {
+   "single definition": true,
+   "at least three approaches with trade-offs": true,
+   "parity proof before/after": true
+  },
+  "evidence": [
+   {
+    "claim": "On-demand feature views execute Python in both historical and online retrieval; labelled Alpha",
+    "method": "doc",
+    "evidence": "feature-view page: '## [Alpha] On demand feature views ... python transformation logic which is executed in both the historical retrieval and online retrieval paths.'"
+   },
+   {
+    "claim": "clock change adding an hour makes a 720-hour window start an hour later than a 30-calendar-day window",
+    "method": "derivation",
+    "evidence": "A fall-back day has 25 h, so 30 calendar days = 721 h; 720 h starts 1 h later and misses an order in that hour."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "the fix is to specify the window in UTC calendar days in the shared definition",
+    "problem": "Picks one semantics unconditionally; the business meaning may be local calendar days or fixed hours. The point is to state it once, explicitly.",
+    "replacement": "the fix is to state the window explicitly in the shared definition (for example 30 calendar days in a named timezone, or 720 hours if that is what is meant) and implement it once"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(as an alpha-stage feature at the time of checking)",
+    "problem": "'at the time of checking' is awkward in an interview answer.",
+    "replacement": "(documented as an alpha feature)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open design comparing five approaches plus a parity-test proof strategy.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Compute once, publish to offline and online",
+    "tradeoff": "No second implementation; not for request-time inputs; freshness bound by pipeline latency"
+   },
+   {
+    "decision": "One shared function/library executed in both paths",
+    "tradeoff": "Single definition; same runtime and pinned versions needed; per-request latency"
+   },
+   {
+    "decision": "Declarative spec compiled to SQL and code",
+    "tradeoff": "Language independent; DSL and generator to maintain"
+   },
+   {
+    "decision": "Two implementations with parity tests",
+    "tradeoff": "Cheapest; only as good as test coverage"
+   },
+   {
+    "decision": "Log served features and train on logs",
+    "tradeoff": "No skew for logged features; needs history, bakes in bugs"
+   },
+   {
+    "decision": "Pin explicit semantics (window/timezone, rounding, null/unknown defaults, knowledge time)",
+    "tradeoff": "Small spec effort removes silent differences"
+   },
+   {
+    "decision": "Replay-based parity test before and in CI after",
+    "tradeoff": "Needs fixtures and compute"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "approaches and parity"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "test procedure, thresholds, worked DST bug"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "all discussed in the answer",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://docs.feast.dev/getting-started/concepts/feature-view",
+    "status": "supported",
+    "evidence": "'On demand feature views ... python transformation logic which is executed in both the historical retrieval and online retrieval paths' under heading '[Alpha] On demand feature views'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Thresholds (50,000 sample, 1e-6) are labelled hypothetical."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-07-5",
+  "verdict": "correct",
+  "reasons": [
+   "Mechanism right; 1-0.97^4 = 11.5% and 0.97^4 = 88.5% recomputed; applied hedge on deleted orders is right.",
+   "One 'Hence' sentence ignores that deleted orders push the gap the other way."
+  ],
+  "parts_answered": {
+   "mechanism": true,
+   "repair of training data": true,
+   "repair of process": true
+  },
+  "evidence": [
+   {
+    "claim": "1-0.97^4 ~ 11.5%; 0.97^4 ~ 88.5% (Poisson mean 4: 88.7%)",
+    "method": "executed",
+    "evidence": "python: 1-0.97**4=0.1147; 0.97**4=0.8853; exp(-0.12)=0.8869"
+   },
+   {
+    "claim": "every late order in a 24 h window is invisible at transaction time",
+    "method": "derivation",
+    "evidence": "order at time >= T-24h with delay >= 24 h arrives after T."
+   },
+   {
+    "claim": "worked example 09:00 and 11:00 orders: online 1, backfill 2",
+    "method": "derivation",
+    "evidence": "11:00 order arrives next day 14:00, after the 12:00 scoring."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Hence the logged online values are lower (late orders missing)",
+    "problem": "The preceding sentence also says deleted orders are excluded from the backfill; that pushes online values higher than backfilled ones, so 'Hence ... lower' follows only for late arrivals, and the net sign depends on which effect dominates.",
+    "replacement": "Hence the logged online values are lower because of the late orders (deleted orders push the other way, since online counts them and the backfill does not; the observed systematic gap implies late arrivals dominate)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Needs bitemporal reasoning (event vs knowledge time), numerical reasoning and a repair plan.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "mechanism and repair"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked example, probability, audit procedure"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "all discussed in the answer",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0006 (delayed chargeback labels) - different",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://docs.feast.dev/getting-started/concepts/point-in-time-joins",
+    "status": "not_supported",
+    "evidence": "Page covers event-timestamp PIT joins and TTL only; the answer's key point (knowledge/ingestion time, bitemporal) is not stated there and no sentence in the answer relies on it. Attachment is topical, not supportive."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Knowledge-time (loaded_at) reconstruction is general data-engineering practice; no authoritative page opened."
+  ],
+  "code_patch": null
+ }
+]

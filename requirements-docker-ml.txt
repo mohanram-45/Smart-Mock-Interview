@@ -1,0 +1,8 @@
+# OPTIONAL extras for the image, installed only with:  docker compose build --build-arg INSTALL_ML=1
+# They enable the legacy Sentence-BERT / Bi-LSTM scorers and the opt-in /api/retrieval/* search inside the container.
+# NOT pinned or built/verified in this repository's sandbox (multi-GB downloads). Model WEIGHTS are never baked into the image: they are
+# downloaded on first use into a volume (HF cache) or mounted. The default image does not need any of this.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.0.0
+sentence-transformers>=2.2.0
+faiss-cpu>=1.7.4

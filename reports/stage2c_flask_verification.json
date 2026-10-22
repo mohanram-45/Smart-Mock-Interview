@@ -1,0 +1,191 @@
+{
+  "results": [
+    {
+      "check": "semantic mode with real MiniLM",
+      "pass": true,
+      "detail": "first request 65864 ms (includes model load + index build/load)"
+    },
+    {
+      "check": "bubble sort paraphrase: smi-0453 first, quicksort smi-0452 in top 3",
+      "pass": true,
+      "detail": "['smi-0453', 'smi-0452', 'smi-0450', 'smi-0446', 'smi-h0032']"
+    },
+    {
+      "check": "selected format active, model/index loaded once across 51 requests",
+      "pass": true,
+      "detail": "{\"doc_mode\": \"qk_concise\", \"mode\": \"semantic\", \"semantic_loads\": 1}"
+    },
+    {
+      "check": "stable id <-> FAISS row mapping (666 ids in corpus order)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "domain + difficulty filters",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "metadata present and canonical answer redacted",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "session-context excludes the current question and returns 5 related",
+      "pass": true,
+      "detail": "smi-0191 -> ['smi-0071', 'smi-0041', 'smi-0031', 'smi-0092', 'smi-0084']"
+    },
+    {
+      "check": "bubble sort exact question: self best, quicksort smi-0452 in top 5 after excluding self",
+      "pass": true,
+      "detail": "['smi-0450', 'smi-0452', 'smi-0446', 'smi-0449', 'smi-h0032']"
+    },
+    {
+      "check": "explicit threshold flags off-topic as no_answer (no default threshold is validated)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "no dataset change",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "explicit BM25 fallback when the model cannot load",
+      "pass": true,
+      "detail": "bm25_fallback"
+    }
+  ],
+  "evidence": {
+    "bubble_paraphrase": [
+      {
+        "difficulty": "Easy",
+        "domain": "Python",
+        "key_concepts": [
+          "bubble sort",
+          "time complexity",
+          "O(n\u00b2)",
+          "adjacent elements"
+        ],
+        "question": "What is bubble sort and what is its time complexity?",
+        "question_id": "smi-0453",
+        "rank": 1,
+        "score": 0.730606,
+        "score_type": "cosine",
+        "topic": "Data structures and algorithms"
+      },
+      {
+        "difficulty": "Medium",
+        "domain": "Python",
+        "key_concepts": [
+          "quicksort",
+          "pivot",
+          "divide-and-conquer",
+          "partition",
+          "worst case"
+        ],
+        "question": "What is quicksort and how would you implement it in Python?",
+        "question_id": "smi-0452",
+        "rank": 2,
+        "score": 0.424591,
+        "score_type": "cosine",
+        "topic": "Data structures and algorithms"
+      },
+      {
+        "difficulty": "Easy",
+        "domain": "Python",
+        "key_concepts": [
+          "FizzBuzz",
+          "divisibility",
+          "modulo operator",
+          "if-elif chain ordering"
+        ],
+        "question": "Implement the fizzbuzz algorithm in Python.",
+        "question_id": "smi-0450",
+        "rank": 3,
+        "score": 0.38063,
+        "score_type": "cosine",
+        "topic": "Data structures and algorithms"
+      },
+      {
+        "difficulty": "Medium",
+        "domain": "Python",
+        "key_concepts": [
+          "queue",
+          "FIFO",
+          "collections.deque",
+          "popleft",
+          "list.pop(0) is O(n)",
+          "queue.Queue",
+          "maxlen"
+        ],
+        "question": "How do you implement a queue in Python?",
+        "question_id": "smi-0446",
+        "rank": 4,
+        "score": 0.362645,
+        "score_type": "cosine",
+        "topic": "Data structures and algorithms"
+      },
+      {
+        "difficulty": "Medium",
+        "domain": "Python",
+        "key_concepts": [
+          "time complexity O(n^2) vs O(n)",
+          "hash set",
+          "sorting and adjacent comparison",
+          "operation counting",
+          "hashability",
+          "space-time trade-off"
+        ],
+        "question": "This function is correct but too slow on large lists:\n\ndef has_duplicates_quadratic(items):\n    for i in range(len(items)):\n        for j in range(i + 1, len(items)):\n            if items[i] == items[j]:\n                return True\n    return False\n\nRewrite it as has_duplicates(items) running in O(n) expected time for hashable items, and as has_duplicates_sorted(items) for items that are orderable but not hashable (e.g. lists). Prove the complexity claim without wall-clock timing: write a wrapper class that counts __eq__ calls (and __hash__ / __lt__ calls) and show that on 200 unique items the quadratic version makes n(n-1)/2 comparisons while the hash version makes at most 2n hash calls and fewer than n equality calls. Finally, when would sorting beat hashing?",
+        "question_id": "smi-h0032",
+        "rank": 5,
+        "score": 0.347611,
+        "score_type": "cosine",
+        "topic": "Data structures and algorithms"
+      }
+    ],
+    "warm_latency_ms": {
+      "n": 50,
+      "p50": 8.79,
+      "p95": 9.95
+    },
+    "status": {
+      "backend": "minilm",
+      "bm25_fallback_doc_mode": "qka",
+      "corpus_ok": true,
+      "corpus_sha256": "db776e9fa135384ae26ba84263b0fbe8a66b326367977b0b97d2f278e4c6e7ef",
+      "default_question_source": "legacy",
+      "degraded_reason": null,
+      "doc_mode": "qk_concise",
+      "domains": [
+        "Data Analysis",
+        "Deep Learning",
+        "Generative AI & RAG",
+        "MLOps & Model Deployment",
+        "Machine Learning",
+        "NLP",
+        "Python",
+        "SQL"
+      ],
+      "index_rebuilt": true,
+      "mode": "semantic",
+      "model": "sentence-transformers/all-MiniLM-L6-v2",
+      "n_records": 666,
+      "requests_served": 51,
+      "semantic_loads": 1,
+      "timings_s": {
+        "corpus_load_s": 0.092,
+        "index_ready_s": 25.502,
+        "model_load_s": 39.232
+      }
+    },
+    "legacy_scorer_load_s": {
+      "first_get_scorer_bert": 0.68,
+      "second": 0.0
+    },
+    "legacy_start_after_warm_s": 0.02,
+    "legacy_start_status": 200
+  },
+  "all_pass": true
+}

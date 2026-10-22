@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Settings · SMART Mock Interview{% endblock %}
+{% block page %}settings{% endblock %}
+{% block body %}
+<div class="page-head"><div><h1>Settings</h1><p>What each way of evaluating an answer does, which ones are available on this computer, and your saved data.</p></div></div>
+
+<div class="section-title first"><h2>Evaluation methods</h2></div>
+<div class="rows" id="methods">
+  <div><div><h3>Similarity score <span class="tag on">Sentence-BERT only</span></h3></div>
+    <div><p>Compares your answer with a reference answer and gives a percentage. It measures closeness of wording and meaning, not correctness, and has not been checked against human markers. It appears only in the optional technical details of your feedback. New interviews use Sentence-BERT only: if it cannot load, the similarity is reported unavailable and no other scorer steps in.</p>
+      {% for m in st.legacy_models %}<p><strong>{{ m.label }}</strong><span class="tag on">used for every new interview</span>: {% if m.ready %}ready.{% else %}needs one-time setup. {{ m.not_ready_reason }}{% if m.setup_hint %} <code class="cmd">{{ m.setup_hint }}</code>{% endif %}{% endif %}</p>{% else %}<p class="muted">The question bank is unavailable, so no scorer status can be shown.</p>{% endfor %}</div></div>
+  <div><div><h3>Concept check <span class="tag exp">experimental · opt-in</span></h3></div>
+    <div><p>Checks which required concepts your answer states, using your own words as evidence. A number appears only for the few questions that allow one and only when the evidence is sufficient. Choose it below (internal setting); it applies to the interviews you start from this browser. It never changes which questions you get.</p>
+      <p><strong>Mock verifier:</strong> {% if 'mock' in st.modular_modes %}available. A word-overlap stand-in that tests the pipeline and says nothing about answer quality.{% else %}not available.{% endif %}</p>
+      <p><strong>Local model (Ollama, qwen2.5:7b):</strong> {% if 'live' in st.modular_modes %}turned on for this server. Slow, runs only on this computer, and its results are not validated.{% else %}off. To turn it on, start the app with:<code class="cmd">run_demo.bat --live-model</code>{% endif %}</p></div></div>
+  <div><div><h3>Code check <span class="tag exp">experimental · opt-in</span></h3></div>
+    <div><p>{{ code.text }} It gives no score.</p>
+      <p><strong>Status:</strong> {% if code.enabled %}turned on for this server ({{ code.questions|length }} questions have a code check).{% else %}off. To turn it on, start the app with:<code class="cmd">run_demo.bat --code-check</code>{% endif %}</p>
+      <p><strong>Running your code:</strong> {% if code.execution_requested %}a locked-down Docker sandbox was requested and is used only if its self-test passes.{% else %}never. Your code is read as text, and nothing is ever executed inside the web server.{% endif %}</p></div></div>
+  <div><div><h3>Reference answers</h3></div>
+    <div><p>{% if expose_reference %}Shown on summaries for this server (<code>SMART_RETRIEVAL_EXPOSE_REFERENCE=1</code>).{% else %}Hidden by default, so a practice question stays a practice question.{% endif %}</p></div></div>
+</div>
+<p class="muted small">Experimental results are always labelled, shown apart from the similarity score, and never used as a grade.</p>
+
+<div class="section-title"><h2>Your preferences</h2><span class="muted">Stored in this browser only</span></div>
+<form class="rows" id="prefs-form" onsubmit="return false">
+  <div><div><h3>Experimental concept check <span class="tag exp">internal</span></h3></div>
+    <div><div class="pref"><label for="pref-modular">Mode for new interviews</label><select id="pref-modular"><option value="off" selected>Off (default)</option>{% if 'mock' in st.modular_modes %}<option value="mock">Mock verifier (tests the pipeline, not answer quality)</option>{% endif %}{% if 'live' in st.modular_modes %}<option value="live">Local model (Ollama; slow)</option>{% endif %}</select></div>
+      <p>Interview length, difficulty progression and the scorer are not choices any more: every interview uses the standard plan and Sentence-BERT. Experimental evaluation is always off until you turn it on here, and its results stay apart from your feedback.</p></div></div>
+  <div><div><h3>Follow-up questions <span class="tag exp">experimental</span></h3></div>
+    <div><div class="pref"><label for="pref-followup">Follow-ups for new interviews</label><select id="pref-followup"><option value="deterministic" selected>Standard (default): chosen from the curated question bank</option>{% if 'mock' in st.followup_modes %}<option value="mock">Mock (word rules; tests the feature, not a model)</option>{% endif %}{% if 'live' in st.followup_modes %}<option value="live">Local model ({{ st.followup_model }}) reads your answer (experimental)</option>{% endif %}</select></div>
+      <p>The local model may write one follow-up based on what you actually said. Every question it proposes is checked by fixed rules, and if the model is slow, offline or the question fails a check, the standard follow-up is used instead. Quality has not been reviewed by humans.{% if 'live' not in st.followup_modes %} To turn it on, start the app with <code class="cmd">run_demo.bat --live-model</code>.{% endif %}</p></div></div>
+  <div><div><h3>Timer</h3></div>
+    <div><div class="pref"><input type="checkbox" id="pref-timer" checked><label for="pref-timer">Show the timer during an interview</label></div>
+      <p>The timer only counts up. It never ends or penalises an answer. Time is still recorded for your history.</p></div></div>
+  <div><div></div><div><button class="btn primary sm" id="prefs-save" type="button">Save preferences</button><span class="saved hidden" id="prefs-saved" role="status">Saved</span></div></div>
+</form>
+
+<div class="section-title"><h2>Your data</h2></div>
+<div class="rows">
+  <div><div><h3>Where it is kept</h3></div><div><p>Interviews, answers and timings are stored as small files in <code>{{ data_dir }}</code> on this computer and removed after {{ '%g'|format(retention) }} days. Nothing is uploaded. Answer text is not written to logs or metrics.</p></div></div>
+  <div><div><h3>Erase everything</h3></div><div>{% if history_ok %}<p>Deletes every saved interview from this computer. This cannot be undone.</p><button class="btn danger sm" id="erase-all" type="button">Delete all saved interviews</button><span class="muted small" id="erase-note" role="status"></span>{% else %}<p>Not available from this client. Use the computer the app runs on.</p>{% endif %}</div></div>
+</div>
+{% endblock %}

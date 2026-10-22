@@ -1,0 +1,631 @@
+round,plan_id,field,old,new,severity_or_origin
+round1,B3-MLO-01-2,answer,and most of the extra dependencies fail silently,and many of the extra dependencies fail silently,minor
+round1,B3-MLO-01-3,detailed_answer,"a 0.013 gap is roughly 2.6 standard deviations for a single comparison, which is suggestive but not conclusive","a 0.013 gap is about 2.6 seed SDs if the old number is treated as exact, but only about 1.8 SDs (0.013 / (0.005 x 1.41)) when both numbers are single runs: suggestive but not conclusive",minor
+round1,B3-MLO-01-3,practical_answer,which is more than two standard deviations of the seed noise,which is about 3.5 standard errors of the difference between two 5-seed means (0.005 x sqrt(2/5) = 0.0032),minor
+round1,B3-MLO-01-4,detailed_answer,hash-randomised set or dict iteration order,hash-randomised iteration order of sets of strings (PYTHONHASHSEED),minor
+round1,B3-MLO-01-5,detailed_answer,"A plain file bucket has none of this: no immutability guarantee, no pointer semantics, no approval trail, no link to evidence.","A plain file bucket typically has none of this by default: no enforced immutability (unless object lock or versioning is configured and used consistently), no pointer semantics, no approval trail, no link to evidence.",minor
+round1,B3-MLO-01-6,detailed_answer,"- Directory hashes: the hash of a directory is a hash of its listing, so adding one file changes the directory hash but leaves the other files' objects shared.","- Directory entries: a directory is represented by a manifest (in DVC a .dir entry) that lists its files and their hashes, so adding one file changes the directory entry but leaves the other files' objects shared.",minor
+round1,B3-MLO-01-6,practical_answer,"- Weekly full copies for a year: 52 x 400 GB = 20.8 TB, on top of the original 400 GB if the first copy is counted separately.",- Weekly full copies for a year: 52 x 400 GB = 20.8 TB (21.2 TB if the initial copy is counted as well).,minor
+round1,B3-MLO-01-7,practical_answer,"here the paired lower end is well above it, but the independent analysis would not be.","here the paired 95% t-interval lower end (about 0.0028) clears it, but the independent analysis (lower end about -0.004) would not.",minor
+round1,B3-MLO-02-2,practical_answer,"import math
+
+
+def _is_null(v):
+    return v is None or (isinstance(v, float) and math.isnan(v))
+
+
+def _type_ok(v, t):
+    if t == ""int"":
+        return isinstance(v, int) and not isinstance(v, bool)
+    if t == ""float"":
+        return isinstance(v, (int, float)) and not isinstance(v, bool)
+    if t == ""str"":
+        return isinstance(v, str)
+    raise ValueError(""unknown type: "" + str(t))
+
+
+def validate_batch(rows, schema):
+    """"""Return a list of violation dicts; an empty list means the batch is clean.
+
+    schema maps column -> dict with optional keys: type ('int'|'float'|'str'),
+    min, max, allowed (collection), max_null_rate (default 0.0),
+    severity ('error' or 'warn', default 'error').
+    A missing key or None/NaN counts as null.
+    """"""
+    if not rows:
+        return [{""column"": None, ""check"": ""empty_batch"", ""severity"": ""error"",
+                 ""detail"": ""no rows""}]
+    out = []
+    n = len(rows)
+    for col in sorted(schema):
+        spec = schema[col]
+        sev = spec.get(""severity"", ""error"")
+        if not any(col in r for r in rows):
+            out.append({""column"": col, ""check"": ""missing_column"",
+                        ""severity"": ""error"", ""detail"": ""absent from every row""})
+            continue
+        values = [r.get(col) for r in rows]
+        non_null = [v for v in values if not _is_null(v)]
+        null_rate = 1 - len(non_null) / n
+        if null_rate > spec.get(""max_null_rate"", 0.0):
+            out.append({""column"": col, ""check"": ""null_rate"", ""severity"": sev,
+                        ""detail"": ""null rate %.3f > %.3f""
+                        % (null_rate, spec.get(""max_null_rate"", 0.0))})
+        if ""type"" in spec:
+            bad = [v for v in non_null if not _type_ok(v, spec[""type""])]
+            if bad:
+                out.append({""column"": col, ""check"": ""type"", ""severity"": ""error"",
+                            ""detail"": ""%d value(s) not %s"" % (len(bad), spec[""type""])})
+                continue
+        if ""min"" in spec or ""max"" in spec:
+            lo = spec.get(""min"", -math.inf)
+            hi = spec.get(""max"", math.inf)
+            bad = [v for v in non_null
+                   if not (isinstance(v, (int, float)) and not isinstance(v, bool)
+                           and lo <= v <= hi)]
+            if bad:
+                out.append({""column"": col, ""check"": ""range"", ""severity"": sev,
+                            ""detail"": ""%d value(s) outside [%s, %s]"" % (len(bad), lo, hi)})
+        if ""allowed"" in spec:
+            allowed = set(spec[""allowed""])
+            bad = [v for v in non_null if v not in allowed]
+            if bad:
+                out.append({""column"": col, ""check"": ""allowed"", ""severity"": sev,
+                            ""detail"": ""unseen values: %s"" % sorted(set(map(str, bad)))})
+    return out
+
+
+def has_errors(violations):
+    return any(v[""severity""] == ""error"" for v in violations)","import math
+
+
+def _is_null(v):
+    return v is None or v != v
+
+
+def _type_ok(v, t):
+    if t == ""int"":
+        return isinstance(v, int) and not isinstance(v, bool)
+    if t == ""float"":
+        return isinstance(v, (int, float)) and not isinstance(v, bool)
+    if t == ""str"":
+        return isinstance(v, str)
+    raise ValueError(""unknown type: "" + str(t))
+
+
+def validate_batch(rows, schema):
+    """"""Return a list of violation dicts; an empty list means the batch is clean.
+
+    schema maps column -> dict with optional keys: type ('int'|'float'|'str'),
+    min, max, allowed (collection), max_null_rate (default 0.0),
+    severity ('error' or 'warn', default 'error').
+    A missing key or None/NaN counts as null.
+    """"""
+    if not rows:
+        return [{""column"": None, ""check"": ""empty_batch"", ""severity"": ""error"",
+                 ""detail"": ""no rows""}]
+    out = []
+    n = len(rows)
+    for col in sorted(schema):
+        spec = schema[col]
+        sev = spec.get(""severity"", ""error"")
+        if not any(col in r for r in rows):
+            out.append({""column"": col, ""check"": ""missing_column"",
+                        ""severity"": ""error"", ""detail"": ""absent from every row""})
+            continue
+        values = [r.get(col) for r in rows]
+        non_null = [v for v in values if not _is_null(v)]
+        null_rate = (n - len(non_null)) / n
+        if null_rate > spec.get(""max_null_rate"", 0.0):
+            out.append({""column"": col, ""check"": ""null_rate"", ""severity"": sev,
+                        ""detail"": ""null rate %.3f > %.3f""
+                        % (null_rate, spec.get(""max_null_rate"", 0.0))})
+        if ""type"" in spec:
+            bad = [v for v in non_null if not _type_ok(v, spec[""type""])]
+            if bad:
+                out.append({""column"": col, ""check"": ""type"", ""severity"": ""error"",
+                            ""detail"": ""%d value(s) not %s"" % (len(bad), spec[""type""])})
+                continue
+        if ""min"" in spec or ""max"" in spec:
+            lo = spec.get(""min"", -math.inf)
+            hi = spec.get(""max"", math.inf)
+            bad = [v for v in non_null
+                   if not (isinstance(v, (int, float)) and not isinstance(v, bool)
+                           and lo <= v <= hi)]
+            if bad:
+                out.append({""column"": col, ""check"": ""range"", ""severity"": sev,
+                            ""detail"": ""%d value(s) outside [%s, %s]"" % (len(bad), lo, hi)})
+        if ""allowed"" in spec:
+            allowed = set(spec[""allowed""])
+            bad = [v for v in non_null if v not in allowed]
+            if bad:
+                out.append({""column"": col, ""check"": ""allowed"", ""severity"": sev,
+                            ""detail"": ""unseen values: %s"" % sorted(set(map(str, bad)))})
+    return out
+
+
+def has_errors(violations):
+    return any(v[""severity""] == ""error"" for v in violations)",major
+round1,B3-MLO-02-2,code.solution,"import math
+
+
+def _is_null(v):
+    return v is None or (isinstance(v, float) and math.isnan(v))
+
+
+def _type_ok(v, t):
+    if t == ""int"":
+        return isinstance(v, int) and not isinstance(v, bool)
+    if t == ""float"":
+        return isinstance(v, (int, float)) and not isinstance(v, bool)
+    if t == ""str"":
+        return isinstance(v, str)
+    raise ValueError(""unknown type: "" + str(t))
+
+
+def validate_batch(rows, schema):
+    """"""Return a list of violation dicts; an empty list means the batch is clean.
+
+    schema maps column -> dict with optional keys: type ('int'|'float'|'str'),
+    min, max, allowed (collection), max_null_rate (default 0.0),
+    severity ('error' or 'warn', default 'error').
+    A missing key or None/NaN counts as null.
+    """"""
+    if not rows:
+        return [{""column"": None, ""check"": ""empty_batch"", ""severity"": ""error"",
+                 ""detail"": ""no rows""}]
+    out = []
+    n = len(rows)
+    for col in sorted(schema):
+        spec = schema[col]
+        sev = spec.get(""severity"", ""error"")
+        if not any(col in r for r in rows):
+            out.append({""column"": col, ""check"": ""missing_column"",
+                        ""severity"": ""error"", ""detail"": ""absent from every row""})
+            continue
+        values = [r.get(col) for r in rows]
+        non_null = [v for v in values if not _is_null(v)]
+        null_rate = 1 - len(non_null) / n
+        if null_rate > spec.get(""max_null_rate"", 0.0):
+            out.append({""column"": col, ""check"": ""null_rate"", ""severity"": sev,
+                        ""detail"": ""null rate %.3f > %.3f""
+                        % (null_rate, spec.get(""max_null_rate"", 0.0))})
+        if ""type"" in spec:
+            bad = [v for v in non_null if not _type_ok(v, spec[""type""])]
+            if bad:
+                out.append({""column"": col, ""check"": ""type"", ""severity"": ""error"",
+                            ""detail"": ""%d value(s) not %s"" % (len(bad), spec[""type""])})
+                continue
+        if ""min"" in spec or ""max"" in spec:
+            lo = spec.get(""min"", -math.inf)
+            hi = spec.get(""max"", math.inf)
+            bad = [v for v in non_null
+                   if not (isinstance(v, (int, float)) and not isinstance(v, bool)
+                           and lo <= v <= hi)]
+            if bad:
+                out.append({""column"": col, ""check"": ""range"", ""severity"": sev,
+                            ""detail"": ""%d value(s) outside [%s, %s]"" % (len(bad), lo, hi)})
+        if ""allowed"" in spec:
+            allowed = set(spec[""allowed""])
+            bad = [v for v in non_null if v not in allowed]
+            if bad:
+                out.append({""column"": col, ""check"": ""allowed"", ""severity"": sev,
+                            ""detail"": ""unseen values: %s"" % sorted(set(map(str, bad)))})
+    return out
+
+
+def has_errors(violations):
+    return any(v[""severity""] == ""error"" for v in violations)","import math
+
+
+def _is_null(v):
+    return v is None or v != v
+
+
+def _type_ok(v, t):
+    if t == ""int"":
+        return isinstance(v, int) and not isinstance(v, bool)
+    if t == ""float"":
+        return isinstance(v, (int, float)) and not isinstance(v, bool)
+    if t == ""str"":
+        return isinstance(v, str)
+    raise ValueError(""unknown type: "" + str(t))
+
+
+def validate_batch(rows, schema):
+    """"""Return a list of violation dicts; an empty list means the batch is clean.
+
+    schema maps column -> dict with optional keys: type ('int'|'float'|'str'),
+    min, max, allowed (collection), max_null_rate (default 0.0),
+    severity ('error' or 'warn', default 'error').
+    A missing key or None/NaN counts as null.
+    """"""
+    if not rows:
+        return [{""column"": None, ""check"": ""empty_batch"", ""severity"": ""error"",
+                 ""detail"": ""no rows""}]
+    out = []
+    n = len(rows)
+    for col in sorted(schema):
+        spec = schema[col]
+        sev = spec.get(""severity"", ""error"")
+        if not any(col in r for r in rows):
+            out.append({""column"": col, ""check"": ""missing_column"",
+                        ""severity"": ""error"", ""detail"": ""absent from every row""})
+            continue
+        values = [r.get(col) for r in rows]
+        non_null = [v for v in values if not _is_null(v)]
+        null_rate = (n - len(non_null)) / n
+        if null_rate > spec.get(""max_null_rate"", 0.0):
+            out.append({""column"": col, ""check"": ""null_rate"", ""severity"": sev,
+                        ""detail"": ""null rate %.3f > %.3f""
+                        % (null_rate, spec.get(""max_null_rate"", 0.0))})
+        if ""type"" in spec:
+            bad = [v for v in non_null if not _type_ok(v, spec[""type""])]
+            if bad:
+                out.append({""column"": col, ""check"": ""type"", ""severity"": ""error"",
+                            ""detail"": ""%d value(s) not %s"" % (len(bad), spec[""type""])})
+                continue
+        if ""min"" in spec or ""max"" in spec:
+            lo = spec.get(""min"", -math.inf)
+            hi = spec.get(""max"", math.inf)
+            bad = [v for v in non_null
+                   if not (isinstance(v, (int, float)) and not isinstance(v, bool)
+                           and lo <= v <= hi)]
+            if bad:
+                out.append({""column"": col, ""check"": ""range"", ""severity"": sev,
+                            ""detail"": ""%d value(s) outside [%s, %s]"" % (len(bad), lo, hi)})
+        if ""allowed"" in spec:
+            allowed = set(spec[""allowed""])
+            bad = [v for v in non_null if v not in allowed]
+            if bad:
+                out.append({""column"": col, ""check"": ""allowed"", ""severity"": sev,
+                            ""detail"": ""unseen values: %s"" % sorted(set(map(str, bad)))})
+    return out
+
+
+def has_errors(violations):
+    return any(v[""severity""] == ""error"" for v in violations)",major
+round1,B3-MLO-02-2,code_patch.solution,"import math
+
+
+def _is_null(v):
+    return v is None or v != v
+
+
+def _type_ok(v, ","import math
+
+
+def _is_null(v):
+    return v is None or v != v
+
+
+def _type_ok(v, "
+round1,B3-MLO-02-2,code_patch.test,"SCHEMA = {
+    ""age"": {""type"": ""int"", ""min"": 18, ""max"": 100},
+    ""basket"": {""ty","SCHEMA = {
+    ""age"": {""type"": ""int"", ""min"": 18, ""max"": 100},
+    ""basket"": {""ty"
+round1,B3-MLO-02-3,practical_answer,"pass if the interval is [0.001, 0.009]; fail if it includes 0","pass (hypothetical 95% interval [0.001, 0.009] excludes 0); it would fail if the interval included 0",minor
+round1,B3-MLO-02-3,practical_answer,"Outcome: rejected on the new-customer slice and on calibration, even though the headline metric improved.","Outcome: rejected on the new-customer slice and on calibration, even though the headline metric improved (overall AUC is not a size-weighted average of slice AUCs, because it also depends on how scores rank across slices, so the pattern is possible).",minor
+round1,B3-MLO-02-4,practical_answer,"import math
+
+
+def promotion_gate(candidate, baseline, min_improvement=0.002, slice_tolerance=0.01,
+                   min_slice_n=200, z=1.96):
+    """"""Compare candidate vs baseline on a higher-is-better metric.
+
+    Each side: {""overall"": (value, std_err),
+                ""slices"": {name: (value, std_err, n)}}.
+    Independent standard errors are assumed (conservative when both models are
+    scored on the same examples). Returns {""decision"", ""reasons""} where
+    decision is 'promote', 'reject' or 'needs_review'.
+    """"""
+    reasons = []
+    hard_fail = False
+    review = False
+
+    c_val, c_se = candidate[""overall""]
+    b_val, b_se = baseline[""overall""]
+    diff = c_val - b_val
+    se = math.sqrt(c_se ** 2 + b_se ** 2)
+    lower = diff - z * se
+    if diff < min_improvement:
+        hard_fail = True
+        reasons.append(""overall gain %.4f below minimum %.4f"" % (diff, min_improvement))
+    elif lower <= 0:
+        hard_fail = True
+        reasons.append(""overall gain %.4f not distinguishable from 0 (lower bound %.4f)""
+                       % (diff, lower))
+
+    cand_slices = candidate.get(""slices"", {})
+    for name in sorted(baseline.get(""slices"", {})):
+        b_s_val, _b_s_se, b_n = baseline[""slices""][name]
+        if name not in cand_slices:
+            hard_fail = True
+            reasons.append(""slice %s missing from candidate"" % name)
+            continue
+        c_s_val, _c_s_se, c_n = cand_slices[name]
+        s_diff = c_s_val - b_s_val
+        if s_diff < -slice_tolerance:
+            if min(b_n, c_n) >= min_slice_n:
+                hard_fail = True
+                reasons.append(""slice %s regressed by %.4f (n=%d)"" % (name, -s_diff, min(b_n, c_n)))
+            else:
+                review = True
+                reasons.append(""slice %s regressed by %.4f but n=%d < %d: inconclusive""
+                               % (name, -s_diff, min(b_n, c_n), min_slice_n))
+
+    if hard_fail:
+        return {""decision"": ""reject"", ""reasons"": reasons}
+    if review:
+        return {""decision"": ""needs_review"", ""reasons"": reasons}
+    return {""decision"": ""promote"", ""reasons"": [""all checks passed""]}","import math
+
+
+def promotion_gate(candidate, baseline, min_improvement=0.002, slice_tolerance=0.01,
+                   min_slice_n=200, z=1.96):
+    """"""Compare candidate vs baseline on a higher-is-better metric.
+
+    Each side: {""overall"": (value, std_err),
+                ""slices"": {name: (value, std_err, n)}}.
+    Independent standard errors are assumed (conservative when both models are
+    scored on the same examples). Returns {""decision"", ""reasons""} where
+    decision is 'promote', 'reject' or 'needs_review'.
+    """"""
+    reasons = []
+    hard_fail = False
+    review = False
+
+    eps = 1e-12  # absorbs float rounding at exact thresholds
+    c_val, c_se = candidate[""overall""]
+    b_val, b_se = baseline[""overall""]
+    diff = c_val - b_val
+    se = math.sqrt(c_se ** 2 + b_se ** 2)
+    lower = diff - z * se
+    if not all(math.isfinite(x) for x in (c_val, c_se, b_val, b_se)):
+        hard_fail = True  # NaN/inf would make every comparison False and slip through
+        reasons.append(""overall value or standard error is not finite"")
+    elif diff < min_improvement - eps:
+        hard_fail = True
+        reasons.append(""overall gain %.4f below minimum %.4f"" % (diff, min_improvement))
+    elif lower <= 0:
+        hard_fail = True
+        reasons.append(""overall gain %.4f not distinguishable from 0 (lower bound %.4f)""
+                       % (diff, lower))
+
+    cand_slices = candidate.get(""slices"", {})
+    for name in sorted(baseline.get(""slices"", {})):
+        b_s_val, _b_s_se, b_n = baseline[""slices""][name]
+        if name not in cand_slices:
+            hard_fail = True
+            reasons.append(""slice %s missing from candidate"" % name)
+            continue
+        c_s_val, _c_s_se, c_n = cand_slices[name]
+        if not (math.isfinite(b_s_val) and math.isfinite(c_s_val)):
+            hard_fail = True
+            reasons.append(""slice %s has a non-finite value"" % name)
+            continue
+        s_diff = c_s_val - b_s_val
+        if s_diff < -slice_tolerance - eps:
+            if b_n >= min_slice_n:
+                hard_fail = True
+                reasons.append(""slice %s regressed by %.4f (n=%d)"" % (name, -s_diff, b_n))
+            else:
+                review = True
+                reasons.append(""slice %s regressed by %.4f but n=%d < %d: inconclusive""
+                               % (name, -s_diff, b_n, min_slice_n))
+
+    if hard_fail:
+        return {""decision"": ""reject"", ""reasons"": reasons}
+    if review:
+        return {""decision"": ""needs_review"", ""reasons"": reasons}
+    return {""decision"": ""promote"", ""reasons"": [""all checks passed""]}",major
+round1,B3-MLO-02-4,code.solution,"import math
+
+
+def promotion_gate(candidate, baseline, min_improvement=0.002, slice_tolerance=0.01,
+                   min_slice_n=200, z=1.96):
+    """"""Compare candidate vs baseline on a higher-is-better metric.
+
+    Each side: {""overall"": (value, std_err),
+                ""slices"": {name: (value, std_err, n)}}.
+    Independent standard errors are assumed (conservative when both models are
+    scored on the same examples). Returns {""decision"", ""reasons""} where
+    decision is 'promote', 'reject' or 'needs_review'.
+    """"""
+    reasons = []
+    hard_fail = False
+    review = False
+
+    c_val, c_se = candidate[""overall""]
+    b_val, b_se = baseline[""overall""]
+    diff = c_val - b_val
+    se = math.sqrt(c_se ** 2 + b_se ** 2)
+    lower = diff - z * se
+    if diff < min_improvement:
+        hard_fail = True
+        reasons.append(""overall gain %.4f below minimum %.4f"" % (diff, min_improvement))
+    elif lower <= 0:
+        hard_fail = True
+        reasons.append(""overall gain %.4f not distinguishable from 0 (lower bound %.4f)""
+                       % (diff, lower))
+
+    cand_slices = candidate.get(""slices"", {})
+    for name in sorted(baseline.get(""slices"", {})):
+        b_s_val, _b_s_se, b_n = baseline[""slices""][name]
+        if name not in cand_slices:
+            hard_fail = True
+            reasons.append(""slice %s missing from candidate"" % name)
+            continue
+        c_s_val, _c_s_se, c_n = cand_slices[name]
+        s_diff = c_s_val - b_s_val
+        if s_diff < -slice_tolerance:
+            if min(b_n, c_n) >= min_slice_n:
+                hard_fail = True
+                reasons.append(""slice %s regressed by %.4f (n=%d)"" % (name, -s_diff, min(b_n, c_n)))
+            else:
+                review = True
+                reasons.append(""slice %s regressed by %.4f but n=%d < %d: inconclusive""
+                               % (name, -s_diff, min(b_n, c_n), min_slice_n))
+
+    if hard_fail:
+        return {""decision"": ""reject"", ""reasons"": reasons}
+    if review:
+        return {""decision"": ""needs_review"", ""reasons"": reasons}
+    return {""decision"": ""promote"", ""reasons"": [""all checks passed""]}","import math
+
+
+def promotion_gate(candidate, baseline, min_improvement=0.002, slice_tolerance=0.01,
+                   min_slice_n=200, z=1.96):
+    """"""Compare candidate vs baseline on a higher-is-better metric.
+
+    Each side: {""overall"": (value, std_err),
+                ""slices"": {name: (value, std_err, n)}}.
+    Independent standard errors are assumed (conservative when both models are
+    scored on the same examples). Returns {""decision"", ""reasons""} where
+    decision is 'promote', 'reject' or 'needs_review'.
+    """"""
+    reasons = []
+    hard_fail = False
+    review = False
+
+    eps = 1e-12  # absorbs float rounding at exact thresholds
+    c_val, c_se = candidate[""overall""]
+    b_val, b_se = baseline[""overall""]
+    diff = c_val - b_val
+    se = math.sqrt(c_se ** 2 + b_se ** 2)
+    lower = diff - z * se
+    if not all(math.isfinite(x) for x in (c_val, c_se, b_val, b_se)):
+        hard_fail = True  # NaN/inf would make every comparison False and slip through
+        reasons.append(""overall value or standard error is not finite"")
+    elif diff < min_improvement - eps:
+        hard_fail = True
+        reasons.append(""overall gain %.4f below minimum %.4f"" % (diff, min_improvement))
+    elif lower <= 0:
+        hard_fail = True
+        reasons.append(""overall gain %.4f not distinguishable from 0 (lower bound %.4f)""
+                       % (diff, lower))
+
+    cand_slices = candidate.get(""slices"", {})
+    for name in sorted(baseline.get(""slices"", {})):
+        b_s_val, _b_s_se, b_n = baseline[""slices""][name]
+        if name not in cand_slices:
+            hard_fail = True
+            reasons.append(""slice %s missing from candidate"" % name)
+            continue
+        c_s_val, _c_s_se, c_n = cand_slices[name]
+        if not (math.isfinite(b_s_val) and math.isfinite(c_s_val)):
+            hard_fail = True
+            reasons.append(""slice %s has a non-finite value"" % name)
+            continue
+        s_diff = c_s_val - b_s_val
+        if s_diff < -slice_tolerance - eps:
+            if b_n >= min_slice_n:
+                hard_fail = True
+                reasons.append(""slice %s regressed by %.4f (n=%d)"" % (name, -s_diff, b_n))
+            else:
+                review = True
+                reasons.append(""slice %s regressed by %.4f but n=%d < %d: inconclusive""
+                               % (name, -s_diff, b_n, min_slice_n))
+
+    if hard_fail:
+        return {""decision"": ""reject"", ""reasons"": reasons}
+    if review:
+        return {""decision"": ""needs_review"", ""reasons"": reasons}
+    return {""decision"": ""promote"", ""reasons"": [""all checks passed""]}",major
+round1,B3-MLO-02-4,detailed_answer,"- A slice missing from the candidate's evaluation is a hard failure: fail closed, because a missing metric often means a broken evaluation job.","- A slice missing from the candidate's evaluation, and any NaN or infinite metric, is a hard failure: fail closed, because a missing metric often means a broken evaluation job and a NaN makes every comparison False, which would otherwise read as a pass.",minor
+round1,B3-MLO-02-4,code_patch.solution,"import math
+
+
+def promotion_gate(candidate, baseline, min_improvement=0.002, sli","import math
+
+
+def promotion_gate(candidate, baseline, min_improvement=0.002, sli"
+round1,B3-MLO-02-4,code_patch.test,"base = {""overall"": (0.900, 0.002),
+        ""slices"": {""new_users"": (0.850, 0.010","base = {""overall"": (0.900, 0.002),
+        ""slices"": {""new_users"": (0.850, 0.010"
+round1,B3-MLO-02-5,practical_answer,"I measured the spread in a toy setup (NumPy logistic regression trained by SGD for 3 epochs, 200 training rows and a fixed 100-row validation set, 200 different seeds for initial weights and sample order; numbers will differ for your model):","Illustrative numbers (a hypothetical toy setup: NumPy logistic regression trained by SGD for 3 epochs, 200 training rows, a fixed 100-row validation set, 200 seeds; they are not reproduced here and will differ for your model, so measure your own):",major
+round1,B3-MLO-02-7,detailed_answer,5. Validation and training were coupled to state of the first attempt: failed attempts left partial artifacts. Fix: commit outputs only on success.,"5. Failed attempts left partial artifacts behind (a half-written feature partition, a stored but unregistered model) that later attempts could pick up. Fix: write to a temporary location, commit or rename only on success, and let downstream steps read only committed outputs.",minor
+round1,B3-MLO-03-1,answer,(MLflow's registry documents this behaviour),(MLflow's registry documents the incrementing version number; treating a version as immutable is the intended usage rather than something that page spells out),minor
+round1,B3-MLO-03-1,answer,and the registry keeps a record of who moved it and when,and a registry with auditing enabled can record who moved it and when,minor
+round1,B3-MLO-03-3,detailed_answer,"A 0.8% label difference is plausible from this alone, but it is a hypothesis to check, not a conclusion.","Float32 rounding alone usually flips far fewer rows than 0.8% (it needs that share of rows to sit within rounding error of a split or of the decision threshold; the skl2onnx documentation says float and double comparisons give the same result in most cases), so treat a 0.8% difference as a sign of a real discrepancy, such as unseen-category or missing-value handling, scaler dtype, or preprocessing outside the graph, until the margin analysis shows otherwise.",major
+round1,B3-MLO-03-3,practical_answer,"If all 1,600 have |p - threshold| < 1e-4, the flips are numeric ties at the threshold and acceptable","If all 1,600 have |p - threshold| < 1e-4 (unlikely for a continuous score, since it would put 0.8% of all rows within 1e-4 of the threshold; look for quantised or tied scores), the flips are numeric ties at the threshold and acceptable",minor
+round1,B3-MLO-03-4,answer,a column that happens to hold whole numbers in the example becomes an integer type even if the model should accept doubles,a column whose example values are integers (for instance Python ints or an int64 column) is inferred as an integer type even if the model should accept doubles,minor
+round1,B3-MLO-03-5,detailed_answer,Versions never change; aliases,Versions should never change (treat them as immutable by convention); aliases,minor
+round1,B3-MLO-03-5,detailed_answer,The pointer update is atomic in the registry,"A single alias update is one registry write (atomic in typical database-backed registries, though the cited page does not state it)",minor
+round1,B3-MLO-04-1,answer,Apply backpressure rather than dropping data silently.,"Apply backpressure rather than dropping data silently. Cost is a continuously running, stateful cluster sized for the peak of 50,000 events/s, so keep the per-event model light.",minor
+round1,B3-MLO-04-3,detailed_answer,max_wait = 0 (no batching),"max_wait = 0 (a batch contains only requests already waiting, so batching still occurs under backlog or simultaneous arrivals; only max_batch=1 disables it)",minor
+round1,B3-MLO-04-3,practical_answer,max_wait=0 gives unbatched latencies,max_wait=0 with widely spaced arrivals gives unbatched latencies,minor
+round1,B3-MLO-04-4,detailed_answer,"at least roughly 9,000 requests","up to roughly 9,000 requests (fewer while the ramp is still climbing)",major
+round1,B3-MLO-04-4,practical_answer,minimum 4 replicas on weekdays from 08:45 (scheduled),"scheduled minimum of 10 replicas on weekdays from 08:45 (the sized peak requirement), 3 otherwise",major
+round1,B3-MLO-04-6,detailed_answer,"Alert on symptoms users feel: error ratio and latency SLO burn (for example, page when the share of requests slower than the latency objective burns the budget quickly).","Alert on symptoms users feel: error ratio and latency SLO burn. The latency statistic you alert on is the fraction of requests slower than the objective (for example 300 ms) burning the budget quickly, not the mean; p95/p99 panels support diagnosis.",minor
+round1,B3-MLO-04-6,practical_answer,(see MLO-04-7),"(burn-rate rules over a long and a short window, as in a standard 99.9% SLO policy)",minor
+round1,B3-MLO-05-3,answer,"needs about 58,000 canary requests","needs roughly 57,000 canary requests (about 47,000 if the baseline variance is used for both hypotheses)",minor
+round1,B3-MLO-05-4,practical_answer,"Outcome check: 14 days after Stage 3 starts, compare matured chargeback and false-positive rates for the cohorts scored by old and new models, using the sticky assignment log.","Outcome check: run an interim comparison 14 days after Stage 3 starts (chargebacks are only partly matured, so compare same-age slices of the cohorts scored by the old and new models), and the final comparison of matured chargeback and false-positive rates once labels have had the full 45 days, using the sticky assignment log.",major
+round1,B3-MLO-05-5,practical_answer,"Had this existed, the original rollback attempt would have been blocked with a clear message instead of silently degrading.","Had this existed at release time, dropping the old column would have been blocked because v6, the rollback target, still declares it; run at rollback time it at least fails loudly instead of silently degrading.",minor
+round1,B3-MLO-06-2,practical_answer,stays below roughly 80% of the limit,stays below roughly 85% of the limit (the estimated 2.9 GiB peak is already about 83% of 3.5 GiB),major
+round1,B3-MLO-06-2,detailed_answer,"Add per-process framework and interpreter overhead (suppose a measured 0.4 GiB each, 0.8 GiB)","Add per-process framework and interpreter overhead (suppose a measured 0.4 GiB each for the two server workers, 0.8 GiB; the 4 data-loader workers add their own overhead, which the measurement should include)",minor
+round1,B3-MLO-06-3,practical_answer,"Then lengthen the simulated load to 200 s and confirm the startup probe fails and the pod is restarted, proving the budget is enforced.","Then lengthen the simulated load beyond the budget (for example 350 s) and confirm the startup probe fails and the pod is restarted, proving the budget is enforced; a 200 s load would still pass inside the 300 s budget.",major
+round1,B3-MLO-06-3,practical_answer,"Validation: kill the weight store's network in a test cluster and confirm pods stay alive but unready (no restarts), then restore it and confirm they become ready without a restart.","Validation: start fresh pods in a test cluster with the weight store unreachable. If the HTTP server answers /health/live while weights load in the background, the pods stay alive but unready (no restarts) and become ready without a restart once the store returns; if loading blocks the server, the startup probe will kill them after about 300 s, so match the test to your real load path.",major
+round1,B3-MLO-06-4,practical_answer,with the expectation that rollback also takes about 4 x 90 s,with the expectation that rollback also takes about 4 x (90 + 30) s = 8 minutes with this minReadySeconds,minor
+round1,B3-MLO-06-5,detailed_answer,"Priorities and queueing (a batch scheduler or job queue with gang scheduling) address fairness for multi-pod training jobs, but those are add-ons beyond the core scheduler.",Gang scheduling and job queueing (a batch scheduler or job-queue controller) address fairness and all-or-nothing placement for multi-pod training jobs and are add-ons beyond the core scheduler; pod priority and preemption are core features and can also let an important job displace lower-priority pods.,minor
+round1,B3-MLO-06-6,detailed_answer,"An OOM kill is deterministic for the same resources and input, so identical retries waste time","An OOM kill usually repeats for the same resources and input (though node memory pressure can make it intermittent), so identical retries often waste time",minor
+round1,B3-MLO-06-6,detailed_answer,"fail fast, or retry once with a larger memory request, and alert","fail fast, or (if your orchestrator supports per-attempt resources) retry once with a larger memory request, and alert",minor
+round1,B3-MLO-06-6,detailed_answer,(rename or write a completion marker such as a manifest listing files and checksums),"(an atomic rename where the filesystem guarantees it, or, on object stores without atomic directory rename, a completion marker such as a manifest listing files and checksums)",minor
+round1,B3-MLO-07-1,concise_answer,Skew is a pipeline inconsistency present from the first request; drift develops later.,"Skew is a pipeline inconsistency, usually present from the first request; drift usually develops later.",minor
+round1,B3-MLO-07-1,detailed_answer,(1) Skew shows up immediately after deployment:,(1) Skew typically shows up immediately after deployment (or after a change to one of the paths):,minor
+round1,B3-MLO-07-1,detailed_answer,(2) Drift appears gradually:,(2) Drift typically appears over time (though it can also be abrupt):,minor
+round1,B3-MLO-07-2,detailed_answer,mirroring what an online store with an expiry would return,mirroring what a serving system that treats old values as expired would return,minor
+round1,B3-MLO-07-2,code_patch.test,"rows = [
+    (""u1"", 100, 2),
+    (""u1"", 200, 5),
+    (""u1"", 200, 6),   # same ti","rows = [
+    (""u1"", 100, 2),
+    (""u1"", 200, 5),
+    (""u1"", 200, 6),   # same ti"
+round1,B3-MLO-07-3,concise_answer,"shared, versioned feature definitions",shared feature definitions,minor
+round1,B3-MLO-07-3,detailed_answer,One system cannot cheaply do both well.,A single store rarely does both well at reasonable cost.,minor
+round1,B3-MLO-07-4,key_concepts,"['single source of truth', 'on-demand transformation', 'parity test', 'shared library', 'materialization', 'feature logging', 'window semantics', 'default handling']","['single source of truth', 'on-demand transformation', 'parity test', 'shared library', 'window semantics', 'default handling', 'feature logging', 'replay of raw events']"
+round1,B3-MLO-07-4,practical_answer,when a daylight-saving change shifts the window start by an hour and an order falls in that hour,"when a clock change adds an hour (a 25-hour local day), so the 720-hour window starts an hour later than the calendar window and misses an order that falls in that hour",minor
+round1,B3-MLO-07-4,detailed_answer,Feast documents on-demand transformations as Python logic executed in both the historical retrieval and online retrieval paths,Feast documents (as an alpha-stage feature at the time of checking) on-demand transformations as Python logic executed in both the historical retrieval and online retrieval paths,minor
+round1,B3-MLO-07-5,practical_answer,(expected near 88 to 89% under these assumptions),"(expected near 88 to 89% if only late arrivals mattered; cancelled-then-deleted orders add mismatches in the opposite direction, so expect somewhat lower)",minor
+round2,B3-MLO-02-4,question,regresses by more than slice_tolerance or is missing from the candidate,"regresses by more than slice_tolerance, or if any baseline slice of any size is missing from the candidate",recheck_minor
+round2,B3-MLO-02-4,detailed_answer,label leakage in the holdout,"slice regressions judged on point estimates (a 200-example slice at accuracy 0.85 has a standard error near 0.025, over twice the 0.01 tolerance, so the slice rule is noisy at the default minimum size); label leakage in the holdout",recheck_minor
+round2,B3-MLO-02-5,practical_answer,"So 0.75 sits within one standard deviation of the mean and fails often, while a floor of 0.70 was never reached in 200 seeds.","In this illustration 0.75 sits within one standard deviation of the mean and fails often, while a floor of 0.70 is never reached in 200 seeds.",recheck_minor
+round2,B3-MLO-02-5,practical_answer,"If a stricter bound is wanted, set it from a larger multiple of the measured standard deviation below the mean, and re-measure when the fixture or the model changes.","If a stricter bound is wanted, note that 3 standard deviations below the mean (about 0.72 here) already equals the worst of 200 seeds, so collect more seeds or enlarge the validation set first, and re-measure when the fixture or the model changes.",recheck_minor
+round2,B3-MLO-02-5,detailed_answer,which is worse than having none,which is arguably worse than having none,recheck_minor
+round2,B3-MLO-03-3,detailed_answer,the skl2onnx documentation says float and double comparisons give the same result in most cases),"the skl2onnx documentation says float and double comparisons give the same result in most cases, though the same page shows a regression example where casting to float produced large errors, so this is an expectation, not a guarantee)",recheck_minor
+round2,B3-MLO-03-4,answer,"- Missing columns, extra columns, wrong shapes.","- Missing columns and wrong shapes. Extra columns are a policy choice: MLflow's schema enforcement ignores them with a warning, so reject them explicitly if you want strictness.",recheck_major
+round2,B3-MLO-03-5,concise_answer,"Promotion moves an alias: atomic in the registry, but replicas change only when redeployed.","Promotion moves an alias: one registry write (atomic in typical database-backed registries), but replicas change only when redeployed.",recheck_minor
+round2,B3-MLO-03-5,detailed_answer,"(atomic in typical database-backed registries, though the cited page does not state it)",(atomic in typical database-backed registries; MLflow's documentation does not state this),recheck_minor
+round2,B3-MLO-03-5,practical_answer,take model v39 and its image digest.,take the model version it names (v39 in this scenario) and its image digest.,recheck_minor
+round2,B3-MLO-04-1,answer,Apply backpressure rather than dropping data silently.,"Prefer backpressure or a durable buffer to silent drops (sensors often cannot be slowed, so if load must be shed, do it deliberately and count it).",recheck_minor
+round2,B3-MLO-04-3,question,It contains the waiting requests up to max_batch.,It contains the waiting requests up to max_batch (a request arriving exactly at the dispatch instant counts as waiting).,recheck_minor
+round2,B3-MLO-04-4,detailed_answer,"so up to roughly 9,000 requests (fewer while the ramp is still climbing) arrive faster than they can be served","so on the order of 9,000 requests (100 requests/s of excess times 90 s, an upper figure that assumes demand is already at 200 requests/s; the two-minute ramp lowers it, scrape and decision delay raise it) arrive faster than they can be served",recheck_minor
+round2,B3-MLO-04-6,practical_answer,"above an SLO burn threshold over a long and a short window (burn-rate rules over a long and a short window, as in a standard 99.9% SLO policy)",above an SLO burn-rate threshold over both a long and a short window (for a 99.9% SLO the SRE Workbook's starting point pages at burn rate 14.4 over 1 h and 5 min),recheck_minor
+round2,B3-MLO-04-6,detailed_answer,avoid raw identifiers or free text where a hash is enough,"avoid raw identifiers or free text where a keyed hash is enough (a plain hash of a low-entropy identifier can be reversed, and pseudonymised data is still personal data)",recheck_minor
+round2,B3-MLO-05-3,answer,"(about 47,000 if the baseline variance is used for both hypotheses)","(about 48,000 with the usual formula that uses baseline variance under the null; two-sided 5% test, 80% power)",recheck_major
+round2,B3-MLO-05-3,answer,"One day at 1% (20,000) gives only about 38% power","One day at 1% (20,000) gives only about 38 to 48% power depending on the formula",recheck_minor
+round2,B3-MLO-05-3,answer,"about 116 complaints expected at baseline across 58,000 requests","about 114 complaints expected at baseline across 57,000 requests",recheck_minor
+round2,B3-MLO-05-4,practical_answer,"Any breach triggers a review and, if needed, rollback.","Any breach triggers a review and, if needed, rollback. After Stage 3 there is no concurrent control, so these comparisons use the Stage 1-2 cohorts (or a small old-model holdout if you keep one), which have few chargeback events; and once the 7-day warm period ends a rollback means redeploying the registered old model rather than flipping traffic.",recheck_minor
+round2,B3-MLO-06-2,detailed_answer,"the 4 data-loader workers add their own overhead, which the measurement should include","the 4 data-loader workers run only during batch calls, so assume their own interpreter overhead is folded into the 0.6 GiB request-peak figure below, and confirm by measuring every process",recheck_minor
+round2,B3-MLO-06-3,practical_answer,"Then lengthen the simulated load beyond the budget (for example 350 s) and confirm the startup probe fails and the pod is restarted, proving the budget is enforced; a 200 s load would still pass inside the 300 s budget.","Then, in a setup where loading blocks the HTTP server (so /health/live is unanswered), lengthen the simulated load beyond the budget (for example 350 s) and confirm the startup probe fails and the pod is restarted, proving the budget is enforced; a 200 s load would still pass inside the 300 s budget. If the server answers during background loading, a longer load only keeps the pod unready, not restarted.",recheck_major
+round2,B3-MLO-06-4,detailed_answer,catches crash-on-first-request failures,gives a window that catches pods which crash shortly after becoming ready,recheck_minor
+round2,B3-MLO-06-4,detailed_answer,(a pod that is still loading its model counts as unavailable),"(a pod that is still loading its model counts as unavailable, provided readiness is gated on model load)",recheck_minor
+round2,B3-MLO-06-5,detailed_answer,and are add-ons beyond the core scheduler,"and have mostly been provided by add-ons beyond the core scheduler (recent Kubernetes versions are adding feature-gated gang scheduling to the core scheduler, so check your cluster version)",recheck_minor
+round2,B3-MLO-06-6,detailed_answer,and the application must cope with being restarted,so a step must tolerate duplicate runs,recheck_minor
+round2,B3-MLO-07-4,practical_answer,the fix is to specify the window in UTC calendar days in the shared definition,"the fix is to state the window explicitly in the shared definition (for example 30 calendar days in a named timezone, or 720 hours if that is what is meant) and implement it once",recheck_minor
+round2,B3-MLO-07-4,detailed_answer,(as an alpha-stage feature at the time of checking),(documented as an alpha feature),recheck_minor
+round2,B3-MLO-07-5,detailed_answer,Hence the logged online values are lower (late orders missing),"Hence the logged online values are lower because of the late orders (deleted orders push the other way, since online counts them and the backfill does not; the observed systematic gap implies late arrivals dominate)",recheck_minor
+round2,B3-MLO-04-2,detailed_answer,"(2) browsers cannot call native gRPC directly, so the dashboard keeps REST or uses a gateway","(2) browsers generally cannot speak native gRPC directly, so the dashboard keeps REST or goes through a gRPC-Web proxy (the gRPC-Web guide's example uses Envoy)",source_verifier
+round2,B3-MLO-01-5,concise_answer,"immutable versions, a stage or alias","numbered versions (treated as immutable by convention), a stage or alias",source_verifier
+round2,B3-MLO-01-5,detailed_answer,"It stores promoted model versions as immutable entries, with","It stores promoted model versions as entries that should be treated as immutable, with",source_verifier
+round2,B3-MLO-04-5,answer,"separately from successful ones, as the SRE book recommends.",separately from successful ones.,source_verifier
+final,B3-MLO-04-2,detailed_answer,Serialised as JSON text at full precision (random values in a local test with Python's json module),Serialised as JSON text with float64 digits (random float32 values converted by numpy tolist and dumped with Python's json module; shortest float32 text would be about 1.75 MB),final_minor
+final,B3-MLO-04-2,concise_answer,"150,528 random float values serialised as JSON text","150,528 random float32 values serialised as JSON text with float64 digits",final_minor
+final,B3-MLO-05-3,answer,gives z of about 1.4 (two-sided p about 0.16),"gives z of about 1.4 to 1.6 (two-sided p about 0.11 to 0.16, depending on whether the observed or the baseline rate sets the variance)",final_minor
+final,B3-MLO-05-4,practical_answer,"Stage 3: 100%, with the previous model kept deployed and warm for 7 days; the rollback is a traffic switch.","Stage 3: 100%, with the previous model kept deployed and warm for 7 days; the rollback is a traffic switch. There is no concurrent control at 100%, so the same auto-rollback rules apply with absolute limits and the Stage 2 control values as reference, again over two consecutive windows.",final_minor
+final,B3-MLO-06-2,detailed_answer,set the request close to steady state so the scheduler packs nodes honestly,"set the request from measured typical busy-state usage so the scheduler packs nodes honestly (the example below uses 3Gi, near the estimated peak, which is conservative)",final_minor
+final,B3-MLO-06-6,practical_answer,features/run-0908/attempt-1/,features/run-1008/attempt-1/,final_minor
+final,B3-MLO-07-4,detailed_answer,Feast documents (documented as an alpha feature) on-demand,Feast documents on-demand (an alpha feature in its docs),final_minor
+final,B3-MLO-07-5,detailed_answer,its TTL decides when a stale value is treated as missing,its TTL (in stores that enforce one) decides when a stale value is treated as missing,final_minor

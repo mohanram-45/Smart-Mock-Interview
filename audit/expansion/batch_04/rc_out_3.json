@@ -1,0 +1,708 @@
+[
+ {
+  "plan_id": "B4-MLO-08-4",
+  "verdict": "correct",
+  "reasons": [
+   "Applied corrections verified: soften to 'most likely' + logging-difference caveat is right; 0.004 (0.0035-0.0055 over eight seeds), p 1e-5..1e-13 and PSI ~1e-4 reproduced exactly with my own eight seeds (statistics 0.0035-0.00546, p 9.8e-6..2.3e-13, PSI 5.6e-5..1.7e-4).",
+   "Noise-floor formula (B-1)(1/n+1/m) reproduced: mean null PSI over 40 draws 1.86e-5 vs formula 1.8e-5.",
+   "Only a minor hedge on the single small-sample draw is needed."
+  ],
+  "parts_answered": {
+   "compare what KS and PSI measure": true,
+   "explain the alert storm": true,
+   "what neither tells you": true
+  },
+  "evidence": [
+   {
+    "claim": "1e6 vs 1e6 N(0,1), 0.01 sd shift: KS ~0.004 (0.0035-0.0055 over 8 seeds), p 1e-5..1e-13, PSI(10 quantile bins) ~1e-4",
+    "method": "executed",
+    "evidence": "scipy 1.18 ks_2samp, seeds 0-7: D 0.0035..0.00546, p 9.8e-6..2.3e-13, PSI 5.6e-5..1.7e-4. Theory: D ~ 0.01*phi(0)=0.004; PSI(J-divergence) ~ delta^2 = 1e-4."
+   },
+   {
+    "claim": "1000 vs 1000 rows, 0.3 sd shift: KS 0.14, p~8e-9, PSI~0.10",
+    "method": "executed",
+    "evidence": "200 draws: KS median 0.13 (5-95%: 0.107-0.172), p median 3.5e-8, PSI median 0.10 (0.067-0.156); alerts at p<0.05 in 100% of draws. Consistent but draw-dependent."
+   },
+   {
+    "claim": "PSI noise floor ~ (B-1)(1/n+1/m)",
+    "method": "executed",
+    "evidence": "40 null draws at n=m=1e6, B=10: mean PSI 1.86e-5 (formula 1.8e-5)."
+   },
+   {
+    "claim": "KS statistic = max abs ECDF difference, H0 identical distributions, continuous inputs assumed",
+    "method": "doc",
+    "evidence": "SciPy ks_2samp page (opened via WebFetch)."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "gave KS statistic 0.14 (p about 8e-9) and PSI about 0.10",
+    "problem": "Single unseeded-looking draw presented as the result; over 200 re-runs (n=1000 per side, 0.3 sd shift) PSI ranged roughly 0.07 to 0.16 (median 0.10), KS statistic 0.11 to 0.17, p-value 2e-13 to 2e-5, so a reader re-running it may not see 0.10.",
+    "replacement": "gave, in one draw, KS statistic 0.14 (p about 8e-9) and PSI about 0.10 (PSI varied roughly 0.07 to 0.16 across draws)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism comparison plus sample-size reasoning; no multi-step derivation required.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single self-contained answer; length (about 330 words) acceptable for evaluation question."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All 7 specific and discussed in the answer (ties/discrete features, noise floor, prediction impact all present).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0026",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.ks_2samp.html",
+    "status": "supported",
+    "evidence": "'The statistic is the maximum absolute difference between the empirical distribution functions of the samples.' / 'The null hypothesis is that the two distributions are identical' / inputs 'assumed to be drawn from a continuous distribution'."
+   },
+   {
+    "url": "https://arxiv.org/pdf/2303.01227",
+    "status": "supported",
+    "evidence": "'the critical value of the PSI decreases with sample size and increases with the number of groups'; also states <0.1 / 0.1-0.25 / >=0.25 rule-of-thumb bands. Supports the recorded sentence; it does not state the (B-1)(1/n+1/m) floor, which is covered by my executed check."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "KS is 'often more sensitive to the bulk than far tails' (well-known property, hedged with 'often'; no page opened)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-10-1",
+  "verdict": "correct",
+  "reasons": [
+   "Applied int-cast fix verified: the integer assertions fail on the old X.copy() (truncation) and pass now; fenced code in practical_answer equals code.solution; passes on 3.13/3.10/3.11 with identical output (52.4%, 100%, 0.0).",
+   "New text adds only the integer-test sentence, which matches the test.",
+   "Residual real weaknesses in the solution (NaN silently passes; float32 round-trip noise; list input) fixed in a small patch."
+  ],
+  "parts_answered": {
+   "invariance_failures": true,
+   "directional_failures": true,
+   "behavioural_report": true,
+   "how to set tolerances": true,
+   "why strict monotonicity may not hold for tree ensembles (thin, strengthened)": true
+  },
+  "evidence": [
+   {
+    "claim": "toy test: clean model all 0.0; flipped sign directional 100% of 500; leaky postcode weight 0.8 invariance 52.4%",
+    "method": "executed",
+    "evidence": "Identical output on 3.13.16, 3.10.20, 3.11.17 (numpy 2.5.3/2.2.6)."
+   },
+   {
+    "claim": "integer matrices handled",
+    "method": "executed",
+    "evidence": "Integer assertions pass; would fail with plain X.copy() because fractional values truncate."
+   },
+   {
+    "claim": "edge: NaN model",
+    "method": "executed",
+    "evidence": "original returns 0 failures for NaN scores on both checks; patched flags them (assert in patched test)."
+   },
+   {
+    "claim": "edge: float32 input, step=0",
+    "method": "executed",
+    "evidence": "original 643/1000 spurious directional failures, 916/1000 for identity perturb at tol=0; patched 0."
+   },
+   {
+    "claim": "edge: direction=-1, input not mutated, empty X, missing key",
+    "method": "executed",
+    "evidence": "direction -1 flags all 1000 for increasing model; inputs unchanged; empty X -> ZeroDivisionError (minor, unpatched); missing max_fail_rate key -> KeyError (fail loud)."
+   },
+   {
+    "claim": "CheckList defines MFT/INV/DIR test families",
+    "method": "paper",
+    "evidence": "'An Invariance test (INV) is when we apply label-preserving perturbations to inputs' ... 'expect the model prediction to remain the same'; DIR: 'the label is expected to change in a certain way'."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "code.solution",
+    "claim": "import numpy as np\n\n\ndef invariance_failures(",
+    "problem": "Part of the same fix (helper/docstring/NaN-safe comparison) so the fenced code equals code.solution.",
+    "replacement": "import numpy as np\n\n\ndef _as_float(X):\n    \"\"\"Float matrix (integer input is cast so a fractional step is not truncated; float32 stays float32).\"\"\"\n    X = np.asarray(X)\n    return X if X.dtype.kind == \"f\" else X.astype(float)\n\n\ndef invariance_failures("
+   },
+   {
+    "severity": "minor",
+    "field": "code.solution",
+    "claim": "moves the score by more than tol.\"\"\"",
+    "problem": "Part of the same fix (helper/docstring/NaN-safe comparison) so the fenced code equals code.solution.",
+    "replacement": "moves the score by more than tol (a NaN score counts as a failure).\"\"\""
+   },
+   {
+    "severity": "minor",
+    "field": "code.solution",
+    "claim": "    X2 = np.array(X, dtype=float)\n    X2[:, col] = perturb(X[:, col])\n    return np.flatnonzero(np.abs(predict(X2) - predict(X)) > tol)",
+    "problem": "Silent pass on NaN: np.abs(nan) > tol and nan < -tol are both False, so a candidate that returns NaN/inf-NaN scores on the perturbed rows is reported as 0 failures (verified: NaN-returning model gave 0 failures on both checks). A behavioural gate must fail closed. Also the blanket np.array(X, dtype=float) introduced by the first correction compares predict(X) in the caller's dtype with predict(X2) in float64: with float32 input and step=0 the directional check reported 643 of 1000 spurious failures, and a no-op perturbation with tol=0 reported 916; list input still raised TypeError at X[:, col].",
+    "replacement": "    X = _as_float(X)\n    X2 = X.copy()\n    X2[:, col] = perturb(X[:, col])\n    return np.flatnonzero(~(np.abs(predict(X2) - predict(X)) <= tol))"
+   },
+   {
+    "severity": "minor",
+    "field": "code.solution",
+    "claim": "against `direction` (+1 or -1).\"\"\"",
+    "problem": "Part of the same fix (helper/docstring/NaN-safe comparison) so the fenced code equals code.solution.",
+    "replacement": "against `direction` (+1 or -1); NaN scores count as failures.\"\"\""
+   },
+   {
+    "severity": "minor",
+    "field": "code.solution",
+    "claim": "    X2 = np.array(X, dtype=float)\n    X2[:, col] = X[:, col] + step\n    delta = (predict(X2) - predict(X)) * direction\n    return np.flatnonzero(delta < -tol)",
+    "problem": "Part of the same fix (helper/docstring/NaN-safe comparison) so the fenced code equals code.solution.",
+    "replacement": "    X = _as_float(X)\n    X2 = X.copy()\n    X2[:, col] = X[:, col] + step\n    delta = (predict(X2) - predict(X)) * direction\n    return np.flatnonzero(~(delta >= -tol))"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "import numpy as np\n\n\ndef invariance_failures(",
+    "problem": "Part of the same fix (helper/docstring/NaN-safe comparison) so the fenced code equals code.solution.",
+    "replacement": "import numpy as np\n\n\ndef _as_float(X):\n    \"\"\"Float matrix (integer input is cast so a fractional step is not truncated; float32 stays float32).\"\"\"\n    X = np.asarray(X)\n    return X if X.dtype.kind == \"f\" else X.astype(float)\n\n\ndef invariance_failures("
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "moves the score by more than tol.\"\"\"",
+    "problem": "Part of the same fix (helper/docstring/NaN-safe comparison) so the fenced code equals code.solution.",
+    "replacement": "moves the score by more than tol (a NaN score counts as a failure).\"\"\""
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "    X2 = np.array(X, dtype=float)\n    X2[:, col] = perturb(X[:, col])\n    return np.flatnonzero(np.abs(predict(X2) - predict(X)) > tol)",
+    "problem": "Silent pass on NaN: np.abs(nan) > tol and nan < -tol are both False, so a candidate that returns NaN/inf-NaN scores on the perturbed rows is reported as 0 failures (verified: NaN-returning model gave 0 failures on both checks). A behavioural gate must fail closed. Also the blanket np.array(X, dtype=float) introduced by the first correction compares predict(X) in the caller's dtype with predict(X2) in float64: with float32 input and step=0 the directional check reported 643 of 1000 spurious failures, and a no-op perturbation with tol=0 reported 916; list input still raised TypeError at X[:, col].",
+    "replacement": "    X = _as_float(X)\n    X2 = X.copy()\n    X2[:, col] = perturb(X[:, col])\n    return np.flatnonzero(~(np.abs(predict(X2) - predict(X)) <= tol))"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "against `direction` (+1 or -1).\"\"\"",
+    "problem": "Part of the same fix (helper/docstring/NaN-safe comparison) so the fenced code equals code.solution.",
+    "replacement": "against `direction` (+1 or -1); NaN scores count as failures.\"\"\""
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "    X2 = np.array(X, dtype=float)\n    X2[:, col] = X[:, col] + step\n    delta = (predict(X2) - predict(X)) * direction\n    return np.flatnonzero(delta < -tol)",
+    "problem": "Part of the same fix (helper/docstring/NaN-safe comparison) so the fenced code equals code.solution.",
+    "replacement": "    X = _as_float(X)\n    X2 = X.copy()\n    X2[:, col] = X[:, col] + step\n    delta = (predict(X2) - predict(X)) * direction\n    return np.flatnonzero(~(delta >= -tol))"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "(they are cast to float first).",
+    "problem": "Describe the two added assertions.",
+    "replacement": "(they are cast to float first), float32 input stays float32 (no cast noise), and a NaN score counts as a failure rather than a silent pass."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "tree ensembles and neural networks are piecewise and can wiggle locally",
+    "problem": "'Piecewise' is not the reason; the question asks why strict monotonicity may not hold. Reason: nothing in unconstrained training enforces it.",
+    "replacement": "an unconstrained tree ensemble or neural network fits whatever the noisy data and feature interactions support, so the response along one feature can dip locally even when the overall trend is monotone"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Three short numpy functions plus tolerance reasoning; not subtle algorithmically (recorded Hard is generous).",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Rationale, tolerance policy, pitfalls."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Reference implementation and observed test numbers (consistent: 100%, 52.4%, 0.0)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All 7 discussed. Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0011",
+   "same_intent": false
+  },
+  "code_findings": "Original corrected solution: passes on all three interpreters; stdlib+numpy only; no 3.11+ features. Edge cases run (float32, NaN, list, empty, direction=-1, mutation, missing key). Patch passes on all three with the extra float32 and NaN assertions; patched fence text equals patched code.solution (replacements applied to both fields).",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/pdf/2005.04118",
+    "status": "supported",
+    "evidence": "INV/DIR/MFT definitions as quoted above."
+   },
+   {
+    "url": "https://xgboost.readthedocs.io/en/stable/tutorials/monotonic.html",
+    "status": "supported",
+    "evidence": "'XGBoost has the ability to enforce monotonicity constraints on any features used in a boosted model.'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": {
+   "solution": "import numpy as np\n\n\ndef _as_float(X):\n    \"\"\"Float matrix (integer input is cast so a fractional step is not truncated; float32 stays float32).\"\"\"\n    X = np.asarray(X)\n    return X if X.dtype.kind == \"f\" else X.astype(float)\n\n\ndef invariance_failures(predict, X, col, perturb, tol=0.01):\n    \"\"\"Row indices where changing column `col` with perturb() moves the score by more than tol (a NaN score counts as a failure).\"\"\"\n    X = _as_float(X)\n    X2 = X.copy()\n    X2[:, col] = perturb(X[:, col])\n    return np.flatnonzero(~(np.abs(predict(X2) - predict(X)) <= tol))\n\n\ndef directional_failures(predict, X, col, step, direction=1, tol=1e-9):\n    \"\"\"Row indices where adding `step` to column `col` moves the score against `direction` (+1 or -1); NaN scores count as failures.\"\"\"\n    X = _as_float(X)\n    X2 = X.copy()\n    X2[:, col] = X[:, col] + step\n    delta = (predict(X2) - predict(X)) * direction\n    return np.flatnonzero(~(delta >= -tol))\n\n\ndef behavioural_report(predict, X, checks, max_fail_rate):\n    \"\"\"checks: name -> function(predict, X) returning failing row indices. Returns (passed, rates).\"\"\"\n    rates = {name: len(fn(predict, X)) / len(X) for name, fn in checks.items()}\n    passed = all(rates[name] <= max_fail_rate[name] for name in checks)\n    return passed, rates",
+   "test": "def _make_model(leak_weight):\n    w = np.array([0.9, 1.1, 0.0, leak_weight])  # missed_payments, utilisation, customer_hash, postcode_hash\n    def predict(X):\n        return 1.0 / (1.0 + np.exp(-(X @ w - 0.2)))\n    return predict\n\n\nrng = np.random.default_rng(7)\nX = np.column_stack([\n    rng.integers(0, 6, 500).astype(float),   # missed_payments (col 0)\n    rng.uniform(0, 1, 500),                  # utilisation (col 1)\n    rng.uniform(0, 1, 500),                  # customer_hash (col 2)\n    rng.uniform(0, 1, 500),                  # postcode_hash (col 3)\n])\nchecks = {\n    \"hash_invariance\": lambda p, A: invariance_failures(p, A, 2, lambda c: 1.0 - c, tol=0.01),\n    \"postcode_invariance\": lambda p, A: invariance_failures(p, A, 3, lambda c: 1.0 - c, tol=0.01),\n    \"more_missed_not_safer\": lambda p, A: directional_failures(p, A, 0, 1.0, direction=+1),\n}\nlimits = {\"hash_invariance\": 0.0, \"postcode_invariance\": 0.0, \"more_missed_not_safer\": 0.0}\n\nok, rates = behavioural_report(_make_model(0.0), X, checks, limits)\nassert ok and all(v == 0.0 for v in rates.values()), rates\n# the missed-payments weight has the wrong sign here, so the directional check must trip\nw_bad = np.array([-0.9, 1.1, 0.0, 0.0])\nbad = lambda A: 1.0 / (1.0 + np.exp(-(A @ w_bad)))\nbad_ok, bad_rates = behavioural_report(bad, X, checks, limits)\nassert not bad_ok and bad_rates[\"more_missed_not_safer\"] == 1.0, bad_rates\n# a model that leaks the postcode feature trips only the postcode invariance check\nleaky_ok, leaky_rates = behavioural_report(_make_model(0.8), X, checks, limits)\nassert not leaky_ok\nassert leaky_rates[\"postcode_invariance\"] > 0.5 and leaky_rates[\"hash_invariance\"] == 0.0\n# integer-typed feature matrices must not silently truncate the perturbation\nXi = np.column_stack([np.arange(6), np.arange(6)])\nassert len(directional_failures(lambda A: A @ np.array([-1.0, 0.0]), Xi, 0, 0.5, direction=+1)) == 6\nassert len(invariance_failures(lambda A: A @ np.array([1.0, 0.0]), Xi, 0, lambda c: c + 0.5, tol=0.1)) == 6\n# float32 input stays float32 (no cast noise), and NaN scores are failures rather than silent passes\nXf = np.random.default_rng(0).uniform(size=(100, 2)).astype(np.float32)\nf32 = lambda A: A @ np.array([0.5, 0.0], dtype=A.dtype)\nassert len(directional_failures(f32, Xf, 0, 0.0)) == 0\nnan_model = lambda A: np.where(A[:, 0] > 0.5, np.nan, A[:, 0])\nn_nan = int((Xf[:, 0] > 0.5).sum())\nassert n_nan > 0 and len(invariance_failures(nan_model, Xf, 1, lambda c: 1 - c)) == n_nan\nassert len(directional_failures(nan_model, Xf, 1, 1.0)) == n_nan\nprint(rates, bad_rates, leaky_rates)"
+  }
+ },
+ {
+  "plan_id": "B4-MLO-11-2",
+  "verdict": "pass",
+  "reasons": [
+   "Applied key-rotation caveat is correct (HMAC rotation changes every pseudonym; re-keying or broken linkage) and consistent with the concise answer.",
+   "Concise answer 74 words, consistent with detailed (90-day window + slack, keyed pseudonym, deletion lookup, sampling).",
+   "Legal claims properly hedged ('generally', 'depends on jurisdiction and legal advice')."
+  ],
+  "parts_answered": {
+   "what is wrong (hash, quasi-identifiers, indefinite retention, over-logging)": true,
+   "what you will change": true,
+   "retention tied to 90-day labels": true,
+   "engineer not lawyer framing": true
+  },
+  "evidence": [
+   {
+    "claim": "unsalted hash of a small/structured ID space is reversible by hashing candidates",
+    "method": "derivation",
+    "evidence": "Deterministic function over an enumerable domain; standard dictionary attack."
+   },
+   {
+    "claim": "DOB + postcode is a classic quasi-identifier",
+    "method": "paper",
+    "evidence": "Sweeney: 87% of US population unique on {5-digit ZIP, gender, date of birth}."
+   },
+   {
+    "claim": "saving serving-time features for a small fraction of examples is useful",
+    "method": "doc",
+    "evidence": "Rules of ML #29: 'Even if you can't do this for every example, do it for a small fraction'."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Applied privacy engineering judgement; several correct components but no deep multi-step reasoning.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Genuinely shorter, 74 words."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Reasoned explanation with engineering changes."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "All 8 specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0030",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule #29: 'The best way to make sure that you train like you serve is to save the set of features used at serving time' ... 'Even if you can't do this for every example, do it for a small fraction'."
+   },
+   {
+    "url": "https://dataprivacylab.org/projects/identifiability/paper1.pdf",
+    "status": "partially",
+    "evidence": "87% (216 million of 248 million) of US population uniquely identified by {5-digit ZIP, gender, date of birth}. Supports the DOB+postal-code quasi-identifier point; the record's 'supports' mentions gender, answer text does not claim 87%, so acceptable."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Pseudonymised data generally remains personal data in many jurisdictions (GDPR Art. 4(5)/Recital 26): hedged, EU page could not be opened (permission not granted), so left unsourced"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-1",
+  "verdict": "correct",
+  "reasons": [
+   "Applied retry-count caveat is sound and relevant; only the verb 'says' overstates the inference.",
+   "Numbers: +3 ms median, p99 120 -> 410 ms = 3.4x ('more than tripled') verified.",
+   "Triage order, table and time-boxed mitigation rule are coherent and consistent across both fields."
+  ],
+  "parts_answered": {
+   "order of investigation": true,
+   "what each observation rules in/out": true,
+   "why offline benchmark missed it": true,
+   "mitigation decision": true
+  },
+  "evidence": [
+   {
+    "claim": "p50 +3 ms, p99 x3.4",
+    "method": "derivation",
+    "evidence": "41-38=3; 410/120=3.42."
+   },
+   {
+    "claim": "CPU throttling by a CFS quota stalls threads until the next period; counters in cpu.stat",
+    "method": "doc",
+    "evidence": "'Throttled threads will not be able to run again until the next period when the quota is replenished.' nr_throttled / throttled_time in cpu.stat (page describes cgroup v1, points to v2 doc)."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "the unchanged error rate says the slow requests still finish inside client timeouts",
+    "problem": "Overstated: an unchanged error rate only suggests requests are not hitting timeouts; with p99 at 410 ms it implies client timeouts above that, which the question does not state.",
+    "replacement": "the unchanged error rate suggests the slow requests still finish inside client timeouts"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Scenario triage with sensible heuristics; breadth rather than depth.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Narrative order and reasoning."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Runbook table with quick tests plus a decision rule not in the detailed text (the 'say 30 minutes' time-box is only in practical; detailed has the mitigate-first stance) - consistent."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All 8 specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0025",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://docs.kernel.org/scheduler/sched-bwc.html",
+    "status": "supported",
+    "evidence": "Quoted throttling sentence confirmed; cpu.stat counters nr_throttled and throttled_time described (cgroup v1 section)."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "GC pauses, batching wait, warm-up and dependency p99 effects are standard operational knowledge presented as 'suspect'/'points to' (hedged), no page opened"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-8",
+  "verdict": "correct",
+  "reasons": [
+   "All figures recomputed: 1152, 4,302,000 requests, 0.2678 (0.268), average 49.79 rps = 31.1% of 160, 4 replicas from ceil(100/28), 792 (31.25% saving), 612, 576 = exactly half of 1152.",
+   "Applied changes verified: '0.26778...' matches output; 'sizes each hour from its average request rate' is accurate to the model.",
+   "Added floor observation improves the business reading; no errors found."
+  ],
+  "parts_answered": {
+   "cost per 1,000 today": true,
+   "(a) autoscaling floor 2, 70%": true,
+   "(b) quantised 1.6x": true,
+   "(c) 20% cache": true,
+   "what to report": true,
+   "what to verify": true
+  },
+  "evidence": [
+   {
+    "claim": "static 1152 / 0.268; (a) 792 / 0.184; (b) 612 / 0.142; (c) 576 / 0.134",
+    "method": "executed",
+    "evidence": "Same output on 3.13/3.10/3.11; hourly replicas [2x9,3,3,4,4,4,3,3,3,4,4,4,3,2,2,2]."
+   },
+   {
+    "claim": "floor of 3 raises autoscaled figure",
+    "method": "executed",
+    "evidence": "min_replicas=3 gives 936 (>792); floor 1 gives 684."
+   },
+   {
+    "claim": "edge cases",
+    "method": "executed",
+    "evidence": "cache_hit=1.0 -> 576 (floor); boundary 28 rps -> 1 replica -> floor 2; all-zero profile -> ZeroDivisionError (not relevant to question); sum() float repr differs by 1e-9 across versions only for non-integer profiles, not for the recorded integer data."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(c) Adding a 20% cache hit rate: 576 units, 0.134 per 1,000, about half of today's cost.",
+    "problem": "Missing insight, verified by running: 576 is exactly the floor cost (2 replicas x 24 h x 12). At 64 x 0.7 = 44.8 requests/s per replica and 80% of load, the peak needs ceil(80/44.8) = 2, so every hour sits on the floor; the cache adds only 36 units over (b) and further gains are capped until the floor is lowered.",
+    "replacement": "(c) Adding a 20% cache hit rate: 576 units, 0.134 per 1,000, about half of today's cost. Note that 576 is exactly the floor (2 replicas x 24 h x 12), so the cache adds only 36 units over (b) and any further efficiency gain is capped by the floor."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Multi-case arithmetic with a short loop, plus verification judgement.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Numbers, reporting and verification."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Executable model; fence equals code.solution."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All 7 discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0024",
+   "same_intent": false
+  },
+  "code_findings": "Passes on 3.13.16, 3.10.20, 3.11.17 (stdlib only, no 3.11 features); fence identical to solution; edge cases listed in evidence.",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-13-3",
+  "verdict": "correct",
+  "reasons": [
+   "Arithmetic verified: baseline 4.6; cached 2.4x0.6=1.44 -> 3.64 (-20.9%); routed+cached 2.275 (-50.5%); routing alone 2.875 (-37.5%); tenant example 6.2 (+34.8%); 1.40/1.08 = 1.296.",
+   "Applied concise change is correct but makes concise_answer 83 words (limit 80) - major per brief; fixed.",
+   "Applied cache-write-surcharge caveat is accurate and useful; applied cache invalidation sentence slightly overstated; tenant-attribution arithmetic does not close the loop with the 30% rise."
+  ],
+  "parts_answered": {
+   "baseline cost per request": true,
+   "80% prefix-cache saving": true,
+   "half-traffic routing saving": true,
+   "attribution": true,
+   "budgets": true,
+   "alerting": true,
+   "release checks": true
+  },
+  "evidence": [
+   {
+    "claim": "4.6 / 3.64 / 2.275 / 2.875 / 6.2 units",
+    "method": "derivation",
+    "evidence": "(2.4+0.8)*1+0.35*4=4.6; 2.4*(0.8*0.5+0.2)=1.44 so 3.64; 0.5*3.64+0.5*0.25*3.64=2.275; 0.5*4.6+0.125*4.6=2.875 (=62.5%); 2.4+2.4+1.4=6.2."
+   },
+   {
+    "claim": "cost per request rose ~30% = 1.40/1.08",
+    "method": "derivation",
+    "evidence": "1.40/1.08=1.296 (assumes unchanged unit prices)."
+   },
+   {
+    "claim": "prefix caching needs identical prefix; stable content first; tools/instructions in prefix; cached_tokens reported",
+    "method": "doc",
+    "evidence": "OpenAI doc: 'Prompt caching reuses work when requests share the same prompt prefix'; 'Cache reuse requires the entire rendered prefix to match'; 'Put stable developer instructions and shared reference material first'; usage.input_tokens_details.cached_tokens."
+   },
+   {
+    "claim": "concise word count",
+    "method": "executed",
+    "evidence": "83 words after first-round edit; 78 with the replacement."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "concise_answer",
+    "claim": "Cost per request must have risen about 30% (1.40/1.08), most likely through more tokens per request (or retries, tool rounds, model mix), so attribute",
+    "problem": "The applied correction pushed concise_answer to 83 words, over the 80-word limit (counted by whitespace). The replacement brings it to 78 words.",
+    "replacement": "Cost per request must have risen about 30% (1.40/1.08), likely from more tokens, retries or model mix, so attribute"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "its per-request cost goes from 4.6 to 6.2 units (+35%).",
+    "problem": "The example is not tied back to the 30% blended rise. One tenant at +35% only explains the bill if it is most of the traffic: 0.8x4.6 + 0.2x6.2 = 4.92, i.e. +7% blended at a 20% share.",
+    "replacement": "its per-request cost goes from 4.6 to 6.2 units (+35%). That explains the 30% rise only if the tenant is most of the traffic: at a 20% share the blended cost per request rises by just 7% (0.8 x 4.6 + 0.2 x 6.2 = 4.92), so check the other drivers too."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Note that every edit to the fixed prefix (system prompt, policy text, tool definitions) invalidates the cached prefix",
+    "problem": "Overstated: prefix caching matches the longest identical prefix, so an edit invalidates the cache from the edited point onward, not necessarily the whole prefix.",
+    "replacement": "Note that an edit to the fixed prefix (system prompt, policy text, tool definitions) invalidates the cache from the edited point onward"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Straight unit arithmetic plus operational controls.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Interview-ready numbers; must be <=80 words (fixed)."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Derivations, caveats."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Operational controls; not in detailed."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "All 7 discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0039",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://developers.openai.com/api/docs/guides/prompt-caching",
+    "status": "supported",
+    "evidence": "Exact-prefix reuse, stable-first ordering, tool definitions in the cached context, cached_tokens reporting all stated. The page's discounts differ from the hypothetical 0.5, which the answer labels hypothetical and provider-specific."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'many providers' reuse only an identical prefix: only one provider doc opened"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-5",
+  "verdict": "correct",
+  "reasons": [
+   "SQL, config and fenced code verified: config content == SQL in solution; passes on 3.13/3.10/3.11 (SQLite 3.45.1/3.53.1) with the stated two rows; 4 of 11 / 1 not recomputed / NULL vs 25.0 all match the test data; rule of three 1-0.05^(1/20000)=1.498e-4 ~ 3/20000=0.015%.",
+   "Applied 'lag of a few hours' change is fine, but the applied windowed-count sentence is conceptually wrong for a trailing as-of window (major, replaced).",
+   "Rubric present, 6 sound decisions with trade-offs; consistent with the fix."
+  ],
+  "parts_answered": {
+   "what to log at serving time": true,
+   "how and when to recompute offline": true,
+   "tolerances by feature type": true,
+   "timestamp root-causing": true,
+   "what to alert on": true,
+   "SQL executed": true
+  },
+  "evidence": [
+   {
+    "claim": "test output (14:00,avg_basket,11,0,1) and (14:00,orders_24h,11,1,4)",
+    "method": "executed",
+    "evidence": "Same on 3.13.16, 3.10.20, 3.11.17."
+   },
+   {
+    "claim": "SQL edge cases",
+    "method": "executed",
+    "evidence": "Diff exactly equal to tolerance not a mismatch; just above is; both NULL match; one NULL mismatches; empty tables -> []; feature missing from tolerances -> [] (silently dropped); duplicate recomputed rows double count (2 mismatches for 1 request); relative tolerance 1e-3 on 10000 hides off-by-one."
+   },
+   {
+    "claim": "rule of three: 20,000 clean comparisons -> 95% upper bound ~0.015%",
+    "method": "executed",
+    "evidence": "1-0.05**(1/20000)=0.00014978 vs 3/20000=0.00015."
+   },
+   {
+    "claim": "ML Test Score monitor test",
+    "method": "paper",
+    "evidence": "'Monitor 3: Training and serving features compute the same values'; paper recommends logging a sample of serving traffic and comparing feature values."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "detailed_answer",
+    "claim": "Windowed counts that depend on event lateness: keep the tolerance at zero but compare only rows whose window closed before the lateness bound (a non-zero tolerance would hide the off-by-one incident in the question), and track the late-event rate separately.",
+    "problem": "The new wording is not sufficient for the feature in the question (a trailing count such as orders_24h as of served_at). Its window ends at served_at, so no row has a window that 'closed before the lateness bound'; events arriving after served_at with an earlier event time are in the offline recompute but not in the served value, giving false mismatches at tolerance zero. Zero tolerance only works if the recompute filters on arrival time.",
+    "replacement": "Windowed counts that depend on event lateness: keep the tolerance at zero (a non-zero tolerance would hide the off-by-one incident in the question) and make the recomputation point-in-time on arrival time, using only events that had arrived by served_at, which needs an ingestion timestamp. If the offline source has no arrival time, late events make offline counts exceed served ones, so compare only windows that were already closed and past the lateness allowance when the request was served, and track the late-event rate separately."
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "A mismatch that begins in the hour after a deploy is where to start reading the diff.",
+    "problem": "Two silent gaps in the recorded query, verified by running: the INNER JOIN to tolerances drops any feature with no tolerance row (a new feature is never compared), and duplicate rows in recomputed double-count n and mismatched.",
+    "replacement": "A mismatch that begins in the hour after a deploy is where to start reading the diff. Caveats: the inner join to tolerances silently drops any feature that has no tolerance row, so require one per logged feature, and recomputed must be unique per (request_id, feature) or the counts double."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open-ended multi-part design with tolerance semantics, point-in-time subtleties and SQL.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Log sampled serving-time feature values with request id, entity id, timestamps, model and pipeline versions",
+    "tradeoff": "Storage/privacy/overhead and sample rate vs detection power."
+   },
+   {
+    "decision": "Recompute point-in-time as of served_at after the lateness bound",
+    "tradeoff": "Detection delay vs false mismatches from late events."
+   },
+   {
+    "decision": "Typed tolerances: exact for ids, categories and windowed counts; abs+rel for floats; NULL mismatch always",
+    "tradeoff": "Sensitivity to off-by-one vs noise false alarms."
+   },
+   {
+    "decision": "Track rows without recomputation separately",
+    "tradeoff": "Visibility of coverage gaps vs extra alert surface."
+   },
+   {
+    "decision": "Aggregate mismatch by feature, hour and version to attribute to deploys, batch jobs or cold start",
+    "tradeoff": "Granularity vs sample size per bucket."
+   },
+   {
+    "decision": "Alert per feature with sample-size-aware thresholds (rule of three) and higher sampling during canary",
+    "tradeoff": "Time to detect vs paging noise and compute cost."
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Design decisions."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Executed SQL and results, not in detailed."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All 7 discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0043",
+   "same_intent": false
+  },
+  "code_findings": "Python+sqlite3 stdlib only; no 3.11 features. Run on three interpreters; fence == solution; configs[0].content == embedded SQL; edge cases above. Prose says \"run with Python sqlite3 on a small in-memory dataset\", accurately stated (no overclaim). No contradiction with earlier questions found (l0044 late data, l0043 parity).",
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule #29: save serving-time features; 'Even if you can't do this for every example, do it for a small fraction' (so you can verify consistency, Rule #37)."
+   },
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "'Monitor 3: Training and serving features compute the same values' (Table IV lists it as 'Training and serving are not skewed'); paper recommends logging a sample of serving traffic and comparing."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Heuristics on root-cause patterns (step at deploy = code change; daily spike = batch job/cache expiry) are hedged with 'points to'"
+  ],
+  "code_patch": null
+ }
+]

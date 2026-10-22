@@ -1,0 +1,378 @@
+round,plan_id,field,old,new,severity_or_origin
+round1,B4-MLO-08-1,code.solution,"    ref = np.asarray(reference, dtype=float)
+    cur = np.asarray(current, dtype=float)
+    edges = np.unique(np.quantile(ref, np.linspace(0.0, 1.0, n_bins + 1)))
+    inner = edges[1:-1]
+    if inner.size == 0:
+        return 0.0
+","    ref = np.asarray(reference, dtype=float)
+    cur = np.asarray(current, dtype=float)
+    ref = ref[np.isfinite(ref)]
+    cur = cur[np.isfinite(cur)]
+    if ref.size == 0 or cur.size == 0:
+        raise ValueError(""reference and current need at least one finite value"")
+    edges = np.unique(np.quantile(ref, np.linspace(0.0, 1.0, n_bins + 1)))
+    inner = edges[1:-1]
+    if inner.size == 0:
+        # constant or two-valued reference: give each value its own bin plus
+        # an open bin on each side, so any change is still visible
+        inner = np.unique(np.concatenate([edges, np.nextafter(edges, np.inf)]))
+",major
+round1,B4-MLO-08-1,code.solution,"    Out-of-range current values fall into the first/last bin. Bin
+    proportions are floored at `eps` so an empty bin gives a large but
+    finite term instead of log(0).
+","    Out-of-range current values fall into the first/last bin. Bin
+    proportions are floored at `eps` so an empty bin gives a large but
+    finite term instead of log(0). NaN/inf are ignored (monitor the null
+    rate separately); a constant or two-valued reference gets one bin per value.
+",minor
+round1,B4-MLO-08-1,practical_answer,"    ref = np.asarray(reference, dtype=float)
+    cur = np.asarray(current, dtype=float)
+    edges = np.unique(np.quantile(ref, np.linspace(0.0, 1.0, n_bins + 1)))
+    inner = edges[1:-1]
+    if inner.size == 0:
+        return 0.0
+","    ref = np.asarray(reference, dtype=float)
+    cur = np.asarray(current, dtype=float)
+    ref = ref[np.isfinite(ref)]
+    cur = cur[np.isfinite(cur)]
+    if ref.size == 0 or cur.size == 0:
+        raise ValueError(""reference and current need at least one finite value"")
+    edges = np.unique(np.quantile(ref, np.linspace(0.0, 1.0, n_bins + 1)))
+    inner = edges[1:-1]
+    if inner.size == 0:
+        # constant or two-valued reference: give each value its own bin plus
+        # an open bin on each side, so any change is still visible
+        inner = np.unique(np.concatenate([edges, np.nextafter(edges, np.inf)]))
+",major
+round1,B4-MLO-08-1,practical_answer,"    Out-of-range current values fall into the first/last bin. Bin
+    proportions are floored at `eps` so an empty bin gives a large but
+    finite term instead of log(0).
+","    Out-of-range current values fall into the first/last bin. Bin
+    proportions are floored at `eps` so an empty bin gives a large but
+    finite term instead of log(0). NaN/inf are ignored (monitor the null
+    rate separately); a constant or two-valued reference gets one bin per value.
+",minor
+round1,B4-MLO-08-1,practical_answer,"Suggested checks, all asserted in the recorded test: PSI of a sample against itself is exactly 0;","Suggested checks, all asserted in the recorded test: a constant or binary reference still registers a shift (constant reference against 9.0 gives more than 5, binary 50/50 against all ones more than 1) and NaNs are ignored; PSI of a sample against itself is exactly 0;",minor
+round1,B4-MLO-08-1,detailed_answer,simply ends up with fewer bins.,"simply ends up with fewer bins. If only one or two distinct edges survive (a constant or binary feature) there are no interior edges, so the code falls back to one bin per distinct value plus open bins on both sides; otherwise any change would score 0.",minor
+round1,B4-MLO-08-1,practical_answer,"split a known-stable period into two random halves 100 times, compute PSI on each pair at your production window size and bin count","draw 100 pairs of non-overlapping windows of your production window size from a known-stable period (on the real time axis, so autocorrelation and weekly effects are included), compute PSI on each pair at your production bin count",minor
+round1,B4-MLO-08-1,code_patch.solution,"import numpy as np
+
+
+def psi(reference, current, n_bins=10, eps=1e-4):
+    """"""Po","import numpy as np
+
+
+def psi(reference, current, n_bins=10, eps=1e-4):
+    """"""Po",code_patch
+round1,B4-MLO-08-1,code_patch.test,"rng = np.random.default_rng(0)
+ref_big = rng.normal(0, 1, 20000)
+same = rng.norm","rng = np.random.default_rng(0)
+ref_big = rng.normal(0, 1, 20000)
+same = rng.norm",code_patch
+round1,B4-MLO-08-2,answer,gave PSI about 8.3 while two plain samples gave about 0.0003,gave PSI about 8.2 with 10 quantile bins and eps=1e-4 (the ceiling for that setup is about 8.3) while two plain samples gave about 0.0003 (lognormal with sigma 1),minor
+round1,B4-MLO-08-2,answer,A pure unit change does exactly that.,A change of units by a large factor such as 100 does exactly that for most amount distributions.,minor
+round1,B4-MLO-08-2,answer,The collapsed scores are a consequence: the model is being fed out-of-support inputs.,The collapsed scores are most likely a consequence: the model is probably being fed out-of-support inputs (confirm by re-scoring a sample with the amounts rescaled).,minor
+round1,B4-MLO-08-2,answer,"a null-to-zero spike moves 9% of the mass into the one bin that already contained the reference zeros. In a similar simulation PSI was only about 0.055 with 10 bins (about 0.09 with 20), under the threshold, although the feature is broken.","a null-to-zero spike moves about 9% of the mass into the lowest bin. In a simulation with a continuous discount_pct and no reference zeros, PSI was only about 0.055 with 10 bins (about 0.09 with 20); with 20% of the reference already at zero it was about 0.03. All are under the threshold, although the feature is broken.",minor
+round1,B4-MLO-08-3,detailed_answer,Sculley et al. suggest limits broad enough not to trigger spuriously.,"Sculley et al. make a related point about action limits on a system's real-world actions: they should be broad enough not to trigger spuriously, and when one trips an alert should lead to investigation.",minor
+round1,B4-MLO-08-3,practical_answer,Expected result with these rules:,Intended result with these rules (verify by replaying the last 90 days of metrics through them before enabling paging):,minor
+round1,B4-MLO-08-4,answer,"The storm is a sample-size effect, not a bug.",The storm is most likely a sample-size effect rather than a bug (rule out a systematic logging difference between reference and yesterday).,minor
+round1,B4-MLO-08-4,answer,the KS statistic was about 0.005 and the p-value about 1e-11,"the KS statistic was about 0.004 (0.0035 to 0.0055 over eight seeds) and the p-value between about 1e-5 and 1e-13, far below 0.05 every time",minor
+round1,B4-MLO-08-7,detailed_answer,These are exact over all traffic and tiny,Counters and histograms are exact over all traffic (quantile sketches are approximate) and tiny,minor
+round1,B4-MLO-08-7,detailed_answer,"and the hourly floor becomes about 9 x (0.00001 + 1/417), about 0.02.","and the hourly floor becomes about 9 x (0.00001 + 1/417), about 0.02 (assuming a 100,000-row reference for the slice; if the slice reference holds only its own 0.5% share, about 500 rows, the floor is 9 x (1/500 + 1/417), about 0.04).",minor
+round1,B4-MLO-08-7,detailed_answer,"keep the row if hash(id) mod 10,000 is below 100 for a 1% rate","keep the row if a stable hash of the ID (for example SHA-256 or xxHash, not Python's salted built-in hash()) mod 10,000 is below 100 for a 1% rate",minor
+round1,B4-MLO-08-8,answer,"(C) Pooled previous 7 days: averages out the weekly cycle, so false alarms from seasonality are mostly gone. But its lag is large:","(C) Pooled previous 7 days: the reference averages out the weekly cycle, but today is a single day, so it is still compared with a weekly mixture. With weekends 25% higher, the weekly average is about 7% above a weekday level, so a weekend day sits about 17% above the pool and a weekday about 7% below it; seasonal false alarms remain unless today is also a 7-day window or the comparison is weekday-adjusted. Its lag is also large:",major
+round1,B4-MLO-08-8,answer,a day-over-day change of 0.05 sd is far below the noise of most daily samples,"a day-over-day change of 0.05 sd is tiny next to the weekly swing and, unless daily volume is large (about 7,200 rows per day are needed to see it at 3 standard errors), within sampling noise",minor
+round1,B4-MLO-08-8,answer,removes seasonality exactly,removes the weekday effect if the weekly pattern is stable,minor
+round1,B4-MLO-09-1,key_concepts,"['continuous training', 'retraining triggers', 'data validation', 'model validation', 'CI/CD for ML', 'lineage tracking']","['continuous training', 'retraining triggers', 'data validation', 'model validation', 'CI/CD for ML', 'artifact lineage and metadata']",code_patch
+round1,B4-MLO-09-3,answer,The Sculley et al. paper suggests action limits as sanity checks that are broad enough not to trigger spuriously; a sudden large shift in score distribution or in the importance of income should stop promotion.,Sculley et al. suggest action limits on a system's real-world actions as sanity checks that are broad enough not to trigger spuriously; a similar bound on champion/challenger change (a sudden large shift in score distribution or in the importance of income) should stop promotion.,minor
+round1,B4-MLO-10-1,code.solution,"X2 = X.copy()
+    X2[:, col] = perturb(X[:, col])","X2 = np.array(X, dtype=float)
+    X2[:, col] = perturb(X[:, col])",major
+round1,B4-MLO-10-1,code.solution,"X2 = X.copy()
+    X2[:, col] = X[:, col] + step","X2 = np.array(X, dtype=float)
+    X2[:, col] = X[:, col] + step",major
+round1,B4-MLO-10-1,practical_answer,"X2 = X.copy()
+    X2[:, col] = perturb(X[:, col])","X2 = np.array(X, dtype=float)
+    X2[:, col] = perturb(X[:, col])",major
+round1,B4-MLO-10-1,practical_answer,"X2 = X.copy()
+    X2[:, col] = X[:, col] + step","X2 = np.array(X, dtype=float)
+    X2[:, col] = X[:, col] + step",major
+round1,B4-MLO-10-1,practical_answer,so each defect trips only its own check.,so each defect trips only its own check. A final assertion checks that integer-typed matrices are perturbed correctly (they are cast to float first).,minor
+round1,B4-MLO-10-1,code_patch.solution,"import numpy as np
+
+
+def invariance_failures(predict, X, col, perturb, tol=0.01)","import numpy as np
+
+
+def invariance_failures(predict, X, col, perturb, tol=0.01)",code_patch
+round1,B4-MLO-10-1,code_patch.test,"def _make_model(leak_weight):
+    w = np.array([0.9, 1.1, 0.0, leak_weight])  # ","def _make_model(leak_weight):
+    w = np.array([0.9, 1.1, 0.0, leak_weight])  # ",code_patch
+round1,B4-MLO-10-2,detailed_answer,Comparing feature_ts with label_ts separates two different failures:,"Comparing feature_ts with label_ts (assuming label_ts is never earlier than prediction_ts, so rows_after_label is a subset of rows_from_future) separates two different failures:",minor
+round1,B4-MLO-10-2,practical_answer,and by warning (with the share) when only rows_from_future is positive,"and by blocking promotion (reporting the share) when only rows_from_future is positive, unless a reviewed exception documents the tolerated lag",minor
+round1,B4-MLO-10-4,detailed_answer,"Tools generally infer conservatively, and TensorFlow Data Validation's documentation, for example, strongly advises","Inference tools differ in how aggressively they generalise from a snapshot; TensorFlow Data Validation's documentation, for example, says it uses conservative heuristics and strongly advises",minor
+round1,B4-MLO-10-4,detailed_answer,What to review. Numeric ranges taken from observed min and max will reject,"What to review. Where a tool derives numeric ranges from observed min and max (not every tool does), those ranges will reject",minor
+round1,B4-MLO-11-1,detailed_answer,minimal secrets in the process.,"minimal secrets in the process. Protects against: a payload that gets past the other controls doing damage beyond the loader (exfiltration, lateral movement). Does not protect against: the model's own malicious behaviour or an attacker who controls the data the loader legitimately reads.",major
+round1,B4-MLO-11-1,detailed_answer,base images pinned by digest and rebuilt on a schedule.,"base images pinned by digest and rebuilt on a schedule. Protects against: tampered or typosquatted packages and silent upstream base-image changes. Does not protect against: a malicious or vulnerable version you pinned on purpose, or a flaw the scanner does not yet know.",minor
+round1,B4-MLO-11-1,detailed_answer,"linked to run, code commit and data version.","linked to run, code commit and data version. Protects against: undetected or deniable promotions and slow forensics. Does not protect against: the attack itself, since it detects and attributes after the fact.",minor
+round1,B4-MLO-11-2,detailed_answer,separate from the warehouse and rotatable),"separate from the warehouse; rotating it changes every pseudonym, so plan a re-keying job or accept broken linkage with older rows)",minor
+round1,B4-MLO-11-3,answer,"Models that memorise (small data, high capacity, overfitted) pose more residual risk than large models trained once over many records, so treat that as a factor in how aggressively you retrain.","Models that memorise (for example small data, high capacity, overfitting, or rare or repeated records) are more likely to retain recognisable traces of individual records, so treat that as a factor in how aggressively you retrain; this is model- and data-dependent and absence of memorisation is hard to demonstrate.",minor
+round1,B4-MLO-11-4,detailed_answer,- Monitoring and rollback: what is tracked in production and who is on call.,"- Ethical and fairness considerations: sensitive attributes used or excluded, subgroup error-rate gaps, and the sign-off decision on them.
+- Monitoring and rollback: what is tracked in production and who is on call.",minor
+round1,B4-MLO-11-5,key_concepts,"['membership inference', 'overfitting gap', 'model inversion', 'output rounding', 'label-only output', 'rate limiting', 'differential privacy', 'attack AUC measurement']","['membership inference', 'overfitting gap', 'label-only attacks', 'output rounding', 'label-only output', 'rate limiting', 'differential privacy', 'attack AUC measurement']",code_patch
+round1,B4-MLO-11-5,detailed_answer,(for example building reference models),(for example label-only attacks that probe each record with hundreds or thousands of perturbed queries),minor
+round1,B4-MLO-11-5,practical_answer,"This tests only the simplest attack; a low AUC is not a proof of safety, only evidence that cheap attacks fail.","This tests only the simplest attack; a low AUC is not a proof of safety, only evidence that cheap attacks fail. Also report the true-positive rate at a low false-positive rate (for example 0.1%), since a near-0.5 AUC can hide a handful of confidently identified records.",minor
+round1,B4-MLO-12-1,detailed_answer,The pattern is the clue: the median barely moved (+3 ms) while the tail more than tripled.,"The pattern is the clue: the median barely moved (+3 ms) while the tail more than tripled, and the unchanged error rate says the slow requests still finish inside client timeouts (check retry counts, because retries can hide a failing tail).",minor
+round1,B4-MLO-12-4,practical_answer,"if they are broken (missing or defaulted inputs), shift traffic to 0% on the new model only after enabling the old feature path or a default, and roll forward with the fix behind a feature flag in a small canary first.","if they are broken (missing or defaulted inputs), restore the old feature path or a safe default first and then roll back; if that cannot be done within minutes, roll forward with the fix behind a feature flag in a small canary first.",minor
+round1,B4-MLO-12-5,practical_answer,| 1 stale cache | 5 consecutive failures or 50% errors in 10 s (circuit opens) | cached features no older than 15 min; others default | 60 min |,| 1 stale cache | 5 consecutive failures or 50% errors in 10 s (circuit opens) | cached features no older than 15 min; a miss or older entry sends that request to mode 2 | about 15 min (then entries have aged out) |,minor
+round1,B4-MLO-12-7,practical_answer,The 19-day gap between the first and detection is the main finding,The 19-day gap between the first bad request and detection is the main finding,minor
+round1,B4-MLO-12-7,practical_answer,fix the detection gap before the root cause,"fix the detection gap as well as the root cause, because the detection gap is what turned a column rename into a 19-day loss",minor
+round1,B4-MLO-12-8,practical_answer,"returns (1152.0, 4302000, 0.268) for the static fleet","returns (1152.0, 4302000, 0.26778...) for the static fleet (0.268 rounded)",minor
+round1,B4-MLO-12-8,detailed_answer,Verify before claiming: autoscaling must handle start-up time,"Verify before claiming: the model sizes each hour from its average request rate, so bursts within the hour need extra headroom; autoscaling must also handle start-up time",minor
+round1,B4-MLO-12-9,question_type,business_case,scenario,code_patch
+round1,B4-MLO-13-1,question_type,scenario,design,code_patch
+round1,B4-MLO-13-2,detailed_answer,which is the more dangerous failure,which can be the more dangerous failure because harmful content then passes unnoticed,minor
+round1,B4-MLO-13-2,detailed_answer,Compare per-stage timings with the block-and-retry count.,"Compare per-stage timings with the block-and-retry count, and check whether the release itself added a guardrail call, a longer prompt or a slower model.",minor
+round1,B4-MLO-13-3,concise_answer,"The bill outgrew traffic because tokens per request rose, so attribute","Cost per request must have risen about 30% (1.40/1.08), most likely through more tokens per request (or retries, tool rounds, model mix), so attribute",minor
+round1,B4-MLO-13-3,detailed_answer,Note that every prompt edit invalidates the prefix,"Note that every edit to the fixed prefix (system prompt, policy text, tool definitions) invalidates the cached prefix",minor
+round1,B4-MLO-13-3,detailed_answer,read the provider's documentation and measure the cached-token counts it reports,"read the provider's documentation (including any cache-write surcharge, which this arithmetic ignores) and measure the cached-token counts it reports",minor
+round1,B4-MLO-14-1,question_type,business_case,scenario,code_patch
+round1,B4-MLO-14-1,answer,A repeat purchase that happens 3 to 6 weeks later cannot show up in a 2-week test by construction,"If the typical repurchase interval is 3 to 6 weeks, most repeat purchases fall outside a 2-week test window by construction",minor
+round1,B4-MLO-14-2,answer,Late events then make shadow scores look better than live scores.,"Late events and missing recent counts then make live feature values differ from what the shadow saw, which can shift live scores (here, lower) without any model change.",minor
+round1,B4-MLO-14-2,answer,"Check whether it included feature retrieval, serialisation, timeout and retry behaviour, and peak load.","Check whether it included feature retrieval, serialisation, timeout and retry behaviour, and peak load. Under live load, feature-fetch timeouts that fall back to default values, plus client retries, could link all three symptoms (slow, lower scores, duplicates).",minor
+round1,B4-MLO-14-4,answer,exploration traffic or counterfactual evaluation (inverse-propensity weighting from logged propensities) are the standard mitigations,"exploration or randomised-ranking traffic is the clean mitigation; counterfactual evaluation (inverse-propensity weighting) works only if the logging policy was stochastic and its propensities were recorded, since items the old ranker never showed cannot be reweighted into the data",major
+round1,B4-MLO-14-4,answer,"Hidden Technical Debt in ML Systems describes this class of problem as a direct feedback loop, where a model influences the selection of its own training data","Hidden Technical Debt in ML Systems describes the related direct feedback loop, where a model influences the selection of its own training data",minor
+round1,B4-MLO-14-4,answer,AUC also weighs the whole list equally,Pooled AUC also mixes between-query and within-query comparisons and weighs the whole list equally,minor
+round1,B4-MLO-14-4,answer,"Plan: reproduce the offline metric per position, replay with propensity weighting,","Plan (the skew check in item 4 is cheapest and can run first): reproduce the offline metric per position, replay with propensity weighting where propensities were logged,",minor
+round1,B4-MLO-14-5,detailed_answer,Windowed counts that depend on event lateness: allow a documented tolerance or compare only rows whose window is older than the lateness bound.,"Windowed counts that depend on event lateness: keep the tolerance at zero but compare only rows whose window closed before the lateness bound (a non-zero tolerance would hide the off-by-one incident in the question), and track the late-event rate separately.",major
+round1,B4-MLO-14-5,detailed_answer,A scheduled job recomputes the same features,"A scheduled job, run after the lateness allowance has elapsed (for example hourly with a lag of a few hours), recomputes the same features",minor
+round1,B4-MLO-14-6,detailed_answer,A has higher expected value in year 1 but much higher variance and a long payback uncertainty,"A has the higher expected net in year 1 (about 80,000 vs 34,300) and, if the gain persists, in later years too (the build cost is not repeated), but with much higher variance",minor
+round2,B4-MLO-08-7,practical_answer,"each row tagged with its sampling weight (1 for 100%, 100 for the 1% sample).","each row tagged with its sampling weight (1 for 100%, 100 for the 1% sample). Run drift tests and population estimates on the uniform hash sample (or on the union with inverse-inclusion-probability weights), never on the mixed set unweighted.",recheck_minor
+round2,B4-MLO-14-1,answer,which a slow outcome metric can never satisfy,which is impractical for an outcome metric that takes weeks to mature,recheck_minor
+round2,B4-MLO-14-1,answer,(say 2 to 5% of users kept on the old model),"(say 2 to 5% of users kept on the old model, sized by a power calculation so it can detect a 2% change in repeat purchases)",recheck_minor
+round2,B4-MLO-14-6,detailed_answer,"so one incident costs 24M x 0.02 x 6/52 = 55,400.","so, reading the 2% as the share of margin lost while an incident lasts, one incident costs 24M x 0.02 x 6/52 = 55,400.",recheck_minor
+round2,B4-MLO-14-6,detailed_answer,"Saving per incident about 51,400;","Saving per incident about 51,400 (assuming monitoring catches every incident within 3 days);",recheck_minor
+round2,B4-MLO-14-6,detailed_answer,"(feature consistency, prediction-distribution and freshness checks, which the ML Test Score lists among its monitoring tests)","(training-serving feature consistency and staleness checks, both monitoring tests in the ML Test Score, plus prediction-distribution or prediction-bias checks as discussed in Hidden Technical Debt)",recheck_minor
+round2,B4-MLO-08-2,answer,A change of units by a large factor such as 100 does exactly that for most amount distributions.,A change of units by a large factor such as 100 does exactly that for a narrowly spread amount distribution; with a wider spread the PSI is lower (about 4 for a lognormal with sigma 2) but still far above any threshold.,recheck_minor
+round2,B4-MLO-08-2,answer,with 20% of the reference already at zero it was about 0.03,with 20% of the reference already at zero it was about 0.02 to 0.03 (depending on how the ties at zero are binned),recheck_minor
+round2,B4-MLO-08-8,answer,is tiny next to the weekly swing and,is smaller than the weekly swing (unless the standard deviation exceeds about five times the mean) and,recheck_minor
+round2,B4-MLO-14-2,answer,a different decision rate (more 'hold' actions) triggers those downstream calls,every 'hold' decision now triggers those downstream calls,recheck_minor
+round2,B4-MLO-11-1,detailed_answer,Protects against: tampered or typosquatted packages and silent upstream base-image changes.,"Protects against: packages whose contents change after you locked them, typosquatted names when the internal mirror serves only reviewed packages, and silent upstream base-image changes.",recheck_minor
+round2,B4-MLO-11-5,detailed_answer,(for example label-only attacks that probe each record with hundreds or thousands of perturbed queries),"(for example label-only attacks, which probe each record with a few augmented queries up to thousands for boundary-distance attacks)",recheck_major
+round2,B4-MLO-11-5,detailed_answer,but do nothing against a single-query threshold test by an authorised caller.,"but do nothing against a single-query threshold test by an authorised caller, and per-key limits can be sidestepped with many keys.",recheck_minor
+round2,B4-MLO-11-5,practical_answer,"(for example 0.1%), since a near-0.5 AUC can hide a handful of confidently identified records.","(for example 0.1%, which needs several thousand non-members to estimate), since a near-0.5 AUC can hide a handful of confidently identified records.",recheck_minor
+round2,B4-MLO-12-7,detailed_answer,"compare CTR in the 19-day window to the same period a week or a month earlier, adjusting for seasonality,","compare CTR in the 19-day window to the pre-rename baseline (the preceding weeks, matched by weekday and adjusted for seasonality; a window shifted by only a week would overlap the incident),",recheck_major
+round2,B4-MLO-13-2,detailed_answer,"a step change exactly at the deploy implicates your change (prompt, model, classifier version or threshold);","a step change exactly at the deploy implicates your change (prompt, model, classifier version or threshold) unless an external event, such as a campaign or a new customer, landed the same day;",recheck_minor
+round2,B4-MLO-13-2,detailed_answer,This yields the share of the 2.7 extra points,Labelling especially the newly blocked items (those the previous versions would have passed) yields the share of the 2.7 extra points,recheck_minor
+round2,B4-MLO-14-4,answer,"counterfactual evaluation (inverse-propensity weighting) works only if the logging policy was stochastic and its propensities were recorded, since items the old ranker never showed cannot be reweighted into the data","counterfactual evaluation (inverse-propensity weighting) needs known or estimated propensities: for item exposure the logging policy must have been stochastic with recorded propensities, since items the old ranker never showed cannot be reweighted into the data (position-bias propensities can instead be estimated from a small randomisation experiment)",recheck_minor
+round2,B4-MLO-14-4,answer,"Plan (the skew check in item 4 is cheapest and can run first): reproduce the offline metric per position, replay with propensity weighting where propensities were logged,","Plan, in the order of items 1 to 4 (the skew check is cheap, so start it in parallel): reproduce the offline metric per position, replay with propensity weighting where propensities were logged, re-score with nDCG@5 or a conversion-weighted metric,",recheck_major
+round2,B4-MLO-08-4,answer,gave KS statistic 0.14 (p about 8e-9) and PSI about 0.10,"gave, in one draw, KS statistic 0.14 (p about 8e-9) and PSI about 0.10 (PSI varied roughly 0.07 to 0.16 across draws)",recheck_minor
+round2,B4-MLO-10-1,code_patch.solution,"import numpy as np
+
+
+def invariance_failures(predict, X, col, perturb, tol=0.01)","import numpy as np
+
+
+def _as_float(X):
+    """"""Float matrix (integer input is cas",recheck_patch
+round2,B4-MLO-10-1,code_patch.test,"def _make_model(leak_weight):
+    w = np.array([0.9, 1.1, 0.0, leak_weight])  # ","def _make_model(leak_weight):
+    w = np.array([0.9, 1.1, 0.0, leak_weight])  # ",recheck_patch
+round2,B4-MLO-10-1,practical_answer,"import numpy as np
+
+
+def invariance_failures(","import numpy as np
+
+
+def _as_float(X):
+    """"""Float matrix (integer input is cast so a fractional step is not truncated; float32 stays float32).""""""
+    X = np.asarray(X)
+    return X if X.dtype.kind == ""f"" else X.astype(float)
+
+
+def invariance_failures(",recheck_minor
+round2,B4-MLO-10-1,practical_answer,"moves the score by more than tol.""""""","moves the score by more than tol (a NaN score counts as a failure).""""""",recheck_minor
+round2,B4-MLO-10-1,practical_answer,"    X2 = np.array(X, dtype=float)
+    X2[:, col] = perturb(X[:, col])
+    return np.flatnonzero(np.abs(predict(X2) - predict(X)) > tol)","    X = _as_float(X)
+    X2 = X.copy()
+    X2[:, col] = perturb(X[:, col])
+    return np.flatnonzero(~(np.abs(predict(X2) - predict(X)) <= tol))",recheck_minor
+round2,B4-MLO-10-1,practical_answer,"against `direction` (+1 or -1).""""""","against `direction` (+1 or -1); NaN scores count as failures.""""""",recheck_minor
+round2,B4-MLO-10-1,practical_answer,"    X2 = np.array(X, dtype=float)
+    X2[:, col] = X[:, col] + step
+    delta = (predict(X2) - predict(X)) * direction
+    return np.flatnonzero(delta < -tol)","    X = _as_float(X)
+    X2 = X.copy()
+    X2[:, col] = X[:, col] + step
+    delta = (predict(X2) - predict(X)) * direction
+    return np.flatnonzero(~(delta >= -tol))",recheck_minor
+round2,B4-MLO-10-1,practical_answer,(they are cast to float first).,"(they are cast to float first), float32 input stays float32 (no cast noise), and a NaN score counts as a failure rather than a silent pass.",recheck_minor
+round2,B4-MLO-10-1,detailed_answer,tree ensembles and neural networks are piecewise and can wiggle locally,"an unconstrained tree ensemble or neural network fits whatever the noisy data and feature interactions support, so the response along one feature can dip locally even when the overall trend is monotone",recheck_minor
+round2,B4-MLO-12-1,detailed_answer,the unchanged error rate says the slow requests still finish inside client timeouts,the unchanged error rate suggests the slow requests still finish inside client timeouts,recheck_minor
+round2,B4-MLO-12-8,detailed_answer,"(c) Adding a 20% cache hit rate: 576 units, 0.134 per 1,000, about half of today's cost.","(c) Adding a 20% cache hit rate: 576 units, 0.134 per 1,000, about half of today's cost. Note that 576 is exactly the floor (2 replicas x 24 h x 12), so the cache adds only 36 units over (b) and any further efficiency gain is capped by the floor.",recheck_minor
+round2,B4-MLO-13-3,concise_answer,"Cost per request must have risen about 30% (1.40/1.08), most likely through more tokens per request (or retries, tool rounds, model mix), so attribute","Cost per request must have risen about 30% (1.40/1.08), likely from more tokens, retries or model mix, so attribute",recheck_major
+round2,B4-MLO-13-3,detailed_answer,its per-request cost goes from 4.6 to 6.2 units (+35%).,"its per-request cost goes from 4.6 to 6.2 units (+35%). That explains the 30% rise only if the tenant is most of the traffic: at a 20% share the blended cost per request rises by just 7% (0.8 x 4.6 + 0.2 x 6.2 = 4.92), so check the other drivers too.",recheck_minor
+round2,B4-MLO-13-3,detailed_answer,"Note that every edit to the fixed prefix (system prompt, policy text, tool definitions) invalidates the cached prefix","Note that an edit to the fixed prefix (system prompt, policy text, tool definitions) invalidates the cache from the edited point onward",recheck_minor
+round2,B4-MLO-14-5,detailed_answer,"Windowed counts that depend on event lateness: keep the tolerance at zero but compare only rows whose window closed before the lateness bound (a non-zero tolerance would hide the off-by-one incident in the question), and track the late-event rate separately.","Windowed counts that depend on event lateness: keep the tolerance at zero (a non-zero tolerance would hide the off-by-one incident in the question) and make the recomputation point-in-time on arrival time, using only events that had arrived by served_at, which needs an ingestion timestamp. If the offline source has no arrival time, late events make offline counts exceed served ones, so compare only windows that were already closed and past the lateness allowance when the request was served, and track the late-event rate separately.",recheck_major
+round2,B4-MLO-14-5,practical_answer,A mismatch that begins in the hour after a deploy is where to start reading the diff.,"A mismatch that begins in the hour after a deploy is where to start reading the diff. Caveats: the inner join to tolerances silently drops any feature that has no tolerance row, so require one per logged feature, and recomputed must be unique per (request_id, feature) or the counts double.",recheck_minor
+round2,B4-MLO-11-5,detailed_answer,"but are partial; label-only attacks exist, so they do not guarantee safety","but label-only attacks exist and defeat defences that only mask confidence scores (Choquette-Choo et al.), so they should not be relied on as a defence on their own",source_verifier
+final,B4-MLO-08-1,detailed_answer,(a constant or binary feature),"(a constant, or a binary feature so imbalanced that the interpolated quantiles stay at 0 and 1; a 50/50 binary feature keeps an interior edge at 0.5)",final_minor
+final,B4-MLO-08-1,detailed_answer,and here they would be exceeded with no change at all,"and with 40 bins both would be exceeded in nearly every run with no change at all (a 2,000-run check gave 98% above 0.25)",final_minor
+final,B4-MLO-08-7,practical_answer,retained for a limited period,"retained for a limited period that must still exceed the longest label delay (weeks), or the join has nothing to attach to",final_minor
+final,B4-MLO-11-1,detailed_answer,Moving the production alias is a separate role that requires an approval by someone other than the author.,"Moving the production alias is a separate role that requires an approval by someone other than the author, after automated gates (tests, dependency scan, model card) pass; experiments in the experiment namespace need no approval.",final_minor
+final,B4-MLO-12-7,practical_answer,"5. Mitigate: roll back, disable the feature","5. Mitigate: restore the renamed column or add a mapping (a model rollback helps only if the older model does not read it), disable the feature",final_minor
+final,B4-MLO-14-4,answer,Check features logged at serving time against offline values (Rules of Machine Learning rule 37),"Log the features used at serving time (Rules of Machine Learning rule 29) and compare them, and the scores they produce, with the offline pipeline on the same examples (rule 37)",final_minor
+final,B4-MLO-08-2,answer,(about 0.09 with 20),(about 0.09 to 0.10 with 20),final_minor
+final,B4-MLO-08-2,answer,"All are under the threshold, although the feature is broken.","At 10 bins all are under the 0.1 line (20 bins sit right at it), although the feature is broken.",final_minor
+final,B4-MLO-08-2,answer,about 0.02 to 0.03 (depending,about 0.015 to 0.03 (depending,final_minor
+final,B4-MLO-08-8,answer,"Weekly seasonality causes recurring weekend alarms unless the training window covered full cycles and you compare like with like,","Weekly seasonality still causes recurring weekend alarms when a single day is compared with the all-days training mixture, unless you compare like with like (same weekday or weekday-adjusted),",final_minor
+final,B4-MLO-14-1,answer,"(say 2 to 5% of users kept on the old model, sized by a power calculation so it can detect a 2% change in repeat purchases)",(say 2 to 5% of users kept on the old model if the user base is large enough; size it by a power calculation so it can detect a 2% change in repeat purchases),final_minor
+final,B4-MLO-14-1,answer,only a concurrent control answers it.,a concurrent control is the cleanest way to answer it.,final_minor
+final,B4-MLO-14-5,detailed_answer,"so compare only windows that were already closed and past the lateness allowance when the request was served, and track the late-event rate separately.","so compare only features computed over windows that had already closed, and were past the lateness allowance, when the request was served (for example the previous complete day; a rolling window ending at served_at never qualifies, so there an ingestion timestamp is needed), and track the late-event rate separately.",final_minor
+final,B4-MLO-10-1,detailed_answer,"Invariance tolerances should cover float noise and small genuine sensitivity, and the allowed failure rate is usually at or near zero.","Calibrate invariance tolerances empirically: run the check on the current production model (and on a retrain with a different seed) and set tol just above the float noise and routine score movement they show, then fix tol before looking at the candidate; the allowed failure rate is usually at or near zero.",final_minor
+final,B4-MLO-10-1,detailed_answer,"monotone, so a pragmatic gate compares",monotone. A pragmatic gate compares,final_minor
+final,B4-MLO-13-2,detailed_answer,a rise in one category only means either a real abuse campaign or a classifier that over-triggers on a new input pattern,a rise in one category most often means either a real abuse campaign or a classifier that over-triggers on a new input pattern (or the release changed what the model outputs in that category),final_minor
+final,B4-MLO-14-2,answer,"4. No feedback: shadow decisions do not change customer behaviour, so downstream effects are not exercised.","4. No feedback loop: shadow decisions do not change customer behaviour (customers retry or call support after a hold, fraudsters adapt), so the traffic and load the live model faces differ from the mirrored traffic.",final_minor
+final,B4-MLO-14-2,answer,Google's Rules of Machine Learning recommend saving the features used at serving time for this reason.,Google's Rules of Machine Learning (Rule #29) recommend saving the features used at serving time so that serving and training values can be checked for consistency.,final_minor
+final,B4-MLO-14-6,detailed_answer,but with much higher variance; B has a smaller but steadier return that is insurance against a loss you currently cannot see.,"but its realised gain is uncertain until an online test (net from -10,000 to +170,000 for 25% to 75% realisation); B's net swings similarly with the incident rate (-68,600 to +85,800 for 1 to 4 incidents a year), yet it is insurance against a loss you currently cannot see, so neither option is low-risk.",final_major
+lead,B4-MLO-14-6,detailed_answer/practical_answer,"+85,800 / saving 51,400 each","+85,700 / saving about 51,430 each",lead_rounding_consistency
+lead,B4-MLO-14-6,detailed_answer,two sentences removed,,lead_word_limit_trim
+lead,B4-MLO-11-1,detailed_answer,Residual risk sentence,shortened,lead_word_limit_trim
+quarantine,B4-MLO-13-4,record,accepted draft,quarantined: intent duplicate of smi-k0015,lead
+checkpoint_fv,B4-MLO-14-6,detailed_answer,"Saving per incident about 51,400 (assuming monitoring catches every incident within 3 days);","Saving per incident about 51,440 (assuming monitoring catches every incident within 3 days and reading the 2% as a loss rate while the incident lasts; if the 2% is instead the whole pre-detection cost of an incident, the saving is 24M x 0.02 x (1 - 3/42), about 445,700, and B wins by a wide margin, so confirm how the 2% was measured);",fv_major
+checkpoint_fv,B4-MLO-14-6,detailed_answer,"24M x 0.02 x 6/52 = 55,400","24M x 0.02 x 6/52 = 55,385",fv_minor
+checkpoint_fv,B4-MLO-14-6,detailed_answer,"24M x 0.02 x 3/365 = 3,900","24M x 0.02 x 3/365 = 3,945",fv_minor
+checkpoint_fv,B4-MLO-14-6,detailed_answer,"(120,000 / 51,400)","(120,000 / 51,440)",fv_minor
+checkpoint_fv,B4-MLO-14-6,detailed_answer,"+85,700 for 1 to 4","+85,800 for 1 to 4",fv_minor
+checkpoint_fv,B4-MLO-14-6,detailed_answer,so the incident rate is unlikely to fall by itself.,so the incident rate should not be assumed to fall by itself.,fv_minor
+checkpoint_fv,B4-MLO-14-6,practical_answer,"(saving about 51,430 each, year-1 cost 120,000)","(saving about 51,440 each, year-1 cost 120,000)",fv_minor
+checkpoint_fv,B4-MLO-14-6,practical_answer,"4 -> net +85,700","4 -> net +85,800",fv_minor
+checkpoint_fv,B4-MLO-14-6,practical_answer,"(60,000 / 51,400)","(60,000 / 51,440)",fv_minor
+checkpoint_fv,B4-MLO-08-8,answer,"That is a constant small offset, easy to miss, and it does not accumulate.","That is a constant small offset, easy to miss when seasonal swings and alert tolerances are of similar size, and it does not accumulate.",fv_minor
+checkpoint_fv,B4-MLO-08-8,answer,so its noise floor is higher and holidays contaminate it.,so its noise floor is higher than C's 7-day pool (4 days of rows instead of 7) and holidays contaminate it.,fv_minor
+checkpoint_fv,B4-MLO-10-1,code_patch.solution,"import numpy as np
+
+
+def _as_float(X):
+    """"""Float matrix (integer input is cas","import numpy as np
+
+
+def _as_float(X):
+    """"""Float matrix (integer input is cas",fv_patch
+checkpoint_fv,B4-MLO-10-1,code_patch.test,"def _make_model(leak_weight):
+    w = np.array([0.9, 1.1, 0.0, leak_weight])  # ","def _make_model(leak_weight):
+    w = np.array([0.9, 1.1, 0.0, leak_weight])  # ",fv_patch
+checkpoint_fv,B4-MLO-10-1,practical_answer,"X2[:, col] = perturb(X[:, col])","X2[:, col] = perturb(X[:, col].copy())",fv_minor
+checkpoint_fv,B4-MLO-10-1,detailed_answer,then fix tol before looking at the candidate; the allowed failure rate is usually at or near zero.,then fix tol before looking at the candidate; for invariance checks the allowed failure rate is typically set at or near zero.,fv_minor
+checkpoint_fv,B4-MLO-11-1,detailed_answer,Protects against: a stolen notebook token reaching production. Does not protect against: an insider who holds the promotion role.,"Protects against: a stolen notebook token writing to the production bucket path or moving the alias directly. If that identity can also launch pipeline jobs, it can still get a malicious artifact registered, so the approval step and the loader hardening below carry that case; artifacts in the experiment namespace stay untrusted. Does not protect against: an insider who holds the promotion role.",fv_minor
+checkpoint_fv,B4-MLO-11-1,detailed_answer,"Immutable log of who registered, approved and moved each alias, linked to run, code commit and data version.","Immutable log of who registered, approved and moved each alias, linked to run, code commit and data version, with an alert on every production-alias move.",fv_minor
+checkpoint_fv,B4-MLO-11-5,detailed_answer,"Differentially private training, or adding noise to outputs, which OWASP also lists. DP training gives a formal bound on how much any one record can influence the model, at a cost in accuracy, complexity and compute; it is the strongest option but not cheap.","Differentially private training. (OWASP also lists adding noise to predictions, but noise on scores that leaves the label unchanged is a form of confidence masking and does not stop label-only attacks.) DP training gives a formal bound on how much any one record can influence the model, at a cost in accuracy, complexity and compute; Choquette-Choo et al. report DP and strong L2 regularisation as the only defences that stopped all the attacks they tried. It is the strongest option but not cheap.",fv_major
+checkpoint_fv,B4-MLO-11-5,concise_answer,"Cheap mitigations: reduce overfitting, return less (label or coarse score), round outputs, authenticate and rate-limit; stronger but costlier: differentially private training.",Cheap mitigations: reduce overfitting (targets the root signal); return less or round scores (label-only attacks still work); authenticate and rate-limit (does not stop a single-query test; keys can be multiplied). Strongest but costlier: differentially private training.,fv_major
+checkpoint_fv,B4-MLO-11-5,detailed_answer,"but do nothing against a single-query threshold test by an authorised caller, and per-key limits can be sidestepped with many keys.","but do nothing against a single-query threshold test by an authorised caller (at 10,000 calls a day one key could test up to 10,000 records, about 3,300 if each needs three augmented queries, but only about 4 at the 2,500 queries of the paper's boundary-distance attack), and per-key limits can be sidestepped with many keys (the paper notes Sybil attacks make query limiting an unlikely defence).",fv_minor
+checkpoint_fv,B4-MLO-11-5,detailed_answer,It is worse when the model overfits,It tends to be worse when the model overfits,fv_minor
+checkpoint_fv,B4-MLO-11-5,practical_answer,1. Hold out a set of records that were never in training (non-members) and sample an equal number of training records (members).,"1. Hold out a set of records that were never in training (non-members), drawn from the same distribution as the training data (a random split, not a later period, or drift will inflate the AUC), and sample an equal number of training records (members).",fv_minor
+checkpoint_fv,B4-MLO-11-5,practical_answer,"(for example 0.1%, which needs several thousand non-members to estimate)","(for example 0.1%, which needs at least several thousand non-members to estimate)",fv_minor
+checkpoint_fv,B4-MLO-12-7,detailed_answer,or to a holdout or shadow model that kept the old feature,"or, if one existed, to a holdout slice still served with the old feature (a shadow model has no click outcomes; it can only show how scores and rankings would have differed on logged requests)",fv_major
+checkpoint_fv,B4-MLO-12-7,detailed_answer,the drift was spread over time as user caches or cohorts refreshed,"a loss that ramps over 19 days when the default applied to every user needs its own explanation (for example cached recommendations or daily-refreshed features ageing out, or a staged rollout of the rename), which the postmortem should check rather than assume",fv_minor
+checkpoint_fv,B4-MLO-12-7,detailed_answer,a canary comparison against the previous model on live traffic,"a comparison of live feature values and scores against a logged reference (the training distribution or a frozen sample of earlier requests), since a canary against the previous model shares the same broken upstream data",fv_minor
+checkpoint_fv,B4-MLO-12-7,practical_answer,disable the feature (so it is intentionally imputed and flagged),"disable the feature only if the model was trained or validated with it missing (otherwise this reproduces the fault), so it is intentionally imputed and flagged",fv_minor
+checkpoint_fv,B4-MLO-13-3,detailed_answer,"Cost scales with tokens per request, not with requests.","Cost scales with total tokens (requests times tokens per request), so 8% more requests cannot explain a 40% rise: cost per request must have risen by about 30% (1.40 / 1.08 = 1.30).",fv_minor
+checkpoint_fv,B4-MLO-13-3,detailed_answer,That explains the 30% rise only if the tenant is most of the traffic,That explains the 30% rise only if the tenant is about 85% of the traffic (0.30 / 0.35),fv_minor
+checkpoint_fv,B4-MLO-13-3,detailed_answer,many providers reuse work only when the beginning of the prompt is byte-identical,cache reuse typically requires the beginning of the prompt to match exactly (OpenAI's documentation says the entire rendered prefix must match),fv_minor
+checkpoint_fv,B4-MLO-14-4,answer,exploration or randomised-ranking traffic is the clean mitigation,exploration or randomised-ranking traffic is one mitigation (Sculley et al. also mention isolating part of the data from the model's influence),fv_minor
+checkpoint_fv,B4-MLO-14-5,practical_answer,"Caveats: the inner join to tolerances silently drops any feature that has no tolerance row, so require one per logged feature, and recomputed must be unique per (request_id, feature) or the counts double.","Caveats: the inner join to tolerances silently drops any feature that has no tolerance row, so require one per logged feature, and recomputed must be unique per (request_id, feature) or the counts double. The comparison is also numeric only: for text ids or categories ABS(s.value - r.value) is 0, so a changed value would be reported as a match. Encode such features as integers (for example a dictionary index) or add a null-safe exact test such as (t.abs_tol = 0 AND t.rel_tol = 0 AND s.value IS NOT r.value) before relying on the query for them.",fv_major
+checkpoint_fv,B4-MLO-14-5,practical_answer,"Reading it: in the 14:00 hour, 4 of 11 orders_24h values were off by one and one request had no recomputation","Reading it: in the 14:00 hour, 4 of the 10 recomputed orders_24h values were off by one and one more request had no recomputation",fv_minor
+checkpoint_fv,B4-MLO-14-5,practical_answer,(10 clean requests per hour plus a deploy-time fault in the 14:00 hour),"(10 requests per hour, with a deploy-time fault in 4 of the 10 in the 14:00 hour, plus one NULL-served value and one request without recomputation)",fv_minor
+checkpoint_fv,B4-MLO-14-5,rubric_points, and higher sampling during canary,,fv_minor
+checkpoint_fv,B4-MLO-08-3,detailed_answer,1. Alert on symptoms first.,1. Alert on model-level symptoms and hard data-quality invariants first.,fv_minor
+checkpoint_fv,B4-MLO-08-3,practical_answer,score-distribution PSI above its own 99th-percentile historical value for 2 consecutive windows,score-distribution PSI above its own 99th-percentile historical value for 2 consecutive windows (a model-output symptom; per-feature drift metrics stay at ticket or dashboard level),fv_minor
+checkpoint_fv,B4-MLO-08-5,answer,where tree models flatten and neural nets can behave unpredictably,where tree-based models predict a constant beyond the observed range and neural nets can behave unpredictably,fv_minor
+checkpoint_fv,B4-MLO-08-5,answer,Re-score a recent sample after replacing each drifted feature (or the group) with values resampled from the reference.,"Re-score a recent sample after replacing each drifted feature (or the group) with values resampled from the reference. Independent resampling breaks correlations with the other features, so treat the result as a sensitivity check, not an exact estimate.",fv_minor
+checkpoint_fv,B4-MLO-08-6,answer,The ML Test Score paper makes the parallel point for prediction quality: models should have zero bias in aggregate and on slices.,The ML Test Score paper makes a parallel point for prediction bias: models should have zero bias in aggregate and on slices.,fv_minor
+checkpoint_fv,B4-MLO-08-7,detailed_answer,"The decision is reproducible, uncorrelated with feature values and needs no coordination","The decision is reproducible, uncorrelated with feature values as long as request IDs are not derived from user or feature data, and needs no coordination",fv_minor
+checkpoint_fv,B4-MLO-08-7,detailed_answer,"even 50 rows gives 9 x (0.00001 + 0.02), about 0.18","even 50 rows gives roughly 9 x (0.00001 + 0.02), about 0.18 (the approximation is rough at so few rows; a simulation gave about 0.24)",fv_minor
+checkpoint_fv,B4-MLO-08-7,practical_answer,log everything once (under a short retention),"log everything once (under a short retention, with security sign-off)",fv_minor
+checkpoint_fv,B4-MLO-09-3,answer,"A single guardrail is not enough: the failure needed corrupted training data, a corrupted holdout and a missing sanity check to align.","Guardrails 1 and 2 alone would very likely have stopped this incident; the later layers are defence in depth, covering a missed quality check, a corrupted holdout, or a model that passes AUC but behaves abnormally.",fv_major
+checkpoint_fv,B4-MLO-09-4,answer,little idle freshness lag,a smaller gap between new data arriving and the model reflecting it,fv_minor
+checkpoint_fv,B4-MLO-09-4,answer,"for each day, produce both variants using only data available then","for each day, produce both variants using only data available then (at 14 hours per full retrain, 60 daily full retrains is costly, so use a sample of 10 to 15 origin days or a subsampled dataset)",fv_minor
+checkpoint_fv,B4-MLO-10-2,detailed_answer,"On the example run (SQLite dialect, executed in the test): refund_flag has all 4 rows from the future","On the example run (SQLite dialect, executed in the test on 4 training rows and 12 feature values, where refund_flag is stamped between 12 hours and about 20 days after prediction time and days_since_login is stamped 23:59 on the prediction day for three of the four rows): refund_flag has all 4 rows from the future",fv_minor
+checkpoint_fv,B4-MLO-10-2,practical_answer,run in the test below against a four-row in-memory dataset,run in the test (code.test) against a four-row in-memory dataset,fv_minor
+checkpoint_fv,B4-MLO-10-2,detailed_answer,"Features with no timestamp, leakage that is not temporal","Features with no timestamp, rows whose label_ts is NULL (they are never counted in rows_after_label), leakage that is not temporal",fv_minor
+checkpoint_fv,B4-MLO-12-1,detailed_answer,shifting traffic back to v11 buys time for the investigation;,shifting most traffic back to v11 buys time for the investigation (keep a small slice or a replay on v12 so versions can still be compared);,fv_minor
+checkpoint_fv,B4-MLO-12-3,detailed_answer,so about 2.9 KiB of memory retained per request.,"so about 2.9 KiB of memory per request if growth is proportional to requests (at flat traffic growth per hour and per request look identical, so confirm with the traffic test below).",fv_minor
+checkpoint_fv,B4-MLO-12-3,detailed_answer,and whether memory stays high when traffic stops,"and whether memory stays high when traffic stops (a leak and allocator retention both do, so use the live-object comparison below to tell them apart)",fv_minor
+checkpoint_fv,B4-MLO-12-3,detailed_answer,It is usually bounded and shows as a sawtooth that never returns to baseline.,"It is usually bounded, so resident size tends to plateau high rather than climb linearly without end; a steady linear climb at flat traffic fits a leak or an unbounded cache better.",fv_minor
+checkpoint_fv,B4-MLO-12-3,detailed_answer,and output tensors retained with their gradient history because gradients were not disabled at inference,"and, in PyTorch services, stored output tensors that still carry autograd history because inference ran with gradient tracking on",fv_minor
+checkpoint_fv,B4-MLO-12-4,detailed_answer,"The ML Test Score rubric lists 'Serving models can be rolled back' as a test, which means rehearsed, not assumed.","The ML Test Score rubric lists 'Models can be quickly and safely rolled back to a previous serving version' as a test and says rollback should be practised outside emergencies, so rehearsed, not assumed.",fv_minor
+checkpoint_fv,B4-MLO-12-4,detailed_answer,"(as in the question, where 30 minutes of data was written under the new feature)","(the question notes that the new feature has been written for 30 minutes, so check whether the old model can still read those rows)",fv_minor
+checkpoint_fv,B4-MLO-12-4,detailed_answer,traffic shifting is often faster than either.,"shifting traffic weight back to the old bundle, or turning the new feature off with a flag, is often faster than redeploying either build.",fv_minor
+checkpoint_fv,B4-MLO-12-4,detailed_answer,"record the timeline, and confirm recovery","record the timeline, quarantine or mark the feature values written in the last 30 minutes so they are not served or reused for training, and confirm recovery",fv_minor
+checkpoint_fv,B4-MLO-12-4,practical_answer,"Decision rule: run the 2-minute replay of recent requests through the old bundle. If outputs look normal, roll back;","Decision rule: while you freeze deployments and start shifting a small share of traffic to the old bundle, run the 2-minute replay of recent requests through it. If outputs look normal, roll back fully;",fv_minor
+checkpoint_fv,B4-MLO-12-5,detailed_answer,"The two dependencies have different roles, so they need different designs.","At 99.95% over 30 days the error budget is only 0.0005 x 43,200 = 21.6 minutes, so last month's 22-minute feature-store outage alone used all of it. The two dependencies have different roles, so they need different designs.",fv_minor
+checkpoint_fv,B4-MLO-12-5,detailed_answer,and bounded retries with jitter.,"and bounded retries with jitter. On recovery, close the circuit gradually and confirm that feature writes missed during the outage are backfilled (or the features are fresh again) before leaving the fallback modes.",fv_minor
+checkpoint_fv,B4-MLO-12-5,detailed_answer,(decide in advance whether fallback responses count as good events),"(a valid, in-time fallback response normally counts as good for the availability SLO, which is why the fallback rate needs its own objective; decide this in advance)",fv_minor
+checkpoint_fv,B4-MLO-12-5,practical_answer,| 0 normal |,| 1 normal |,fv_minor
+checkpoint_fv,B4-MLO-12-5,practical_answer,| 1 stale cache |,| 2 stale cache |,fv_minor
+checkpoint_fv,B4-MLO-12-5,practical_answer,| 2 request-only model |,| 3 request-only model |,fv_minor
+checkpoint_fv,B4-MLO-12-5,practical_answer,| 3 safe default |,| 4 safe default |,fv_minor
+checkpoint_fv,B4-MLO-12-5,practical_answer,a miss or older entry sends that request to mode 2,a miss or older entry sends that request to mode 3,fv_minor
+checkpoint_fv,B4-MLO-12-5,practical_answer,recovery back to mode 0 happens without a thundering herd,recovery back to mode 1 happens without a thundering herd,fv_minor
+checkpoint_fv,B4-MLO-12-6,detailed_answer,"Adapt that to quality: when the quality budget is exhausted,","Adapt that to quality: let the proxy budget drive the immediate freeze and paging, and the matured-label budget confirm, extend or lift it; when the quality budget is exhausted,",fv_minor
+checkpoint_fv,B4-MLO-12-8,detailed_answer,"Results from the executed model (abstract units): the daily traffic is 4,302,000 requests.","Results from an executed model that uses an assumed hourly profile of average requests/s (about 5 to 8 overnight, rising to the 100 requests/s peak at 19:00 and summing to 4,302,000 requests a day; the profile is an illustration, not data from the question, so (a) to (c) change with a different shape): the daily traffic is 4,302,000 requests.",fv_major
+checkpoint_fv,B4-MLO-12-8,detailed_answer,so the fleet is on average about 31% loaded; it is sized for the peak of 100 requests/s at 70% target utilisation (28 requests/s per replica gives 4 replicas).,"so the fleet is on average about 31% loaded; 4 replicas is consistent with sizing for the peak of 100 requests/s at 70% target utilisation (100 / 28 = 3.6, rounded up), although the question does not say how 4 was chosen.",fv_minor
+checkpoint_fv,B4-MLO-12-8,detailed_answer,"accelerators plus supporting services such as feature reads, logging and network","replicas (CPU or accelerator) plus supporting services such as feature reads, logging and network",fv_minor
+checkpoint_fv,B4-MLO-12-8,detailed_answer,or scale on a metric that reflects the accelerator's queue rather than CPU,"or scale on a metric that reflects saturation, such as in-flight requests or queue wait (CPU is a poor signal if the work runs on an accelerator)",fv_minor
+checkpoint_fv,B4-MLO-12-8,detailed_answer,Include non-GPU costs and the engineering time the change costs.,"Include costs beyond the replicas (feature reads, logging, network, cache storage) and the engineering time the change costs.",fv_minor
+checkpoint_fv,B4-MLO-11-2,detailed_answer,"Pseudonymisation lowers risk but the data is generally still regarded as personal data in many jurisdictions, because re-identification remains possible with additional information; exactly where the line sits depends on jurisdiction and legal advice.","Pseudonymisation lowers risk but pseudonymised data is generally still treated as personal data, because re-identification remains possible with additional information (the UK ICO's guidance says it is personal data in the hands of anyone who holds the additional information, which includes the team holding the key and the raw IDs); exactly where the line sits for a given recipient depends on jurisdiction and legal advice.",fv_minor
+checkpoint_fv,B4-MLO-11-2,detailed_answer,"Date of birth plus postcode is a classic quasi-identifier combination, so even","Date of birth plus postcode is a classic quasi-identifier combination (Sweeney estimated that about 87% of the US population was likely unique on 5-digit ZIP, gender and date of birth), so even",fv_minor
+checkpoint_fv,B4-MLO-11-3,answer,"Models that memorise (for example small data, high capacity, overfitting, or rare or repeated records) are more likely to retain recognisable traces of individual records, so treat that as a factor in how aggressively you retrain; this is model- and data-dependent and absence of memorisation is hard to demonstrate.","Models can retain recognisable traces of individual records (the Secret Sharer study found unintended memorisation of rare sequences in language models, arising early in training rather than only from overtraining, and increasing with model size), so treat that as a factor in how aggressively you retrain; this is model- and data-dependent and absence of memorisation is hard to demonstrate.",fv_major
+checkpoint_fv,B4-MLO-12-9,question_type,scenario,design,fv
+checkpoint_fv,B4-MLO-12-9,answer,that checkpoint overhead is small relative to step time,that checkpoint write time is small relative to the checkpoint interval,fv_minor
+checkpoint_fv,B4-MLO-13-1,answer,you can see from the logged identifier whether the underlying model changed,"you can see from the model identifier recorded on each request (the resolved snapshot returned in the response, where the API reports it) whether the underlying model changed",fv_minor
+checkpoint_fv,B4-MLO-13-2,detailed_answer,Pull 50 to 100 blocked items across categories,"Pull 50 to 100 blocked items across categories (with that few labels the estimated false-positive share is rough, about plus or minus 10 to 14 points at 95% confidence for a share near 50%; label more for a tighter estimate)",fv_minor
+checkpoint_fv,B4-MLO-14-1,answer,"(3) Novelty and exposure effects: early click lift may fade while a narrowing of what users see (less diversity, fewer discovery items) accumulates.","(3) Exposure and novelty effects: click-through is still up here, so the click lift has not faded, but a narrowing of what users see (less diversity, fewer discovery items) can accumulate over weeks and depress later purchases; a novelty effect also means the 2-week test window may not have been representative.",fv_minor
+checkpoint_fv,B4-MLO-14-2,answer,recommend saving the features used at serving time so that serving and training values can be checked for consistency,"recommend saving the features used at serving time and logging them for use at training time, which also gives you the exact values to compare against offline recomputation",fv_minor
+checkpoint_fv,B4-MLO-14-3,practical_answer,"If it shows a difference or SRM, the platform is the problem, not the model.","If it shows SRM or a repeatable significant difference between identical arms (a single A/A run will show p < 0.05 about 5% of the time by chance), the platform is the problem, not the model.",fv_minor
+checkpoint_fv,B4-MLO-11-2,detailed_answer,so deletion and access requests can be honoured,(erasure is not absolute hedge),gdpr_lead
+checkpoint_fv2,B4-MLO-08-3,practical_answer,- Ticket (next business day): any single feature's drift metric,- Ticket (next business day): null rate of any other feature above its 90-day maximum by more than a set margin; any single feature's drift metric,fv2_minor
+checkpoint_fv2,B4-MLO-08-3,practical_answer,above its 90-day maximum by more than a set margin for 2 consecutive windows,"above its 90-day maximum by more than a set margin for 2 consecutive windows (compute these data-quality checks hourly, so a regression pages within hours rather than after two daily runs)",fv2_minor
+checkpoint_fv2,B4-MLO-11-5,detailed_answer,report DP and strong L2 regularisation as the only defences that stopped all the attacks they tried,report DP and strong L2 regularisation as the only known defences that stopped their label-only attacks (at an accuracy cost; DP's epsilon was large at useful accuracy),fv2_minor
+checkpoint_fv2,B4-MLO-11-5,detailed_answer,Model inversion is a related but different risk: using outputs to reconstruct attributes or representative inputs; for a tabular scorer this matters most when sensitive attributes are predictable from other inputs.,Model inversion (reconstructing attributes or inputs from outputs) is a related but different risk.,fv2_minor
+checkpoint_fv2,B4-MLO-12-5,detailed_answer,so last month's 22-minute feature-store outage alone used all of it,"so last month's 22-minute feature-store outage, if every request failed throughout, used essentially all of it (a 31-day month allows 22.3 minutes)",fv2_minor
+checkpoint_fv2,B4-MLO-12-9,rubric_points,(none),added,fv2
+checkpoint_fv2,B4-MLO-12-9,question_type,design,scenario (or keep design with the supplied rubric),fv
+checkpoint_fv2,B4-MLO-12-9,answer,bound the extra at roughly 40 minutes on a 7-hour job (about 10%) in this example,"bound the extra at roughly 40 minutes on a 7-hour job (about 10%) in this example, provided replacement capacity arrives within the restore time",fv2_minor
+checkpoint_fv2,B4-MLO-14-1,answer,"click-through is still up here, so the click lift has not faded, but","click-through is still up, so a classic novelty fade in the click lift is not what is observed (check the lift by weeks since launch), but",fv2_minor
+checkpoint_fv2,B4-MLO-14-1,answer,; a novelty effect also means the 2-week test window may not have been representative.,.,fv2_minor
+checkpoint_fv2,B4-MLO-14-1,answer,Check that the metric definition and tracking did not change at the same time.,"Check that the metric definition and tracking did not change at the same time. What separates them: a repeat-purchase gap between holdback and exposed users points to the model (proxy mismatch, or narrowing if item diversity also fell); the same dip in both groups points to season or cohort mix; a gap opening only after the test's 2-week horizon shows in cohort curves by weeks since launch.",fv2_minor
+checkpoint_fv2,B4-MLO-08-5,answer,(permutation or attribution mass on a recent sample),"(permutation importance on labelled validation data, or attribution mass such as mean absolute SHAP on a recent sample)",fv2_minor
+checkpoint_fv2,B4-MLO-08-5,answer,analyst labels disagreeing with the model indicate real harm,analyst labels disagreeing with the model are signs of possible harm,fv2_minor
+checkpoint_fv2,B4-MLO-12-6,detailed_answer,"when the quality budget is exhausted, freeze non-urgent model and feature releases","when the proxy quality budget is exhausted, freeze non-urgent model and feature releases (fixes to the data or the monitoring itself are exempt)",fv2_minor
+checkpoint_fv2,B4-MLO-08-6,answer,and about 0.0001 on the rest,and about 0.0002 on the rest,fv2_minor
+checkpoint_fv2,B4-MLO-09-4,answer,so use a sample of 10 to 15 origin days or a subsampled dataset),"so run the warm-start chain on consecutive days from one full-retrain checkpoint, since it is cheap at about 40 minutes a day and its errors accumulate along the chain, and compute the full-retrain baseline only on a sample of 10 to 15 of those days or on a subsampled dataset)",fv2_major
+checkpoint_fv2,B4-MLO-09-4,answer,"(for example, refitting trees is not the same as adding trees; the behaviour is implementation-specific)","(for example, some tree libraries can continue boosting from an existing model while others only refit, so check the library's documented behaviour)",fv2_minor
+checkpoint_fv2,B4-MLO-11-2,detailed_answer,"Sweeney estimated that about 87% of the US population was likely unique on 5-digit ZIP, gender and date of birth","Sweeney estimated, from 1990 US census data, that about 87% of the US population was likely unique on 5-digit ZIP, gender and date of birth",fv2_minor
+checkpoint_fv2,B4-MLO-11-2,concise_answer,keep a way to find a person's rows for deletion.,keep a way to find a person's rows for access and deletion requests where they apply.,fv2_minor
+checkpoint_fv2,B4-MLO-12-7,practical_answer,"disable the feature only if the model was trained or validated with it missing (otherwise this reproduces the fault), so it is intentionally imputed and flagged,","disable the feature only if the model was trained or validated with it missing (otherwise this reproduces the fault), in which case it is intentionally imputed and flagged,",fv2_minor
+checkpoint_fv2,B4-MLO-08-7,detailed_answer,"So the slice should be captured at 100%, which is 10,000 rows a day","So the slice should be covered at 100%, either by its streamed per-slice histograms (item 1) or by raw capture when rows are needed for investigation, which is 10,000 rows a day",fv2_minor
+checkpoint_fv2,B4-MLO-10-1,practical_answer,"A final assertion checks that integer-typed matrices are perturbed correctly (they are cast to float first), float32 input stays float32 (no cast noise), and a NaN score counts as a failure rather than a silent pass.","Further assertions check that integer-typed matrices are perturbed correctly (they are cast to float first), float32 input stays float32 (no cast noise), a NaN score counts as a failure rather than a silent pass, and a perturb function that mutates its argument in place can neither corrupt X nor hide the failure.",fv2_minor
+checkpoint_fv2,B4-MLO-11-3,answer,and increasing with model size),"and, in its appendix experiments, increasing with model size and batch size)",fv2_minor
+checkpoint_fv2,B4-MLO-12-4,detailed_answer,"and confirm recovery against the same hour a week earlier, not a feeling.","and confirm recovery against a concurrent control if one exists, otherwise against the same hour a week earlier, not a feeling.",fv2_minor
+checkpoint_fv2,B4-MLO-12-4,detailed_answer,(so the feature takes its default),"(so the feature takes its default, which is safe only if the model was trained to handle that default)",fv2_minor
+checkpoint_fv2,B4-MLO-12-8,detailed_answer,the cache adds only 36 units over (b),the cache saves only 36 units compared with (b),fv2_major
+checkpoint_fv2,B4-MLO-13-3,detailed_answer,cost per request must have risen by about 30% (1.40 / 1.08 = 1.30),cost per request must have risen by about 30% at unchanged prices (1.40 / 1.08 = 1.30),fv2_minor
+checkpoint_fv2,B4-MLO-13-3,concise_answer,Cost per request must have risen about 30% (1.40/1.08),"At fixed prices, cost per request rose about 30% (1.40/1.08)",fv2_minor
+checkpoint_fv3,B4-MLO-08-3,practical_answer,(a model-output symptom; per-feature drift metrics stay at ticket or dashboard level),"(a model-output symptom; page on it only if replaying past incidents shows it tracks quality, otherwise treat it as a ticket-level signal like other drift statistics; per-feature drift metrics stay at ticket or dashboard level)",fv3_minor
+checkpoint_fv3,B4-MLO-09-4,answer,along with day-to-day stability and the cost,"along with the cost and day-to-day stability (visible in full for the warm-start chain, only coarsely for the sampled full retrains)",fv3_minor
+checkpoint_fv3,B4-MLO-08-5,answer,removes your ability to attribute any change,makes it harder to attribute any change,fv3_minor
+checkpoint_fv3,B4-MLO-08-7,detailed_answer,"about 417 an hour, and the hourly floor","about 417 an hour on average (fewer overnight, where the floor is higher), and the hourly floor",fv3_minor
+checkpoint_fv3,B4-MLO-08-7,detailed_answer,a simulation gave about 0.24,a simulation gave roughly 0.2 to 0.25,fv3_minor
+checkpoint_fv3,B4-MLO-10-1,code_patch.test,"def _make_model(leak_weight):
+    w = np.array([0.9, 1.1, 0.0, leak_weight])  # ","def _make_model(leak_weight):
+    w = np.array([0.9, 1.1, 0.0, leak_weight])  # ",fv3_patch
+checkpoint_fv3,B4-MLO-11-3,answer,"(the nightly one is excluded from tomorrow, the others at their next cycle)","(the nightly one from the first run that reads the tombstone list, the others at their next cycle)",fv3_minor
+checkpoint_fv3,B4-MLO-12-6,concise_answer,when the quality budget is exhausted,when the proxy quality budget is exhausted,fv3_minor
+lead,B4-MLO-12-9,question_type,(set during fv),design (rubric_points added),lead_fix_type_label
+lead,B4-MLO-11-1/14-6,detailed_answer,over 450 words after fixes,trimmed to <=450; 14-6 alternative-reading detail moved to practical_answer,lead_word_limit

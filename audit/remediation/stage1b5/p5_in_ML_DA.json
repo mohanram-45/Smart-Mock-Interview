@@ -1,0 +1,306 @@
+[
+ {
+  "id": "smi-i0003",
+  "plan_id": "P3-ML-03",
+  "domain": "Machine Learning",
+  "difficulty": "Medium",
+  "priority": true,
+  "question": "A gradient-boosted classifier for loan default has 0.88 ROC-AUC, but when it outputs 0.30 for a group of applicants, roughly 12% of them actually default. What does it mean for a model to be calibrated, how would you measure it with a reliability diagram and expected calibration error, why does the high AUC not tell you the probabilities are right, and when does calibration matter?",
+  "answer": "A model is calibrated if, among cases given predicted probability p, about a fraction p are positive. Here the 0.30 group defaulting at 12% means the model overestimates default risk in that region.\n\nReliability diagram: bin predictions (equal-width or equal-frequency bins), plot mean predicted probability on x against observed positive fraction on y; a calibrated model lies on the diagonal. scikit-learn's calibration_curve does exactly this binning. Expected calibration error (ECE) summarises it as the sample-weighted average of |mean predicted - observed rate| over bins. ECE depends on binning choices and on bin counts, is noisy when bins hold few positives, and only measures calibration, not discrimination; log loss or the Brier score are proper scoring rules that combine both.\n\nAUC measures only ranking: it is unchanged by any strictly increasing transformation of the scores. Illustration (my own simulation, 200,000 rows, true logit drawn from Normal(-1.5, 1.5), 10 equal-width bins; exact values depend on the score distribution and binning): taking a perfectly calibrated score and tripling its logit leaves AUC at about 0.82 but raises ECE from about 0.002 to about 0.13, because the ordering is identical while the probabilities are badly stretched.\n\nCalibration matters when the probability itself is used: expected-loss or pricing calculations, thresholds derived from costs, combining model outputs, or showing risk to humans. If you only rank cases or pick the top k, calibration is mostly irrelevant. Evaluate calibration on data not used to fit the model or the calibrator.",
+  "key_concepts": [
+   "calibration",
+   "reliability diagram",
+   "expected calibration error",
+   "AUC invariance to monotone transforms",
+   "Brier score",
+   "log loss",
+   "proper scoring rule"
+  ],
+  "common_mistakes": [
+   "Saying a high-AUC model must give accurate probabilities",
+   "Reporting ECE without mentioning binning sensitivity",
+   "Claiming calibration improves ranking quality"
+  ],
+  "sources": [
+   {
+    "title": "scikit-learn: Probability calibration",
+    "url": "https://scikit-learn.org/stable/modules/calibration.html",
+    "supports": "calibration_curve bins predictions and plots mean predicted probability against fraction of positives (reliability diagram); calibration is generally expected not to affect ranking metrics such as ROC-AUC.",
+    "verification": "independent_reviewer_supported"
+   }
+  ],
+  "code": null,
+  "originally_flagged": [
+   {
+    "severity": "major",
+    "claim": "Illustration (seeded simulation, 200,000 rows): taking a perfectly calibrated score and tripling its logit leaves AUC at 0.8314 but raises ECE from about 0.001 to about 0.07, because the ordering is identical while the probabilities are badly stretched.",
+    "problem": "Numbers not reproducible; seed and score distribution not given; my reproduction gives AUC about 0.82 and ECE about 0.002 -> 0.13.",
+    "replacement": "Illustration (my own simulation, 200,000 rows, true logit drawn from Normal(-1.5, 1.5), 10 equal-width bins; exact values depend on the score distribution and binning): taking a perfectly calibrated score and tripling its logit leaves AUC at about 0.82 but raises ECE from about 0.002 to about 0.13, because the ordering is identical while the probabilities are badly stretched."
+   },
+   {
+    "severity": "minor",
+    "claim": "means the model is overconfident in that region",
+    "problem": "Predicting 0.30 where 12% default is overestimation of risk; 'overconfident' usually means too extreme/sharp and is ambiguous here.",
+    "replacement": "means the model overestimates default risk in that region"
+   }
+  ]
+ },
+ {
+  "id": "smi-i0004",
+  "plan_id": "P3-ML-04",
+  "domain": "Machine Learning",
+  "difficulty": "Medium",
+  "priority": false,
+  "question": "You must calibrate a fraud classifier's probabilities. Option A has only 2,000 labelled validation rows (about 60 positives); option B has 200,000 (about 6,000 positives). Compare Platt scaling and isotonic regression for each case, explain why the calibrator must not be fitted on the training data, and say what calibration does to ROC-AUC.",
+  "answer": "Platt scaling (method=\"sigmoid\") fits a two-parameter logistic map on the model's score. It is low variance, so it suits small samples, but it can only fix distortions of that shape; scikit-learn's docs note it can struggle with highly imbalanced problems where errors are not symmetric. Isotonic regression fits any non-decreasing step function, so it can correct arbitrary monotone distortion but is more prone to overfitting on small data. The docs say isotonic performs as well as or better than sigmoid with more than roughly 1,000 samples. That figure is a rule of thumb for total samples; with imbalanced data I would look at the number of positives rather than total rows, since each isotonic step needs enough of them (this is my own heuristic, not a documented threshold).\n\nOption A: about 60 positives, so I would use Platt scaling (isotonic would produce a jagged, unstable staircase) and report the uncertainty of the reliability curve. Option B: 6,000 positives, so isotonic is reasonable; compare both by cross-validated log loss or Brier score and keep the simpler one if they are close.\n\nFit the calibrator on data the classifier did not train on. On its own training data the classifier is usually more confident than on new data, so a calibrator fitted there learns a map toward 0 and 1 that is too extreme. Options: a held-out calibration set, or CalibratedClassifierCV with cross-validation, or wrapping an already-fitted model so the calibrator sees only disjoint data. Then evaluate calibration on yet another set, because the calibration set cannot grade itself; with only about 60 positives in option A, use repeated or nested cross-validation instead of carving out a third set.\n\nRanking: a strictly increasing map (sigmoid with positive slope) leaves ROC-AUC unchanged. Isotonic produces ties, so ROC-AUC can differ slightly from the uncalibrated value; sigmoid is strictly monotonic and keeps the ranking.",
+  "key_concepts": [
+   "Platt scaling",
+   "isotonic regression",
+   "calibration set",
+   "overfitting calibrator",
+   "CalibratedClassifierCV",
+   "ties in scores",
+   "number of positives"
+  ],
+  "common_mistakes": [
+   "Calibrating on the training set",
+   "Choosing isotonic purely because it is more flexible",
+   "Saying calibration always leaves AUC identical",
+   "Evaluating calibration on the same data used to fit the calibrator"
+  ],
+  "sources": [
+   {
+    "title": "scikit-learn: Probability calibration",
+    "url": "https://scikit-learn.org/stable/modules/calibration.html",
+    "supports": "Sigmoid suits small samples, isotonic is more flexible but overfits small data and does as well or better above roughly 1000 samples; calibrator should be fit on data independent of classifier training; isotonic can introduce ties and change ROC-AUC while sigmoid preserves ranking.",
+    "verification": "independent_reviewer_supported"
+   }
+  ],
+  "code": null,
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "claim": "That figure is a rule of thumb; what really matters is the number of positives, since each step needs enough of them.",
+    "problem": "Presented as fact; docs only give '~1000 samples'. Positive-count reasoning is a reasonable but undocumented heuristic.",
+    "replacement": "That figure is a rule of thumb for total samples; with imbalanced data I would look at the number of positives rather than total rows, since each isotonic step needs enough of them (this is my own heuristic, not a documented threshold)."
+   },
+   {
+    "severity": "minor",
+    "claim": "Then evaluate calibration on yet another set, because the calibration set cannot grade itself.",
+    "problem": "Infeasible as a third split for option A.",
+    "replacement": "Then evaluate calibration on yet another set, because the calibration set cannot grade itself; with only about 60 positives in option A, use repeated or nested cross-validation instead of carving out a third set."
+   },
+   {
+    "severity": "minor",
+    "claim": "Isotonic produces ties, so AUC can change slightly, usually by a small amount.",
+    "problem": "Redundant and 'usually' unsupported; docs only say metrics 'might differ'.",
+    "replacement": "Isotonic produces ties, so ROC-AUC can differ slightly from the uncalibrated value; sigmoid is strictly monotonic and keeps the ranking."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0005",
+  "plan_id": "P3-ML-05",
+  "domain": "Machine Learning",
+  "difficulty": "Easy",
+  "priority": false,
+  "question": "Your team's dashboards mention 'covariate drift', 'label drift' and 'concept drift' as if they were the same thing. Define each, give one example each for a credit-risk model, and say which of the three you can detect without waiting for ground-truth labels.",
+  "answer": "Covariate drift: the input distribution P(X) changes while P(y|X) stays the same. Credit example: marketing shifts toward younger applicants, but a given profile is as risky as before.\n\nLabel (prior) drift: P(y) changes, with P(X|y) assumed stable. Example: a recession lifts the default rate from 3% to 6%; this is pure label drift only if defaulters still look like past defaulters, which rarely holds exactly, so real cases are often a mix of label and concept drift.\n\nConcept drift: P(y|X) itself changes. Example: new fraud tactics or regulation mean applicants with the same features now default at a different rate.\n\nWithout labels you can directly detect a change in the input distribution P(X), by comparing feature distributions between a reference and a recent window (PSI, KS); this flags input drift but cannot on its own show whether P(y|X) is unchanged or whether the cause is covariate or label shift. Label drift cannot be observed directly, though it can be estimated from predictions under the stable-P(X|y) assumption. Concept drift cannot be confirmed without labels; score-distribution changes or business proxies are only hints. In practice the types often occur together.",
+  "key_concepts": [
+   "covariate shift",
+   "prior probability (label) shift",
+   "concept drift",
+   "P(y|X)",
+   "PSI",
+   "KS test",
+   "drift detection without labels"
+  ],
+  "common_mistakes": [
+   "Using 'concept drift' for any change in the data",
+   "Claiming covariate drift always degrades accuracy",
+   "Saying all three are detectable without labels"
+  ],
+  "sources": [],
+  "code": null,
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "claim": "Example: a recession lifts the default rate from 3% to 6%, while defaulters still look like past defaulters.",
+    "problem": "Recessions usually also change P(y|X); example is only pure label drift under a strong assumption.",
+    "replacement": "Example: a recession lifts the default rate from 3% to 6%; this is pure label drift only if defaulters still look like past defaulters, which rarely holds exactly, so real cases are often a mix of label and concept drift."
+   },
+   {
+    "severity": "minor",
+    "claim": "you can directly detect covariate drift, by comparing feature distributions between a reference and a recent window (PSI, KS).",
+    "problem": "A P(X) shift cannot by itself show P(y|X) is unchanged, nor distinguish covariate from label shift (P(X) moves when P(y) moves).",
+    "replacement": "you can directly detect a change in the input distribution P(X), by comparing feature distributions between a reference and a recent window (PSI, KS); this flags input drift but cannot on its own show whether P(y|X) is unchanged or whether the cause is covariate or label shift."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0006",
+  "plan_id": "P3-ML-06",
+  "domain": "Machine Learning",
+  "difficulty": "Hard",
+  "priority": true,
+  "question": "A card-fraud model flags transactions for manual review. Analysts feel precision has been falling for a month, but chargeback labels take 30-60 days to arrive, so the weekly precision report is always stale. Design a monitoring plan that can warn you earlier, covering input checks, score checks, proxy metrics, delayed-label evaluation, alert thresholds and retraining triggers, and say what trade-offs each choice brings.",
+  "answer": "Layer the monitoring by how quickly each signal is available.\n\n1. Inputs (hours): per-feature drift versus a fixed reference window (the training or last-good period) using PSI for binned numeric and categorical features and KS for continuous ones, plus data-quality checks (null rates, new categories, range violations, volume). With many features, alert on the top-importance features and on data-quality breaks. PSI cut-offs of about 0.1 (watch) and 0.25 (act) are an industry convention, not statistical thresholds; check sensitivity on your data, because PSI depends on binning and sample size and with large volumes tiny shifts become 'significant' in a KS test.\n2. Scores (daily): compare the score distribution and the flag rate at the live threshold with the reference. A stable flag rate with falling precision suggests concept change or a falling fraud rate (precision depends on prevalence, so also track the confirmed-fraud rate); a rising flag rate suggests input drift or fraudster adaptation.\n3. Proxies (days): analyst review outcomes (reviewed-and-confirmed rate), customer disputes and early-reported fraud, and manual-review queue stats. These are faster but incomplete and noisy: analyst confirmation can disagree with eventual chargebacks, and because only flagged items are reviewed they say little about recall or missed fraud; keep a small random sample of unflagged or low-score traffic for unbiased review.\n4. Delayed labels (weeks): evaluate by cohort on the transaction date once labels mature, with a maturity window (for example only count transactions older than 60 days) so recent cohorts are not understated, and track precision and recall at the live threshold with confidence intervals.\n\nRetraining triggers: scheduled retraining as a baseline, plus event triggers (sustained drift on key features, flag-rate break, matured-cohort precision below a floor). Trade-offs: set alert thresholds from each metric's historical week-to-week variation (for example a 'watch' level and a 'page' level, firing only if breached in two consecutive windows) rather than from one fixed number; tight thresholds catch problems early but cause alert fatigue; retraining on fresh data helps adaptation but recent labels are immature and biased by the previous model's decisions, so validate a challenger on matured data or in shadow mode before promotion.",
+  "key_concepts": [
+   "PSI",
+   "KS test",
+   "score distribution monitoring",
+   "delayed labels",
+   "label maturity window",
+   "proxy metrics",
+   "retraining triggers",
+   "shadow mode"
+  ],
+  "common_mistakes": [
+   "Waiting for chargebacks before monitoring anything",
+   "Treating PSI 0.25 as a universal law",
+   "Computing precision on recent cohorts with immature labels",
+   "Retraining automatically on the newest data without validation"
+  ],
+  "sources": [],
+  "code": null,
+  "originally_flagged": [
+   {
+    "severity": "major",
+    "claim": "Trade-offs: tight thresholds catch problems early but cause alert fatigue;",
+    "problem": "Question requires alert thresholds with trade-offs; no method for setting them is given.",
+    "replacement": "Trade-offs: set alert thresholds from each metric's historical week-to-week variation (for example a 'watch' level and a 'page' level, firing only if breached in two consecutive windows) rather than from one fixed number; tight thresholds catch problems early but cause alert fatigue;"
+   },
+   {
+    "severity": "minor",
+    "claim": "These are faster but biased, because only flagged items are reviewed; keep a small random sample of unflagged or low-score traffic for unbiased review.",
+    "problem": "Reviewed-and-confirmed rate among flagged items is a direct (if noisy) precision proxy; selection mainly hurts recall/missed-fraud estimates.",
+    "replacement": "These are faster but incomplete and noisy: analyst confirmation can disagree with eventual chargebacks, and because only flagged items are reviewed they say little about recall or missed fraud; keep a small random sample of unflagged or low-score traffic for unbiased review."
+   },
+   {
+    "severity": "minor",
+    "claim": "A stable flag rate with falling precision suggests concept change; a rising one suggests input drift or fraudster adaptation.",
+    "problem": "Omits the prevalence explanation: precision falls when the fraud rate falls even with an unchanged model.",
+    "replacement": "A stable flag rate with falling precision suggests concept change or a falling fraud rate (precision depends on prevalence, so also track the confirmed-fraud rate); a rising flag rate suggests input drift or fraudster adaptation."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0009",
+  "plan_id": "P3-ML-09",
+  "domain": "Machine Learning",
+  "difficulty": "Hard",
+  "priority": true,
+  "question": "A new churn model beats the old one in offline evaluation (higher AUC on a held-out month), but in an online A/B test its retention uplift is clearly worse than the old model's. Give the causes of training-serving skew you would suspect, and describe how you would isolate which one is responsible.",
+  "answer": "When offline looks fine and online does not, the model code is rarely the problem; usually the data it sees at serving time differs from what it trained on. Suspects:\n\n1. Feature computed differently online (different code path, time zone, rounding, aggregation window, join key, library version) than in the training pipeline.\n2. Stale or late features: online feature store values lag the event time, or batch features refresh daily while training used point-in-time-correct values; or the opposite, training used features that were fresher than serving can provide.\n3. Missing-value handling: nulls, defaults or imputers differ, or an upstream outage fills a column with a constant.\n4. Categorical encodings or vocabularies out of sync (unknown category mapping, different ordering, scaling parameters not shipped with the model).\n5. Label delay and evaluation mismatch: the online metric is read on immature labels or a different definition of churn or retention window.\n6. Population shift: online traffic differs from the held-out month (new customer segment, seasonality, the A/B assignment itself, or feedback loops from earlier model actions).\n\nIsolation: (a) log the exact feature vector and score at serving time. (b) Recompute the same features offline for the same entities and timestamps and compare per feature (mean, null rate, exact-match rate); mismatches pinpoint skew in 1-4. (c) Score the logged online features with the model offline and score offline-recomputed features, then compare AUC and score distributions. (d) Compare score distributions online vs offline and slice by segment, missingness and time to separate population shift. (e) Check metric definitions and label maturity for both arms. (f) Shadow-run the new model on live traffic to confirm. Whichever step first reveals a gap names the cause. If (a)-(d) show no feature or score gap, suspect the objective rather than skew: churn AUC measures who will leave, not who will respond to the retention offer, so a model that ranks churn risk equally well can still give lower uplift; also check A/B validity (sample-ratio mismatch, sample size, novelty effects).",
+  "key_concepts": [
+   "training-serving skew",
+   "feature parity",
+   "point-in-time correctness",
+   "feature store staleness",
+   "missing-value handling",
+   "shadow deployment",
+   "label delay",
+   "population shift"
+  ],
+  "common_mistakes": [
+   "Blaming overfitting when the offline score was fine on a held-out month",
+   "Retraining without comparing logged serving features to offline features",
+   "Ignoring metric-definition and label-maturity differences between offline and online"
+  ],
+  "sources": [],
+  "code": null,
+  "originally_flagged": [
+   {
+    "severity": "major",
+    "claim": "beats the old one by the same margin in offline evaluation (same AUC on a held-out month)",
+    "problem": "Self-contradictory/ambiguous (beats vs same AUC).",
+    "replacement": "beats the old one in offline evaluation (higher AUC on a held-out month)"
+   },
+   {
+    "severity": "major",
+    "claim": "Whichever step first reveals a gap names the cause.",
+    "problem": "If steps (a)-(d) show no feature/score gap the procedure ends without a cause; objective mismatch and experiment validity are not covered.",
+    "replacement": "Whichever step first reveals a gap names the cause. If (a)-(d) show no feature or score gap, suspect the objective rather than skew: churn AUC measures who will leave, not who will respond to the retention offer, so a model that ranks churn risk equally well can still give lower uplift; also check A/B validity (sample-ratio mismatch, sample size, novelty effects)."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0033",
+  "plan_id": "P3-DA-03",
+  "domain": "Data Analysis",
+  "difficulty": "Medium",
+  "priority": true,
+  "question": "A customer survey has 30 percent of income answers missing. Explain how you would decide whether the missingness is MCAR, MAR or MNAR using business examples, what happens if you just drop those rows versus impute, and what you can actually test.",
+  "answer": "MCAR (missing completely at random): the chance a value is missing is unrelated to anything, observed or not. Example: a survey tool bug that randomly loses 5 percent of responses. MAR (missing at random): missingness depends on observed variables but not on the missing value itself once those are accounted for. Example: younger respondents skip the income question more often, and age is recorded. MNAR (missing not at random): missingness depends on the unobserved value itself. Example: very high earners decline to state income.\n\nConsequences. Dropping rows (complete-case analysis) is unbiased under MCAR, only losing power, but can be biased under MAR and MNAR because the remaining sample is not representative; with 30 percent missing you may also lose much data when several columns have gaps. Imputation helps under MAR if the imputation model uses the variables that drive missingness (multiple imputation is preferred to a single mean fill, which shrinks variance and distorts relationships). Under MNAR no standard imputation fixes the bias, because the information is not in the observed data; you need sensitivity analysis or outside data.\n\nWhat you can test: compare observed variables between rows with and without income (t-tests, or a logistic regression predicting a missing indicator). Clear differences are evidence against MCAR; finding none does not prove it, because the test can lack power and missingness may depend on unobserved variables. Little's test targets MCAR specifically. You cannot test MAR versus MNAR from the data alone, since that needs the missing values; it rests on domain argument, ideally supported by follow-up data collection on a sample of non-responders.\n\nPractical step: add a missing indicator, report results under a few assumptions, and say how far conclusions move.",
+  "key_concepts": [
+   "MCAR",
+   "MAR",
+   "MNAR",
+   "complete-case analysis",
+   "multiple imputation",
+   "missing-indicator",
+   "sensitivity analysis"
+  ],
+  "common_mistakes": [
+   "Claiming a statistical test can prove data is MAR rather than MNAR",
+   "Saying mean imputation is harmless because it keeps the mean",
+   "Assuming dropping rows is always unbiased"
+  ],
+  "sources": [],
+  "code": null,
+  "originally_flagged": [
+   {
+    "severity": "major",
+    "claim": "Differences rule out MCAR.",
+    "problem": "Overstated: a statistically significant difference is evidence against MCAR, not proof, and absence of a significant difference does not establish MCAR (low power, unobserved drivers).",
+    "replacement": "Clear differences are evidence against MCAR; finding none does not prove it, because the test can lack power and missingness may depend on unobserved variables."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0034",
+  "plan_id": "P3-DA-04",
+  "domain": "Data Analysis",
+  "difficulty": "Hard",
+  "priority": true,
+  "question": "Product wants to test a redesigned checkout button on a site with about 40,000 eligible visitors per day and a 4.0 percent checkout conversion. Design the experiment: primary and guardrail metrics, randomisation unit, sample size and duration, novelty effects, and the stopping rule.",
+  "answer": "Primary metric: checkout conversion, defined precisely as users with at least one completed order divided by users exposed, over a fixed window after first exposure. Guardrails: revenue per user and average order value, payment failures, page load time, refund/cancel rate, and error rate; the test should not ship if a guardrail degrades beyond a pre-agreed margin even when conversion rises.\n\nRandomisation unit: the user (stable cookie or account id), not the page view, so each person always sees one version and the analysis unit matches the randomisation unit. If many users share devices or switch between logged-out and logged-in, consider the logged-in id where available. Check sample ratio mismatch (an observed split deviating from 50/50) before reading results; it signals an assignment or logging bug.\n\nSample size: to detect a 5 percent relative lift (4.0 to 4.2 percent) at two-sided alpha 0.05 and 80 percent power, the standard two-proportion formula gives roughly 154,000 users per arm (normal approximation, equal allocation; computed). A 10 percent relative lift (4.0 to 4.4 percent) needs about 39,500 per arm. The minimum detectable effect should be set by what is worth shipping, not by what is convenient.\n\nDuration: at 40,000 visitors a day (about 20,000 per arm) about 154,000 per arm takes roughly 8 days if every daily visitor were a new unique user; in practice longer, so run two full weeks to cover complete weekly cycles, since weekday and weekend behaviour differ. Note that repeat visitors mean unique users accumulate more slowly than visits.\n\nNovelty effect: a new button may get extra clicks simply for being new, or lose in the short run through change aversion. Look at the effect by day and by new versus returning users, and run long enough to see it settle.\n\nStopping rule: fix sample size, duration and the analysis in advance (pre-registration). Do not stop when p first dips below 0.05; repeated peeking inflates false positives unless you use a sequential method designed for it.",
+  "key_concepts": [
+   "primary metric",
+   "guardrail metrics",
+   "randomisation unit",
+   "sample size calculation",
+   "sample ratio mismatch",
+   "novelty effect",
+   "peeking",
+   "weekly seasonality"
+  ],
+  "common_mistakes": [
+   "Stopping the test as soon as the p-value crosses 0.05",
+   "Randomising by page view or session while analysing by user",
+   "Choosing sample size without a minimum effect that matters, or ending mid-week"
+  ],
+  "sources": [],
+  "code": null,
+  "originally_flagged": [
+   {
+    "severity": "major",
+    "claim": "A 10 percent relative lift needs about 38,000 to 39,000 per arm.",
+    "problem": "Computed value is about 39,500 per arm (39,475), outside the stated range.",
+    "replacement": "A 10 percent relative lift (4.0 to 4.4 percent) needs about 39,500 per arm."
+   },
+   {
+    "severity": "minor",
+    "claim": "gives roughly 150,000 users per arm (illustrative, computed)",
+    "problem": "Computed value is about 154,000; also assumes pooled-variance normal approximation, equal arms.",
+    "replacement": "gives roughly 154,000 users per arm (normal approximation, equal allocation; computed)"
+   },
+   {
+    "severity": "minor",
+    "claim": "150,000 per arm takes roughly 8 days",
+    "problem": "Follows from 154,000/20,000 = 7.7 days, but assumes all 40,000 daily visitors are unique new users, which the answer then partly caveats.",
+    "replacement": "about 154,000 per arm takes roughly 8 days if every daily visitor were a new unique user; in practice longer"
+   }
+  ]
+ }
+]

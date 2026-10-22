@@ -1,0 +1,712 @@
+[
+ {
+  "plan_id": "B4-MLO-08-2",
+  "id": "smi-m0002",
+  "verdict": "pass",
+  "reasons": [
+   "All simulated numbers reproduce (x100 lognormal PSI 8.18 sigma=1, 4.2 sigma=2, ceiling 8.28 at eps=1e-4, plain 0.0004; discount null->0 PSI 0.053-0.058 at 10 bins, 0.088-0.096 at 20 bins, 0.014-0.030 with 20% reference zeros).",
+   "No contradiction with prior answers (l0040 skew/unit change, l0008 block on contract violations)."
+  ],
+  "parts_answered": {
+   "triage without retraining": true,
+   "what PSI 8.3 tells": true,
+   "what PSI 0.05 + null jump tells": true,
+   "monitoring changes": true
+  },
+  "evidence": [
+   {
+    "claim": "PSI 8.2 for x100 (10 quantile bins, eps 1e-4), ceiling ~8.3",
+    "method": "executed",
+    "evidence": "8.18 (sigma 1), 8.28 (sigma 0.3), ceiling 8.280"
+   },
+   {
+    "claim": "sigma=2 gives ~4",
+    "method": "executed",
+    "evidence": "4.20"
+   },
+   {
+    "claim": "discount_pct PSI ~0.055 (10 bins), ~0.09-0.10 (20 bins), 0.015-0.03 with 20% ref zeros",
+    "method": "executed",
+    "evidence": "0.053-0.058; 0.088-0.096; 0.014-0.030 (10 bins), 0.020-0.029 (20 bins)"
+   },
+   {
+    "claim": "ML Test Score lists schema-match monitoring",
+    "method": "doc",
+    "evidence": "Monitor 2 quote verified"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism plus comparison of two diagnostics and a monitoring redesign; no multi-step derivation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer is appropriate"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0040",
+   "same_intent": false
+  },
+  "code_findings": "No code or configs in record. All numbers recomputed with numpy/scipy simulations (scratch /tmp/claude-0/audit_f2); no recorded code to run on 3.10/3.11.",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/46555.pdf",
+    "status": "supported",
+    "evidence": "Monitor 2: 'measure whether data matches the schema and alert when they diverge significantly'; 'careful tuning of alerting thresholds is needed to achieve a useful balance between false positive and false negative rates'; Monitor 7: 'models should have zero bias, in aggregate and on slices.'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-08-3",
+  "id": "smi-m0003",
+  "verdict": "correct",
+  "reasons": [
+   "Arithmetic verified (1.2 expected hits, 1-0.99^120 = 0.7006).",
+   "Minor wording fix to 'symptoms' and a hedge for tension with prior smi-l0026 ('do not page on drift statistics')."
+  ],
+  "parts_answered": {
+   "why noisy": true,
+   "redesign principles": true,
+   "fixes missed null-rate incident": true
+  },
+  "evidence": [
+   {
+    "claim": "120 x 0.01 = 1.2; 1-0.99^120 ~ 70%",
+    "method": "executed",
+    "evidence": "1.2; 0.7006"
+   },
+   {
+    "claim": "Sculley action limits 'broad enough not to trigger spuriously', alerts lead to investigation",
+    "method": "paper",
+    "evidence": "verbatim quotes found"
+   },
+   {
+    "claim": "ML Test Score threshold tuning",
+    "method": "doc",
+    "evidence": "Monitor 2/3 quotes verified"
+   },
+   {
+    "claim": "SRE: symptoms, every page actionable, dashboards",
+    "method": "doc",
+    "evidence": "quotes verified"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "1. Alert on symptoms first.",
+    "problem": "Null-rate and schema checks are causes/invariants, not user-visible symptoms in the SRE sense; wording overstates the SRE citation.",
+    "replacement": "1. Alert on model-level symptoms and hard data-quality invariants first."
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "score-distribution PSI above its own 99th-percentile historical value for 2 consecutive windows",
+    "problem": "Prior smi-l0026 says 'Do not page on drift statistics'; here a drift statistic is paged. Not wrong (model-output symptom, persistence) but should be made explicit.",
+    "replacement": "score-distribution PSI above its own 99th-percentile historical value for 2 consecutive windows (a model-output symptom; per-feature drift metrics stay at ticket or dashboard level)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Application of multiple-testing arithmetic and alert design; rubric-style design question.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": "[{\"decision\": \"Alert on symptoms (score distribution, data-quality invariants, quality proxies) and demote per-feature drift to diagnostics\", \"tradeoff\": \"Fewer pages vs slower root-cause hints; risk of missing a feature fault that does not move outputs\"}, {\"decision\": \"Use effect size with thresholds taken from the metric's own history (percentile, same weekday) instead of p<0.01\", \"tradeoff\": \"Needs history and re-tuning vs ignoring statistically significant but trivial differences\"}, {\"decision\": \"Require persistence (k of n windows) except for hard failures such as schema violations\", \"tradeoff\": \"Lower false alarms vs added detection delay\"}, {\"decision\": \"Severity tiers (page / ticket / dashboard) by feature importance and failure type, each with an owner\", \"tradeoff\": \"Triage effort and importance estimates vs attention spent only where it matters\"}, {\"decision\": \"Absolute data-quality rules (null/zero rate, range) with their own bands, independent of drift scores\", \"tradeoff\": \"Extra rules to maintain vs catching the missed null-rate regression\"}, {\"decision\": \"Review loop: track actionability of each alert, retire or retune never-actioned rules\", \"tradeoff\": \"Ongoing ownership cost vs alert rot returning\"}]",
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "canonical"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "tier table with thresholds not in detailed"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0006",
+   "same_intent": false
+  },
+  "code_findings": "No code or configs in record. All numbers recomputed with numpy/scipy simulations (scratch /tmp/claude-0/audit_f2); no recorded code to run on 3.10/3.11.",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/46555.pdf",
+    "status": "supported",
+    "evidence": "Monitor 2: 'measure whether data matches the schema and alert when they diverge significantly'; 'careful tuning of alerting thresholds is needed to achieve a useful balance between false positive and false negative rates'; Monitor 7: 'models should have zero bias, in aggregate and on slices.'"
+   },
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "supported",
+    "evidence": "'A model may directly influence the selection of its own future training data.'; action limits: 'These limits should be broad enough not to trigger spuriously.' / 'automated alerts should fire and trigger manual intervention or investigation.'"
+   },
+   {
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "status": "supported",
+    "evidence": "'it's better to spend much more effort on catching symptoms than causes'; 'Every page should be actionable.'; 'favor a dashboard that monitors all ongoing subcritical problems.'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "percentile-of-history thresholds, k-of-n persistence (practitioner heuristics, labelled illustrative)"
+  ],
+  "code_patch": null,
+  "contradictions": [
+   {
+    "ids": [
+     "smi-m0003",
+     "smi-l0026"
+    ],
+    "claims": "m0003 pages on score-distribution PSI; l0026 'Do not page on drift statistics, offline accuracy, or a single noisy metric'",
+    "right_side": "Both defensible; l0026 is about SLO-style serving alerts and a single noisy metric. m0003 uses persistence on a model-output metric. Hedge added."
+   }
+  ]
+ },
+ {
+  "plan_id": "B4-MLO-08-4",
+  "id": "smi-m0004",
+  "verdict": "pass",
+  "reasons": [
+   "Simulations reproduce: shift 0.01 sd, n=1e6: KS 0.0035-0.0055, p 1e-5 to 2e-13, PSI ~0.0001; n=1000 shift 0.3: KS 0.13-0.17, PSI 0.08-0.16.",
+   "Noise-floor formula (B-1)(1/n+1/m) validated by simulation (e.g. 20000/100000: 0.00053 vs 0.00054; 1000/1000: 0.0181 vs 0.018; 1e6/1e6: 1.7e-5 vs 1.8e-5).",
+   "SciPy statements verified."
+  ],
+  "parts_answered": {
+   "compare signals": true,
+   "explain storm": true,
+   "what neither tells": true
+  },
+  "evidence": [
+   {
+    "claim": "KS D~0.004, p<=1e-5 at n=1e6 per side, 0.01 sd shift",
+    "method": "executed",
+    "evidence": "D 0.0035-0.0055; p 2e-13..1e-5"
+   },
+   {
+    "claim": "PSI noise floor",
+    "method": "executed",
+    "evidence": "simulated means match formula"
+   },
+   {
+    "claim": "KS = max abs ECDF difference, null identical distributions, continuous assumption",
+    "method": "doc",
+    "evidence": "scipy docs quotes"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Compare two metrics, interpret a simulation, state limits.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0041",
+   "same_intent": false
+  },
+  "code_findings": "No code or configs in record. All numbers recomputed with numpy/scipy simulations (scratch /tmp/claude-0/audit_f2); no recorded code to run on 3.10/3.11.",
+  "sources_findings": [
+   {
+    "url": "https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.ks_2samp.html",
+    "status": "supported",
+    "evidence": "'maximum absolute difference between the empirical distribution functions'; 'null hypothesis is that the two distributions are identical'; 'assumed to be drawn from a continuous distribution'. Page does not discuss ties (answer's tie advice is the answer's own inference, correctly phrased as a caveat)."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "KS more sensitive to bulk than tails (hedged 'often')"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-08-5",
+  "id": "smi-m0005",
+  "verdict": "correct",
+  "reasons": [
+   "Reasoning sound; two minor precision fixes (universal-sounding extrapolation claim; counterfactual replacement caveat)."
+  ],
+  "parts_answered": {
+   "decide harmful vs harmless without labels": true,
+   "what would change answer": true,
+   "retrain tonight": true
+  },
+  "evidence": [
+   {
+    "claim": "Unchanged scores do not rule out concept drift",
+    "method": "derivation",
+    "evidence": "consistent with prior i0005"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "where tree models flatten and neural nets can behave unpredictably",
+    "problem": "Unsourced and slightly loose: tree ensembles predict a constant beyond the training range, which is the accurate statement.",
+    "replacement": "where tree-based models predict a constant beyond the observed range and neural nets can behave unpredictably"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "Re-score a recent sample after replacing each drifted feature (or the group) with values resampled from the reference.",
+    "problem": "Independent resampling breaks correlations with other features and can create off-manifold rows; result is a sensitivity check only.",
+    "replacement": "Re-score a recent sample after replacing each drifted feature (or the group) with values resampled from the reference. Independent resampling breaks correlations with the other features, so treat the result as a sensitivity check, not an exact estimate."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Procedure design with judgement; no calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0006",
+   "same_intent": false
+  },
+  "code_findings": "No code or configs in record. All numbers recomputed with numpy/scipy simulations (scratch /tmp/claude-0/audit_f2); no recorded code to run on 3.10/3.11.",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "tree/NN behaviour outside training support",
+   "permutation-importance weighting (standard)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-08-6",
+  "id": "smi-m0006",
+  "verdict": "correct",
+  "reasons": [
+   "Simulation reproduces: overall mean 52.96-53.04, aggregate PSI 0.059-0.063, slice PSI 5.97-6.03 (6.4-6.96 with eps 1e-6), rest 7e-5 to 2.4e-4.",
+   "One minor source-wording fix: the cited ML Test Score sentence concerns prediction bias, not quality."
+  ],
+  "parts_answered": {
+   "why quiet": true,
+   "change monitoring": true,
+   "cost": true
+  },
+  "evidence": [
+   {
+    "claim": "aggregate PSI ~0.06, slice >5, rest ~0.0001, mean ~53",
+    "method": "executed",
+    "evidence": "0.059-0.063; 5.97-6.03; 7e-5-2.4e-4; 52.96-53.04"
+   },
+   {
+    "claim": "zero bias in aggregate and on slices",
+    "method": "doc",
+    "evidence": "Monitor 7 verbatim"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "The ML Test Score paper makes the parallel point for prediction quality: models should have zero bias in aggregate and on slices.",
+    "problem": "Paper's sentence is about prediction bias (Monitor 7), not prediction quality in general.",
+    "replacement": "The ML Test Score paper makes a parallel point for prediction bias: models should have zero bias in aggregate and on slices."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism plus design cost analysis.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0006",
+   "same_intent": false
+  },
+  "code_findings": "No code or configs in record. All numbers recomputed with numpy/scipy simulations (scratch /tmp/claude-0/audit_f2); no recorded code to run on 3.10/3.11.",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/46555.pdf",
+    "status": "supported",
+    "evidence": "Monitor 2: 'measure whether data matches the schema and alert when they diverge significantly'; 'careful tuning of alerting thresholds is needed to achieve a useful balance between false positive and false negative rates'; Monitor 7: 'models should have zero bias, in aggregate and on slices.'"
+   },
+   {
+    "url": "https://arxiv.org/pdf/2303.01227",
+    "status": "partially",
+    "evidence": "Paper attributes 0.1/0.25 cut-offs to Lewis and says (citing Du Pisanie & Visagie) PSI critical value decreases with sample size and increases with groups. Does not give the (B-1)(1/n+1/m) floor (derived and simulated here)."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "noise floor formula (derived, simulation-verified)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-08-7",
+  "id": "smi-m0007",
+  "verdict": "correct",
+  "reasons": [
+   "All sizing arithmetic reproduces (20,000 rows, 80 MB, 100 slice rows/day, 4.2/h, 417/h, floors 0.00054, 0.18, 0.0217, 0.040); simulation floors 0.00053, 0.24 (50 rows), 0.0218, 0.0378.",
+   "Three minor hedges: hash uncorrelated only if IDs are not derived from user/feature data; 50-row floor approximation is rough; full logging validation should have security sign-off."
+  ],
+  "parts_answered": {
+   "what to log": true,
+   "sampling": true,
+   "sample big enough": true,
+   "slice 0.5% hourly": true,
+   "label join": true,
+   "privacy": true
+  },
+  "evidence": [
+   {
+    "claim": "PSI floor numbers",
+    "method": "executed",
+    "evidence": "formula and simulation agree except n=50 (0.24 simulated vs 0.18)"
+   },
+   {
+    "claim": "1% sample vs full PSI a few 0.0001",
+    "method": "executed",
+    "evidence": "0.00056 single draw (formula 0.00045)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "The decision is reproducible, uncorrelated with feature values and needs no coordination",
+    "problem": "Holds only if request IDs are random, not derived from user or feature data (answer later asks to validate, but claim is unconditional).",
+    "replacement": "The decision is reproducible, uncorrelated with feature values as long as request IDs are not derived from user or feature data, and needs no coordination"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "even 50 rows gives 9 x (0.00001 + 0.02), about 0.18",
+    "problem": "Chi-square approximation understates at ~5 rows per bin; simulation gives about 0.24.",
+    "replacement": "even 50 rows gives roughly 9 x (0.00001 + 0.02), about 0.18 (the approximation is rough at so few rows; a simulation gave about 0.24)"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "log everything once (under a short retention)",
+    "problem": "Security team wants less raw data retained; full logging needs their agreement.",
+    "replacement": "log everything once (under a short retention, with security sign-off)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-part design with quantitative sizing and trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": "[{\"decision\": \"Stream exact aggregates (counters, histograms on frozen edges) over all traffic, no raw rows\", \"tradeoff\": \"Tiny storage and exactness vs no raw values for ad-hoc tests\"}, {\"decision\": \"Deterministic hash-of-request-ID sampling stored with the sampling weight\", \"tradeoff\": \"Reproducible, label-joinable and coordination-free vs possible correlation with ID structure (validate it)\"}, {\"decision\": \"Size samples with the PSI noise floor (B-1)(1/n+1/m) per slice and window\", \"tradeoff\": \"Quantifies adequacy vs rough approximation at few rows per bin\"}, {\"decision\": \"Oversample (100% capture) rare slices, errors and low-confidence scores, with weights\", \"tradeoff\": \"Adequate slice power vs more stored data and privacy exposure\"}, {\"decision\": \"Minimise and pseudonymise logged data, set retention\", \"tradeoff\": \"Security/privacy vs debugging depth and label-join keys\"}, {\"decision\": \"Validate the sampler against full logging for a few days\", \"tradeoff\": \"Short-term extra storage vs detecting a biased sampling key\"}]",
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "canonical"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "policy + validation procedure; modest overlap on slice rule"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0026",
+   "same_intent": false
+  },
+  "code_findings": "No code or configs in record. All numbers recomputed with numpy/scipy simulations (scratch /tmp/claude-0/audit_f2); no recorded code to run on 3.10/3.11.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/pdf/2303.01227",
+    "status": "partially",
+    "evidence": "Supports PSI cut-offs and sample-size/group dependence only; floor formula is derived."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "(B-1)(1/n+1/m) floor (derived, simulated)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-09-1",
+  "id": "smi-m0009",
+  "verdict": "pass",
+  "reasons": [
+   "Every Google claim verified verbatim; concise (61 words) consistent with detailed; practical empty appropriately."
+  ],
+  "parts_answered": {
+   "define CT": true,
+   "difference from CI/CD": true
+  },
+  "evidence": [
+   {
+    "claim": "CT definition, triggers, data validation before training, model validation after, CI covers data/schemas/models",
+    "method": "doc",
+    "evidence": "verbatim quotes"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Easy",
+  "difficulty_rationale": "Definition and contrast, single concept.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "61 words, genuinely shorter"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "canonical"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "All discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0015",
+   "same_intent": false
+  },
+  "code_findings": "No code or configs in record. All numbers recomputed with numpy/scipy simulations (scratch /tmp/claude-0/audit_f2); no recorded code to run on 3.10/3.11.",
+  "sources_findings": [
+   {
+    "url": "https://docs.cloud.google.com/architecture/mlops-continuous-delivery-and-automation-pipelines-in-machine-learning",
+    "status": "supported",
+    "evidence": "'CT is a new property, unique to ML systems, that's concerned with automatically retraining and serving the models.'; five triggers incl. schedule, new data, performance degradation, significant changes in data distributions; data validation 'required before model training to decide whether you should retrain'; model validation 'occurs after you successfully train'; CI also tests 'data, data schemas, and models'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-09-2",
+  "id": "smi-m0010",
+  "verdict": "pass",
+  "reasons": [
+   "Sizing reproduces: 30,000 rejected, 600 explored, weight 50, 90 defaults.",
+   "Sources verified incl. 'evaluating f(X) using the data of accepts will overestimate scorecard performance' and 'modest potential' for reject inference.",
+   "Optional improvement: mention positivity (propensity must be >0 in the region you want to learn about)."
+  ],
+  "parts_answered": {
+   "what is going on": true,
+   "redesign data": true
+  },
+  "evidence": [
+   {
+    "claim": "600 loans, weight 50, 90 defaults",
+    "method": "executed",
+    "evidence": "50000*0.6*0.02=600; 1/0.02=50; 600*0.15=90"
+   },
+   {
+    "claim": "direct feedback loop",
+    "method": "paper",
+    "evidence": "verbatim"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Causal/selection-bias reasoning plus exploration design and sizing.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "canonical"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked sizing + promotion rule"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0006",
+   "same_intent": false
+  },
+  "code_findings": "No code or configs in record. All numbers recomputed with numpy/scipy simulations (scratch /tmp/claude-0/audit_f2); no recorded code to run on 3.10/3.11.",
+  "sources_findings": [
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "supported",
+    "evidence": "'A model may directly influence the selection of its own future training data.'; action limits: 'These limits should be broad enough not to trigger spuriously.' / 'automated alerts should fire and trigger manual intervention or investigation.'"
+   },
+   {
+    "url": "https://arxiv.org/html/2407.13009",
+    "status": "supported",
+    "evidence": "'The FI cannot observe the repayment behavior of rejected clients.'; 'evaluating f(X) using the data of accepts will overestimate scorecard performance'; 'reject inference is a difficult problem with modest potential to improve scorecard performance'; unbiased sample of randomly approved loans."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "IPW for exploration data (standard)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-09-3",
+  "id": "smi-m0011",
+  "verdict": "correct",
+  "reasons": [
+   "One major: closing sentence says a single guardrail is not enough, which contradicts the list (guardrail 1 or 2 alone would very likely have stopped this incident); reframe as defence in depth."
+  ],
+  "parts_answered": {
+   "which guardrails": true,
+   "where in pipeline": true
+  },
+  "evidence": [
+   {
+    "claim": "Data validation required before training",
+    "method": "doc",
+    "evidence": "Google quote verified"
+   },
+   {
+    "claim": "Action limits",
+    "method": "paper",
+    "evidence": "quote verified; answer frames its champion/challenger bound as 'similar'"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "answer",
+    "claim": "A single guardrail is not enough: the failure needed corrupted training data, a corrupted holdout and a missing sanity check to align.",
+    "problem": "Misleading: guardrail 1 (quality alerts block retraining) or 2 (data validation with quarantine) alone would very likely have prevented the incident; the layers are defence in depth, not each necessary.",
+    "replacement": "Guardrails 1 and 2 alone would very likely have stopped this incident; the later layers are defence in depth, covering a missed quality check, a corrupted holdout, or a model that passes AUC but behaves abnormally."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-stage pipeline design with trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": "[{\"decision\": \"Separate data-quality alerts from drift alerts; quality failures block retraining; add persistence and cooldown\", \"tradeoff\": \"Prevents chained retrains vs slower response to genuine drift\"}, {\"decision\": \"Data validation before training with quarantine of bad partitions\", \"tradeoff\": \"Protects training data vs lost recent rows or failed runs\"}, {\"decision\": \"Trusted holdout: time-based validated data plus a fixed curated set\", \"tradeoff\": \"Independent grading vs staleness of the curated set\"}, {\"decision\": \"Model validation vs champion on trusted slices with bounded prediction/importance change\", \"tradeoff\": \"Catches AUC-gaming and corrupted behaviour vs may block legitimate large improvements\"}, {\"decision\": \"Human approval and staged rollout with rollback when money is involved or change exceeds limit\", \"tradeoff\": \"Safety vs automation speed\"}, {\"decision\": \"Record data versions and excluded partitions\", \"tradeoff\": \"Auditability vs bookkeeping\"}]",
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0008",
+   "same_intent": false
+  },
+  "code_findings": "No code or configs in record. All numbers recomputed with numpy/scipy simulations (scratch /tmp/claude-0/audit_f2); no recorded code to run on 3.10/3.11.",
+  "sources_findings": [
+   {
+    "url": "https://docs.cloud.google.com/architecture/mlops-continuous-delivery-and-automation-pipelines-in-machine-learning",
+    "status": "supported",
+    "evidence": "'CT is a new property, unique to ML systems, that's concerned with automatically retraining and serving the models.'; five triggers incl. schedule, new data, performance degradation, significant changes in data distributions; data validation 'required before model training to decide whether you should retrain'; model validation 'occurs after you successfully train'; CI also tests 'data, data schemas, and models'."
+   },
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "supported",
+    "evidence": "'A model may directly influence the selection of its own future training data.'; action limits: 'These limits should be broad enough not to trigger spuriously.' / 'automated alerts should fire and trigger manual intervention or investigation.'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "cooldown/persistence, curated fixed set, human-approval thresholds (framed as recommendations)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-09-4",
+  "id": "smi-m0012",
+  "verdict": "correct",
+  "reasons": [
+   "Two minor fixes: odd phrase 'idle freshness lag'; backtest cost (60 full retrains at 14 h) not acknowledged."
+  ],
+  "parts_answered": {
+   "compare": true,
+   "what can go wrong": true,
+   "how decide with data": true
+  },
+  "evidence": [
+   {
+    "claim": "Rules of ML Rule 8 freshness",
+    "method": "doc",
+    "evidence": "page asks how much performance degrades if a model is a day old; consistent with answer"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "little idle freshness lag",
+    "problem": "Unclear phrase.",
+    "replacement": "a smaller gap between new data arriving and the model reflecting it"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "for each day, produce both variants using only data available then",
+    "problem": "At 14 h per full retrain, 60 daily full retrains is ~35 days of cluster time; the answer should say how to cut cost.",
+    "replacement": "for each day, produce both variants using only data available then (at 14 hours per full retrain, 60 daily full retrains is costly, so use a sample of 10 to 15 origin days or a subsampled dataset)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Trade-off comparison and evaluation design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0015",
+   "same_intent": false
+  },
+  "code_findings": "No code or configs in record. All numbers recomputed with numpy/scipy simulations (scratch /tmp/claude-0/audit_f2); no recorded code to run on 3.10/3.11.",
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule #8 'Know the freshness requirements of your system': 'How much does performance degrade if you have a model that is a day old?'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "forgetting/recency bias of last-day-only updates (general knowledge, framed as risks)"
+  ],
+  "code_patch": null
+ }
+]

@@ -1,0 +1,309 @@
+[
+ {
+  "id": "smi-h0037",
+  "plan_id": "P2-DA-03",
+  "domain": "Data Analysis",
+  "difficulty": "Medium",
+  "question": "An experiment was configured for a 50/50 split. After a week the analysis table shows 50,000 users in control and 51,200 in treatment. A PM says \"that's only 2.4% off, close enough\".\n\nImplement srm_check(counts, expected_ratios, alpha=0.001) -> (chi2, df, p_value, mismatch_flag), a chi-square goodness-of-fit test for sample ratio mismatch, with no scipy (use math.erfc for df = 1). Example: srm_check([50000, 51200], [1, 1]) should give chi2 about 14.23 with a very small p-value and a True flag. Then say how you would interpret this, which causes you would investigate first, and what you do with the experiment's results.",
+  "answer": "Treat it as a failed experiment until explained. Expected counts are 50,600 each, so chi2 = 2 * 600^2 / 50,600 = 14.23 with df = 1 and p = 1.6e-4. If assignment really were 50/50, a gap this large would be rare, and with 100k users, treatment having 2.4% more users than control (50.6% vs 49.4% of the total) is not small.. A very low alarm threshold such as 0.001 is common practice for SRM checks (a convention, not a law), and this still trips it.\n\n```python\nimport math\n\ndef srm_check(counts, expected_ratios, alpha=0.001):\n    \"\"\"Chi-square goodness-of-fit for sample ratio mismatch.\n    counts: observed users per arm; expected_ratios: intended allocation (any\n    positive weights). Returns (chi2, df, p_value, mismatch_flag).\"\"\"\n    if len(counts) != len(expected_ratios) or len(counts) < 2:\n        raise ValueError(\"need matching counts and ratios for at least 2 arms\")\n    if any(c < 0 for c in counts) or any(r <= 0 for r in expected_ratios):\n        raise ValueError(\"counts must be >= 0 and ratios > 0\")\n    total = sum(counts)\n    ratio_sum = sum(expected_ratios)\n    expected = [total * r / ratio_sum for r in expected_ratios]\n    chi2 = sum((o - e) ** 2 / e for o, e in zip(counts, expected))\n    df = len(counts) - 1\n    if df == 1:\n        # chi-square(1) survival function: P(Z^2 > x) = erfc(sqrt(x/2))\n        p_value = math.erfc(math.sqrt(chi2 / 2))\n    else:\n        # Even/odd closed forms of the chi-square survival function\n        x = chi2 / 2\n        if df % 2 == 0:\n            p_value = math.exp(-x) * sum(x ** k / math.factorial(k) for k in range(df // 2))\n        else:\n            p_value = math.erfc(math.sqrt(x)) + math.exp(-x) * sum(\n                x ** (k + 0.5) / math.gamma(k + 1.5) for k in range(df // 2))\n    return chi2, df, p_value, p_value < alpha\n```\n\nFor df = 1 the chi-square survival function is erfc(sqrt(chi2 / 2)). I added closed forms for other degrees of freedom so it works for multi-arm tests, and checked values against scipy.stats.chisquare in a separate script.\n\nInterpretation: SRM does not say which arm is wrong, only that the pipeline from assignment to analysis table did not treat arms equally. Typical causes: bot or internal-traffic filtering applied after assignment and differently by arm; a redirect or slower page in one arm so some users bounce before the exposure event is logged; client-side logging that fails more often in one variant; bucketing on a different id than the analysis id; caching or CDN effects; crashes on one variant; the trigger condition for counting a user depending on the treatment.\n\nWhat to do: do not ship on the metrics, and do not rescale or drop users to force 50/50, because the missing users are probably not a random subset. Slice the counts by day, platform, browser, country and new vs returning to localise the gap; compare assignment logs with exposure logs; fix the cause and rerun if needed.\n\nPitfalls: a large p-value does not prove the pipeline is healthy (the test only sees count imbalances, and a small one may be undetectable at low traffic); run the check on the same population that is analysed; and with very large traffic with very large traffic even tiny imbalances become statistically significant; still treat a flagged SRM as a pipeline problem and look at the size of the gap and its cause as well as p., so look at the size of the gap and its cause as well as p.",
+  "key_concepts": [
+   "sample ratio mismatch",
+   "chi-square goodness of fit",
+   "degrees of freedom",
+   "chi-square survival function via erfc",
+   "assignment vs exposure logging",
+   "bot filtering"
+  ],
+  "common_mistakes": [
+   "Treating a 2.4% imbalance as acceptable because it looks small",
+   "Dropping or reweighting users to restore 50/50 and carrying on",
+   "Testing the split with a t-test on conversion instead of a goodness-of-fit test on counts"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import math\n\ndef srm_check(counts, expected_ratios, alpha=0.001):\n    \"\"\"Chi-square goodness-of-fit for sample ratio mismatch.\n    counts: observed users per arm; expected_ratios: intended allocation (any\n    positive weights). Returns (chi2, df, p_value, mismatch_flag).\"\"\"\n    if len(counts) != len(expected_ratios) or len(counts) < 2:\n        raise ValueError(\"need matching counts and ratios for at least 2 arms\")\n    if any(c < 0 for c in counts) or any(r <= 0 for r in expected_ratios):\n        raise ValueError(\"counts must be >= 0 and ratios > 0\")\n    total = sum(counts)\n    ratio_sum = sum(expected_ratios)\n    expected = [total * r / ratio_sum for r in expected_ratios]\n    chi2 = sum((o - e) ** 2 / e for o, e in zip(counts, expected))\n    df = len(counts) - 1\n    if df == 1:\n        # chi-square(1) survival function: P(Z^2 > x) = erfc(sqrt(x/2))\n        p_value = math.erfc(math.sqrt(chi2 / 2))\n    else:\n        # Even/odd closed forms of the chi-square survival function\n        x = chi2 / 2\n        if df % 2 == 0:\n            p_value = math.exp(-x) * sum(x ** k / math.factorial(k) for k in range(df // 2))\n        else:\n            p_value = math.erfc(math.sqrt(x)) + math.exp(-x) * sum(\n                x ** (k + 0.5) / math.gamma(k + 1.5) for k in range(df // 2))\n    return chi2, df, p_value, p_value < alpha",
+   "test": "chi2, df, p, flag = srm_check([50000, 51200], [1, 1])\nassert df == 1\nassert abs(chi2 - 14.229249011857707) < 1e-9          # 2 * 600**2 / 50600\nassert abs(p - 1.6183543368e-4) < 1e-12               # reference value from scipy.stats.chisquare\nassert flag is True\n\n_, _, p2, flag2 = srm_check([50000, 50400], [1, 1])\nassert abs(p2 - 0.20680891513) < 1e-9 and flag2 is False\n\n# unequal intended split 1:3\n_, _, p3, flag3 = srm_check([1000, 3100], [1, 3])\nassert abs(p3 - 0.3672323880) < 1e-9 and not flag3\n\n# same 2.4% relative gap: not alarming with 10k users, alarming with 1M\nassert not srm_check([5000, 5120], [1, 1])[3]\nassert srm_check([500000, 512000], [1, 1])[3]\n\n# three arms, df = 2; four arms, df = 3 (threshold is a parameter)\nchi2, df, p, flag = srm_check([33000, 34500, 32500], [1, 1, 1])\nassert df == 2 and abs(chi2 - 65.0) < 1e-9 and p < 1e-12 and flag\nc4 = srm_check([2400, 2600, 2550, 2450], [1, 1, 1, 1], alpha=0.05)\nassert c4[1] == 3 and abs(c4[0] - 10.0) < 1e-12 and abs(c4[2] - 0.018566135) < 1e-8 and c4[3] is True\n\nfor bad in [([1, 2], [1]), ([5], [1]), ([5, 5], [1, 0])]:\n    try:\n        srm_check(*bad)\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(bad)\n",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "problem": "A flagged SRM should be treated as a pipeline problem regardless of size; calling imbalances 'harmless' invites ignoring a real alarm.",
+    "claim": "even tiny, harmless imbalances become significant"
+   },
+   {
+    "severity": "minor",
+    "problem": "Ambiguous: the PM's 2.4% is treatment vs control; 1.2% is the gap as a share of the total, and each arm is 0.6 pp from 50%.",
+    "claim": "with 100k users a 1.2% imbalance is not small"
+   }
+  ]
+ },
+ {
+  "id": "smi-h0038",
+  "plan_id": "P2-DA-04",
+  "domain": "Data Analysis",
+  "difficulty": "Medium",
+  "question": "In an experiment on a signup flow, variant A shows 17.5% overall conversion and variant B shows 8.7%, so B looks much worse. Broken down by device, however, B converts better than A on both desktop and mobile.\n\nWrite simpson_report(df) -> dict for a DataFrame with columns variant, segment, users, conversions. It should return the pooled rate per variant, the per-segment rates (segment x variant), the pooled winner, the variant that wins in every segment (or None), a boolean reversal flag, and mix-standardised rates (each variant re-weighted to the overall segment mix). Use this data: A desktop 1000 users / 200 conversions, A mobile 200 / 10, B desktop 200 / 44, B mobile 1000 / 60. Explain what causes the reversal and which comparison you would trust.",
+  "answer": "The reversal comes from different segment mixes, not from B being worse. Desktop converts about 20-22% and mobile about 5-6%; A's traffic is 83% desktop (1000 of 1200 users) while B's is 83% mobile. The pooled rate is a mix-weighted average, so B's pooled number is dragged down by its mobile-heavy traffic.\n\n```python\nimport pandas as pd\n\ndef simpson_report(df):\n    \"\"\"df columns: variant, segment, users, conversions.\n    Returns dict with pooled rates, per-segment rates, the variant that wins\n    pooled, the variant that wins in every segment (or None), whether the\n    pooled ranking reverses, and mix-standardised rates (each variant\n    re-weighted to the overall segment mix).\"\"\"\n    pooled = df.groupby(\"variant\")[[\"users\", \"conversions\"]].sum()\n    pooled_rate = (pooled[\"conversions\"] / pooled[\"users\"]).to_dict()\n\n    seg = df.set_index([\"segment\", \"variant\"])\n    seg_rate = (seg[\"conversions\"] / seg[\"users\"]).unstack(\"variant\")\n\n    pooled_winner = max(pooled_rate, key=pooled_rate.get)\n    all_win = [v for v in seg_rate.columns\n               if (seg_rate[v] > seg_rate.drop(columns=v).max(axis=1)).all()]\n    segment_winner = all_win[0] if all_win else None\n\n    mix = df.groupby(\"segment\")[\"users\"].sum()\n    mix = mix / mix.sum()\n    standardised = {v: float((seg_rate[v] * mix).sum()) for v in seg_rate.columns}\n\n    return {\n        \"pooled_rate\": pooled_rate,\n        \"segment_rate\": seg_rate,\n        \"pooled_winner\": pooled_winner,\n        \"segment_winner\": segment_winner,\n        \"reversal\": segment_winner is not None and segment_winner != pooled_winner,\n        \"standardised_rate\": standardised,\n    }\n```\n\nOn the example data the pooled rates are A 17.5% vs B 8.67%, but per segment desktop is A 20% vs B 22%, and mobile A 5% vs B 6%. Standardising both variants to the overall 50/50 mix gives A 12.5% vs B 14.0%.\n\nWhich to trust depends on why the mix differs:\n- In a properly randomised experiment, segment mix should be about the same in both arms. A 83%/17% split between arms is itself a red flag (broken randomisation, a redirect that affects devices differently, a segment-specific SRM). Fix and rerun before trusting any comparison.\n- If the data are observational and the segment is a pre-treatment attribute that drives both exposure and conversion, the stratified or standardised comparison is the more credible one, assuming the segment captures that confounding.\n- If the segment is itself affected by the treatment (for example, the variant changes which device or landing page users end up on), conditioning on it can bias the result, and the pooled comparison may answer the total-effect question. Decide from the causal story, not from which number looks nicer.\n\nPitfalls: stating \"always trust the segments\"; checking only one segmentation (a different split could reverse again); ignoring sampling noise in small segments; and using the pooled average of segment rates unweighted instead of a stated standard mix.",
+  "key_concepts": [
+   "Simpson's paradox",
+   "confounding by segment mix",
+   "stratification",
+   "direct standardisation",
+   "pooled vs segment rates",
+   "randomisation check"
+  ],
+  "common_mistakes": [
+   "Saying the segment-level result is always the right one",
+   "Not noticing that a 83%/17% mix difference between randomised arms signals a randomisation problem",
+   "Averaging segment rates without weights"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import pandas as pd\n\ndef simpson_report(df):\n    \"\"\"df columns: variant, segment, users, conversions.\n    Returns dict with pooled rates, per-segment rates, the variant that wins\n    pooled, the variant that wins in every segment (or None), whether the\n    pooled ranking reverses, and mix-standardised rates (each variant\n    re-weighted to the overall segment mix).\"\"\"\n    pooled = df.groupby(\"variant\")[[\"users\", \"conversions\"]].sum()\n    pooled_rate = (pooled[\"conversions\"] / pooled[\"users\"]).to_dict()\n\n    seg = df.set_index([\"segment\", \"variant\"])\n    seg_rate = (seg[\"conversions\"] / seg[\"users\"]).unstack(\"variant\")\n\n    pooled_winner = max(pooled_rate, key=pooled_rate.get)\n    all_win = [v for v in seg_rate.columns\n               if (seg_rate[v] > seg_rate.drop(columns=v).max(axis=1)).all()]\n    segment_winner = all_win[0] if all_win else None\n\n    mix = df.groupby(\"segment\")[\"users\"].sum()\n    mix = mix / mix.sum()\n    standardised = {v: float((seg_rate[v] * mix).sum()) for v in seg_rate.columns}\n\n    return {\n        \"pooled_rate\": pooled_rate,\n        \"segment_rate\": seg_rate,\n        \"pooled_winner\": pooled_winner,\n        \"segment_winner\": segment_winner,\n        \"reversal\": segment_winner is not None and segment_winner != pooled_winner,\n        \"standardised_rate\": standardised,\n    }",
+   "test": "import pandas as pd\n\ndf = pd.DataFrame({\n    \"variant\": [\"A\", \"A\", \"B\", \"B\"],\n    \"segment\": [\"desktop\", \"mobile\", \"desktop\", \"mobile\"],\n    \"users\": [1000, 200, 200, 1000],\n    \"conversions\": [200, 10, 44, 60],\n})\nr = simpson_report(df)\nassert abs(r[\"pooled_rate\"][\"A\"] - 0.175) < 1e-12\nassert abs(r[\"pooled_rate\"][\"B\"] - 104 / 1200) < 1e-12\nassert r[\"pooled_winner\"] == \"A\"\nassert r[\"segment_winner\"] == \"B\"\nassert r[\"reversal\"] is True\nsr = r[\"segment_rate\"]\nassert sr.loc[\"desktop\"].round(4).tolist() == [0.2, 0.22]\nassert sr.loc[\"mobile\"].round(4).tolist() == [0.05, 0.06]\n# standardised to the overall mix (50% desktop / 50% mobile)\nassert abs(r[\"standardised_rate\"][\"A\"] - 0.125) < 1e-12\nassert abs(r[\"standardised_rate\"][\"B\"] - 0.14) < 1e-12\n\n# no reversal when the mix is balanced\ndf2 = df.copy()\ndf2[\"users\"] = [600, 600, 600, 600]\ndf2[\"conversions\"] = [120, 30, 132, 36]\nr2 = simpson_report(df2)\nassert r2[\"pooled_winner\"] == \"B\" and r2[\"segment_winner\"] == \"B\" and r2[\"reversal\"] is False\n\n# no segment-wise winner when segments disagree\ndf3 = df.copy()\ndf3[\"conversions\"] = [200, 20, 44, 50]      # mobile: A 10% > B 5%; desktop: B > A\nassert simpson_report(df3)[\"segment_winner\"] is None\n",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "problem": "Duplicate segment/variant rows raise 'Index contains duplicate entries'; a missing segment-variant cell makes the standardised rate silently skip that segment (A=0.083 in my test). Input assumed pre-aggregated, undocumented.",
+    "claim": "seg = df.set_index([\"segment\", \"variant\"])"
+   }
+  ]
+ },
+ {
+  "id": "smi-h0040",
+  "plan_id": "P2-DA-06",
+  "domain": "Data Analysis",
+  "difficulty": "Medium",
+  "question": "You have 10 page-load times in seconds: [12, 15, 11, 40, 13, 14, 90, 16, 12, 18] and want a 95% interval for the median.\n\nWrite bootstrap_median_ci(x, n_boot=5000, alpha=0.05, seed=0) -> (lo, hi) returning a percentile bootstrap interval using numpy default_rng (vectorised: resample indices with replacement, take medians, take the alpha/2 and 1 - alpha/2 quantiles). Explain exactly what the interval does and does not mean, when the percentile bootstrap is unreliable (small samples, dependence, other statistics), and what you can assert in a deterministic test.",
+  "answer": "```python\nimport numpy as np\n\ndef bootstrap_median_ci(x, n_boot=5000, alpha=0.05, seed=0):\n    \"\"\"Percentile bootstrap CI for the median. Returns (lo, hi).\"\"\"\n    x = np.asarray(x, dtype=float)\n    if x.size < 2:\n        raise ValueError(\"need at least 2 observations\")\n    if not 0 < alpha < 1:\n        raise ValueError(\"alpha must be in (0, 1)\")\n    rng = np.random.default_rng(seed)\n    idx = rng.integers(0, x.size, size=(n_boot, x.size))   # resample indices with replacement\n    medians = np.median(x[idx], axis=1)\n    lo, hi = np.quantile(medians, [alpha / 2, 1 - alpha / 2])\n    return float(lo), float(hi)\n```\n\nFor the 10 load times (sample median 14.5) this gives roughly (12, 28) with seed 0: wide and right-skewed, reflecting the two slow outliers and the tiny sample.\n\nWhat it means: the procedure, repeated over many samples from the same population, produces intervals that cover the true median about 95% of the time if the bootstrap approximation is good. It is not \"a 95% probability that the true median lies in this particular interval\" (that is a Bayesian credible-interval statement that needs a prior), and it says nothing about individual page loads or the spread of the data.\n\nWhen it is unreliable:\n- Small n and discreteness. With n = 10 the bootstrap medians take only a handful of distinct values (data values or averages of two), so the interval endpoints come from that small set of values (data points or midpoints, possibly interpolated) and coverage can be below nominal. In a quick simulation I ran (2,000 repeats per setting, lognormal and exponential data, n = 5 to 15) coverage was about 0.91 to 0.94 rather than 0.95; treat that as an illustration, not a general rule.\n- Dependent data (time series, repeated measures): resampling rows breaks the dependence; use a block bootstrap, or resample whole users/clusters.\n- Extreme statistics (max, min), and the mean under heavy tails with infinite variance: the bootstrap can be inconsistent.\n- Skewed or biased sampling distributions: BCa or bootstrap-t intervals may behave better, at more complexity.\n- n_boot controls Monte Carlo noise only; 5,000 does not fix a small sample.\n\nDeterministic tests: reproducibility for a fixed seed; a constant sample gives (c, c); for a tiny sample the endpoints are values from the data; the interval brackets the sample median; more data gives a narrower interval; alpha=0.5 gives a narrower interval than alpha=0.05; invalid alpha or n < 2 raises.\n\nPitfall: bootstrapping the standard error of the mean and applying it to the median.",
+  "key_concepts": [
+   "percentile bootstrap",
+   "median",
+   "resampling with replacement",
+   "confidence interval interpretation",
+   "block bootstrap",
+   "BCa interval",
+   "seeded reproducibility"
+  ],
+  "common_mistakes": [
+   "Interpreting the interval as a 95% probability that the true median is inside it",
+   "Resampling without replacement (which just returns the same sample)",
+   "Assuming 5,000 resamples compensate for having 10 observations"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\ndef bootstrap_median_ci(x, n_boot=5000, alpha=0.05, seed=0):\n    \"\"\"Percentile bootstrap CI for the median. Returns (lo, hi).\"\"\"\n    x = np.asarray(x, dtype=float)\n    if x.size < 2:\n        raise ValueError(\"need at least 2 observations\")\n    if not 0 < alpha < 1:\n        raise ValueError(\"alpha must be in (0, 1)\")\n    rng = np.random.default_rng(seed)\n    idx = rng.integers(0, x.size, size=(n_boot, x.size))   # resample indices with replacement\n    medians = np.median(x[idx], axis=1)\n    lo, hi = np.quantile(medians, [alpha / 2, 1 - alpha / 2])\n    return float(lo), float(hi)",
+   "test": "import numpy as np\n\nx = [12, 15, 11, 40, 13, 14, 90, 16, 12, 18]       # sample median 14.5\nlo, hi = bootstrap_median_ci(x, n_boot=5000, seed=0)\nassert (lo, hi) == bootstrap_median_ci(x, n_boot=5000, seed=0)      # reproducible\nassert lo < np.median(x) < hi\nassert 11 <= lo <= hi <= 90\nassert 11 <= lo <= 14.5 <= hi <= 40      # bootstrap quantiles of the resampled medians (12.0, 28.0 on the author run)\n\n# tiny sample: every bootstrap median is a data value or an average of two\ntiny = [3, 5, 9, 20, 21]\nl2, h2 = bootstrap_median_ci(tiny)\nassert l2 in tiny and h2 in tiny\n\n# constant data -> degenerate interval\nassert bootstrap_median_ci([7] * 10) == (7.0, 7.0)\n\n# 1..99, true centre 50: interval brackets it and is reasonably tight\nl3, h3 = bootstrap_median_ci(np.arange(1, 100))\nassert l3 < 50 < h3 and 35 <= l3 and h3 <= 65\n\n# more data -> narrower; lower confidence -> narrower\nrng = np.random.default_rng(1)\nsmall, big = rng.normal(100, 15, 25), rng.normal(100, 15, 400)\nw_small = np.subtract(*bootstrap_median_ci(small)[::-1])\nw_big = np.subtract(*bootstrap_median_ci(big)[::-1])\nassert w_big < w_small / 2\nw90 = np.subtract(*bootstrap_median_ci(small, alpha=0.5)[::-1])\nassert w90 < w_small\n\nfor bad in [dict(x=[1]), dict(x=[1, 2], alpha=0), dict(x=[1, 2], alpha=1.5)]:\n    try:\n        bootstrap_median_ci(**bad)\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(bad)\n",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "problem": "For n = 10 (even) bootstrap medians are data values or averages of two, so endpoints need not be data points; np.quantile also interpolates between order statistics.",
+    "claim": "so the interval endpoints are data points and coverage can be below nominal"
+   }
+  ]
+ },
+ {
+  "id": "smi-h0041",
+  "plan_id": "P2-DA-07",
+  "domain": "Data Analysis",
+  "difficulty": "Medium",
+  "question": "A dashboard test reports 20 independent metrics, each tested at alpha = 0.05, and the team is excited that two are significant. First say how many false positives you expect if no metric truly changed and the chance of at least one.\n\nThen implement bonferroni(pvals, alpha=0.05) and benjamini_hochberg(pvals, q=0.05), each returning a list of booleans in the ORIGINAL order of the p-values. Test input: [0.200, 0.021, 0.001, 0.600, 0.022, 0.008, 0.900, 0.029, 0.400, 0.0045] (10 tests). Explain what each controls and when to prefer which.",
+  "answer": "With 20 independent true nulls at alpha = 0.05 you expect 20 x 0.05 = 1 false positive, and P(at least one) = 1 - 0.95^20 = 64.2%. Two significant results out of 20 is therefore weak evidence by itself.\n\n```python\ndef bonferroni(pvals, alpha=0.05):\n    \"\"\"Reject H_i when p_i <= alpha / m. Controls FWER at alpha.\"\"\"\n    m = len(pvals)\n    return [p <= alpha / m for p in pvals]\n\ndef benjamini_hochberg(pvals, q=0.05):\n    \"\"\"BH step-up. Find the largest rank k (1-based, ascending p) with\n    p_(k) <= q*k/m and reject all hypotheses with rank <= k.\n    Returns booleans in the ORIGINAL order. Controls FDR at q for independent\n    (or positively dependent) tests.\"\"\"\n    m = len(pvals)\n    order = sorted(range(m), key=lambda i: pvals[i])\n    k_max = 0\n    for rank, i in enumerate(order, start=1):\n        if pvals[i] * m <= q * rank:\n            k_max = rank\n    reject = [False] * m\n    for rank, i in enumerate(order, start=1):\n        if rank <= k_max:\n            reject[i] = True\n    return reject\n```\n\nOn the 10-test list, Bonferroni (threshold 0.05 / 10 = 0.005) rejects only 0.001 and 0.0045, so 2 hypotheses. Benjamini-Hochberg rejects 6. Sorted p-values are .001, .0045, .008, .021, .022, .029, ... with thresholds k * 0.05 / 10 = .005, .010, .015, .020, .025, .030. Rank 4 (.021) misses its own threshold, but rank 5 (.022) and rank 6 (.029) pass, and BH is a step-up procedure: it rejects everything up to the largest passing rank, so ranks 1 to 6 are all rejected. A common bug is stopping at the first failure.\n\nWhat they control: Bonferroni controls the family-wise error rate (probability of any false rejection) and needs no independence assumption. BH controls the false discovery rate, the expected fraction of rejections that are false, under independence or positive dependence of the tests (for arbitrary dependence the Benjamini-Yekutieli variant is needed). FDR is an average property, not a guarantee for any single experiment.\n\nWhen to prefer: use Bonferroni (or the uniformly more powerful Holm step-down, which has the same FWER guarantee) when a single false claim is costly, for example a launch decision that depends on a few confirmatory metrics. Use BH when screening many metrics or segments and you accept that some discoveries will be false, then follow up the discoveries. Best practice is to pre-specify one primary metric and treat the rest as secondary or exploratory.\n\nPitfalls: correcting only the metrics that looked interesting after the fact, mixing BH-adjusted and raw p-values in one report, and ignoring that correlated metrics make Bonferroni overly conservative.",
+  "key_concepts": [
+   "family-wise error rate",
+   "false discovery rate",
+   "Bonferroni correction",
+   "Benjamini-Hochberg procedure",
+   "step-up procedure",
+   "Holm method",
+   "primary vs exploratory metrics"
+  ],
+  "common_mistakes": [
+   "Stopping BH at the first p-value that misses its threshold instead of taking the largest passing rank",
+   "Returning results in sorted order instead of the original order",
+   "Saying Bonferroni and BH control the same error rate"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "def bonferroni(pvals, alpha=0.05):\n    \"\"\"Reject H_i when p_i <= alpha / m. Controls FWER at alpha.\"\"\"\n    m = len(pvals)\n    return [p <= alpha / m for p in pvals]\n\ndef benjamini_hochberg(pvals, q=0.05):\n    \"\"\"BH step-up. Find the largest rank k (1-based, ascending p) with\n    p_(k) <= q*k/m and reject all hypotheses with rank <= k.\n    Returns booleans in the ORIGINAL order. Controls FDR at q for independent\n    (or positively dependent) tests.\"\"\"\n    m = len(pvals)\n    order = sorted(range(m), key=lambda i: pvals[i])\n    k_max = 0\n    for rank, i in enumerate(order, start=1):\n        if pvals[i] * m <= q * rank:\n            k_max = rank\n    reject = [False] * m\n    for rank, i in enumerate(order, start=1):\n        if rank <= k_max:\n            reject[i] = True\n    return reject",
+   "test": "import math, random\n\np = [0.200, 0.021, 0.001, 0.600, 0.022, 0.008, 0.900, 0.029, 0.400, 0.0045]\nassert bonferroni(p) == [False, False, True, False, False, False, False, False, False, True]\n# BH: sorted p = .001 .0045 .008 .021 .022 .029 ...; thresholds .005 .010 .015 .020 .025 .030 ...\n# rank 4 (.021) misses its own threshold (.020) but rank 5 and 6 pass, so ranks 1-6 are all rejected\nassert benjamini_hochberg(p) == [False, True, True, False, True, True, False, True, False, True]\nassert sum(benjamini_hochberg(p)) == 6 and sum(bonferroni(p)) == 2\n\nassert bonferroni([]) == [] and benjamini_hochberg([]) == []\nassert benjamini_hochberg([0.04]) == [True] and benjamini_hochberg([0.06]) == [False]\nassert benjamini_hochberg([0.5, 0.6, 0.7]) == [False] * 3\nassert benjamini_hochberg([0.01, 0.02, 0.03]) == [True] * 3\n\n# 20 independent tests at alpha = 0.05\nassert abs(20 * 0.05 - 1.0) < 1e-12\nassert abs((1 - 0.95 ** 20) - 0.6415140775914581) < 1e-12\n\n# BH always rejects at least everything Bonferroni rejects\nr = random.Random(0)\nfor _ in range(500):\n    ps = [round(r.random() ** 3, 4) for _ in range(r.randint(1, 25))]\n    b, h = bonferroni(ps), benjamini_hochberg(ps)\n    assert all(hh or not bb for bb, hh in zip(b, h))\n    # rejected set is closed downwards: a rejected p implies every smaller p is rejected\n    if any(h):\n        cutoff = max(q for q, hh in zip(ps, h) if hh)\n        assert all(hh for q, hh in zip(ps, h) if q <= cutoff)\n",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "problem": "NaN p-values are 'rejected' (benjamini_hochberg([nan, 0.001]) -> [True, True]); no range validation.",
+    "claim": "benjamini_hochberg (code)"
+   }
+  ]
+ },
+ {
+  "id": "smi-h0042",
+  "plan_id": "P2-DA-08",
+  "domain": "Data Analysis",
+  "difficulty": "Hard",
+  "question": "You have two tables: signups(user_id, signup_date) and events(user_id, event_date), one row per user action (many per user, possibly several per day). Define weekly retention precisely and implement weekly_retention(signups, events, as_of, max_week=None) with pandas.\n\nDefinitions to use: weeks start on Monday; a user's cohort is the week of their signup; retention at week k = fraction of the cohort with at least one event in week (cohort week + k), so week 0 is the signup week itself; users with no events still count in the cohort size; events before signup and events by users without a signup row are ignored; cells whose week had not fully elapsed before the exclusive end date as_of are NaN. Return a DataFrame indexed by cohort week with a cohort_size column and columns 0..max_week. Example: with 6 signups across two cohorts and as_of='2024-01-22' the first cohort's row is [1.0, 0.667, 0.333] and the second is [1.0, 0.0, NaN].",
+  "answer": "Retention needs an explicit definition because \"retained\" differs between \"active on exactly day N\", \"active in week N\" and \"active at any time since\". The version below is a rolling-unit \"active in week k\" definition:\n\n```python\nimport numpy as np\nimport pandas as pd\n\ndef _week_start(s):\n    \"\"\"Monday 00:00 of the week containing each timestamp.\"\"\"\n    d = s.dt.normalize()\n    return d - pd.to_timedelta(d.dt.dayofweek, unit=\"D\")\n\ndef weekly_retention(signups, events, as_of, max_week=None):\n    \"\"\"signups: columns user_id, signup_date. events: columns user_id, event_date.\n    Cohort = Monday-based week of signup. Retention at week k = share of the\n    cohort with >= 1 event in week (cohort_week + k). Week 0 is the signup\n    week. Cells whose week has not fully elapsed by `as_of` (a date, exclusive\n    end of observation) are NaN. Returns DataFrame: index cohort_week, column\n    'cohort_size', then integer columns 0..max_week.\"\"\"\n    su = signups.copy()\n    su[\"signup_date\"] = pd.to_datetime(su[\"signup_date\"])\n    su = su.drop_duplicates(\"user_id\")\n    su[\"cohort_week\"] = _week_start(su[\"signup_date\"])\n\n    ev = events.copy()\n    ev[\"event_date\"] = pd.to_datetime(ev[\"event_date\"])\n    ev[\"event_week\"] = _week_start(ev[\"event_date\"])\n    ev = ev.drop_duplicates([\"user_id\", \"event_week\"])      # one row per active user-week\n\n    m = ev.merge(su[[\"user_id\", \"cohort_week\"]], on=\"user_id\", how=\"inner\")\n    m[\"k\"] = (m[\"event_week\"] - m[\"cohort_week\"]).dt.days // 7\n    m = m[m[\"k\"] >= 0]\n\n    as_of = pd.Timestamp(as_of)\n    last_complete_week = _week_start(pd.Series([as_of - pd.Timedelta(days=1)])).iloc[0]\n    if max_week is None:\n        max_week = int((last_complete_week - su[\"cohort_week\"].min()).days // 7)\n    max_week = max(max_week, 0)\n\n    sizes = su.groupby(\"cohort_week\")[\"user_id\"].nunique()\n    active = m.groupby([\"cohort_week\", \"k\"])[\"user_id\"].nunique().unstack(\"k\")\n    active = active.reindex(index=sizes.index, columns=range(max_week + 1))\n    rate = active.fillna(0).div(sizes, axis=0)\n\n    # right-censoring: week k of a cohort counts only if that week is complete\n    for cw in rate.index:\n        for k in rate.columns:\n            if cw + pd.Timedelta(days=7 * (k + 1)) > as_of:\n                rate.loc[cw, k] = np.nan\n    out = rate.copy()\n    out.insert(0, \"cohort_size\", sizes)\n    return out\n```\n\nSteps and reasons:\n1. Normalise dates to the Monday of their week, so cohort and event weeks are comparable and k is an integer number of weeks.\n2. De-duplicate to one row per user-week before counting, and count with nunique anyway, so ten events in a week do not inflate retention above 100%.\n3. Use an inner merge with the signup table, then drop k < 0 (activity before signup, for example data from an earlier identity). Users with no events never appear in the merge but stay in the denominator via the signups table, otherwise retention is overstated.\n4. Reindex to all weeks 0..max_week and fill missing numerators with 0. A genuinely quiet week is 0, not missing.\n5. Right-censor: a cohort that signed up this week cannot have week 3 yet. Cells whose week is not complete before as_of are set to NaN rather than 0, otherwise recent cohorts look artificially bad.\n\nThe code was checked on a six-user fixture that includes a duplicate same-week event, a non-signup user, a pre-signup event and a user with no events; it passes on pandas 2.3 and 3.0.\n\nPitfalls: calendar weeks make week 0 a partial week for most users (a Sunday signup has one day in week 0); the alternative is 7-day windows measured from each user's own signup timestamp, which avoids that but needs per-user windows. Timezone choices change week boundaries. Define \"event\" carefully: a login-less background ping is not engagement.",
+  "key_concepts": [
+   "cohort analysis",
+   "retention definition",
+   "right-censoring",
+   "groupby nunique",
+   "week alignment (Monday)",
+   "denominator including inactive users",
+   "pandas merge"
+  ],
+  "common_mistakes": [
+   "Dividing by the number of active users instead of the cohort size",
+   "Showing 0 instead of blank for weeks that have not happened yet",
+   "Counting repeated events in the same week more than once"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\nimport pandas as pd\n\ndef _week_start(s):\n    \"\"\"Monday 00:00 of the week containing each timestamp.\"\"\"\n    d = s.dt.normalize()\n    return d - pd.to_timedelta(d.dt.dayofweek, unit=\"D\")\n\ndef weekly_retention(signups, events, as_of, max_week=None):\n    \"\"\"signups: columns user_id, signup_date. events: columns user_id, event_date.\n    Cohort = Monday-based week of signup. Retention at week k = share of the\n    cohort with >= 1 event in week (cohort_week + k). Week 0 is the signup\n    week. Cells whose week has not fully elapsed by `as_of` (a date, exclusive\n    end of observation) are NaN. Returns DataFrame: index cohort_week, column\n    'cohort_size', then integer columns 0..max_week.\"\"\"\n    su = signups.copy()\n    su[\"signup_date\"] = pd.to_datetime(su[\"signup_date\"])\n    su = su.drop_duplicates(\"user_id\")\n    su[\"cohort_week\"] = _week_start(su[\"signup_date\"])\n\n    ev = events.copy()\n    ev[\"event_date\"] = pd.to_datetime(ev[\"event_date\"])\n    ev[\"event_week\"] = _week_start(ev[\"event_date\"])\n    ev = ev.drop_duplicates([\"user_id\", \"event_week\"])      # one row per active user-week\n\n    m = ev.merge(su[[\"user_id\", \"cohort_week\"]], on=\"user_id\", how=\"inner\")\n    m[\"k\"] = (m[\"event_week\"] - m[\"cohort_week\"]).dt.days // 7\n    m = m[m[\"k\"] >= 0]\n\n    as_of = pd.Timestamp(as_of)\n    last_complete_week = _week_start(pd.Series([as_of - pd.Timedelta(days=1)])).iloc[0]\n    if max_week is None:\n        max_week = int((last_complete_week - su[\"cohort_week\"].min()).days // 7)\n    max_week = max(max_week, 0)\n\n    sizes = su.groupby(\"cohort_week\")[\"user_id\"].nunique()\n    active = m.groupby([\"cohort_week\", \"k\"])[\"user_id\"].nunique().unstack(\"k\")\n    active = active.reindex(index=sizes.index, columns=range(max_week + 1))\n    rate = active.fillna(0).div(sizes, axis=0)\n\n    # right-censoring: week k of a cohort counts only if that week is complete\n    for cw in rate.index:\n        for k in rate.columns:\n            if cw + pd.Timedelta(days=7 * (k + 1)) > as_of:\n                rate.loc[cw, k] = np.nan\n    out = rate.copy()\n    out.insert(0, \"cohort_size\", sizes)\n    return out",
+   "test": "import numpy as np\nimport pandas as pd\n\nsu = pd.DataFrame({\"user_id\": [1, 2, 3, 4, 5, 6],\n                   \"signup_date\": [\"2024-01-01\", \"2024-01-03\", \"2024-01-07\",\n                                   \"2024-01-08\", \"2024-01-10\", \"2024-01-14\"]})\nev = pd.DataFrame({\n    \"user_id\":    [1, 1, 2, 3, 3, 3, 4, 5, 1, 2, 4, 6, 7],\n    \"event_date\": [\"2024-01-01\", \"2024-01-09\", \"2024-01-04\", \"2024-01-07\", \"2024-01-08\",\n                   \"2024-01-15\", \"2024-01-08\", \"2024-01-12\", \"2024-01-10\", \"2023-12-30\",\n                   \"2024-01-22\", \"2024-01-14\", \"2024-01-09\"]})\n\nr = weekly_retention(su, ev, \"2024-01-22\")\nassert r.index.strftime(\"%Y-%m-%d\").tolist() == [\"2024-01-01\", \"2024-01-08\"]\nassert r.columns.tolist() == [\"cohort_size\", 0, 1, 2]\nassert r[\"cohort_size\"].tolist() == [3, 3]\nw1 = r.loc[r.index[0], [0, 1, 2]].astype(float).tolist()\nw2 = r.loc[r.index[1], [0, 1, 2]].astype(float).tolist()\nassert np.allclose(w1, [1.0, 2 / 3, 1 / 3])\nassert w2[:2] == [1.0, 0.0] and np.isnan(w2[2])        # week 2 of the later cohort is not complete yet\n# user 7 (no signup row) and the pre-signup event of user 2 are ignored; repeated events in a week count once\n\nr2 = weekly_retention(su, ev, \"2024-01-29\", max_week=3)\nassert r2.columns.tolist() == [\"cohort_size\", 0, 1, 2, 3]\nassert np.allclose(r2.loc[r2.index[1], [0, 1, 2]].astype(float).tolist(), [1.0, 0.0, 1 / 3])\nassert np.isnan(float(r2.loc[r2.index[1], 3])) and float(r2.loc[r2.index[0], 3]) == 0.0\n\n# a signup with no events at all still counts in the denominator\nsu2 = pd.concat([su, pd.DataFrame({\"user_id\": [8], \"signup_date\": [\"2024-01-02\"]})], ignore_index=True)\nr3 = weekly_retention(su2, ev, \"2024-01-22\")\nassert r3[\"cohort_size\"].tolist() == [4, 3]\nassert np.allclose(r3.loc[r3.index[0], [0, 1, 2]].astype(float).tolist(), [0.75, 0.5, 0.25])\n",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "problem": "Process narration, and the version caveat is outdated: it also passes on pandas 2.3.3 (Python 3.10 and 3.11).",
+    "claim": "I ran it on a six-user fixture, including a duplicate-same-week event, a non-signup user, a pre-signup event and a user with no events; the test compares values via lists and np.allclose, uses strftim"
+   },
+   {
+    "severity": "minor",
+    "problem": "Signups after as_of give a cohort row with all-NaN cells but nonzero cohort_size; empty signups raises ValueError 'cannot convert float NaN to integer'; nested .loc loop is O(cohorts x weeks).",
+    "claim": "as_of handling (code)"
+   }
+  ]
+ },
+ {
+  "id": "smi-h0043",
+  "plan_id": "P2-DA-09",
+  "domain": "Data Analysis",
+  "difficulty": "Hard",
+  "question": "Overall checkout conversion fell from 3.00% to 2.71% between two weeks (100,000 sessions in each). Sessions and orders by device:\n- Week 0: desktop 45,000 sessions / 1,800 orders; mobile 50,000 / 900; tablet 5,000 / 300.\n- Week 1: desktop 38,000 / 1,482; mobile 57,000 / 969; tablet 5,000 / 255.\n\nWrite decompose_conversion_change(df) -> DataFrame for columns segment, sessions_0, orders_0, sessions_1, orders_1 that splits the total change into a mix effect and a within-segment rate effect per segment so that they sum exactly to the change. Report the numbers, say whether the drop is statistically distinguishable from noise, and list the next diagnostic steps.",
+  "answer": "Use a midpoint (average-weights, average-rates) decomposition so there is no leftover interaction term:\n\nchange = sum_i (share1_i - share0_i) * (avg rate_i - avg overall rate)   [mix]\n       + sum_i (rate1_i - rate0_i) * (avg share_i)                       [rate]\n\n```python\nimport pandas as pd\n\ndef decompose_conversion_change(df):\n    \"\"\"df columns: segment, sessions_0, orders_0, sessions_1, orders_1\n    (period 0 = baseline, period 1 = current). Splits the change in overall\n    conversion into a mix effect and a within-segment rate effect, per segment.\n    Midpoint convention, so mix + rate sums exactly to the total change.\n    mix_effect_i = (share1 - share0) * (avg segment rate - avg overall rate):\n    a shift towards a segment only hurts if that segment converts below average.\"\"\"\n    d = df.set_index(\"segment\")\n    share0 = d[\"sessions_0\"] / d[\"sessions_0\"].sum()\n    share1 = d[\"sessions_1\"] / d[\"sessions_1\"].sum()\n    rate0 = d[\"orders_0\"] / d[\"sessions_0\"]\n    rate1 = d[\"orders_1\"] / d[\"sessions_1\"]\n    overall0 = d[\"orders_0\"].sum() / d[\"sessions_0\"].sum()\n    overall1 = d[\"orders_1\"].sum() / d[\"sessions_1\"].sum()\n    out = pd.DataFrame({\n        \"share_0\": share0, \"share_1\": share1,\n        \"rate_0\": rate0, \"rate_1\": rate1,\n        \"mix_effect\": (share1 - share0) * ((rate0 + rate1) / 2 - (overall0 + overall1) / 2),\n        \"rate_effect\": (rate1 - rate0) * (share0 + share1) / 2,\n    })\n    out[\"total\"] = out[\"mix_effect\"] + out[\"rate_effect\"]\n    return out\n```\n\nThe overall rate moved 3.000% -> 2.706%, a change of -0.294 points. Of that, the mix effect is -0.154 points (desktop's share fell 45% -> 38% while mobile, which converts below average, rose 50% -> 57%) and the within-segment rate effect is -0.140 points (desktop 4.0% -> 3.9%, mobile 1.8% -> 1.7%, tablet 6.0% -> 5.1%). So roughly half of the drop is traffic composition and half is conversion getting worse within segments. Subtracting the average overall rate in the mix term matters: a shift of share only hurts if it goes toward below-average segments, and it makes per-segment mix numbers interpretable (the mix terms sum to the same total either way). Other decomposition conventions (using baseline weights, with a separate interaction term) split the numbers differently; state the convention you use.\n\nNoise check: under a simple independence assumption the two-proportion z is about 3.9, so the drop is unlikely to be pure sampling noise, but sessions from the same user are not independent, so treat that loosely.\n\nNext steps: (1) split further and look for a single driver (traffic source, campaign, country, new vs returning, browser/app version); (2) walk the funnel (product view -> cart -> checkout -> payment) to find where the rate fell; (3) line up changes with releases, pricing, shipping fees, payment-provider outages, promotions ending and seasonality; (4) validate instrumentation (tracking changes, bot traffic, session definition); (5) check whether the finest segmentation reverses the story (Simpson's paradox); (6) form a causal hypothesis and test it, because the decomposition describes, not explains.",
+  "key_concepts": [
+   "mix effect vs rate effect",
+   "decomposition of a ratio metric",
+   "midpoint (Shapley-style) decomposition",
+   "traffic composition",
+   "funnel analysis",
+   "Simpson's paradox",
+   "instrumentation check"
+  ],
+  "common_mistakes": [
+   "Concluding that conversion got worse everywhere without checking that the traffic mix changed",
+   "Reporting mix and rate effects that do not sum to the total because the interaction term was dropped",
+   "Stopping at the decomposition without checking the funnel or instrumentation"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import pandas as pd\n\ndef decompose_conversion_change(df):\n    \"\"\"df columns: segment, sessions_0, orders_0, sessions_1, orders_1\n    (period 0 = baseline, period 1 = current). Splits the change in overall\n    conversion into a mix effect and a within-segment rate effect, per segment.\n    Midpoint convention, so mix + rate sums exactly to the total change.\n    mix_effect_i = (share1 - share0) * (avg segment rate - avg overall rate):\n    a shift towards a segment only hurts if that segment converts below average.\"\"\"\n    d = df.set_index(\"segment\")\n    share0 = d[\"sessions_0\"] / d[\"sessions_0\"].sum()\n    share1 = d[\"sessions_1\"] / d[\"sessions_1\"].sum()\n    rate0 = d[\"orders_0\"] / d[\"sessions_0\"]\n    rate1 = d[\"orders_1\"] / d[\"sessions_1\"]\n    overall0 = d[\"orders_0\"].sum() / d[\"sessions_0\"].sum()\n    overall1 = d[\"orders_1\"].sum() / d[\"sessions_1\"].sum()\n    out = pd.DataFrame({\n        \"share_0\": share0, \"share_1\": share1,\n        \"rate_0\": rate0, \"rate_1\": rate1,\n        \"mix_effect\": (share1 - share0) * ((rate0 + rate1) / 2 - (overall0 + overall1) / 2),\n        \"rate_effect\": (rate1 - rate0) * (share0 + share1) / 2,\n    })\n    out[\"total\"] = out[\"mix_effect\"] + out[\"rate_effect\"]\n    return out",
+   "test": "import numpy as np\nimport pandas as pd\n\ndf = pd.DataFrame({\n    \"segment\": [\"desktop\", \"mobile\", \"tablet\"],\n    \"sessions_0\": [45000, 50000, 5000], \"orders_0\": [1800, 900, 300],\n    \"sessions_1\": [38000, 57000, 5000], \"orders_1\": [1482, 969, 255],\n})\nr = decompose_conversion_change(df)\noverall0 = df[\"orders_0\"].sum() / df[\"sessions_0\"].sum()\noverall1 = df[\"orders_1\"].sum() / df[\"sessions_1\"].sum()\nassert abs(overall0 - 0.03) < 1e-12 and abs(overall1 - 0.02706) < 1e-12\n\nassert abs(r[\"total\"].sum() - (overall1 - overall0)) < 1e-12           # exact decomposition\nassert abs(r[\"mix_effect\"].sum() - (-0.00154)) < 1e-9\nassert abs(r[\"rate_effect\"].sum() - (-0.00140)) < 1e-9\nassert r[\"total\"].round(6).tolist() == [-0.001183, -0.001307, -0.00045]\nassert r[\"mix_effect\"].round(6).tolist() == [-0.000768, -0.000772, 0.0]\nassert r.index.tolist() == [\"desktop\", \"mobile\", \"tablet\"]\n\n# pure mix shift: rates frozen, only shares move\nd2 = df.copy()\nd2[\"sessions_1\"] = [50000, 35000, 15000]\nd2[\"orders_1\"] = [2000, 630, 900]          # same segment rates: 4.0%, 1.8%, 6.0%\nr2 = decompose_conversion_change(d2)\nassert np.allclose(r2[\"rate_effect\"], 0.0, atol=1e-15)\nassert r2[\"mix_effect\"].sum() > 0       # shift towards the higher-converting desktop and tablet segments\n# pure rate change: shares frozen\nd3 = df.copy(); d3[\"sessions_1\"] = d3[\"sessions_0\"]; d3[\"orders_1\"] = d3[\"orders_0\"] // 2\nr3 = decompose_conversion_change(d3)\nassert np.allclose(r3[\"mix_effect\"], 0.0, atol=1e-15)\nassert abs(r3[\"rate_effect\"].sum() + overall0 / 2) < 1e-12\n\n# is 3.00% -> 2.706% on 100k sessions each noise? two-proportion z (independence assumed)\nn0, n1 = 100000, 100000\nse = (overall0 * (1 - overall0) / n0 + overall1 * (1 - overall1) / n1) ** 0.5\nassert 3.8 < (overall0 - overall1) / se < 4.1\n",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "problem": "The question does not fix a decomposition convention, so per-segment numbers are convention-dependent; the answer does say to state the convention, which mitigates this.",
+    "claim": "question wording / answer convention"
+   },
+   {
+    "severity": "minor",
+    "problem": "A zero-session segment gives NaN rates, so mix/rate/total silently skip it and no longer sum to the overall change (tested).",
+    "claim": "segment present in only one period (code)"
+   }
+  ]
+ },
+ {
+  "id": "smi-h0044",
+  "plan_id": "P2-DA-10",
+  "domain": "Data Analysis",
+  "difficulty": "Medium",
+  "question": "A customer-satisfaction survey (score 1-5) was emailed to all customers. You received 500 responses: 50 from customers with under 1 year of tenure (mean 3.0), 150 with 1-3 years (mean 3.8) and 300 with over 3 years (mean 4.5). The CRM shows the customer base is 50% under-1-year, 30% 1-3 years and 20% over 3 years.\n\nName the bias, say how you would check for it, and implement poststratify(df, stratum_col, value_col, population_share) -> dict returning the raw mean, the post-stratified mean, the weights and Kish's effective sample size. Report the worked numbers and the limits of reweighting.",
+  "answer": "This is non-response bias (more precisely, differential response by tenure): happy long-tenure customers are over-represented, so the raw mean of 4.14 overstates satisfaction for the customer base.\n\nHow to check: compare the respondent mix with the known population mix (here 10% / 30% / 60% of respondents vs 50% / 30% / 20% of customers); compute response rates by stratum from the invite list (respondents divided by invited, which here requires the invite counts per tenure group); compare early and late responders, because late responders often resemble non-responders more; and, when possible, follow up a random sample of non-responders.\n\nPost-stratification gives each respondent the weight population share / sample share, then takes a weighted mean:\n\n```python\nimport pandas as pd\n\ndef poststratify(df, stratum_col, value_col, population_share):\n    \"\"\"Post-stratification. population_share: dict stratum -> known population\n    proportion (must sum to 1 and cover every stratum seen in df).\n    Returns dict: raw_mean, weighted_mean, weights (per stratum, scaled so the\n    average respondent weight is 1), kish_n (effective sample size).\"\"\"\n    if abs(sum(population_share.values()) - 1) > 1e-9:\n        raise ValueError(\"population shares must sum to 1\")\n    counts = df[stratum_col].value_counts()\n    missing = set(counts.index) - set(population_share)\n    if missing:\n        raise ValueError(\"strata without a population share: %s\" % sorted(missing))\n    n = len(df)\n    # weight = population share / sample share (strata with no respondents cannot be reweighted)\n    weights = {s: population_share[s] / (counts[s] / n) for s in counts.index}\n    w = df[stratum_col].map(weights)\n    weighted_mean = float((w * df[value_col]).sum() / w.sum())\n    kish_n = float(w.sum() ** 2 / (w ** 2).sum())\n    return {\n        \"raw_mean\": float(df[value_col].mean()),\n        \"weighted_mean\": weighted_mean,\n        \"weights\": weights,\n        \"kish_n\": kish_n,\n    }\n```\n\nWeights are 5.0 (new), 1.0 (mid) and 0.33 (long). The post-stratified mean is 0.5 x 3.0 + 0.3 x 3.8 + 0.2 x 4.5 = 3.54, against the raw 4.14, a gap of 0.6 points. Kish's effective sample size is (sum w)^2 / sum w^2 = about 174, so the 500 responses carry the precision of roughly 174 equally weighted ones, and confidence intervals should reflect that (use weighted variance estimators, not the raw standard error).\n\nLimits: (1) it corrects only imbalance on the variables used for stratification. If unhappy long-tenure customers are less likely to answer than happy ones in the same stratum, bias remains; the method assumes that, within a stratum, respondents resemble non-respondents. (2) You need accurate population totals and every population stratum must have respondents; empty strata cannot be reweighted. (3) Large weights from small cells (here 50 respondents carry weight 5) make estimates unstable; consider collapsing strata or capping weights, accepting some bias. (4) Weights do not fix measurement bias or leading questions. (5) Report the sensitivity: how much would the answer change under plausible non-response differences within strata.",
+  "key_concepts": [
+   "non-response bias",
+   "post-stratification",
+   "survey weights",
+   "Kish effective sample size",
+   "response rate by stratum",
+   "missing at random given strata",
+   "weight trimming"
+  ],
+  "common_mistakes": [
+   "Believing reweighting removes all non-response bias",
+   "Weighting respondents by population share instead of population share divided by sample share",
+   "Quoting the raw standard error after applying large weights"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import pandas as pd\n\ndef poststratify(df, stratum_col, value_col, population_share):\n    \"\"\"Post-stratification. population_share: dict stratum -> known population\n    proportion (must sum to 1 and cover every stratum seen in df).\n    Returns dict: raw_mean, weighted_mean, weights (per stratum, scaled so the\n    average respondent weight is 1), kish_n (effective sample size).\"\"\"\n    if abs(sum(population_share.values()) - 1) > 1e-9:\n        raise ValueError(\"population shares must sum to 1\")\n    counts = df[stratum_col].value_counts()\n    missing = set(counts.index) - set(population_share)\n    if missing:\n        raise ValueError(\"strata without a population share: %s\" % sorted(missing))\n    n = len(df)\n    # weight = population share / sample share (strata with no respondents cannot be reweighted)\n    weights = {s: population_share[s] / (counts[s] / n) for s in counts.index}\n    w = df[stratum_col].map(weights)\n    weighted_mean = float((w * df[value_col]).sum() / w.sum())\n    kish_n = float(w.sum() ** 2 / (w ** 2).sum())\n    return {\n        \"raw_mean\": float(df[value_col].mean()),\n        \"weighted_mean\": weighted_mean,\n        \"weights\": weights,\n        \"kish_n\": kish_n,\n    }",
+   "test": "import pandas as pd\n\nrows = [(\"new\", 3.0)] * 50 + [(\"mid\", 3.8)] * 150 + [(\"long\", 4.5)] * 300\ndf = pd.DataFrame(rows, columns=[\"tenure\", \"score\"])\npop = {\"new\": 0.5, \"mid\": 0.3, \"long\": 0.2}\nr = poststratify(df, \"tenure\", \"score\", pop)\nassert abs(r[\"raw_mean\"] - 4.14) < 1e-12\nassert abs(r[\"weighted_mean\"] - 3.54) < 1e-12          # 0.5*3.0 + 0.3*3.8 + 0.2*4.5\nassert {k: round(float(v), 6) for k, v in r[\"weights\"].items()} == {\"new\": 5.0, \"mid\": 1.0, \"long\": 0.333333}\nassert abs(r[\"kish_n\"] - 174.4186046511628) < 1e-9     # 500 respondents behave like ~174\n\n# if respondents already mirror the population, weights are all 1 and nothing changes\ndf2 = pd.DataFrame([(\"a\", 2.0)] * 50 + [(\"b\", 4.0)] * 50, columns=[\"g\", \"y\"])\nr2 = poststratify(df2, \"g\", \"y\", {\"a\": 0.5, \"b\": 0.5})\nassert abs(r2[\"weighted_mean\"] - r2[\"raw_mean\"]) < 1e-12 and abs(r2[\"kish_n\"] - 100) < 1e-9\n\nfor bad_pop in [{\"new\": 0.5, \"mid\": 0.3}, {\"new\": 0.5, \"mid\": 0.3, \"long\": 0.3}]:\n    try:\n        poststratify(df, \"tenure\", \"score\", bad_pop)\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(bad_pop)\n",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "problem": "Stated as a requirement but the code does not enforce it: a population stratum with no respondents is silently dropped and the others renormalised (pop a:.5,b:.3,c:.2 with only a,b -> 2.75, no error). NaN scores still count in w.sum() (2.98 vs 3.0).",
+    "claim": "every population stratum must have respondents; empty strata cannot be reweighted"
+   }
+  ]
+ },
+ {
+  "id": "smi-h0046",
+  "plan_id": "P2-DA-12",
+  "domain": "Data Analysis",
+  "difficulty": "Hard",
+  "question": "A dashboard shows that product pages with more images have a higher conversion rate: pages with 8+ images convert at about 6% and pages with 1-3 images at about 2%. A product manager proposes adding images to every page to triple conversion.\n\nExplain why this is not evidence of a causal effect, name specific confounders, design an experiment that would test the causal claim (what you randomise, the unit, the metric and the analysis), and give observational fallbacks with their assumptions. To illustrate confounding, write simulate_confounding(n=40000, seed=0) -> (naive_slope, adjusted_slope, randomised_slope) in which product tier drives both image count and conversion while images have zero true effect.",
+  "answer": "The dashboard shows an association. It would be causal only if pages with few images would convert like the many-image pages had they been given more images, and that is unlikely: image-rich pages are chosen, not assigned.\n\nLikely confounders: product tier and price (premium products get more photography and also have more motivated buyers), brand or category, traffic source and intent (high-intent visitors reach well-merchandised pages), product popularity and reviews, stock status, and seasonality. Reverse causality is also possible: teams add images to products that already sell. Mediators matter too: more images can slow the page, which pushes the other way, so do not adjust for page speed when estimating the total effect of images.\n\nThe simulation below has zero true image effect, yet the naive slope is positive.\n\n```python\nimport numpy as np\n\ndef simulate_confounding(n=40000, seed=0):\n    \"\"\"Premium products get more images AND convert better; images have NO\n    causal effect on conversion. Returns (naive_slope, adjusted_slope,\n    randomised_slope): OLS coefficient of conversion on image count\n    (a) ignoring product tier, (b) controlling for tier, (c) when image count\n    is assigned at random, independently of tier.\"\"\"\n    rng = np.random.default_rng(seed)\n    premium = rng.random(n) < 0.3\n    images = rng.poisson(np.where(premium, 8, 3))\n    p_conv = np.where(premium, 0.06, 0.02)            # depends on tier only\n    converted = (rng.random(n) < p_conv).astype(float)\n\n    def slope(y, cols):\n        X = np.column_stack([np.ones(len(y))] + cols)\n        beta = np.linalg.lstsq(X, y, rcond=None)[0]\n        return float(beta[1])\n\n    naive = slope(converted, [images])\n    adjusted = slope(converted, [images, premium.astype(float)])\n    images_rand = rng.poisson(4, size=n)               # assigned independently of tier\n    randomised = slope(converted, [images_rand])\n    return naive, adjusted, randomised\n```\n\nIn my runs (seed 0) the naive slope was about +0.0046 conversion probability per extra image (about 0.46 points), the tier-adjusted slope was about 0.0007 (near zero, within sampling noise), and the randomised-assignment slope was about 0.0004. The test asserts bands rather than exact values.\n\nCausal test: run a randomised experiment. Randomise the number or layout of images for the same products: for each visitor (or each product page, if visitor-level changes are infeasible), assign the standard gallery or the expanded gallery, holding product, price and copy fixed. Primary metric: purchase conversion per visitor; guardrails: page load time, bounce rate, return rate and revenue per visitor. Randomising at the product level means products are the clusters, so use cluster-robust errors and enough products. Pre-register the hypothesis, compute power and check for sample ratio mismatch.\n\nObservational fallbacks (only if an experiment is impossible): regression or stratified comparisons within tier and category, matching or propensity weighting, and difference-in-differences when images were added to some products at a known date. They need no unmeasured confounding given the covariates, overlap in covariates between the groups, and for difference-in-differences parallel trends. Say plainly that these designs cannot rule out unmeasured confounders.\n\nPitfalls: controlling for a mediator such as page speed, which changes the estimand; claiming \"triple conversion\" from the raw gap; and extrapolating a linear effect beyond the tested range of images.",
+  "key_concepts": [
+   "confounding",
+   "correlation vs causation",
+   "randomised controlled experiment",
+   "unit of randomisation",
+   "cluster-robust inference",
+   "difference-in-differences",
+   "propensity weighting",
+   "unmeasured confounding"
+  ],
+  "common_mistakes": [
+   "Calling the dashboard gap an effect size",
+   "Controlling for variables that are caused by the treatment, such as page load time",
+   "Proposing observational adjustment as if it removed all confounding"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\ndef simulate_confounding(n=40000, seed=0):\n    \"\"\"Premium products get more images AND convert better; images have NO\n    causal effect on conversion. Returns (naive_slope, adjusted_slope,\n    randomised_slope): OLS coefficient of conversion on image count\n    (a) ignoring product tier, (b) controlling for tier, (c) when image count\n    is assigned at random, independently of tier.\"\"\"\n    rng = np.random.default_rng(seed)\n    premium = rng.random(n) < 0.3\n    images = rng.poisson(np.where(premium, 8, 3))\n    p_conv = np.where(premium, 0.06, 0.02)            # depends on tier only\n    converted = (rng.random(n) < p_conv).astype(float)\n\n    def slope(y, cols):\n        X = np.column_stack([np.ones(len(y))] + cols)\n        beta = np.linalg.lstsq(X, y, rcond=None)[0]\n        return float(beta[1])\n\n    naive = slope(converted, [images])\n    adjusted = slope(converted, [images, premium.astype(float)])\n    images_rand = rng.poisson(4, size=n)               # assigned independently of tier\n    randomised = slope(converted, [images_rand])\n    return naive, adjusted, randomised",
+   "test": "naive, adjusted, randomised = simulate_confounding(n=40000, seed=0)\n# truth: images have zero causal effect on conversion\nassert 0.003 < naive < 0.0065          # ~ +0.45 pp conversion per extra image, purely from the tier\nassert abs(adjusted) < 0.0015          # controlling for the confounder removes it (within noise)\nassert abs(randomised) < 0.0015        # random assignment removes it too\nassert naive > 5 * abs(adjusted)\nassert simulate_confounding(n=40000, seed=0) == (naive, adjusted, randomised)\n",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "problem": "Page speed lies on the causal path (mediator), not a confounder; the later pitfall says so correctly.",
+    "claim": "Mechanism confounds exist too: more images can slow the page, which pushes the other way."
+   },
+   {
+    "severity": "minor",
+    "problem": "simulate_confounding(n=10) returns (0.0, 0.0, 0.0) because of a rank-deficient design; irrelevant at default n.",
+    "claim": "small n (code)"
+   }
+  ]
+ }
+]

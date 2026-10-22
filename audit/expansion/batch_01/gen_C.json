@@ -1,0 +1,645 @@
+[
+ {
+  "plan_id": "B1-GEN-05-1",
+  "cell_id": "GEN-05",
+  "topic": "RAG evaluation (recall@k, MRR, nDCG, faithfulness, golden sets, LLM judges)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "coding",
+  "difficulty": "Medium",
+  "question": "You compare two retrievers on 40 labelled queries using hit@5 (1 if a gold chunk is in the top 5, else 0). Retriever A scores 0.50 and B scores 0.60: B hits where A misses on 6 queries, A hits where B misses on 2, and they agree on the other 32. A teammate wants to ship B because 'it is 10 points better'.\n\nWrite paired_bootstrap_ci(a, b, n_boot=10000, alpha=0.05, seed=0) that takes per-query scores for the two systems and returns (mean difference b - a, lower, upper) using a percentile bootstrap over queries. Then say what the interval tells you, why resampling pairs beats treating the two scores as independent samples, and what you would do next.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Compute the per-query difference d_i = b_i - a_i. Here 6 queries have d = +1, 2 have d = -1 and 32 have d = 0, so the mean is 4/40 = 0.10. The bootstrap resamples queries (not scores) with replacement, recomputes the mean difference for each resample and takes the 2.5th and 97.5th percentiles. With the recorded code (seed 0, 10,000 resamples) the interval is roughly [-0.025, +0.225]: it contains 0, so this evidence cannot distinguish a 10-point gain from no gain. It does not show the systems are equal either; the set is simply too small.\n\nWhy paired: both systems see the same queries, and hard queries are hard for both. The per-query differences are far less variable than the raw scores. With the normal approximation, the standard error of the paired difference here is about 0.070, while treating A and B as independent samples gives about 0.112. Ignoring the pairing makes you wrongly conservative; resampling each system separately would do the same.\n\nOnly 8 of 40 queries actually separate the systems, so the effective information is the 6-vs-2 split. An exact sign/McNemar-style test on those 8 gives a two-sided p of about 0.29 (2 x 37/256), which agrees with the interval. The same 15% / 5% / 80% pattern on 400 queries (60 vs 20 discordant) gives roughly [+0.058, +0.143], which excludes zero.\n\nPitfalls: queries are often not independent (several questions drawn from the same document, or paraphrases of one intent), so cluster the resampling by document or topic; the percentile bootstrap is only approximate at small n or for rare events; if you check many metrics, cuts and k values, some will look 'significant' by chance; and statistical significance says nothing about whether a difference matters to users.\n\nNext steps: add queries (prioritising ones from real logs), look at the 8 discordant queries by hand for a systematic pattern, report the interval alongside the point estimate, and decide in advance what size of gain would justify the switch.",
+  "practical_answer": "Reference implementation (numpy only):\n\n```python\nimport numpy as np\n\n\ndef paired_bootstrap_ci(a, b, n_boot=10000, alpha=0.05, seed=0):\n    \"\"\"Percentile bootstrap CI for mean(b - a) over queries (paired resampling).\"\"\"\n    a = np.asarray(a, dtype=float)\n    b = np.asarray(b, dtype=float)\n    if a.shape != b.shape or a.ndim != 1 or a.size == 0:\n        raise ValueError(\"a and b must be equal-length non-empty 1-D arrays\")\n    d = b - a\n    rng = np.random.default_rng(seed)\n    idx = rng.integers(0, d.size, size=(n_boot, d.size))\n    means = d[idx].mean(axis=1)\n    lo, hi = np.quantile(means, [alpha / 2, 1 - alpha / 2])\n    return float(d.mean()), float(lo), float(hi)\n```\n\nThe recorded test builds the 40-query case (mean difference 0.10, interval containing 0), a 10x larger case with the same win rates (interval excludes 0 and is narrower), checks seed determinism, and checks that identical systems give exactly (0, 0, 0).",
+  "key_concepts": [
+   "paired bootstrap",
+   "per-query differences",
+   "confidence interval",
+   "discordant queries",
+   "sample size",
+   "McNemar / sign test"
+  ],
+  "common_mistakes": [
+   "Comparing 0.50 and 0.60 as point estimates without any uncertainty",
+   "Resampling the two systems' scores independently, which throws away the pairing and inflates the variance",
+   "Reading 'the interval contains 0' as 'the systems are equal' rather than 'this set cannot tell them apart'"
+  ],
+  "interview_style_note": "Shows that small golden sets give wide intervals, uses the paired structure, and proposes more queries or a stratified analysis rather than shipping or rejecting on noise.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\n\ndef paired_bootstrap_ci(a, b, n_boot=10000, alpha=0.05, seed=0):\n    \"\"\"Percentile bootstrap CI for mean(b - a) over queries (paired resampling).\"\"\"\n    a = np.asarray(a, dtype=float)\n    b = np.asarray(b, dtype=float)\n    if a.shape != b.shape or a.ndim != 1 or a.size == 0:\n        raise ValueError(\"a and b must be equal-length non-empty 1-D arrays\")\n    d = b - a\n    rng = np.random.default_rng(seed)\n    idx = rng.integers(0, d.size, size=(n_boot, d.size))\n    means = d[idx].mean(axis=1)\n    lo, hi = np.quantile(means, [alpha / 2, 1 - alpha / 2])\n    return float(d.mean()), float(lo), float(hi)",
+   "test": "def _hits(n_both, n_b_only, n_a_only, n_neither):\n    a = [1] * n_both + [0] * n_b_only + [1] * n_a_only + [0] * n_neither\n    b = [1] * n_both + [1] * n_b_only + [0] * n_a_only + [0] * n_neither\n    return a, b\n\n\n# 40 queries: B beats A on 6, A beats B on 2, tie on 32.\na, b = _hits(18, 6, 2, 14)\nm, lo, hi = paired_bootstrap_ci(a, b)\nassert abs(m - 0.10) < 1e-12\nassert lo < 0.0 < hi\n# same pattern on 10x as many queries: interval should exclude zero\na, b = _hits(180, 60, 20, 140)\nm2, lo2, hi2 = paired_bootstrap_ci(a, b)\nassert abs(m2 - 0.10) < 1e-12 and lo2 > 0.0\nassert (hi2 - lo2) < (hi - lo)\n# deterministic for a fixed seed\nassert paired_bootstrap_ci(a, b) == paired_bootstrap_ci(a, b)\n# identical systems -> zero difference, CI is exactly [0, 0]\nassert paired_bootstrap_ci(a, a) == (0.0, 0.0, 0.0)\nprint(\"ok\")",
+   "expected": null
+  },
+  "sources": [],
+  "related_domains": [
+   "Data Analysis"
+  ],
+  "tags": [
+   "evaluation",
+   "bootstrap",
+   "confidence-interval",
+   "retrieval",
+   "statistics"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Existing smi-h0010 asks for metric implementations; this question is about the statistical uncertainty of a metric difference on a small eval set (not covered by any existing item).",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-05-2",
+  "cell_id": "GEN-05",
+  "topic": "RAG evaluation (recall@k, MRR, nDCG, faithfulness, golden sets, LLM judges)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "evaluation",
+  "difficulty": "Medium",
+  "question": "You use an LLM judge to label RAG answers as 'ok' (faithful to the retrieved context) or 'bad'. On 100 answers a human reviewer also labelled, the two agree on 91. The human marked 90 answers ok and 10 bad; the judge marked 95 ok and 5 bad. A colleague says 'it agrees 91% of the time, so we can trust it as our faithfulness gate'.\n\nReconstruct the confusion matrix, compute Cohen's kappa, and explain why the headline agreement is misleading here. Then implement cohen_kappa(human, judge) and say what else you would report before relying on the judge.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Reconstruct the table. Humans: 90 ok, 10 bad. Judge: 95 ok, 5 bad. Agreement is 91, so let both-ok = a, both-bad = d. Human-ok-judge-bad = 90 - a, human-bad-judge-ok = 10 - d. Judge ok = a + 10 - d = 95 and a + d = 91 give a = 88, d = 3. So: both ok 88, human ok / judge bad 2, human bad / judge ok 7, both bad 3.\n\nObserved agreement is 0.91. Chance agreement, given the marginals, is 0.90 x 0.95 + 0.10 x 0.05 = 0.86. Kappa = (0.91 - 0.86) / (1 - 0.86) = about 0.36. Most of the 91% is what two raters would reach by both saying 'ok' nearly all the time.\n\nThe more important number is per-class: of the 10 answers humans called bad, the judge flagged only 3 (30% recall on the class a faithfulness gate exists to catch), and of its 5 'bad' flags, 3 were right (60% precision). A gate with that profile lets about 7 in 10 unfaithful answers through.\n\nContrast: with balanced labels (50 ok / 50 bad) and the same 91% raw agreement, for example 46 / 4 / 5 / 45, kappa is 0.82. Same headline, very different reliability.\n\nWhat to report: the confusion matrix, per-class precision and recall (or sensitivity and specificity), kappa with an interval (n = 100 with only 10 bad examples is very noisy, so oversample bad answers when building the calibration set), and human-human agreement on a subset, since the judge cannot be expected to beat the humans' own consistency. Kappa itself has quirks: it depends on prevalence and is not comparable across datasets with different class mixes. Re-check the judge when the prompt, the judge model, or the answer distribution changes.",
+  "practical_answer": "Implementation:\n\n```python\nfrom collections import Counter\n\n\ndef cohen_kappa(human, judge):\n    \"\"\"Cohen's kappa for two equal-length label sequences (any hashable labels).\"\"\"\n    n = len(human)\n    if n == 0 or n != len(judge):\n        raise ValueError(\"need two non-empty sequences of equal length\")\n    p_o = sum(h == j for h, j in zip(human, judge)) / n\n    ch, cj = Counter(human), Counter(judge)\n    p_e = sum(ch[c] * cj[c] for c in set(ch) | set(cj)) / (n * n)\n    if p_e == 1.0:\n        return 1.0 if p_o == 1.0 else 0.0\n    return (p_o - p_e) / (1.0 - p_e)\n```\n\nThe test rebuilds the 88 / 2 / 7 / 3 table (raw agreement 0.91, kappa about 0.357), the balanced 46 / 4 / 5 / 45 table (raw 0.91, kappa 0.82), and checks perfect agreement (1.0), perfect disagreement (-1.0) and the degenerate single-label case.",
+  "key_concepts": [
+   "Cohen's kappa",
+   "chance agreement",
+   "class imbalance",
+   "recall on the 'bad' class",
+   "confusion matrix",
+   "judge calibration"
+  ],
+  "common_mistakes": [
+   "Quoting raw agreement when one class dominates",
+   "Reporting only overall agreement and not how many of the genuinely bad answers the judge catches",
+   "Treating a kappa threshold as universal without looking at per-class errors and sample size"
+  ],
+  "interview_style_note": "Candidate computes chance-corrected agreement, notices the judge misses most bad answers, and proposes a per-class and uncertainty-aware calibration step.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "from collections import Counter\n\n\ndef cohen_kappa(human, judge):\n    \"\"\"Cohen's kappa for two equal-length label sequences (any hashable labels).\"\"\"\n    n = len(human)\n    if n == 0 or n != len(judge):\n        raise ValueError(\"need two non-empty sequences of equal length\")\n    p_o = sum(h == j for h, j in zip(human, judge)) / n\n    ch, cj = Counter(human), Counter(judge)\n    p_e = sum(ch[c] * cj[c] for c in set(ch) | set(cj)) / (n * n)\n    if p_e == 1.0:\n        return 1.0 if p_o == 1.0 else 0.0\n    return (p_o - p_e) / (1.0 - p_e)",
+   "test": "def _labels(tp, fn, fp, tn):\n    # tp: both 'ok'; fn: human 'ok', judge 'bad'; fp: human 'bad', judge 'ok'; tn: both 'bad'\n    human = [\"ok\"] * tp + [\"ok\"] * fn + [\"bad\"] * fp + [\"bad\"] * tn\n    judge = [\"ok\"] * tp + [\"bad\"] * fn + [\"ok\"] * fp + [\"bad\"] * tn\n    return human, judge\n\n\nh, j = _labels(88, 2, 7, 3)\nraw = sum(x == y for x, y in zip(h, j)) / len(h)\nassert abs(raw - 0.91) < 1e-12\nk = cohen_kappa(h, j)\nassert abs(k - (0.91 - 0.86) / 0.14) < 1e-12 and 0.35 < k < 0.36\n# balanced classes with the same raw agreement give a much higher kappa\nh2, j2 = _labels(46, 4, 5, 45)\nassert abs(sum(x == y for x, y in zip(h2, j2)) / 100 - 0.91) < 1e-12\nassert abs(cohen_kappa(h2, j2) - 0.82) < 1e-12\nassert cohen_kappa(h, h) == 1.0\nassert cohen_kappa([\"a\", \"b\", \"a\", \"b\"], [\"b\", \"a\", \"b\", \"a\"]) == -1.0\nassert cohen_kappa([\"ok\"] * 5, [\"ok\"] * 5) == 1.0\nprint(\"ok\")",
+   "expected": null
+  },
+  "sources": [],
+  "related_domains": [
+   "Data Analysis"
+  ],
+  "tags": [
+   "llm-as-judge",
+   "cohen-kappa",
+   "calibration",
+   "class-imbalance",
+   "faithfulness"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Existing smi-h0003 touches faithfulness metrics but not judge validation; this item is about validating an LLM judge against humans with a chance-corrected statistic (no existing question does this).",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-05-3",
+  "cell_id": "GEN-05",
+  "topic": "RAG evaluation (recall@k, MRR, nDCG, faithfulness, golden sets, LLM judges)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "evaluation",
+  "difficulty": "Medium",
+  "question": "A RAG bot is asked: 'How many days of notice are needed to cancel the contract?' The retriever returns only a superseded policy page saying 30 days (the current policy says 60). Three candidate answers:\n\nA: 'You need 30 days of notice.'\nB: 'You need 60 days of notice.' (no retrieved text mentions 60)\nC: 'Cancellations must be made in writing and follow the contract terms.'\n\nFor each answer say whether it is faithful, relevant and correct, state which inputs each of those three judgements needs, and explain what this implies for choosing the headline metric of a RAG evaluation.",
+  "answer_set": "concise+detailed",
+  "answer": null,
+  "concise_answer": "A is faithful, relevant, incorrect (the context was stale). B is unfaithful (unsupported by context), relevant, correct, so it is luck or parametric memory. C is faithful, weakly relevant (it does not answer the question) and not correct. Faithfulness needs answer plus context, relevance needs question plus answer, correctness needs a reference answer. They are independent, so report all three and diagnose by the pattern, not one score.",
+  "detailed_answer": "Faithfulness (groundedness): are the claims in the answer supported by the retrieved context? Inputs: answer and context only. Answer relevance: does the answer address the question asked? Inputs: question and answer. Correctness: does it match the truth? Inputs: a reference answer or an authoritative source.\n\nA: faithful (30 days is in the context), relevant, incorrect. The generator did its job; the failure is upstream, in retrieval or in index freshness (a superseded document outranked or replaced the current one). Faithfulness scoring alone would give this answer full marks.\n\nB: unfaithful (60 is not in the retrieved text), relevant, correct. Perhaps the model recalled it from pre-training or guessed. It looks good on a correctness metric but is untrustworthy: on another question the same behaviour yields confident fabrications. A strict grounded-answer product would count this as a failure even though the user got the right number.\n\nC: faithful, only loosely relevant (on-topic but non-responsive), not correct. It is a typical 'safe vague' answer that high faithfulness scores reward. Relevance and correctness catch it.\n\nImplications: no single number is enough. Faithfulness guards against unsupported claims but not against bad context; correctness needs labelled references, which are expensive and go stale when policies change; relevance is cheap but weak. Report them together and read the pattern: low faithfulness points at generation (prompting, decoding, instruction to abstain), faithful-but-wrong points at retrieval, freshness or the corpus, and relevant-but-vague points at prompt or answer-format issues. Also check context relevance/recall separately, since an LLM judge of faithfulness inherits any errors in the context it is shown.",
+  "practical_answer": null,
+  "key_concepts": [
+   "faithfulness",
+   "answer relevance",
+   "answer correctness",
+   "reference answer",
+   "groundedness",
+   "stale context"
+  ],
+  "common_mistakes": [
+   "Treating faithfulness as a proxy for truth",
+   "Assuming a correct answer implies a good RAG system even when it came from the model's memory",
+   "Using answer relevance alone, which a vague but on-topic answer can still pass"
+  ],
+  "interview_style_note": "Separates three independent axes, names their required inputs, and concludes that no single score is enough and the failure axes point to different fixes.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "faithfulness",
+   "answer-relevance",
+   "correctness",
+   "groundedness",
+   "rag-evaluation"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Existing smi-h0003 asks how to triage failures with these metrics; this one tests the conceptual independence of the three axes with a compact worked example (nearest: smi-h0003).",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-05-4",
+  "cell_id": "GEN-05",
+  "topic": "RAG evaluation (recall@k, MRR, nDCG, faithfulness, golden sets, LLM judges)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "evaluation",
+  "difficulty": "Medium",
+  "question": "You use an LLM as a pairwise judge to compare a new prompt (B) against the current prompt (A) on 200 questions. The judge prefers B on 62% of pairs. Before reporting it, you re-run the same 200 pairs with the answer order swapped, and the judge's verdict changes (it picks the other system) on 31% of the pairs. The new prompt's answers are on average about 40% longer than the old prompt's.\n\nWhat is going on, which other judge biases should you test for, and how do you turn this judge into a usable measurement?",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "A 31% flip rate under order swapping is direct evidence of position bias (and general instability): for nearly a third of pairs the verdict depends on which answer is shown first, not on content. If the judge were consistent, only a few percent of verdicts should change. The 62% headline mixes real preference with order effects, so it is not reportable as is.\n\nOther biases to test: verbosity or length bias (longer, more formatted answers preferred regardless of correctness; check by regressing the verdict on the length difference, or by comparing win rates inside length-matched bins); self-preference (a judge tending to favour text resembling its own outputs, so avoid using the same model family as both generator and judge, or at least check); style/format bias (markdown, confident tone); and sensitivity to the judge prompt and rubric wording. How strong each effect is varies across models and prompts, so measure it in your setup.\n\nMaking it usable: (1) run both orders and count a win only when the same system wins in both; disagreements are ties, and report the tie/inconsistency rate openly. (2) Give an explicit rubric (correctness against a reference or context, completeness, no unsupported claims) and ask for the reasoning or per-criterion scores before the verdict. (3) Control length, either by instructing the judge, by length-matched comparison, or by reporting a length-adjusted win rate. (4) Calibrate against humans: have people label a sample (include hard and borderline cases), report agreement and per-class errors (see chance-corrected agreement), and re-check after any change to judge model or prompt. (5) Use the judge to rank systems on large sets and keep humans for decisions near the margin; put an interval on the win rate (bootstrap over questions).",
+  "practical_answer": "Swap-consistent scoring worked example (illustrative counts for the 200 pairs, not measured data): suppose B wins in both orders on 95 pairs, A wins in both orders on 43 pairs, and the verdict flips with order on 62 pairs (31%). Counting only consistent verdicts: B 95, A 43, tie 62. Win rate excluding ties = 95 / (95 + 43) = 0.69, and 'B wins or ties' vs 'A wins' views give you a range instead of one number. Report: consistent-B 47.5%, consistent-A 21.5%, inconsistent 31%. Then check the 95 B wins by length: if B's answers are mostly longer, compare B-wins only among pairs whose length differs by less than some small margin (for example 10%) and see whether the margin of victory survives. Add a human-labelled sample of the 62 inconsistent pairs, since these are where the judge is least informative.",
+  "key_concepts": [
+   "position bias",
+   "order swapping",
+   "verbosity bias",
+   "self-preference bias",
+   "tie handling",
+   "human calibration"
+  ],
+  "common_mistakes": [
+   "Reporting the single-order win rate as if the judge were consistent",
+   "Averaging scores over a few runs of the same order and calling that debiasing",
+   "Assuming a stronger judge model removes the biases rather than measuring them"
+  ],
+  "interview_style_note": "Recognises that a 31% verdict flip is a measurement-validity problem, proposes swap-consistent scoring, length controls and human calibration, and states limits honestly.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "llm-as-judge",
+   "position-bias",
+   "verbosity-bias",
+   "self-preference",
+   "calibration"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Existing items do not cover judge bias. Nearest: smi-h0003 (mentions evaluation metrics only); this question is specifically about position/verbosity bias diagnosis and mitigation.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B1-GEN-05-5",
+  "cell_id": "GEN-05",
+  "topic": "RAG evaluation (recall@k, MRR, nDCG, faithfulness, golden sets, LLM judges)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Hard",
+  "question": "Your team wants to pick between BM25 and a dense retriever for a 20,000-chunk internal knowledge base. The plan: sample 500 chunks uniformly at random, prompt an LLM to 'write a question that this chunk answers', mark that chunk as the single gold chunk, and compare recall@5.\n\nCritique this golden-set plan. Name the specific biases it introduces and which retriever it is likely to favour, and describe a better construction, including how you would validate it and keep it from going stale.",
+  "answer_set": "concise+detailed",
+  "answer": null,
+  "concise_answer": "The plan likely over-rewards lexical matching: LLM-written questions copy rare words from the chunk, favouring BM25, and they are unlike real queries. Other flaws: one gold chunk (duplicates and overlapping chunks count as misses), uniform sampling over boilerplate, no multi-chunk or unanswerable questions, and no held-out split. Better: mix real logged queries with validated synthetic ones, pool candidates from several systems, have humans judge, and version the set.",
+  "detailed_answer": "Problems with the plan:\n\n1. Lexical leakage. A question written while looking at a chunk tends to reuse its distinctive terms and phrasing. That is an easy case for BM25 and also for dense models, but it systematically flatters term-matching systems relative to real users, who paraphrase, use abbreviations, or describe a problem without knowing the document's vocabulary. The comparison may therefore be biased towards BM25 (the direction is likely, not guaranteed; measure it).\n2. Distribution mismatch. Real queries are shorter, vaguer, sometimes multi-part, sometimes unanswerable, and concentrated on popular topics. Uniform chunk sampling gives the opposite: equal weight to rarely used pages, boilerplate (headers, legal footers, tables of contents) and chunks that cannot yield a self-contained question.\n3. Context-dependent questions. 'What does the table above show?' is not retrievable. Generated questions need a standalone-answerable filter.\n4. A single gold chunk. Duplicated content, overlapping chunks and other pages stating the same fact are scored as misses, which adds noise and penalises retrievers that find a valid alternative.\n5. No hard cases: multi-hop questions needing two chunks, questions whose answer changed over time, and questions with no answer in the corpus.\n6. Size and overfitting: 500 items give wide intervals on differences between systems, and reusing the set for tuning inflates the final numbers.\n\nA better construction: start from real query logs (anonymised) or support tickets where available; add synthetic questions for coverage but instruct the generator to paraphrase and avoid copying rare terms, then filter by standalone-answerability and by a second check that a human or strong model agrees the chunk answers it. Collect candidates by pooling the top results from several diverse retrievers (BM25, dense, hybrid) and have annotators mark every pooled candidate as relevant or not, allowing multiple gold chunks. Stratify by question type and topic, include unanswerable items, and split into a development set and a frozen test set. Version the set, store corpus snapshot IDs with it, and review it when documents change.",
+  "practical_answer": null,
+  "key_concepts": [
+   "synthetic question generation",
+   "lexical leakage",
+   "single gold chunk",
+   "query distribution shift",
+   "near-duplicate chunks",
+   "held-out split"
+  ],
+  "common_mistakes": [
+   "Assuming LLM-generated questions are interchangeable with real user queries",
+   "Treating the single source chunk as the only correct one even when near-duplicates or overlapping chunks also answer it",
+   "Tuning on the golden set and then reporting results on the same set"
+  ],
+  "interview_style_note": "Identifies generation-time leakage and distribution mismatch, ties them to a concrete directional bias, and proposes a mixed, validated, versioned golden set.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "golden-set",
+   "synthetic-queries",
+   "lexical-overlap",
+   "evaluation-bias",
+   "pooling"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Existing smi-g0010 mentions offline evaluation in a design question without detail; this item drills into golden-set construction bias (nearest: smi-g0010).",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-05-6",
+  "cell_id": "GEN-05",
+  "topic": "RAG evaluation (recall@k, MRR, nDCG, faithfulness, golden sets, LLM judges)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "debugging",
+  "difficulty": "Hard",
+  "question": "You replace the embedding model in a RAG pipeline that passes the top 5 retrieved chunks to the generator. On a 200-question golden set, recall@10 rises from 0.78 to 0.84. Human-graded answer correctness barely moves: 61% to 62.5%. The team wonders if retrieval metrics 'don't matter'.\n\nGive at least four distinct reasons this can happen, say how you would tell them apart with the data you already have, and what extra experiment establishes the ceiling on what better retrieval can deliver.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Recall@10 counts gold chunks in 10 positions, but the generator sees 5. Candidate explanations:\n\n1. The gain sits at ranks 6-10. Recall@5 may not have moved at all. Always report recall at the k actually passed to the generator (and the rank distribution of the gold chunk).\n2. The generator is the bottleneck. Many remaining failures happen with the right chunk in context: misreading, ignoring it, over-compressing, or hallucinating. Better retrieval cannot fix those.\n3. The new hits are on questions the model already answered correctly from parametric knowledge, or on easy single-hop questions, while the hard ones (multi-hop, tables, negation) are unchanged.\n4. Position and distraction effects: with long contexts, models often use evidence in the middle less reliably than at the edges, and extra irrelevant chunks can distract; a better embedder may reorder chunks without making the context cleaner.\n5. Label problems: 'gold chunk retrieved' can overstate sufficiency (the chunk is relevant but incomplete, so the answer needs a second chunk) or the answer grader may be noisy.\n6. Noise. With n = 200, the standard error on a 61% accuracy is about sqrt(0.61 x 0.39 / 200) = 3.4 points, so a 1.5-point move says almost nothing alone.\n\nTelling them apart: build a per-query transition table (retrieval hit before/after at the used k vs answer correct before/after) and look only at queries whose retrieval status changed. Check the rank of the gold chunk for the newly hit queries. Break results down by question type. Hand-read a sample of failures that have the gold chunk in context.\n\nCeiling experiment: run the generator with the gold chunk(s) injected as the context (oracle context). If correctness only rises to, say, the mid-70s, retrieval can at most close a limited gap and the generator or labels need attention; if oracle accuracy is far higher than current accuracy, retrieval and context assembly still have headroom. Also run a no-context baseline to measure parametric knowledge.",
+  "practical_answer": "Illustrative (hypothetical) breakdown for the 200 questions: recall@10 gain of +0.06 equals 12 queries newly hit. Suppose 7 of those 12 have the gold chunk only at ranks 6-10, so they never reach the 5-chunk context: no effect possible. Of the 5 that do reach the context, 3 flip to correct and 2 are still wrong because the generator misreads the chunk. Net: +3 correct answers = +1.5 points, matching the observed 61% to 62.5%. Meanwhile the new embedder may have pushed the gold chunk out of the top 5 for a few queries, so also count the reverse transitions. This turns a puzzling flat line into an explanation: the gain was mostly outside the window the generator sees. Next actions: report recall@5, consider passing more chunks only if the generator handles longer context well, add a reranker to move the ranks 6-10 hits into the top 5, and use the oracle experiment to decide whether to invest in retrieval or in the generation step.",
+  "key_concepts": [
+   "recall@k at the k actually used",
+   "oracle context ablation",
+   "transition table",
+   "lost in the middle",
+   "parametric knowledge",
+   "standard error"
+  ],
+  "common_mistakes": [
+   "Concluding that retrieval quality is irrelevant from one flat end-to-end number",
+   "Measuring recall at a larger k than the number of chunks the generator actually sees",
+   "Ignoring sampling noise: with 200 questions a 1.5-point change is well inside the error"
+  ],
+  "interview_style_note": "Decomposes an aggregate mismatch into testable hypotheses, uses a per-query transition analysis and an oracle-context ceiling, and quantifies noise.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "end-to-end-evaluation",
+   "recall-at-k",
+   "oracle-context",
+   "transition-analysis",
+   "rag-evaluation"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Existing smi-h0003 triages failure buckets for one system; this question is about explaining why a retrieval gain fails to propagate end to end and designing the diagnostic experiments (nearest: smi-h0003).",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B1-GEN-05-7",
+  "cell_id": "GEN-05",
+  "topic": "RAG evaluation (recall@k, MRR, nDCG, faithfulness, golden sets, LLM judges)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "evaluation",
+  "difficulty": "Medium",
+  "question": "Your retrieval golden set was built by annotators who judged only the top 10 results of the existing BM25 system for each query. You now evaluate a new dense retriever against it: its recall@10 and nDCG@10 come out lower than BM25's, yet when you read its results for 20 queries by hand, they look as good or better. Why can the metrics say this, and how would you fix the evaluation?",
+  "answer_set": "single",
+  "answer": "Recall, precision and nDCG all treat a document as relevant only if it appears in the judged-relevant set; unjudged documents count as non-relevant. When the labelled set came from the top 10 of BM25 only, relevant documents that BM25 cannot find were never shown to annotators, so they have no label. A dense retriever that surfaces such documents is penalised for exactly the behaviour you want, while BM25 is flattered because its own top results are the ones that got judged. This is pooling bias, and the metrics are biased towards systems similar to the one that built the pool.\n\nSmall example: the labelled relevant set for a query is {d1, d2, d3}. The dense system returns [d1, x, y, d2, z]. If x and y are truly relevant but never judged, measured recall@5 is 2/3 and precision@5 is 2/5, while the real precision@5 is 4/5.\n\nDiagnose it by computing the judged fraction at k (the share of each system's top-k that has any label). If BM25 is near 100% and the dense system is much lower, the comparison is unreliable. Also sample the unjudged dense results and have a human (or a carefully validated LLM judge) label them to estimate how many are relevant.\n\nFixes: (1) pool the top results from several different systems (BM25, dense, hybrid, the new candidate) before annotating, and re-pool when you add a new system; (2) judge the unjudged documents in the new system's top k, which is usually a small extra batch; (3) as a sensitivity check, report metrics on 'condensed lists' that drop unjudged documents; (4) keep the judged fraction as a standard column in every eval report; (5) when labels are partial, prefer to say 'lower bound' about measured recall. More queries do not help because the missing labels bias every query the same way.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "pooling",
+   "unjudged documents",
+   "incomplete relevance labels",
+   "judged fraction at k",
+   "condensed lists",
+   "candidate pool diversity"
+  ],
+  "common_mistakes": [
+   "Treating every unlabelled document as non-relevant without checking whether it was ever judged",
+   "Concluding the new model is worse from metrics that are structurally biased towards the system that built the labels",
+   "Fixing it by adding more queries rather than more diverse judged candidates"
+  ],
+  "interview_style_note": "Understands that metrics only credit judged-relevant documents, so evaluation sets are biased towards the systems that created the pool, and knows concrete remedies.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "pooling-bias",
+   "incomplete-judgments",
+   "unjudged-documents",
+   "recall-at-k",
+   "retrieval-evaluation"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Existing smi-h0010 states the convention 'unjudged documents count as non-relevant' but does not discuss its consequences; this question builds on that gap (nearest: smi-h0010).",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-05-8",
+  "cell_id": "GEN-05",
+  "topic": "RAG evaluation (recall@k, MRR, nDCG, faithfulness, golden sets, LLM judges)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "coding",
+  "difficulty": "Medium",
+  "question": "Some of your RAG questions need several pieces of evidence (for example a policy rule plus its exception), and for each piece there may be several acceptable chunks because the corpus contains near-duplicates. Averaging plain recall@k over queries hides whether the generator actually receives everything it needs.\n\nImplement evidence_coverage(ranked, groups, k), where groups is a list of sets of chunk ids and a group counts as covered if any of its chunks is in the top k, returning (fraction of groups covered, whether all groups are covered), and aggregate(runs, k) returning (mean coverage, full-coverage rate). Using the four-query example in the test, explain why mean coverage and full-coverage rate move differently when k goes from 3 to 4.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Plain recall@k averages over gold chunks. For a question that needs two chunks, retrieving one of them gives recall 0.5 but usually gives a generator that cannot answer correctly, because the second piece (the exception, the second hop) is missing. What matters for answerability is whether all required pieces are present, so report both: mean coverage (partial credit, a smooth signal for tuning) and the full-coverage rate (the share of questions whose evidence is complete, closer to the answer-correctness ceiling).\n\nModelling evidence as groups of acceptable chunks handles duplicates and overlapping chunk boundaries: a group is covered if any member is retrieved, so retrieving the equivalent duplicate is not penalised, and one chunk should not be counted twice. Define the groups when building the golden set (by pooling and judging, not just by the chunk the question came from).\n\nIn the four-query example, at k = 3 the per-query coverages are 1.0, 0.5, 0.0 and 1/3, so mean coverage is 0.458, and only the first query is fully covered (rate 0.25). Going to k = 4 raises the fourth query to 2/3 and mean coverage to 0.542, but the full-coverage rate stays at 0.25, because the second query still misses its second group and the fourth has a group (c40) that is nowhere in the ranking. A larger k can look like progress on the mean while giving the generator no more complete evidence sets. Note too that a larger k means more context tokens and more distractors for generation.\n\nCaveats: coverage says nothing about rank order (pair it with MRR or nDCG), about whether the chunk is sufficient on its own, or about whether the generator uses it. Edge cases: no groups is an invalid question (unanswerable questions need their own handling), and k = 0 gives zero coverage.",
+  "practical_answer": "Implementation:\n\n```python\ndef evidence_coverage(ranked, groups, k):\n    \"\"\"ranked: list of chunk ids. groups: list of sets; a group is covered if ANY of\n    its chunk ids is in the top-k. Returns (fraction of groups covered, all covered).\"\"\"\n    if not groups:\n        raise ValueError(\"a question needs at least one evidence group\")\n    top = set(ranked[:k]) if k > 0 else set()\n    covered = sum(1 for g in groups if g & top)\n    return covered / len(groups), covered == len(groups)\n\n\ndef aggregate(runs, k):\n    \"\"\"runs: list of (ranked, groups). Returns (mean coverage, full-coverage rate).\"\"\"\n    res = [evidence_coverage(r, g, k) for r, g in runs]\n    n = len(res)\n    return sum(c for c, _ in res) / n, sum(1 for _, ok in res if ok) / n\n```\n\nThe test checks coverage at k = 2, 3 and 4 for individual queries, k = 0, and the aggregates: at k = 3 mean coverage 0.458 and full-coverage rate 0.25; at k = 4 mean coverage 0.542 and full-coverage rate 0.25.",
+  "key_concepts": [
+   "evidence groups",
+   "full coverage rate",
+   "mean coverage",
+   "context sufficiency",
+   "multi-hop retrieval",
+   "duplicate chunks"
+  ],
+  "common_mistakes": [
+   "Counting each gold chunk separately and penalising retrieval of an equivalent duplicate",
+   "Reporting only mean recall, which gives partial credit for answers that cannot be produced from incomplete evidence",
+   "Forgetting that a larger k can raise coverage without making any question fully answerable"
+  ],
+  "interview_style_note": "Chooses a metric that matches what the generator needs (all evidence present), handles equivalent chunks, and reads the two aggregates correctly.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "def evidence_coverage(ranked, groups, k):\n    \"\"\"ranked: list of chunk ids. groups: list of sets; a group is covered if ANY of\n    its chunk ids is in the top-k. Returns (fraction of groups covered, all covered).\"\"\"\n    if not groups:\n        raise ValueError(\"a question needs at least one evidence group\")\n    top = set(ranked[:k]) if k > 0 else set()\n    covered = sum(1 for g in groups if g & top)\n    return covered / len(groups), covered == len(groups)\n\n\ndef aggregate(runs, k):\n    \"\"\"runs: list of (ranked, groups). Returns (mean coverage, full-coverage rate).\"\"\"\n    res = [evidence_coverage(r, g, k) for r, g in runs]\n    n = len(res)\n    return sum(c for c, _ in res) / n, sum(1 for _, ok in res if ok) / n",
+   "test": "runs = [\n    ([\"c1\", \"c9\", \"c2\", \"c7\"], [{\"c1\"}, {\"c2\", \"c20\"}]),   # both groups by rank 3\n    ([\"c5\", \"c3\", \"c8\", \"c4\"], [{\"c3\"}, {\"c6\"}]),          # only first group in top-4\n    ([\"c10\", \"c11\"], [{\"c12\"}]),                            # miss\n    ([\"c1\", \"c2\", \"c3\", \"c4\"], [{\"c4\"}, {\"c3\"}, {\"c40\"}]),  # 2 of 3 groups\n]\nassert evidence_coverage(runs[0][0], runs[0][1], 2) == (0.5, False)\nassert evidence_coverage(runs[0][0], runs[0][1], 3) == (1.0, True)\nassert evidence_coverage(runs[3][0], runs[3][1], 4) == (2 / 3, False)\nassert evidence_coverage(runs[2][0], runs[2][1], 0) == (0.0, False)\nm3, f3 = aggregate(runs, 3)\nm4, f4 = aggregate(runs, 4)\nassert (m3, f3) == ((1.0 + 0.5 + 0.0 + 1 / 3) / 4, 0.25), (m3, f3)\nassert (m4, f4) == ((1.0 + 0.5 + 0.0 + 2 / 3) / 4, 0.25), (m4, f4)\nprint(m3, f3, m4, f4)\nprint(\"ok\")",
+   "expected": null
+  },
+  "sources": [],
+  "related_domains": [],
+  "tags": [
+   "evidence-coverage",
+   "multi-hop-retrieval",
+   "recall-at-k",
+   "evidence-groups",
+   "context-sufficiency"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Existing smi-h0010 implements recall@k, MRR and nDCG for single relevant sets; this item adds all-evidence coverage with alternative chunks (nearest: smi-h0010).",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-06-1",
+  "cell_id": "GEN-06",
+  "topic": "Vector databases and index operations (filters, freshness, updates, cost)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Hard",
+  "question": "A 20M-chunk collection sits in an HNSW index. Queries always carry a metadata filter. For a filter such as department='legal' AND year=2019, only about 0.5% of vectors match (roughly 100,000 chunks). With ef_search=100 and top_k=10, the service often returns only 0 to 2 results, though the same query unfiltered returns 10 sensible hits and an exact scan with the filter returns 10 good ones.\n\nExplain why this happens with post-filtering, what in-graph (filtered) traversal and pre-filtering change, and how you would choose a strategy by selectivity.",
+  "answer_set": "concise+detailed",
+  "answer": null,
+  "concise_answer": "Post-filtering retrieves ef_search candidates by similarity alone, then drops non-matching ones. At 0.5% selectivity, 100 candidates leave about 0.5 survivors on average if matches are spread randomly, so you get 0 to a few results. For selective filters, pre-filter and scan the ~100k matching vectors exactly, partition by the filter field, or use traversal-time filtering. Pick the method from estimated selectivity.",
+  "detailed_answer": "Post-filtering: the index returns the ef_search nearest candidates ignoring the filter, then the engine discards non-matching ones. If the filter is roughly independent of the query, the expected number of survivors is ef_search x selectivity = 100 x 0.005 = 0.5, far below top_k = 10. To get 10 survivors on average you would need ef around 2,000 (10 / 0.005), which costs latency and still fails when the filter correlates with the query (a query about a topic that lies mostly outside 'legal 2019' will rarely have matching items among its nearest neighbours). Raising top_k does not help for the same reason.\n\nPre-filtering with exact scan: evaluate the filter first (inverted index or bitmap), giving about 100,000 ids, then compute exact distances for just those. For 768-d float32 vectors that is about 100,000 x 768 x 4 bytes = 307 MB of vector data to read, acceptable for a rare query pattern and perfect recall within the filter, but too heavy at high QPS or when the filter passes millions of vectors.\n\nTraversal-time (in-graph) filtering: search the graph but only admit matching nodes to the result set, still walking through non-matching nodes. It works well for moderate selectivity, but when matching nodes are very sparse, the search wanders through mostly non-matching regions, the effective graph of matching nodes can become disconnected, and recall or latency degrades; implementations differ in how they handle this (for example by switching to a brute-force path when the filter is selective enough).\n\nPartitioning: if a few filter fields are used on nearly every query (tenant, year, language), build separate indexes or partitions per value so that the ANN index only holds eligible vectors.\n\nChoosing: estimate selectivity per query from filter statistics; use post-filter with generous ef when most data matches (for example more than half); use traversal-time filtering in the middle range; use pre-filter plus exact scan when the matching set is small enough to scan within the latency budget. Always measure recall against an exact filtered search on a sample of real filter/query combinations, split by selectivity band, since average recall hides the selective cases.",
+  "practical_answer": null,
+  "key_concepts": [
+   "post-filtering",
+   "pre-filtering",
+   "filter selectivity",
+   "ef_search",
+   "graph connectivity under filters",
+   "query planner / fallback to exact scan"
+  ],
+  "common_mistakes": [
+   "Raising top_k or ef_search blindly and hoping the filter matches appear",
+   "Assuming the ANN index is 'broken' rather than the filter strategy being mismatched to selectivity",
+   "Assuming filtered traversal keeps recall for any selectivity"
+  ],
+  "interview_style_note": "Links filter selectivity to expected candidates surviving post-filtering, and chooses among post-filter, pre-filter exact scan and traversal-time filtering with numbers.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "Databases"
+  ],
+  "tags": [
+   "filtered-ann",
+   "post-filtering",
+   "pre-filtering",
+   "selectivity",
+   "hnsw",
+   "exact-scan-fallback"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Existing items cover embeddings and retrieval design but nothing on filtered ANN (nearest: smi-g0010, help-centre semantic search design).",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-06-2",
+  "cell_id": "GEN-06",
+  "topic": "Vector databases and index operations (filters, freshness, updates, cost)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Medium",
+  "question": "You must serve 50 million chunks, 768-d float32 embeddings, from an in-memory HNSW index with M=16, with 3 replicas for availability and throughput. Each node has about 100 GB usable for the index. Estimate memory for the base design, work out how many nodes it needs, and compare it with int8 scalar quantisation and product quantisation with 96-byte codes. Which would you choose and what would you verify before deciding?",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Assumptions (state them in the interview; real engines differ): decimal GB; layer 0 stores up to 2M = 32 neighbour ids of 4 bytes per node; upper layers add roughly n/(M-1) node-layer entries with up to M links each; per-node headers, ids, allocator overhead and metadata are ignored and typically add more.\n\nBase design: vectors = 50e6 x 768 x 4 B = 153.6 GB. Layer-0 links = 50e6 x 32 x 4 B = 6.4 GB. Upper layers add about 0.2 GB. Total about 160.2 GB per full copy. Three replicas = about 480.6 GB cluster-wide.\n\nNodes: one copy does not fit within 100 GB, so shard it: ceil(160.2 / 100) = 2 shards of about 80 GB each, times 3 replicas = 6 nodes. Replicas multiply cost but not capacity.\n\nint8 scalar quantisation: 1 byte per dimension gives 38.4 GB for vectors plus 6.6 GB for the graph = 45.0 GB per copy, which fits on one node, so 3 nodes with 3 replicas. The recall loss is often small but data- and model-dependent, so measure it.\n\nProduct quantisation with 96 one-byte codes per vector (8 dimensions per sub-vector): 4.8 GB + 6.6 GB = 11.4 GB per copy. Much cheaper, but lossy: distances are approximate, so many setups re-rank the top candidates with full-precision vectors stored on SSD or in object storage (153.6 GB on disk), adding latency and I/O. The graph links, not the vectors, dominate once codes are this small.\n\nDecision: with these assumptions, int8 gets from 6 nodes to 3 and is a reasonable first step; PQ pays off when memory is the binding constraint. Before deciding, compare recall@k and end-to-end answer quality against the float32 index on a real query set, measure latency under load at the intended QPS and ef_search, and check the build and rebuild time and cost, since sharded indexes also need a fan-out and merge of per-shard top-k results.",
+  "practical_answer": "Calculator used for the figures above (the fenced code is exactly the tested solution):\n\n```python\ndef hnsw_memory_gb(n, dim, bytes_per_dim=4.0, m=16, link_bytes=4, replicas=1):\n    \"\"\"Rough in-RAM size estimate in decimal GB (1e9 bytes) for an HNSW index.\n\n    vectors: n * dim * bytes_per_dim\n    layer 0: up to 2*m links per node\n    upper layers: about n/(m-1) node-layer memberships with up to m links each\n    Real engines add per-node headers, ids, alignment and allocator overhead.\n    \"\"\"\n    vec = n * dim * bytes_per_dim\n    base_links = n * 2 * m * link_bytes\n    upper_links = n / (m - 1) * m * link_bytes\n    total = (vec + base_links + upper_links) * replicas\n    return total / 1e9\n```\n\nThe test asserts: 160.2 GB for one full-precision copy, 480.6 GB for three replicas, 45.0 GB with int8, 11.4 GB with 96-byte PQ codes, and 6.6 GB for the links alone. For capacity planning, do n_shards = ceil(copy_size / usable_per_node), nodes = n_shards x replicas, then multiply by a safety factor for engine overhead and growth.",
+  "key_concepts": [
+   "vector memory arithmetic",
+   "HNSW link overhead",
+   "scalar quantisation",
+   "product quantisation",
+   "sharding vs replication",
+   "re-ranking with full vectors"
+  ],
+  "common_mistakes": [
+   "Forgetting that the graph links take memory in addition to the vectors",
+   "Believing replication adds capacity for a larger index; it only adds copies for availability and throughput",
+   "Applying quantisation without measuring recall loss and whether a full-precision re-rank is needed"
+  ],
+  "interview_style_note": "Gets the order of magnitude right with explicit assumptions, separates sharding from replication, and names recall and re-ranking checks before choosing a compressed layout.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "def hnsw_memory_gb(n, dim, bytes_per_dim=4.0, m=16, link_bytes=4, replicas=1):\n    \"\"\"Rough in-RAM size estimate in decimal GB (1e9 bytes) for an HNSW index.\n\n    vectors: n * dim * bytes_per_dim\n    layer 0: up to 2*m links per node\n    upper layers: about n/(m-1) node-layer memberships with up to m links each\n    Real engines add per-node headers, ids, alignment and allocator overhead.\n    \"\"\"\n    vec = n * dim * bytes_per_dim\n    base_links = n * 2 * m * link_bytes\n    upper_links = n / (m - 1) * m * link_bytes\n    total = (vec + base_links + upper_links) * replicas\n    return total / 1e9",
+   "test": "n, d = 50_000_000, 768\nassert round(hnsw_memory_gb(n, d), 1) == 160.2\nassert round(hnsw_memory_gb(n, d, replicas=3), 1) == 480.6\nassert round(hnsw_memory_gb(n, d, bytes_per_dim=1), 1) == 45.0\n# product quantisation, 96 one-byte codes per vector (8 dims per sub-vector)\nassert round(hnsw_memory_gb(n, 96, bytes_per_dim=1), 1) == 11.4\n# links alone, independent of dimension\nassert round(hnsw_memory_gb(n, 0), 1) == 6.6\nprint(\"ok\")",
+   "expected": null
+  },
+  "sources": [],
+  "related_domains": [],
+  "tags": [
+   "memory-estimation",
+   "hnsw",
+   "quantisation",
+   "product-quantisation",
+   "sharding",
+   "replication"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Existing smi-h0009 covers 1M embeddings and similarity metrics, not index memory or capacity planning (nearest: smi-h0009).",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B1-GEN-06-3",
+  "cell_id": "GEN-06",
+  "topic": "Vector databases and index operations (filters, freshness, updates, cost)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "A RAG service re-ingests documents weekly; each document is split into chunks and upserted into an HNSW-based vector store, and deleted documents are removed with a 'delete by chunk id' call. Six months in, you see: memory and disk keep growing though the corpus is stable, p95 latency is creeping up, recall on a fixed monitoring set has dropped a little, and legal reports that a withdrawn document still appears in answers.\n\nExplain the likely mechanisms and design the update and delete path properly.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Likely mechanisms:\n\n1. Soft deletes. Many ANN implementations mark deleted vectors (tombstones) and filter them from results but leave them in the graph and storage until a compaction or rebuild. Memory and disk do not shrink; searches still traverse deleted nodes, which consume part of the ef budget; and repeatedly inserting into a graph around deleted nodes can reduce graph quality. This fits growing memory, slower queries and mildly lower recall. Behaviour varies by engine, so check the one you use.\n2. Orphaned chunks. If chunk ids are random per ingest, or are position-based (doc42_chunk_11) while a document shrinks from 12 to 9 chunks, then re-upserting by id overwrites some chunks and leaves chunks 10 to 12 of the old version alive. Edited text also shifts chunk boundaries, so the old and new versions coexist and the corpus quietly grows with stale, contradictory text.\n3. The withdrawn document: the delete was keyed on chunk ids the pipeline no longer had (or ran before the index refresh made it visible), so some chunks survive.\n\nDesign: (a) store doc_id, doc_version and chunk ordinal as metadata, with chunk ids derived from doc_id and version; (b) update = write the new version, then delete everything for that doc_id with an older version (a delete-by-filter on doc_id, not a list of ids you remember); (c) add a query-time filter on an 'active' flag or valid_to timestamp so removals take effect for retrieval immediately even before physical deletion, which is what a compliance deletion needs; (d) monitor the deleted/live ratio and run compaction or a rebuild based on it, validating recall against an exact search on a held-out query set; (e) for large rebuilds build a new index in the background and switch an alias or pointer atomically, with the ability to roll back; (f) reconcile periodically: compare doc ids in the source of truth against the index and fix drift; (g) remember that other copies (caches, reranker caches, backups, answer logs) may also contain the withdrawn text.",
+  "practical_answer": "Procedure for one document update, illustrative: 1) Chunk the new text, assign ids as f'{doc_id}:v{version}:{ordinal}', and attach metadata {doc_id, version, active:true}. 2) Upsert all new chunks (they become searchable once the index refresh completes). 3) After the upsert is confirmed, set active:false on, or delete by filter, all chunks where doc_id matches and version < new version. Queries add the filter active=true (or version = current version via a lookup table), so a mid-update query sees either only old chunks or a mix that the filter limits to a single consistent version. 4) Record the operation in a ledger table with timestamps; reconcile it nightly against the index. 5) For a withdrawal: set the document's status to withdrawn in the metadata store first (takes effect at once through the filter), then physically delete, then verify with a search by doc_id that nothing remains and clear any caches. Measure the deleted fraction in the index weekly and trigger a compaction/rebuild when recall at fixed ef, measured against exact search, drops by a tolerance you choose.",
+  "key_concepts": [
+   "tombstone deletes",
+   "index compaction / rebuild",
+   "stable chunk ids",
+   "orphaned chunks",
+   "alias swap",
+   "query-time validity filter"
+  ],
+  "common_mistakes": [
+   "Assuming a delete call physically removes the vector and repairs the graph immediately",
+   "Generating new random chunk ids on each re-ingest, so old chunks are never overwritten",
+   "Relying on a rebuild schedule alone for urgent compliance removals"
+  ],
+  "interview_style_note": "Explains soft deletes and graph degradation, orphaned chunks from changing chunk counts, and gives a layered design: versioned ids, validity filter, scheduled compaction, and alias-based rebuild.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "Databases"
+  ],
+  "tags": [
+   "tombstones",
+   "hnsw-deletes",
+   "index-compaction",
+   "chunk-ids",
+   "blue-green-reindex",
+   "compliance-deletion"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Existing items do not cover index maintenance; nearest smi-g0010 mentions 'keep the index fresh' only briefly (nearest: smi-g0010).",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B1-GEN-06-4",
+  "cell_id": "GEN-06",
+  "topic": "Vector databases and index operations (filters, freshness, updates, cost)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Hard",
+  "question": "Users of a news-assistant RAG product expect a newly published article to be answerable within about 30 seconds. Today the vector index is rebuilt every night, ingestion runs at roughly 200 new chunks per second at peak, and queries must stay under 200 ms at p95.\n\nDesign how new documents become searchable quickly without rebuilding the whole index, say where the 30 seconds actually go, and discuss the consistency and cost trade-offs.",
+  "answer_set": "concise+detailed",
+  "answer": null,
+  "concise_answer": "Keep a large, mostly immutable ANN index plus a small mutable 'fresh' segment that is searched alongside it, and merge the two top-k lists. The fresh segment can use exact scan while small, then be flushed into a built ANN segment every few minutes; background compaction merges segments. Measure the lag: queueing, chunking and embedding often take most of the 30 seconds. Trade-offs are fan-out latency, merge scoring consistency, and compaction cost.",
+  "detailed_answer": "Architecture: a main index (ANN, large, rebuilt or compacted in the background) and a delta/fresh segment that accepts writes. Ingestion path: document arrives, is queued, chunked, embedded (often a batched model call), written to a durable log, then added to the fresh segment. A query searches main and fresh in parallel and merges the two top-k lists by similarity (valid because both use the same embedding model and metric; for hybrid keyword scores, normalise or fuse by rank since term statistics differ across segments).\n\nFresh segment sizing: at 200 chunks per second, an hour accumulates 720,000 chunks. Brute-forcing 768-d float32 vectors for that many chunks means reading about 720,000 x 768 x 4 B = 2.2 GB per query, which is too heavy at high QPS if you let the segment grow for an hour. So flush frequently: after, say, a few minutes (tens of thousands of chunks, tens of MB to a few hundred MB per scan, depending on the interval), convert the segment to a small ANN index or keep it exact, and start a new fresh segment. Many segments increase query fan-out and tail latency, so a background compaction merges small segments into larger ones, in the style of log-structured merge designs.\n\nWhere the 30 seconds go: measure end to end. Message-queue delay, fetching and cleaning documents, chunking, the embedding call (rate limits and batching delays), the index refresh interval (a newly written vector is often invisible until the next refresh or commit), and replication to read replicas. Optimising index internals will not help if embedding batches wait 20 seconds to fill.\n\nTrade-offs: a shorter refresh interval gives fresher results but creates more tiny segments and write amplification; read-your-writes consistency for the publishing user may need a routing hint or a direct lookup; deletes and updates must be applied to both main and fresh segments (see tombstone handling); recall of ANN on the main index is not the same as exact scan on the fresh one, but that mismatch is usually acceptable; and failures need a durable log so the fresh segment can be rebuilt after a crash. Nightly rebuilds then become compaction jobs rather than the freshness mechanism.",
+  "practical_answer": null,
+  "key_concepts": [
+   "fresh segment",
+   "brute-force scan of a small segment",
+   "segment merge / compaction",
+   "refresh interval",
+   "embedding pipeline latency",
+   "read-your-writes"
+  ],
+  "common_mistakes": [
+   "Treating freshness as an index problem only, when chunking, embedding and queueing often dominate the lag",
+   "Merging results from segments with incomparable scores",
+   "Rebuilding the whole ANN index more often as the only freshness mechanism"
+  ],
+  "interview_style_note": "Proposes a main-plus-delta (segmented) architecture, quantifies when brute force stops being viable, and addresses merge scoring, consistency and compaction.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "Databases"
+  ],
+  "tags": [
+   "index-freshness",
+   "segmented-index",
+   "brute-force-segment",
+   "refresh-interval",
+   "compaction",
+   "near-real-time-search"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Existing smi-g0010 lists freshness as one bullet in a design prompt; this question designs the near-real-time path in depth (nearest: smi-g0010).",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B1-GEN-06-5",
+  "cell_id": "GEN-06",
+  "topic": "Vector databases and index operations (filters, freshness, updates, cost)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Hard",
+  "question": "A SaaS RAG product serves 3,000 tenants. Sizes are heavily skewed: most have a few hundred chunks, a handful have millions. Candidate designs: (a) one shared index with a tenant_id filter, (b) a separate index per tenant, (c) a hybrid. Customers require that one tenant can never retrieve another's data, and that deleting a tenant removes all its vectors.\n\nCompare the designs on isolation, search quality and latency, cost, noisy neighbours and erasure, and say which you would build.",
+  "answer_set": "concise+detailed",
+  "answer": null,
+  "concise_answer": "I would tier: small tenants share partitions where the tenant key is enforced by the data layer and each tenant's few hundred chunks are searched exactly, while large tenants get dedicated indexes. A pure shared index makes isolation depend on a filter bug-free query path and harms ANN recall for tiny tenants; one index per tenant wastes overhead on thousands of tiny ones. Always enforce tenant scope below the application code and test for leaks.",
+  "detailed_answer": "(a) Shared index with a tenant_id filter. Cheapest for many small tenants and simple to operate, but: isolation depends on every query path adding the filter, so one missing clause is a cross-tenant leak; a tenant with 300 chunks among 100M has selectivity around 3e-6, so post-filtered ANN returns nothing or poor results (see filtered-ANN behaviour) unless the engine pre-filters or scans exactly; one heavy tenant's queries or ingestion can consume shared capacity (noisy neighbour); deleting a tenant means many deletes with tombstones, compaction and no hard proof of removal.\n\n(b) One index (or collection) per tenant. Strong logical isolation, per-tenant tuning, simple erasure (drop the index) and the ability to place a large tenant on its own hardware. But fixed overhead per index (memory, file handles, background threads, cluster metadata) multiplies by thousands, and tiny tenants waste it. Engines differ in how many indexes they handle well, so test your own.\n\n(c) Hybrid, which I would choose. Tier 1: very small tenants (a few hundred to a few thousand chunks) live in shared partitions keyed by tenant. At that size an exact scan within the tenant's partition is cheap (a few hundred 768-d vectors is trivial) and avoids ANN recall problems entirely. Tier 2: large tenants get dedicated indexes or shards, so they are isolated, tuned and scaled independently; a tenant graduates when its size or traffic passes a threshold. A routing layer maps tenant to location.\n\nIsolation controls beyond the filter: derive the tenant from the authenticated token in a gateway, not from user input; make the data layer enforce scoping (per-tenant namespaces, row-level policies, or credentials limited to a tenant's collection) so a forgotten filter cannot cross tenants; test with canary documents per tenant and automated cross-tenant queries; include tenant id in cache keys for retrieval and generation caches; consider per-tenant encryption keys where regulations demand. Erasure: dedicated index drops cleanly; shared partitions need delete-by-tenant plus compaction and a verification query; remember backups, logs and caches.\n\nMonitor per-tenant latency and size, set rate limits per tenant, and automate promotion between tiers.",
+  "practical_answer": null,
+  "key_concepts": [
+   "shared index with filter",
+   "index per tenant",
+   "hybrid tiering",
+   "isolation enforced server-side",
+   "noisy neighbour",
+   "tenant deletion"
+  ],
+  "common_mistakes": [
+   "Relying on an application-level tenant filter as the only isolation control",
+   "Choosing one index per tenant without counting per-index overhead for thousands of tiny tenants",
+   "Ignoring that selective tenant filters hurt ANN recall in a shared index"
+  ],
+  "interview_style_note": "Trades off isolation, recall, and cost across the skew in tenant sizes and arrives at a tiered design with security controls that do not depend on a single filter.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "Databases"
+  ],
+  "tags": [
+   "multi-tenancy",
+   "tenant-isolation",
+   "namespaces",
+   "filtered-search",
+   "noisy-neighbour",
+   "erasure"
+  ],
+  "time_sensitive": false,
+  "change_notes": "No existing item covers vector-store multi-tenancy (nearest: smi-g0010, which does not address tenancy).",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B1-GEN-06-6",
+  "cell_id": "GEN-06",
+  "topic": "Vector databases and index operations (filters, freshness, updates, cost)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "A hybrid search service runs BM25 and dense retrieval across 8 shards. Each shard computes BM25 with its own local statistics, returns its top 20, and the coordinator merges the lists by raw score and then fuses with the dense list. After the corpus was resharded unevenly, queries with rare terms started returning odd rankings, and the hybrid scores seem on a different scale than the dense ones.\n\nWhy does this happen, and how should the merging and fusion work?",
+  "answer_set": "concise+detailed",
+  "answer": null,
+  "concise_answer": "BM25 depends on collection statistics. With shard-local IDF the same term gets a different weight in each shard, so raw scores from shards are not comparable. Use global statistics, or evenly distributed documents, or fuse by rank. Dense and BM25 scores live on unrelated scales, so combine them with rank-based fusion such as reciprocal rank fusion or normalised scores, and take deeper candidate lists than the final k.",
+  "detailed_answer": "Why raw merging fails: BM25 weights terms by IDF, computed from document frequency and collection size. Using the common Lucene-style form idf = ln(1 + (N - n + 0.5) / (n + 0.5)), a term that appears in 5 of 250,000 documents on one shard has idf of about 10.72, while on another shard where it appears in 40 of 250,000 it has about 8.73. For the same term frequency and document length, the first shard produces larger scores. Merging by raw score then favours shards where the term happens to be locally rare, a bias that grows with uneven resharding (for example one shard holding a topical cluster). When the corpus was split randomly, local statistics approximate the global ones and the problem is small; after skewed resharding it is not.\n\nFixes: (1) compute or distribute global term statistics (a first pass collects document frequencies from all shards, or a periodically refreshed global dictionary), at the cost of an extra round trip or stale stats; many distributed search engines support such a mode. (2) Route documents so each shard is a statistically fair sample of the corpus. (3) Avoid relying on raw cross-shard BM25 scores: normalise per query, or use rank-based merging.\n\nHybrid fusion: BM25 scores are unbounded and corpus-dependent; cosine similarities lie in [-1, 1] and cluster in a narrow band. Adding them directly gives one signal dominance. Reciprocal rank fusion scores a document as the sum of 1 / (c + rank) over lists (c = 60 is a widely used default), which needs no calibration: a document ranked 1st in BM25 and 3rd in dense gets 1/61 + 1/63 = 0.03227, just above one ranked 2nd in both (2/62 = 0.03226), so consistent mid-high placement competes with one strong placement. The alternative is min-max or z-score normalisation per list, which is sensitive to outliers and list length, plus a tuned weight.\n\nCandidate depth: each shard must return at least the number of candidates you want globally (to guarantee an exact merged top-k each shard must return k), and for fusion take more than the final k from each retriever (for example 50 to 100 for a final 10) because a document ranked 30th in one list may be 2nd in the other. ANN recall also applies per shard. Evaluate on judged queries with rare terms, since that is where lexical retrieval adds value.",
+  "practical_answer": null,
+  "key_concepts": [
+   "shard-local IDF",
+   "global statistics",
+   "scatter-gather top-k",
+   "reciprocal rank fusion",
+   "score scale mismatch",
+   "candidate depth"
+  ],
+  "common_mistakes": [
+   "Merging raw BM25 scores from shards with different local statistics",
+   "Adding BM25 and cosine scores directly even though their scales are unrelated",
+   "Taking too few candidates per shard or per retriever before fusion"
+  ],
+  "interview_style_note": "Explains why local IDF makes scores incomparable, and chooses between global statistics, even routing and rank-based fusion with attention to candidate depth.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP",
+   "Databases"
+  ],
+  "tags": [
+   "sharded-bm25",
+   "idf-statistics",
+   "score-normalisation",
+   "reciprocal-rank-fusion",
+   "scatter-gather",
+   "hybrid-search"
+  ],
+  "time_sensitive": false,
+  "change_notes": "No existing item covers hybrid retrieval across shards (nearest: smi-g0010, which only mentions retrieval and re-ranking at a high level).",
+  "confidence": "medium"
+ }
+]

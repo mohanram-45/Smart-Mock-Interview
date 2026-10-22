@@ -1,0 +1,286 @@
+[
+ {
+  "plan_id": "B2-GEN-11-1",
+  "verdict": "correct",
+  "reasons": [
+   "Recheck edit (Wilson interval) verified: 95/100 Wilson 95% = 88.8% to 97.8%, 'roughly 89% to 98%' correct.",
+   "Attached LIMA source supports no sentence in this record (LIMA is never mentioned or paraphrased); drop it."
+  ],
+  "parts_answered": {},
+  "evidence": [
+   {
+    "claim": "Wilson 95% CI for 95/100 is ~89%-98%",
+    "method": "executed",
+    "evidence": "0.8882-0.9785"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Prompting-vs-fine-tuning decision with an evaluation plan.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "reasoning"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "plan with numbers"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2305.11206",
+    "status": "not_supported",
+    "evidence": "Page opened and says what the sentence says, but no answer sentence relies on it. Drop."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": [
+   "https://arxiv.org/abs/2305.11206"
+  ]
+ },
+ {
+  "plan_id": "B2-GEN-11-3",
+  "verdict": "pass",
+  "reasons": [
+   "All numbers recomputed with exact two-sided binomial on discordant pairs: (44,20) p=0.00369 (text 0.004 / 0.0037 ok); (90,66) p=0.0652 (text 0.065 ok); old (120,96) p=0.117 removed everywhere (no residue).",
+   "Case 2 consistency: prompt correct 296 = 230 both right + 66 prompt-only; fine-tune correct 320 = 230 + 90; discordant 156; both wrong 400-230-156 = 14. All match.",
+   "Threshold claim: with b-c=24, exact p>0.05 first occurs at n=140 (p=0.0515); n=138 gives 0.0498. 'roughly 140 or more' is correct (n must be even).",
+   "Prior defect (216 discordant, p 0.12) fully gone; detailed and practical agree."
+  ],
+  "parts_answered": {},
+  "evidence": [
+   {
+    "claim": "p values and 140 threshold",
+    "method": "executed",
+    "evidence": "scipy-free exact binomial in python"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Paired test reasoning, calculation, leakage/fairness checks.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "why/what"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked cases; mild overlap with Case 2 but acceptable"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B2-GEN-11-6",
+  "verdict": "pass",
+  "reasons": [
+   "Edit 'reserve part of human data as held-out first' is sensible and consistent with the control and rubric.",
+   "Shumailov wording now matches abstract ('causes irreversible defects ... tails of the original content distribution disappear'), hedged for single-round augmentation.",
+   "5% of 20,000 = 1,000 correct. LIMA claim worded as 'argues', matches abstract (1,000 curated prompts; almost all knowledge learned in pretraining)."
+  ],
+  "parts_answered": {},
+  "evidence": [],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Risk analysis plus ablation design; rubric present and fits design type.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2305.11206",
+    "status": "supported",
+    "evidence": "'almost all knowledge in large language models is learned during pretraining'; 'only 1,000 carefully curated prompts and responses'"
+   },
+   {
+    "url": "https://arxiv.org/abs/2305.17493",
+    "status": "supported",
+    "evidence": "'causes irreversible defects in the resulting models'; 'tails of the original content distribution disappear'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B2-GEN-12-2",
+  "verdict": "correct",
+  "reasons": [
+   "Both edits verified consistent: acceptance test now matches the policy table (send_email always confirmed; create_event confirmed unless attendees empty/known) and search_web queries as outbound channel matches detailed layer 4. Concise 74 words.",
+   "Greshake source: no sentence in the answers relies on it (no mention of mitigations lacking or data/instruction blur citation); drop.",
+   "Minor gap: the acceptance test only checks send/create_event; it does not test exfiltration via search_web queries even though the table adds a rule for it."
+  ],
+  "parts_answered": {},
+  "evidence": [],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "require that no send_email, and no create_event with unknown attendees, executes without a human approval",
+    "problem": "Acceptance test omits the search_web query-exfiltration rule added to the table.",
+    "replacement": "require that no send_email, and no create_event with unknown attendees, executes without a human approval, and that no search_web query contains text copied from mail or calendar"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-layer trade-off design with residual risk.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2302.12173",
+    "status": "partially",
+    "evidence": "Abstract supports blur of data/instructions and mitigations lacking, but no answer sentence uses it. Drop."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": [
+   "https://arxiv.org/abs/2302.12173"
+  ]
+ },
+ {
+  "plan_id": "B2-GEN-12-4",
+  "verdict": "correct",
+  "reasons": [
+   "Added prompt-minimisation sentence is accurate but repeats 'if the model is hosted' from the sentence before it (redundant).",
+   "Morris source supported (92% of 32-token inputs; full names from clinical notes) for 'embeddings can leak'. ICO page supports 'beyond use' backups only; 'weakest point' is the answer's own judgement, so partial.",
+   "Minor: question asks where each control is weakest; logs and prompt controls' weak points are only implicit."
+  ],
+  "parts_answered": {},
+  "evidence": [],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "and, if the model is hosted, confirm the provider's retention and training-use terms and use a no-retention setting where one is offered.",
+    "problem": "Repeats the earlier 'if the model is hosted ... retention and training terms'.",
+    "replacement": "and use a provider no-retention setting where one is offered (you can contract for, but not verify, provider deletion)."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Cross-cutting privacy design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2310.06816",
+    "status": "supported",
+    "evidence": "'recover 92% of 32-token text inputs exactly'; full names from clinical notes"
+   },
+   {
+    "url": "https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/individual-rights/individual-rights/right-to-erasure/",
+    "status": "partially",
+    "evidence": "'The key issue is to put the backup data beyond use, even if it cannot be immediately overwritten.' Supports suppression/age-out, not 'weakest point'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B2-GEN-12-6",
+  "verdict": "pass",
+  "reasons": [
+   "Edits verified: OWASP LLM01 page says 'Jailbreaking is a form of prompt injection' and 'unclear if there are fool-proof methods of prevention'; Greshake abstract says data/instruction line blurred and mitigations lacking. 'No complete defence is currently known' is suitably hedged.",
+   "Greshake and OWASP both support sentences present in the answer."
+  ],
+  "parts_answered": {},
+  "evidence": [],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Conceptual distinction with attacker/victim and mitigations.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2302.12173",
+    "status": "supported",
+    "evidence": "'blur the line between data and instructions'"
+   },
+   {
+    "url": "https://genai.owasp.org/llmrisk/llm01-prompt-injection/",
+    "status": "supported",
+    "evidence": "'Jailbreaking is a form of prompt injection.'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ }
+]

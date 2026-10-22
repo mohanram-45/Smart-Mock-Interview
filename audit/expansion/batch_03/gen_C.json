@@ -1,0 +1,647 @@
+[
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Docker builds an image as a stack of layers and caches each instruction's result. Per Docker's build-cache documentation, when a layer changes every layer after it must be rebuilt. In the original file, COPY . . comes before the install step, and that copy includes the application source. Any edited line changes the content of the copied files, so the COPY layer is invalidated, and the pip install layer below it is invalidated too, even though requirements.txt did not change. That is why each code edit re-downloads and re-installs every dependency.\n\nThe fix is to order instructions from least to most frequently changing. Copy only the dependency manifest, install, and only then copy the source. Now a code-only change invalidates only the last COPY layer and everything after it, and the expensive install layer is reused from cache. Docker's optimisation guidance describes exactly this split: expensive, stable steps early, frequently changing source late.\n\nOther tightening worth mentioning: (1) Pin dependencies in a lock file with exact versions, otherwise the cached install layer can hide that a fresh build would resolve different packages. (2) Pin the base image, ideally by digest, because a tag can move; Docker documents digest pinning as a supply-chain measure. (3) Add a .dockerignore so datasets, .git, notebooks and local virtualenvs are not sent in the build context or copied into the image, which also keeps COPY layers from being invalidated by irrelevant files. (4) Run as a non-root user with USER if the service needs no privileges. (5) Decide deliberately where model weights live: baking them in makes the image self-contained but large, and a new layer for weights should sit before the code layer so code changes do not re-push them; downloading at start-up keeps the image small but makes start-up depend on external storage. (6) Consider a multi-stage build if compilers or build tools are only needed to install dependencies.",
+  "practical_answer": "A restructured file (placeholders in angle brackets, adapt names to your repo):\n\n```dockerfile\nFROM <slim-python-base-image>@sha256:<digest>\nWORKDIR /app\n\n# 1. dependency manifest only: this layer changes rarely\nCOPY requirements.lock ./\nRUN pip install -r requirements.lock\n\n# 2. weights: large, changes per model release\nCOPY model/ ./model/\n\n# 3. application code: changes on nearly every commit\nCOPY service/ ./service/\n\nRUN useradd --create-home appuser\nUSER appuser\nCMD [\"python\", \"-m\", \"service.main\"]\n```\n\nPaired with a .dockerignore listing .git, data/, notebooks/ and local environments. To check the result: build once, change a single line under service/, rebuild, and confirm the build log reports the dependency and weights steps as cached (reused) while only the service/ COPY and later steps re-run.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Docker Docs: Build cache",
+    "url": "https://docs.docker.com/build/cache/",
+    "supports": "When a layer changes, all layers after it are rebuilt."
+   },
+   {
+    "title": "Docker Docs: Optimize build cache",
+    "url": "https://docs.docker.com/build/cache/optimize/",
+    "supports": "Put expensive, rarely changing steps early; copy package-management files first, install dependencies, then copy frequently changing source so dependency layers are not rebuilt."
+   },
+   {
+    "title": "Docker Docs: Building best practices",
+    "url": "https://docs.docker.com/build/building/best-practices/",
+    "supports": "Pinning a base image to a specific digest is supported for supply-chain integrity; use USER to run as non-root where privileges are not needed; .dockerignore excludes files from the build context."
+   }
+  ],
+  "related_domains": [],
+  "time_sensitive": false,
+  "plan_id": "B3-MLO-06-1",
+  "cell_id": "MLO-06",
+  "topic": "Containers, orchestration and ML pipelines in practice (Docker, Kubernetes basics, GPU scheduling, pipeline steps)",
+  "question_type": "debugging",
+  "difficulty": "Easy",
+  "question": "A teammate's Dockerfile for a model-serving API is: a slim Python base image, WORKDIR /app, COPY . ., RUN pip install -r requirements.txt, then CMD to start the server. Editing one line of application code makes CI take about 8 minutes, because every large dependency wheel is downloaded and installed again. Why does that happen, and how would you restructure the file? What else would you tighten in this image before it goes to production?",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "layer caching",
+   "cache invalidation",
+   "COPY ordering",
+   "lock file",
+   "base image digest",
+   "dockerignore",
+   "non-root user",
+   "multi-stage build"
+  ],
+  "common_mistakes": [
+   "Adding a pip cache flag or more RUN lines while leaving COPY . . before the install, which does not fix invalidation",
+   "Putting the dependency install before copying requirements, so the install step cannot see the file",
+   "Pinning only the Python package versions but leaving the base image on a moving tag"
+  ],
+  "interview_style_note": "Explains cache invalidation as 'a changed layer invalidates all later layers' and orders the Dockerfile by change frequency, then volunteers lock files, digest pinning and non-root.",
+  "tags": [
+   "docker",
+   "layer-caching",
+   "image-build",
+   "reproducibility"
+  ],
+  "change_notes": "New: Docker layer-ordering debugging; no existing question covers containers (existing hits for container/docker are unrelated RAG/LLM items).",
+  "confidence": "high"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Locally there was no limit, so nothing stopped the container from using whatever the processes wanted; the 32 GB machine simply never hit pressure. In Kubernetes the memory limit is enforced by the kernel: Kubernetes documents that memory limits are enforced through out-of-memory kills, and that an OOMKilled reason means the container tried to use more memory than its limit. The container is killed and restarted, which matches the periodic restarts. (CPU behaves differently: a CPU limit throttles, it does not kill.)\n\nAdd up what the container really holds. Two workers times 1.4 GiB of model is 2.8 GiB before anything else. Add per-process framework and interpreter overhead (suppose a measured 0.4 GiB each, 0.8 GiB), and the container is at about 3.6 GiB while idle. A request spike, for instance a large batch plus intermediate tensors (suppose 0.6 GiB), takes the peak to about 4.2 GiB, above the 4 GiB limit. Memory-backed shared memory makes it worse: Kubernetes documents that files written to an emptyDir with medium Memory count against the memory limit of the container that wrote them, so tensors the data loader places in shared memory are part of the same budget. Do not assume forked workers share the model for free; whether pages stay shared depends on how and when the model is loaded and on copy-on-write behaviour, so measure rather than assume.\n\nFinding the real need: run the container locally with representative traffic including the largest batch you allow, observe peak resident memory of all processes (not just one), and repeat under a limit equal to the intended one to see where it dies. Also watch memory over hours, because a slow upward trend points to a leak, not to a too-small limit.\n\nChanges, in order of leverage: reduce duplication (one process with threads, or load the model once per pod and scale out with replicas), cap batch size and concurrency, size the limit from measured peak plus margin, and set the request close to steady state so the scheduler packs nodes honestly. Raising the limit alone treats the symptom if the cause is a leak.",
+  "practical_answer": "Worked sizing with hypothetical measurements: idle 3.6 GiB, worst-case request peak 4.2 GiB, shared-memory scratch up to 0.5 GiB. Peak is about 4.7 GiB, so a 4 GiB limit is wrong by design. Options: (a) one worker process plus threads: model 1.4 + overhead 0.4 + request peak 0.6 + shm 0.5 = 2.9 GiB, so a 3.5 GiB limit (about 20% margin) is plausible; (b) keep two workers and set the limit to about 5.5 GiB. Pod spec fragment for (a):\n\n```yaml\nresources:\n  requests: {memory: 3Gi}\n  limits:   {memory: 3.5Gi}\nvolumeMounts:\n  - {name: shm, mountPath: /dev/shm}\nvolumes:\n  - name: shm\n    emptyDir: {medium: Memory, sizeLimit: 512Mi}\n```\n\nThe shm volume is memory-backed, so its usage is inside the 3.5 GiB. After rollout, check that restarts stop and that the container's peak memory stays below roughly 80% of the limit during a load test at your largest allowed batch.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Kubernetes Docs: Resource Management for Pods and Containers",
+    "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+    "supports": "kube-scheduler places Pods using requests; memory limits are enforced by kernel OOM kills and CPU limits by throttling; OOMKilled means the container tried to use more memory than its limit; a Pod stays Pending while its request cannot be satisfied; extended resources must be whole numbers and cannot be overcommitted (request equals limit)."
+   },
+   {
+    "title": "Kubernetes Docs: Volumes (emptyDir)",
+    "url": "https://kubernetes.io/docs/concepts/storage/volumes/",
+    "supports": "emptyDir with medium Memory is a RAM-backed tmpfs, and files written to it count against the memory limit of the container that wrote them."
+   }
+  ],
+  "related_domains": [],
+  "time_sensitive": false,
+  "plan_id": "B3-MLO-06-2",
+  "cell_id": "MLO-06",
+  "topic": "Containers, orchestration and ML pipelines in practice (Docker, Kubernetes basics, GPU scheduling, pipeline steps)",
+  "question_type": "debugging",
+  "difficulty": "Medium",
+  "question": "A scoring service runs fine with docker run on a 32 GB workstation, but in Kubernetes with a memory limit of 4 GiB (request 2 GiB) the pod restarts every few hours, and kubectl describe shows the last state as terminated with reason OOMKilled. The container starts 2 server worker processes, each of which loads a model that takes 1.4 GiB in memory; a batch endpoint also uses a data loader with 4 worker processes that exchange tensors through shared memory (/dev/shm). Why did it not fail locally, how would you find the real memory need, and what would you change?",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "OOMKilled",
+   "memory limit",
+   "memory request",
+   "CPU throttling",
+   "shared memory",
+   "emptyDir medium Memory",
+   "worker processes",
+   "peak memory measurement"
+  ],
+  "common_mistakes": [
+   "Treating the limit as a soft target like CPU, when memory over limit means a kill",
+   "Counting the model once instead of once per worker process",
+   "Forgetting that memory-backed /dev/shm usage counts against the container limit"
+  ],
+  "interview_style_note": "Connects the kill to kernel-enforced memory limits, sums per-process memory including shared memory, and proposes measurement before resizing.",
+  "tags": [
+   "kubernetes",
+   "oomkilled",
+   "resource-limits",
+   "shared-memory"
+  ],
+  "change_notes": "New: memory limit / OOMKilled debugging; numbers hypothetical. No existing question on Kubernetes resources.",
+  "confidence": "high"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "What happens: Kubernetes documents that a failed liveness check makes the kubelet kill the container and restart it. With these settings the first check starts about 20 s after start-up, and three consecutive failures at 10 s intervals take it to roughly 40 to 50 s. The model needs up to 150 s, so the container is killed before it is ever ready, restarts, repeats, and eventually backs off. Nothing is wrong with the application; the probe is judging a slow start as a deadlock.\n\nDesign: use three probes with different jobs. (1) A startup probe on the same endpoint as liveness. Kubernetes documents that liveness and readiness probes are not run until the startup probe succeeds, and that startup probes are meant for slow-starting containers; if it never succeeds the kubelet kills the container. Its budget is about failureThreshold x periodSeconds, so with a 10 s period and a threshold of 30 you allow roughly 300 s, comfortably above the 150 s worst case, without weakening the liveness settings. (2) A readiness probe that returns success only when weights are loaded and a trivial inference has run; Kubernetes documents that pods not ready receive no traffic through Services, and that readiness probes run for the container's whole lifecycle, so it also protects against a pod that becomes unable to serve later. (3) A liveness probe that is cheap and local: is the event loop responding. Keep it short-fused (the original 10 s x 3 is fine once startup is handled) because its job is to detect a hung process.\n\nWhat can still go wrong: if liveness checks a downstream dependency (feature store, database), an outage of that dependency restarts every pod at once and turns a partial failure into a total one. Likewise, a readiness probe that includes an expensive inference or depends on a shared backend can flap under load, removing pods and pushing more traffic onto the rest; keep the probe cheap and give it a sensible timeout. Also, a startup budget that is too tight causes restarts after a slow storage day, so set it from the observed worst case plus margin.",
+  "practical_answer": "Probe block under hypothetical timings (load 60 to 150 s):\n\n```yaml\nstartupProbe:\n  httpGet: {path: /health/live, port: 8080}\n  periodSeconds: 10\n  failureThreshold: 30      # about 300 s allowed\nreadinessProbe:\n  httpGet: {path: /health/ready, port: 8080}   # 200 only after weights loaded + 1 dummy inference\n  periodSeconds: 5\n  timeoutSeconds: 2\nlivenessProbe:\n  httpGet: {path: /health/live, port: 8080}    # local only, no downstream calls\n  periodSeconds: 10\n  failureThreshold: 3\n```\n\nValidation: kill the weight store's network in a test cluster and confirm pods stay alive but unready (no restarts), then restore it and confirm they become ready without a restart. Then lengthen the simulated load to 200 s and confirm the startup probe fails and the pod is restarted, proving the budget is enforced.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Kubernetes Docs: Liveness, Readiness and Startup Probes",
+    "url": "https://kubernetes.io/docs/concepts/workloads/pods/probes/",
+    "supports": "Liveness and readiness probes are not run until the startup probe succeeds; a failed startup probe makes the kubelet kill the container, subject to its restart policy; liveness probes do not wait for readiness; startup probes suit slow-starting containers."
+   },
+   {
+    "title": "Kubernetes Docs: Configure Liveness, Readiness and Startup Probes",
+    "url": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/",
+    "supports": "A pod whose containers report not ready receives no traffic through Services; a failed liveness check makes the kubelet kill and restart the container; readiness probes run during the container's whole lifecycle."
+   }
+  ],
+  "related_domains": [],
+  "time_sensitive": false,
+  "plan_id": "B3-MLO-06-3",
+  "cell_id": "MLO-06",
+  "topic": "Containers, orchestration and ML pipelines in practice (Docker, Kubernetes basics, GPU scheduling, pipeline steps)",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "A model service takes 60 to 150 seconds to become usable: it downloads about 1 GB of weights and then warms up. Its Deployment has a liveness probe on /health with initialDelaySeconds 20, periodSeconds 10 and failureThreshold 3, and no readiness or startup probe. Pods enter CrashLoopBackOff and never serve. Explain what is happening and design the probe configuration, including what each endpoint should check and one way your design could still go wrong.",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "liveness probe",
+   "readiness probe",
+   "startup probe",
+   "CrashLoopBackOff",
+   "failureThreshold",
+   "model warm-up",
+   "dependency checks in probes",
+   "Service endpoints"
+  ],
+  "common_mistakes": [
+   "Raising initialDelaySeconds on liveness to a large fixed number instead of using a startup probe, which slows detection of real deadlocks forever",
+   "Making liveness depend on downstream services, so their outage restarts all pods",
+   "Using one /health endpoint for liveness and readiness"
+  ],
+  "interview_style_note": "Separates the three probe purposes, computes the startup budget from threshold x period, and names the cascading-restart risk.",
+  "tags": [
+   "kubernetes",
+   "probes",
+   "model-loading",
+   "startup"
+  ],
+  "change_notes": "New: probe design for slow model load; the numbers (20 s, 10 s, 3, 30) are my own hypothetical settings.",
+  "confidence": "high"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "With maxSurge 1 the Deployment is allowed to create one pod above the desired 4, and maxUnavailable 0 forbids taking any old pod down until a new one is available. The surge pod needs a free GPU, but all 4 are held by old pods, so the scheduler cannot place it; Kubernetes documents that a pod stays Pending as long as its resource request cannot be satisfied. Since the old pods may not be removed until a new pod is available, the rollout deadlocks. Serving is unaffected, which is the safe failure mode, but the release never lands.\n\nOptions:\n1. Switch to maxSurge 0 and maxUnavailable 1. The documented rule is that these cannot both be 0; this setting replaces in place: one old pod is terminated, freeing its GPU, then a new pod is scheduled onto it. Cost: capacity drops to 3 of 4 replicas for the whole update (a pod that is still loading its model counts as unavailable), and the update takes at least 4 x 90 s = 6 minutes because each replacement loads before the next old pod is removed. If 3 replicas cannot carry peak traffic, schedule the rollout off-peak.\n2. Keep surge but make room: temporarily add a fifth GPU (autoscaling the pool or reserving spare capacity). Cost: paying for an idle GPU most of the time, or waiting for node provisioning. It preserves full capacity and fast rollback, since old pods keep serving until new ones are available.\n3. Use a different release shape, such as a separate second Deployment at small scale on a spare GPU for a canary before replacing the main one. Cost: requires spare GPUs again and extra routing configuration.\n\nAlso relevant: minReadySeconds delays counting a new pod as available, which slows the rollout further but catches crash-on-first-request failures. Rollback is available because Deployments keep old ReplicaSets as revision history by default, but under option 1 a failed new version has already consumed capacity, so decide on readiness-based abort criteria before starting.",
+  "practical_answer": "Rollout arithmetic, hypothetical: peak traffic needs 3.4 replicas' worth of throughput. With option 1 (surge 0, unavailable 1) capacity during the update is 3 replicas, which is below 3.4, so some requests will queue or fail; the update therefore runs only when traffic is below about 88% of peak (3 / 3.4), or you add a fifth GPU. Strategy block for option 1:\n\n```yaml\nstrategy:\n  type: RollingUpdate\n  rollingUpdate:\n    maxSurge: 0\n    maxUnavailable: 1\nminReadySeconds: 30\n```\n\nCheck during the rollout that the count of ready pods never drops below 3, that each new pod passes readiness only after loading, and that you have a rollback command ready (reverting to the previous revision) with the expectation that rollback also takes about 4 x 90 s.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Kubernetes Docs: Deployments",
+    "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+    "supports": "maxUnavailable and maxSurge definitions, both default to 25%, they cannot both be 0; minReadySeconds; old ReplicaSets are kept as revision history for rollback."
+   },
+   {
+    "title": "Kubernetes Docs: Resource Management for Pods and Containers",
+    "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+    "supports": "kube-scheduler places Pods using requests; memory limits are enforced by kernel OOM kills and CPU limits by throttling; OOMKilled means the container tried to use more memory than its limit; a Pod stays Pending while its request cannot be satisfied; extended resources must be whole numbers and cannot be overcommitted (request equals limit)."
+   }
+  ],
+  "related_domains": [],
+  "time_sensitive": false,
+  "plan_id": "B3-MLO-06-4",
+  "cell_id": "MLO-06",
+  "topic": "Containers, orchestration and ML pipelines in practice (Docker, Kubernetes basics, GPU scheduling, pipeline steps)",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "Your GPU inference Deployment has 4 replicas, each requesting 1 GPU, on a node pool that currently has exactly 4 GPUs in total, all occupied by those replicas. A model release is rolled out with maxSurge 1 and maxUnavailable 0, and the rollout never completes. A new pod sits in Pending while the 4 old pods keep serving. Why, what are your options, and what does each cost? Assume a pod needs about 90 s to load the model.",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "maxSurge",
+   "maxUnavailable",
+   "Pending pod",
+   "GPU capacity",
+   "rolling update",
+   "minReadySeconds",
+   "revision history",
+   "rollback"
+  ],
+  "common_mistakes": [
+   "Assuming the scheduler will preempt old pods to make room for the surge pod",
+   "Setting maxUnavailable to 0 and maxSurge to 0 together, which Kubernetes rejects",
+   "Forgetting that a pod still loading its model counts as unavailable, so capacity during the update is lower than it looks"
+  ],
+  "interview_style_note": "Traces the dead-lock between surge and unavailable limits to a GPU shortage and quantifies the capacity/time trade-off of each fix.",
+  "tags": [
+   "kubernetes",
+   "rolling-update",
+   "gpu",
+   "capacity"
+  ],
+  "change_notes": "New: rolling update meets GPU capacity. All figures hypothetical; nearest existing items are deployment-strategy questions in other cells, none cover Kubernetes rollout parameters.",
+  "confidence": "high"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": "GPUs are extended resources: whole numbers only, set in limits (a limit alone becomes the request), and if both appear they must be equal, with no overcommit. So 0.5 and 'requests 1, limits 2' are invalid. Free GPUs are counted per node, so 10 free GPUs scattered across nodes cannot host an 8-GPU pod. Fix with dedicated GPU node pools: taint them, add tolerations and selectors only on GPU workloads, and pack small services onto separate nodes.",
+  "detailed_answer": "Rules. In Kubernetes a GPU is exposed as an extended resource. The documentation says GPUs are specified in limits; a limit given alone is used as the request; if you specify both they must be equal, and requests without limits are not allowed. The resource-management docs add that extended resources are restricted to whole numbers and cannot be overcommitted. So nvidia.com/gpu: 0.5 is rejected, and 'requests 1, limits 2' is invalid because they differ. A container asks for whole devices, so an ordinary resource request cannot express sharing one GPU. Sharing one physical GPU between several pods (time-slicing, partitioning) is possible only through vendor or operator mechanisms layered on top, which differ by setup and are not part of the plain resource request; whether they fit depends on your cluster and workload isolation needs, so verify with your platform team.\n\nWhy the training job is stuck. An 8-GPU pod must be placed on one node that has 8 GPUs free at once. The scheduler places a pod on a single node, so 10 free GPUs spread as, say, 2 or 3 per node are useless to it. This is fragmentation: each small 1-GPU service lands wherever it fits, and once every node has at least one GPU taken, no node can ever offer 8. CPU-only pods landing on GPU nodes also consume CPU and memory the GPU job needs on that node.\n\nOrganising scheduling. Separate pools by workload shape. Taint GPU nodes so that only pods with a matching toleration are scheduled there (the taints documentation describes dedicating nodes this way), and give GPU workloads a node selector or affinity for the right GPU type. Put small services on a node pool sized for them, or on specific nodes, so they do not fragment the large-job nodes. Priorities and queueing (a batch scheduler or job queue with gang scheduling) address fairness for multi-pod training jobs, but those are add-ons beyond the core scheduler.",
+  "practical_answer": "Example layout, hypothetical: pool A has 3 nodes x 8 GPUs reserved for training; pool B has 2 nodes x 8 GPUs for inference services. Taint pool A with something like workload=training:NoSchedule and give training jobs the matching toleration plus a node selector on the pool label; inference pods target pool B.\n\n```yaml\nspec:\n  nodeSelector: {pool: training}\n  tolerations:\n    - {key: workload, operator: Equal, value: training, effect: NoSchedule}\n  containers:\n    - name: trainer\n      resources:\n        limits: {nvidia.com/gpu: 8}\n```\n\nVerification: with pool A empty, the 8-GPU job schedules to one node; deliberately start a CPU-only pod without the toleration and confirm it stays off pool A.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Kubernetes Docs: Schedule GPUs",
+    "url": "https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus/",
+    "supports": "GPUs are specified in limits; a limit alone is used as the request; if both are given they must be equal; node labels and node selectors can target nodes with particular GPU types."
+   },
+   {
+    "title": "Kubernetes Docs: Resource Management for Pods and Containers",
+    "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+    "supports": "kube-scheduler places Pods using requests; memory limits are enforced by kernel OOM kills and CPU limits by throttling; OOMKilled means the container tried to use more memory than its limit; a Pod stays Pending while its request cannot be satisfied; extended resources must be whole numbers and cannot be overcommitted (request equals limit)."
+   },
+   {
+    "title": "Kubernetes Docs: Taints and Tolerations",
+    "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/",
+    "supports": "Tainted nodes accept no new Pods without a matching toleration (NoSchedule), which can dedicate nodes to particular workloads."
+   }
+  ],
+  "related_domains": [],
+  "time_sensitive": true,
+  "plan_id": "B3-MLO-06-5",
+  "cell_id": "MLO-06",
+  "topic": "Containers, orchestration and ML pipelines in practice (Docker, Kubernetes basics, GPU scheduling, pipeline steps)",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "A shared Kubernetes cluster has several 8-GPU nodes. A researcher requests nvidia.com/gpu: 0.5 for a small embedding service and the API server rejects it. Another job requests 'requests: 1, limits: 2'. Meanwhile an 8-GPU training job stays Pending even though the cluster shows 10 free GPUs in total, because small CPU-heavy pods and 1-GPU services have spread across the nodes. Explain the GPU resource rules, why the big job is stuck, and how you would organise scheduling.",
+  "answer_set": "concise+detailed+practical",
+  "key_concepts": [
+   "extended resource",
+   "GPU limits",
+   "whole-number devices",
+   "no overcommit",
+   "fragmentation",
+   "taints and tolerations",
+   "node selector",
+   "dedicated node pool"
+  ],
+  "common_mistakes": [
+   "Believing a pod can claim a fraction of a GPU through an ordinary resource request",
+   "Summing free GPUs cluster-wide instead of per node",
+   "Relying on a node selector alone, which does not stop other workloads from landing on GPU nodes"
+  ],
+  "interview_style_note": "States the whole-GPU/equal-limits rules accurately, explains per-node fragmentation, and uses taints plus selectors for isolation while hedging on GPU sharing.",
+  "tags": [
+   "kubernetes",
+   "gpu-scheduling",
+   "taints",
+   "fragmentation"
+  ],
+  "change_notes": "New: GPU resource semantics and fragmentation. Sharing mechanisms are explicitly hedged because they are vendor/operator specific.",
+  "confidence": "medium"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Root cause: orchestrators and job controllers give at-least-once execution. Kubernetes documents that for Jobs the same program may sometimes be started twice, and the application must cope with being restarted. So each step has to be safe to run more than once and safe to be observed mid-run.\n\nProperties each step needs. (1) Idempotent: running it again with the same inputs yields the same outcome and no duplicate side effects. register_model is the offender in the first incident; make it a get-or-create keyed by an idempotency key such as the training run id or the model artifact hash, so a second attempt finds the existing version and returns it. (2) Atomic publication of outputs: build_features should write to a temporary location unique to the attempt and publish only at the end (rename or write a completion marker such as a manifest listing files and checksums). Downstream steps read only complete, marked outputs. That removes the half-written read in the second incident, and it works because train is told which committed output to read, rather than listing a directory that something else may still be writing. (3) Deterministic output location: key outputs by a content address or by pipeline-run id plus step name, so retries overwrite their own attempt, never another run's data.\n\nPassing artifacts. Steps exchange references, not large payloads: a URI plus checksum (and schema version) stored by the orchestrator, with the artifact in object or shared storage. The downstream step verifies the checksum before use, which catches truncation.\n\nCaching. A step's cache key is a hash of its code version (image digest or commit), its configuration, and the digests of its input artifacts. If the key matches a completed, committed run, skip execution and reuse the output. This makes retries and backfills cheap, but only if steps are deterministic enough that reuse is acceptable; non-deterministic training should record its seed and be cached by key anyway, treating the stored result as the canonical one. Include anything that changes the output in the key, including the data snapshot id, otherwise stale results are reused.\n\nRetries. Retry only transient failures (node loss, network blips). An OOM kill is deterministic for the same resources and input, so identical retries waste time: fail fast, or retry once with a larger memory request, and alert. Cap attempts and make failure visible rather than silently looping.",
+  "practical_answer": "Replay of the two incidents with the fixed design (hypothetical ids): day 41 train attempt 1 is OOM-killed and the retry is configured with a higher memory request; attempt 2 completes and commits model artifact sha256:ab12 with a manifest. register_model computes key = hash(pipeline run 2026-10-08, artifact sha256:ab12), looks it up, finds none, creates version 41 and stores the key. A duplicate invocation computes the same key, finds version 41, and returns it, leaving exactly one version. For build_features, attempt 1 writes under features/run-0908/attempt-1/ and is killed before the manifest; attempt 2 writes under attempt-2/ and then writes MANIFEST.json with file names and checksums. train is passed the URI of the manifest, refuses to start if it is absent, and verifies the checksums. A cache key for train is hash(image digest, config, manifest digest, data snapshot id); a rerun of the same day finds the committed model and skips training.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Kubernetes Docs: Jobs",
+    "url": "https://kubernetes.io/docs/concepts/workloads/controllers/job/",
+    "supports": "Jobs run tasks to completion with a backoffLimit for retries, and the same program may sometimes be started twice, so applications must handle being restarted."
+   }
+  ],
+  "related_domains": [],
+  "time_sensitive": false,
+  "plan_id": "B3-MLO-06-6",
+  "cell_id": "MLO-06",
+  "topic": "Containers, orchestration and ML pipelines in practice (Docker, Kubernetes basics, GPU scheduling, pipeline steps)",
+  "question_type": "debugging",
+  "difficulty": "Hard",
+  "question": "A nightly ML pipeline runs five steps as containerised jobs: extract, build_features, train, evaluate, register_model. Two incidents occurred this week. First, train was OOM-killed at 90% and retried automatically; register_model then ran twice for that day and created two registry versions with identical weights. Second, a retried build_features step overwrote its output directory while train was starting, and train read a half-written dataset without error. Explain what properties each step needs, how you would pass artifacts between steps, and where caching and retries fit.",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "at-least-once execution",
+   "idempotent step",
+   "idempotency key",
+   "atomic publish",
+   "completion manifest",
+   "artifact checksum",
+   "cache key",
+   "retry policy"
+  ],
+  "common_mistakes": [
+   "Adding more retries to fix the duplicate registration instead of making registration idempotent",
+   "Treating an existing output directory as proof the step finished",
+   "Retrying OOM kills unchanged, expecting a different outcome"
+  ],
+  "interview_style_note": "Frames the incidents as consequences of at-least-once execution and proposes idempotency keys, atomic commit, hash-keyed caching and selective retries.",
+  "tags": [
+   "ml-pipelines",
+   "idempotency",
+   "caching",
+   "retries",
+   "artifacts"
+  ],
+  "change_notes": "New: pipeline step design under retries. Keeps orchestration at ML level (no specific orchestrator); nearest existing smi-0232 'What is a pipeline?' is a basic definition.",
+  "confidence": "high"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": "Training-serving skew is a mismatch between how features (or data) are produced at training time and at serving time, so the model sees inputs in production that differ from what it was trained on, even for the same underlying event. Drift is change over time in the real world's data distribution. Skew is a pipeline inconsistency present from the first request; drift develops later. Example: a price feature in cents in training but dollars in serving.",
+  "detailed_answer": "Training-serving skew is a difference between the data a model sees during training and the data it sees when serving, caused by how the data is produced, not by the world changing. A typical case is a feature computed by different code in each path: a price stored in cents in the training table but sent in dollars by the live service, or a missing value filled with -1 offline and 0 online. The same real-world event yields different feature values in the two places, so the model's learned relationships no longer apply.\n\nData drift is a change over time in the distribution of inputs (or labels) in the real world, for example customer behaviour shifting after a price change. The pipelines may be perfectly consistent; the population simply moved away from the training window.\n\nThe tools for them overlap, which is why people confuse them. TensorFlow Data Validation, for instance, documents distribution skew as a difference between training and serving data, and drift as a comparison between consecutive spans of data.\n\nHow to tell which: (1) Skew shows up immediately after deployment: serving feature statistics differ from the training statistics from day one, and an offline replay of logged production requests through the training code produces different feature values than the live service did. (2) Drift appears gradually: day-one serving statistics match training, then diverge as time passes, and a replay of today's raw data through the training pipeline gives the same features the service computed. A direct test is to take a sample of raw events, run them through both the offline and the online feature path, and compare outputs row by row: any difference is skew. Comparing the training distribution with the served distribution tells you something is off but not which cause.\n\nThe fixes differ too: skew is a bug to be fixed by sharing code or definitions; drift calls for monitoring, retraining or redesign.",
+  "practical_answer": null,
+  "code": null,
+  "sources": [
+   {
+    "title": "TensorFlow Data Validation guide",
+    "url": "https://www.tensorflow.org/tfx/guide/tfdv",
+    "supports": "TFDV can detect distribution skew between training and serving data; drift is detected between consecutive spans; drift for categorical features is expressed as L-infinity distance."
+   }
+  ],
+  "related_domains": [],
+  "time_sensitive": false,
+  "plan_id": "B3-MLO-07-1",
+  "cell_id": "MLO-07",
+  "topic": "Feature stores and training-serving skew",
+  "question_type": "concept",
+  "difficulty": "Easy",
+  "question": "What is training-serving skew, and how is it different from data drift? Use a small concrete example, and say how you would tell which one you are looking at.",
+  "answer_set": "concise+detailed",
+  "key_concepts": [
+   "training-serving skew",
+   "data drift",
+   "feature computation paths",
+   "unit mismatch",
+   "default value handling",
+   "distribution comparison",
+   "replay of raw events"
+  ],
+  "common_mistakes": [
+   "Treating any drop in production performance as drift without checking pipeline consistency",
+   "Claiming skew is only about label or model changes",
+   "Comparing aggregate distributions only and concluding the cause"
+  ],
+  "interview_style_note": "Gives the clean distinction (pipeline inconsistency vs change over time) plus a practical test: run the same raw events through both paths.",
+  "tags": [
+   "training-serving-skew",
+   "drift",
+   "feature-engineering"
+  ],
+  "change_notes": "New: Easy definition plus skew-vs-drift test. Distinct from smi-i0009 (lists causes of an offline-online gap in a churn A/B test); this asks for the definition, the distinction from drift and a discriminating test.",
+  "confidence": "high"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "The colleague's join uses information from the future. A label event at time t should be paired with the feature values that were known at t, but the 'newest row per entity' includes updates made after t, for example a ticket count that already reflects the complaint that preceded the churn. The model then learns from signals that cannot exist at prediction time, so validation looks better than production will. This is temporal leakage, and it also creates skew, because the live system by construction can only see the past.\n\nA point-in-time (as-of) join fixes this by selecting, per event, the most recent feature row with feature_ts <= event_ts. Feast documents this behaviour as joining features onto an entity dataframe in a point-in-time correct way, reproducing the state at each entity timestamp, and also scanning backward from that timestamp up to a TTL. The TTL bounds staleness: a feature last updated a year ago should usually not be treated as current, so beyond the TTL the value is missing (None), mirroring what an online store with an expiry would return.\n\nImplementation notes. Group rows by entity and sort by timestamp, then use binary search (bisect_right on the timestamps) to find the last row not after the event; that is O(log n) per event after an O(n log n) sort. The comparison must be less-or-equal on the timestamp: a row stamped exactly at the event time was available then. In the tests, with TTL 300, an event at 250 sees the value written at 200, an event at 800 sees nothing because the newest row (t=400) is 400 s old, and the naive join returns the t=400 value for every u1 event, including the one at t=99 where nothing was yet known. Ties: when two rows share a timestamp, I let the one appearing later in the input win, which is a convention you must make deterministic and document; in practice a separate ingestion or created-at timestamp is a better tie-breaker. One more subtlety: feature_ts here is the time the value was true; if data arrives late, you also need the time it became known (see backfill questions).",
+  "practical_answer": "Tested implementation (also includes the leaky join for contrast):\n\n```python\nfrom bisect import bisect_right\nfrom collections import defaultdict\n\n\ndef point_in_time_join(events, feature_rows, ttl):\n    \"\"\"For each (entity, event_ts) return the latest feature value known at event_ts.\n\n    feature_rows: iterable of (entity, feature_ts, value).\n    A row qualifies if feature_ts <= event_ts and event_ts - feature_ts <= ttl.\n    Ties on feature_ts: the row that appears later in feature_rows wins.\n    Returns a list aligned with events; None when nothing qualifies.\n    \"\"\"\n    by_entity = defaultdict(list)\n    for i, (ent, ts, val) in enumerate(feature_rows):\n        by_entity[ent].append((ts, i, val))\n    times = {}\n    vals = {}\n    for ent, rows in by_entity.items():\n        rows.sort(key=lambda r: (r[0], r[1]))\n        times[ent] = [r[0] for r in rows]\n        vals[ent] = [r[2] for r in rows]\n    out = []\n    for ent, event_ts in events:\n        ts_list = times.get(ent)\n        if not ts_list:\n            out.append(None)\n            continue\n        j = bisect_right(ts_list, event_ts) - 1\n        if j < 0 or event_ts - ts_list[j] > ttl:\n            out.append(None)\n        else:\n            out.append(vals[ent][j])\n    return out\n\n\ndef naive_latest_join(events, feature_rows):\n    \"\"\"Leaky join: always uses the newest feature row per entity, ignoring event time.\"\"\"\n    latest = {}\n    for ent, ts, val in feature_rows:\n        if ent not in latest or ts >= latest[ent][0]:\n            latest[ent] = (ts, val)\n    return [latest[ent][1] if ent in latest else None for ent, _ in events]\n```\n\nCheck on the example data: rows u1 at t=100 (value 2), t=200 (5 then 6), t=400 (9), u2 at t=150 (value 1), TTL 300. Events u1@99 gives None, u1@100 gives 2, u1@250 gives 6, u1@399 gives 6, u1@500 gives 9, u1@800 gives None because the row is 400 s old. The naive join gives 9 for every u1 event.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "from bisect import bisect_right\nfrom collections import defaultdict\n\n\ndef point_in_time_join(events, feature_rows, ttl):\n    \"\"\"For each (entity, event_ts) return the latest feature value known at event_ts.\n\n    feature_rows: iterable of (entity, feature_ts, value).\n    A row qualifies if feature_ts <= event_ts and event_ts - feature_ts <= ttl.\n    Ties on feature_ts: the row that appears later in feature_rows wins.\n    Returns a list aligned with events; None when nothing qualifies.\n    \"\"\"\n    by_entity = defaultdict(list)\n    for i, (ent, ts, val) in enumerate(feature_rows):\n        by_entity[ent].append((ts, i, val))\n    times = {}\n    vals = {}\n    for ent, rows in by_entity.items():\n        rows.sort(key=lambda r: (r[0], r[1]))\n        times[ent] = [r[0] for r in rows]\n        vals[ent] = [r[2] for r in rows]\n    out = []\n    for ent, event_ts in events:\n        ts_list = times.get(ent)\n        if not ts_list:\n            out.append(None)\n            continue\n        j = bisect_right(ts_list, event_ts) - 1\n        if j < 0 or event_ts - ts_list[j] > ttl:\n            out.append(None)\n        else:\n            out.append(vals[ent][j])\n    return out\n\n\ndef naive_latest_join(events, feature_rows):\n    \"\"\"Leaky join: always uses the newest feature row per entity, ignoring event time.\"\"\"\n    latest = {}\n    for ent, ts, val in feature_rows:\n        if ent not in latest or ts >= latest[ent][0]:\n            latest[ent] = (ts, val)\n    return [latest[ent][1] if ent in latest else None for ent, _ in events]",
+   "test": "rows = [\n    (\"u1\", 100, 2),\n    (\"u1\", 200, 5),\n    (\"u1\", 200, 6),   # same timestamp: later row wins\n    (\"u1\", 400, 9),\n    (\"u2\", 150, 1),\n]\nevents = [\n    (\"u1\", 99),    # before any feature row\n    (\"u1\", 100),   # exactly on the row\n    (\"u1\", 199),\n    (\"u1\", 250),\n    (\"u1\", 399),\n    (\"u1\", 500),   # newest row is 100 s old\n    (\"u1\", 800),   # newest row is 400 s old: expired\n    (\"u2\", 149),\n    (\"u2\", 150),\n    (\"u3\", 300),   # unknown entity\n]\ngot = point_in_time_join(events, rows, ttl=300)\nassert got == [None, 2, 2, 6, 6, 9, None, None, 1, None], got\n# the future row (ts=400) must never reach an event at ts<400\nassert 9 not in got[:5]\n# naive join leaks: every u1 event sees the value from t=400\nnaive = naive_latest_join(events, rows)\nassert naive == [9, 9, 9, 9, 9, 9, 9, 1, 1, None], naive\n# input order does not matter when there are no timestamp ties\nimport random\nrandom.seed(0)\nclean = [r for r in rows if r[2] != 5]\nshuffled = clean[:]\nrandom.shuffle(shuffled)\nassert point_in_time_join(events, clean, 300) == point_in_time_join(events, shuffled, 300)\nprint(\"ok\")\n",
+   "expected": null
+  },
+  "sources": [
+   {
+    "title": "Feast Docs: Point-in-time joins",
+    "url": "https://docs.feast.dev/getting-started/concepts/point-in-time-joins",
+    "supports": "Feast joins features onto an entity dataframe in a point-in-time correct way, reproducing the state at each entity timestamp, and scans backward from that timestamp up to the TTL."
+   },
+   {
+    "title": "Feast Docs: Feature view",
+    "url": "https://docs.feast.dev/getting-started/concepts/feature-view",
+    "supports": "A feature view's TTL limits how far back Feast looks when generating historical datasets; on-demand transformation logic is documented as executed in both historical and online retrieval paths."
+   }
+  ],
+  "related_domains": [
+   "Python"
+  ],
+  "time_sensitive": false,
+  "plan_id": "B3-MLO-07-2",
+  "cell_id": "MLO-07",
+  "topic": "Feature stores and training-serving skew",
+  "question_type": "coding",
+  "difficulty": "Medium",
+  "question": "You are building training data for a churn model. Feature rows are (entity, feature_ts, value) and labelled events are (entity, event_ts). A colleague joins each event to the newest feature row per entity and gets a surprisingly high validation score. Explain what is wrong, then implement point_in_time_join(events, feature_rows, ttl) returning, for each event, the latest value with feature_ts <= event_ts and event_ts - feature_ts <= ttl, else None. Say how you treat ties on feature_ts.",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "point-in-time join",
+   "temporal leakage",
+   "as-of join",
+   "feature TTL",
+   "binary search",
+   "tie-breaking",
+   "event timestamp"
+  ],
+  "common_mistakes": [
+   "Using strict < or the wrong inequality direction so same-instant rows are mishandled or future rows leak",
+   "Joining on entity only and taking the latest row",
+   "Ignoring TTL so ancient values look current"
+  ],
+  "interview_style_note": "Names the leakage mechanism, implements an as-of join with bisect and an explicit TTL and tie rule, and tests the future-row case.",
+  "tags": [
+   "point-in-time-join",
+   "leakage",
+   "feature-store",
+   "coding"
+  ],
+  "change_notes": "New coding item on as-of joins. Nearest existing: smi-i0001 (defines leakage types conceptually); this implements the join and TTL handling.",
+  "confidence": "high"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": "A feature store gives shared, versioned feature definitions, point-in-time correct training data and low-latency lookups at serving. It has two stores because the access patterns differ: the offline store holds history for large scans and training; the online store holds the latest values for millisecond key lookups. For one batch-scored model reading from a warehouse, I would not adopt one now; I would reconsider with online serving, multiple models sharing features, or repeated skew bugs.",
+  "detailed_answer": "What it solves. A feature store addresses three recurring problems: (1) one definition of each feature, reused across training and serving and across models, so teams do not re-implement it in different languages; (2) point-in-time correct training sets, so training rows get the feature values known at the label time and not later values; (3) serving features at low latency by key. Feast's documentation describes joining features onto an entity dataframe in a point-in-time correct way, and ingesting values into an online store so features can be served in real time with low latency.\n\nWhy two stores. The access patterns conflict. Training needs historical values across millions of entities and timestamps, read as large scans, which suits warehouse or lake storage (the offline store). An online prediction needs the latest value for one or a few entities within a few milliseconds, which suits a key-value store (the online store). One system cannot cheaply do both well. A process, often called materialization, loads recent values from the offline side into the online side; this process and its freshness are where much of the operational work lies.\n\nThis team. Nightly batch scoring means no online store is needed: the scoring job can read the same warehouse tables the training job reads. The point-in-time logic can be a tested SQL or Python function, as in a small as-of join, and the feature code can be one shared module or SQL view used by both training and scoring. A feature store would add infrastructure to run, a new abstraction and a migration for a team with little capacity.\n\nWhat would change the answer: real-time scoring (the online store becomes necessary); several models or teams reusing the same features and duplicating logic; recurring skew or leakage incidents despite shared code; features with complex time windows where hand-written as-of joins keep going wrong; or audit needs for feature lineage. Even then I would start with the smallest step, such as a shared definitions repo with parity tests, and only adopt a store when the pain is demonstrated.",
+  "practical_answer": null,
+  "code": null,
+  "sources": [
+   {
+    "title": "Feast Docs: Point-in-time joins",
+    "url": "https://docs.feast.dev/getting-started/concepts/point-in-time-joins",
+    "supports": "Feast joins features onto an entity dataframe in a point-in-time correct way, reproducing the state at each entity timestamp, and scans backward from that timestamp up to the TTL."
+   },
+   {
+    "title": "Feast Docs: Architecture overview",
+    "url": "https://docs.feast.dev/getting-started/architecture/overview",
+    "supports": "Feast ingests feature values into an online store so that features can be served in real time with low latency."
+   }
+  ],
+  "related_domains": [],
+  "time_sensitive": true,
+  "plan_id": "B3-MLO-07-3",
+  "cell_id": "MLO-07",
+  "topic": "Feature stores and training-serving skew",
+  "question_type": "business_case",
+  "difficulty": "Medium",
+  "question": "A three-person team has one churn model. Features come from a data warehouse, the model scores 200,000 customers once a night, and results are written back to a table. The CTO wants to introduce a feature store with online and offline stores. What problems does a feature store solve, why do such systems usually have two stores, and would you adopt one here? Say what would change your answer.",
+  "answer_set": "concise+detailed",
+  "key_concepts": [
+   "feature store",
+   "offline store",
+   "online store",
+   "materialization",
+   "point-in-time correctness",
+   "shared feature definitions",
+   "batch scoring"
+  ],
+  "common_mistakes": [
+   "Assuming a feature store is required for any production model",
+   "Saying the two stores exist for redundancy rather than differing access patterns",
+   "Ignoring the operational cost of keeping the online store fresh"
+  ],
+  "interview_style_note": "Explains the two-store design from access patterns and gives a reasoned 'not yet' with explicit triggers for adopting.",
+  "tags": [
+   "feature-store",
+   "online-store",
+   "offline-store",
+   "build-vs-buy"
+  ],
+  "change_notes": "New: business-case/adoption question. Nearest smi-i0009 is about causes of skew; this is about whether and why to adopt the architecture.",
+  "confidence": "medium"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "The root problem is two independent implementations of one specification. Any duplicated logic drifts, and each choice (window boundaries, rounding, default) is a place where they can differ silently. The goal is that exactly one artifact defines the transformation, and that anything else is generated from it or tested against it.\n\nApproaches:\n1. Single computation, two destinations. Compute features once in a pipeline (batch or streaming), write them to the offline store with timestamps and push the latest values to the online store, so serving reads, never recomputes. Pros: no second implementation. Cons: only works for features that can be computed ahead of the request; request-time inputs (the current cart) cannot be precomputed, and freshness is bounded by pipeline latency.\n2. One transformation function executed in both paths. Feast documents on-demand transformations as Python logic executed in both the historical retrieval and online retrieval paths; a shared library imported by both the training job and the service achieves the same. Pros: one definition for request-time features. Cons: both environments must run the same language and runtime; library versions must be pinned and equal; per-request latency cost.\n3. Declarative spec compiled to both targets (a feature DSL generates SQL and service code). Pros: language-independent. Cons: a new language to maintain; generator bugs affect everyone; limited expressiveness.\n4. Keep two implementations but enforce parity with tests. Pros: no re-architecture. Cons: parity is only as good as test coverage, and it is a recurring cost. This is the fallback when 1 to 3 are impractical.\n5. Log-and-wait: log the features the service actually computed at prediction time and train on the logs. Pros: eliminates skew by construction for the logged features. Cons: needs a history of logs before you can train, hard to add new features retrospectively, and it can bake in the live service's bugs.\n\nSpecify the semantics regardless of choice: window definition (calendar vs hours, timezone), rounding rule, null and unknown-category defaults, and the time at which a value is considered known.\n\nProving parity: replay a sample of raw entities through both implementations and compare values, categorising mismatches. Do this before the change to baseline the problem, and in CI after the change so that any later edit that breaks equivalence fails the build.",
+  "practical_answer": "Parity test procedure, hypothetical thresholds. Sample 50,000 raw entity snapshots stratified by segment, including edge cases (new users, nulls, month-end, daylight-saving change dates, unseen categories). Run both implementations on the same frozen raw inputs and the same 'as of' time. Pass criteria: numeric features equal within 1e-6 relative error (or exactly, for integers and booleans); categorical features exactly equal; null/default handling equal; zero mismatches allowed on categoricals and null masks; for floats, any row above tolerance is listed. Triage: group mismatches by feature and by cause (window, rounding, default). Example of one found bug: the '30 days' feature gives 12 in SQL for a customer with 12 orders in the last 30 calendar days, but 11 in code that uses 720 hours when a daylight-saving change shifts the window start by an hour and an order falls in that hour; the fix is to specify the window in UTC calendar days in the shared definition. Wire the test into CI as a gate with a small frozen fixture (a few hundred rows containing the edge cases) and run the large sample nightly.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Feast Docs: Feature view",
+    "url": "https://docs.feast.dev/getting-started/concepts/feature-view",
+    "supports": "A feature view's TTL limits how far back Feast looks when generating historical datasets; on-demand transformation logic is documented as executed in both historical and online retrieval paths."
+   }
+  ],
+  "related_domains": [],
+  "time_sensitive": true,
+  "plan_id": "B3-MLO-07-4",
+  "cell_id": "MLO-07",
+  "topic": "Feature stores and training-serving skew",
+  "question_type": "design",
+  "difficulty": "Hard",
+  "question": "Training features come from warehouse SQL; the live service recomputes the same features in application code written by another team. Audits keep finding differences: rounding, a 30-day window that is 'last 30 calendar days' in one place and '720 hours' in the other, and unknown categories mapped to different defaults. Propose how to give training and serving a single transformation definition, compare at least three approaches with their trade-offs, and explain how you would prove parity before and after the change.",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "single source of truth",
+   "on-demand transformation",
+   "parity test",
+   "shared library",
+   "materialization",
+   "feature logging",
+   "window semantics",
+   "default handling"
+  ],
+  "common_mistakes": [
+   "Believing a code review will keep two implementations aligned",
+   "Testing parity only on typical rows, not on boundaries, nulls and unseen categories",
+   "Using a shared function but different library or runtime versions on each side"
+  ],
+  "interview_style_note": "Compares options with honest costs, insists on explicit semantics, and offers a replay-based parity proof usable in CI.",
+  "tags": [
+   "training-serving-skew",
+   "shared-transformations",
+   "parity-testing",
+   "design"
+  ],
+  "change_notes": "New: design for single transformation definition. Nearest smi-i0009 lists skew causes; this asks for remediation architecture and verification.",
+  "confidence": "medium"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "The backfill answers a different question from the one the online path answers. The backfill ran today over the complete, corrected orders table, so for a transaction last March it counts every order in the 24 hours before the transaction, including orders that only arrived in the warehouse days later and excluding orders that were later cancelled and deleted. The online feature, computed at the time of the transaction, could only count orders that had arrived by then and still existed. Hence the logged online values are lower (late orders missing) and the backfilled values are, in this respect, cleaner than anything the live system ever sees. The model learns relationships on idealised features and meets noisier ones in production: training-serving skew caused by data availability, a form of temporal leakage, since information that was not yet known at the prediction time is used. Event-time-only correctness is not enough; the join must also respect when each record became known.\n\nRepair. (1) Track two times per record: event time (order_ts, when it happened) and knowledge time (ingestion or loaded_at, when the system could see it), and keep history of deletions or status changes instead of overwriting. With both, the backfill can ask 'what did the table look like at time t': include a row only if loaded_at <= t and it was not yet deleted at t. (2) If history is unavailable, you cannot reproduce past knowledge exactly; use logged online feature values for the period where they exist, and for the rest consider simulating the delay (drop each order from the window with the observed delay distribution) as an approximation, flagged as such. (3) Going forward, log the features served with each prediction and use them for training and for skew checks. (4) Compare distributions of backfilled versus logged values for the same transactions before trusting any backfill, and re-evaluate the model on the logged features, which is the number that predicts production.\n\nA related freshness point: whatever pipeline fills the online store has its own lag, and its TTL decides when a stale value is treated as missing; reproduce that lag in training as well, or the same kind of skew returns.",
+  "practical_answer": "Worked example, hypothetical: a customer places orders at 09:00 (arrives in the warehouse immediately) and 11:00 (arrives next day at 14:00). A transaction at 12:00 is scored. Online orders_last_24h = 1, because the 11:00 order was not yet visible. The backfill run a month later returns 2. Aggregated, if 3% of orders are late and a customer averages 4 orders in the window, about 11 to 12% of customers would see a lower count online (1 - 0.97^4 is about 11.5%), which matches a systematic gap in logged versus backfilled values. Audit procedure: take 10,000 scored transactions that have logged features; recompute orders_last_24h with the as-of rule (event_ts in window, loaded_at <= transaction time, not deleted at transaction time); report the share of transactions where recomputed equals logged (target close to 100%; any remaining gap reveals other skew) versus the share where the naive backfill equals logged (expected near 88 to 89% under these assumptions). Then rebuild training features with the as-of rule and re-measure offline AUC; expect it to fall toward the production figure.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Feast Docs: Point-in-time joins",
+    "url": "https://docs.feast.dev/getting-started/concepts/point-in-time-joins",
+    "supports": "Feast joins features onto an entity dataframe in a point-in-time correct way, reproducing the state at each entity timestamp, and scans backward from that timestamp up to the TTL."
+   }
+  ],
+  "related_domains": [],
+  "time_sensitive": false,
+  "plan_id": "B3-MLO-07-5",
+  "cell_id": "MLO-07",
+  "topic": "Feature stores and training-serving skew",
+  "question_type": "debugging",
+  "difficulty": "Hard",
+  "question": "A fraud model uses orders_last_24h per customer. About 3% of order records reach the warehouse 1 to 3 days after the order time, and cancelled orders are later deleted. Training features for the past year were backfilled last month with a single SQL query over the current orders table, using order_ts for the 24-hour window. Offline AUC is excellent but production is clearly worse, and logged online feature values for orders_last_24h are systematically lower than the backfilled values for the same transactions. Explain the mechanism and how to repair the training data and the process.",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "knowledge time",
+   "event time",
+   "late-arriving data",
+   "backfill",
+   "bitemporal data",
+   "temporal leakage",
+   "feature logging",
+   "feature TTL"
+  ],
+  "common_mistakes": [
+   "Assuming point-in-time correctness on event time alone is sufficient",
+   "Backfilling from the current table state and calling it historical",
+   "Blaming concept drift without comparing logged and recomputed values for the same transactions"
+  ],
+  "interview_style_note": "Identifies that the backfill uses information not yet known at scoring time, proposes event-time plus knowledge-time reconstruction, and validates against logged serving features.",
+  "tags": [
+   "backfill",
+   "late-arriving-data",
+   "point-in-time",
+   "training-serving-skew"
+  ],
+  "change_notes": "New: late-arriving and corrected data in backfills. Distinct from MLO-07-2 (as-of join on event time) because here event-time join is correct but still leaks.",
+  "confidence": "high"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Each statistic points at a different failure. The null-rate gap tells you about missing-value handling: the training data may have imputed, filtered or never contained nulls, while the live path sends them (or the reverse). The unseen-category rate detects vocabulary mismatches: spelling or case differences ('gb' vs 'GB'), new categories after the training cut-off, or a different normalisation function; those values hit the encoder's unknown-category branch, often silently mapped to a default. The L-infinity distance, the largest absolute difference in any single category's relative frequency, gives a worst-case view of distribution shift between the two samples. TensorFlow Data Validation documents expressing drift for categorical features in terms of L-infinity distance, and it supports detecting distribution skew between training and serving data; a similar statistic is a reasonable, interpretable check.\n\nDesign choices in the function: compute category frequencies over non-missing values only, so that a null-rate difference is reported separately and does not distort the frequency comparison; report which category produced the maximum gap, because 'country=gb' immediately suggests a casing bug; treat thresholds as parameters. In the test, serving sends 240 of 960 non-null values in lower case ('gb'), which the training data never contains: unseen rate 25%, L-infinity 0.25 on 'gb', and the 'GB' frequency falls from 0.60 to 0.375. 4% nulls in serving versus none in training triggers the null violation.\n\nLimits. Sample sizes matter: with small samples, the maximum gap fluctuates by chance, so thresholds need calibrating on two training-like samples (the test checks that a 100-row sample constructed with near-training proportions, 58/31/11 against 60/30/10, does not fire at the default 0.10 threshold). The statistic is insensitive to long tails, since a thousand rare categories can each shift by little but together matter, which the unseen rate catches only for new values. It compares marginal distributions only, so a joint shift (feature relationships) goes unnoticed, and a matching distribution does not prove per-row equality: two implementations can disagree row by row yet produce the same aggregate. Row-level replay remains the definitive check.",
+  "practical_answer": "Tested implementation:\n\n```python\nfrom collections import Counter\n\n\ndef categorical_skew(train, served, linf_threshold=0.10,\n                     unseen_threshold=0.01, null_gap_threshold=0.02):\n    \"\"\"Compare a served sample of one categorical feature with its training sample.\n\n    None means missing. Returns a dict of statistics and a list of violations.\n    linf is the largest absolute gap between category frequencies, where\n    frequencies are computed over non-missing values only.\n    \"\"\"\n    if not train or not served:\n        raise ValueError(\"both samples must be non-empty\")\n\n    def split(values):\n        present = [v for v in values if v is not None]\n        return Counter(present), len(present), len(values) - len(present)\n\n    c_tr, n_tr, miss_tr = split(train)\n    c_sv, n_sv, miss_sv = split(served)\n    if n_tr == 0 or n_sv == 0:\n        raise ValueError(\"a sample has no non-missing values\")\n\n    null_tr = miss_tr / len(train)\n    null_sv = miss_sv / len(served)\n    gaps = {}\n    for cat in set(c_tr) | set(c_sv):\n        gaps[cat] = abs(c_tr[cat] / n_tr - c_sv[cat] / n_sv)\n    worst_cat = min(gaps, key=lambda c: (-gaps[c], str(c)))\n    linf = gaps[worst_cat]\n    unseen = sum(n for cat, n in c_sv.items() if cat not in c_tr) / n_sv\n\n    violations = []\n    if abs(null_sv - null_tr) > null_gap_threshold:\n        violations.append(\"null_rate\")\n    if unseen > unseen_threshold:\n        violations.append(\"unseen_categories\")\n    if linf > linf_threshold:\n        violations.append(\"linf\")\n    return {\n        \"null_rate_train\": null_tr,\n        \"null_rate_served\": null_sv,\n        \"linf\": linf,\n        \"linf_category\": worst_cat,\n        \"unseen_rate\": unseen,\n        \"violations\": violations,\n    }\n```\n\nUse it on a sample of served features logged with the request id, against a sample from the training table. Start the thresholds at the defaults (0.10 on L-infinity, 1% unseen, 2 percentage points on null rate), run it on two disjoint training-like samples to see the noise floor, then tighten. Interpret violations in order: null_rate first (cheap to fix), then unseen_categories (look at the unseen values, they usually reveal normalisation bugs), then linf (look at linf_category).",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "from collections import Counter\n\n\ndef categorical_skew(train, served, linf_threshold=0.10,\n                     unseen_threshold=0.01, null_gap_threshold=0.02):\n    \"\"\"Compare a served sample of one categorical feature with its training sample.\n\n    None means missing. Returns a dict of statistics and a list of violations.\n    linf is the largest absolute gap between category frequencies, where\n    frequencies are computed over non-missing values only.\n    \"\"\"\n    if not train or not served:\n        raise ValueError(\"both samples must be non-empty\")\n\n    def split(values):\n        present = [v for v in values if v is not None]\n        return Counter(present), len(present), len(values) - len(present)\n\n    c_tr, n_tr, miss_tr = split(train)\n    c_sv, n_sv, miss_sv = split(served)\n    if n_tr == 0 or n_sv == 0:\n        raise ValueError(\"a sample has no non-missing values\")\n\n    null_tr = miss_tr / len(train)\n    null_sv = miss_sv / len(served)\n    gaps = {}\n    for cat in set(c_tr) | set(c_sv):\n        gaps[cat] = abs(c_tr[cat] / n_tr - c_sv[cat] / n_sv)\n    worst_cat = min(gaps, key=lambda c: (-gaps[c], str(c)))\n    linf = gaps[worst_cat]\n    unseen = sum(n for cat, n in c_sv.items() if cat not in c_tr) / n_sv\n\n    violations = []\n    if abs(null_sv - null_tr) > null_gap_threshold:\n        violations.append(\"null_rate\")\n    if unseen > unseen_threshold:\n        violations.append(\"unseen_categories\")\n    if linf > linf_threshold:\n        violations.append(\"linf\")\n    return {\n        \"null_rate_train\": null_tr,\n        \"null_rate_served\": null_sv,\n        \"linf\": linf,\n        \"linf_category\": worst_cat,\n        \"unseen_rate\": unseen,\n        \"violations\": violations,\n    }",
+   "test": "train = [\"GB\"] * 600 + [\"US\"] * 300 + [\"DE\"] * 100\n# identical distribution -> clean\nr = categorical_skew(train, list(train))\nassert r[\"violations\"] == [] and r[\"linf\"] == 0.0 and r[\"unseen_rate\"] == 0.0\n\n# serving sends lower-case codes for part of the traffic and some missing values\nserved = [\"GB\"] * 360 + [\"gb\"] * 240 + [\"US\"] * 270 + [\"DE\"] * 90 + [None] * 40\nr = categorical_skew(train, served)\nassert abs(r[\"null_rate_train\"] - 0.0) < 1e-12\nassert abs(r[\"null_rate_served\"] - 40 / 1000) < 1e-12\nassert abs(r[\"unseen_rate\"] - 240 / 960) < 1e-12\nassert r[\"linf_category\"] == \"gb\"\nassert abs(r[\"linf\"] - 240 / 960) < 1e-12\nassert r[\"violations\"] == [\"null_rate\", \"unseen_categories\", \"linf\"]\n\n# sample-size noise alone should not fire at these thresholds\nsmall = [\"GB\"] * 58 + [\"US\"] * 31 + [\"DE\"] * 11\nr = categorical_skew(train, small)\nassert r[\"violations\"] == [], r\n\n# thresholds are parameters\nr = categorical_skew(train, small, linf_threshold=0.005)\nassert r[\"violations\"] == [\"linf\"]\n\nfor bad in ([], [None, None]):\n    try:\n        categorical_skew(train, bad)\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(\"expected ValueError\")\nprint(\"ok\", r[\"linf\"])\n",
+   "expected": null
+  },
+  "sources": [
+   {
+    "title": "TensorFlow Data Validation guide",
+    "url": "https://www.tensorflow.org/tfx/guide/tfdv",
+    "supports": "TFDV can detect distribution skew between training and serving data; drift is detected between consecutive spans; drift for categorical features is expressed as L-infinity distance."
+   }
+  ],
+  "related_domains": [
+   "Python"
+  ],
+  "time_sensitive": false,
+  "plan_id": "B3-MLO-07-6",
+  "cell_id": "MLO-07",
+  "topic": "Feature stores and training-serving skew",
+  "question_type": "coding",
+  "difficulty": "Medium",
+  "question": "You log 1,000 served values of a categorical feature 'country' and have the training sample. After release, the offline-to-online metric gap is large. Implement categorical_skew(train, served, ...) that reports null rates, the L-infinity distance between category frequencies, and the share of served values whose category never appears in training, plus a list of threshold violations. Then say what each statistic would tell you, what mistake in the pipeline it would reveal, and what its limits are.",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "L-infinity distance",
+   "null rate",
+   "unseen categories",
+   "category frequency",
+   "served feature logging",
+   "skew threshold",
+   "sampling noise"
+  ],
+  "common_mistakes": [
+   "Computing frequencies including nulls so a null-rate gap hides or inflates category shifts",
+   "Setting thresholds without checking the noise level on same-distribution samples",
+   "Concluding that matching marginals mean the two pipelines produce identical rows"
+  ],
+  "interview_style_note": "Implements a small interpretable skew check, links each statistic to a concrete pipeline bug, and states what marginal comparisons cannot detect.",
+  "tags": [
+   "skew-detection",
+   "categorical-features",
+   "feature-logging",
+   "coding"
+  ],
+  "change_notes": "New coding item on detecting skew from logged features. Differs from MLO-07-1 (definition) and from smi-i0009 (cause list).",
+  "confidence": "high"
+ }
+]

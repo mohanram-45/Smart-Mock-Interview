@@ -1,0 +1,208 @@
+[
+ {
+  "id": "smi-g0016",
+  "verdict": "pass",
+  "reasons": [
+   "Code re-run from scratch passes; all numeric claims (exp overflow in float64, float16 max 65504 ~ exp(11.09), -800 exact log-softmax) verified.",
+   "Only minor wording points; nothing that needs changing."
+  ],
+  "parts_answered": {
+   "investigation order": true,
+   "data": true,
+   "learning rate": true,
+   "log(0)": true,
+   "softmax overflow": true,
+   "exploding gradients": true,
+   "mixed precision": true,
+   "stable softmax in numpy": true,
+   "stable CE from logits in numpy": true,
+   "survives [1000,1001,1002]": true,
+   "survives logit gap 800": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Give the order in which you would investigate (data, learning rate, log(0), softmax overflow, exploding gradients, mixed precision)",
+    "problem": "The parenthetical lists candidate causes, not a mandated order; the answer reorders them (data, grad/LR, loss code, mixed precision). Defensible and explained, so not changed.",
+    "replacement": null
+   },
+   {
+    "severity": "minor",
+    "claim": "cross_entropy_from_logits",
+    "problem": "Edge cases: all -inf row gives nan, +inf logit gives nan, empty batch gives nan mean (0/0, which the answer itself lists as a nan source). Out of scope for the question.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Prioritised diagnosis checklist plus a short, standard stable softmax/CE implementation; no non-trivial reasoning chain.",
+  "key_concepts_findings": "All 7 concepts are discussed in the answer (warmup in step 2, clipping in step 2, float16 range and loss scaling in step 4). No weak ones.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0049",
+   "same_intent": false
+  },
+  "code_findings": "Ran solution+test under python3/numpy: passes; p=[0.090,0.245,0.665], loss 800.0. Extra cases: log_softmax([1000,1001,1002]) = [-2.4076,-1.4076,-0.4076] correct; row [0,-inf,-inf] gives [0,-inf,-inf] (fine); row of all -inf gives nan; empty batch CE gives nan (with warning); float32 [0,-800] loss 800.0; logits [1e30,-1e30] loss 2e30 finite; softmax with +inf gives nan. Fenced block in the answer is identical to the tested solution. No version-dependent behaviour (plain numpy; fine on numpy 2.2/Python 3.10).",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0020",
+  "verdict": "correct",
+  "reasons": [
+   "Derivation and code are correct and the quoted 1.6e-10 reproduces (1.59e-10).",
+   "Answer refers to a 'logit-gap-of-800 test' and a 'test' that are not shown in the answer text/code block; the numeric verification asked for is only described, not shown."
+  ],
+  "parts_answered": {
+   "show gradient is p - y": true,
+   "verify numerically vs finite differences in numpy": true,
+   "explain why fused CE-from-logits": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "as the logit-gap-of-800 test shows",
+    "problem": "Dangling reference: the answer's code block contains no such test, so a reader cannot see what is meant.",
+    "replacement": "as logits [0, -800] with the true class at index 1 show: log(softmax(z)) gives -inf (0 * -inf even gives nan with a one-hot product), while the fused form returns a loss of exactly 800"
+   },
+   {
+    "severity": "minor",
+    "claim": "The test compares this against central differences (max difference about 1.6e-10 in the run) and checks the row sums.",
+    "problem": "The comparison call is not in the displayed code, so the 'verify numerically' part is only described.",
+    "replacement": "Check it with: z = rng.normal(size=(5, 4)) * 3; y = np.eye(4)[rng.integers(0, 4, 5)]; assert np.allclose(ce_grad(z, y), numeric_grad(z, y), atol=1e-8) and np.allclose(ce_grad(z, y).sum(axis=1), 0). Central differences with eps=1e-6 agree to about 1.6e-10 in the run, and the row sums are zero."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Standard derivation through the softmax Jacobian plus a short gradient-check implementation and a mechanism explanation.",
+  "key_concepts_findings": "All 6 present in the answer. Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0164",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran solution+test: passes, max abs diff 1.59e-10. Extra: extreme case z=[0,-800], y=[0,1] gives grad [[1,-1]] and loss finite 800; naive product gives nan (0*-inf) rather than -inf, still caught by the test. Soft-label y summing to 1 works (derivation holds). Fenced block matches tested solution (test not displayed). Pure numpy, no version dependence.",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0021",
+  "verdict": "correct",
+  "reasons": [
+   "Core math, statistics (SE 0.00065, mean 1.0002, drop 0.2999, plain 0.6998) all verified.",
+   "Code silently upcasts float32 activations to float64, and the p validation is skipped in eval mode; both minor."
+  ],
+  "parts_answered": {
+   "inverted dropout train/eval in numpy": true,
+   "backward pass": true,
+   "why scale at train time": true,
+   "fixed-seed expectation test": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "mask = (rng.random(x.shape) >= p) / (1.0 - p)   # 0 or 1/(1-p)",
+    "problem": "Mask is float64, so float32 activations come back as float64 (verified), doubling memory and changing dtype in a real network.",
+    "replacement": "mask = ((rng.random(x.shape) >= p) / (1.0 - p)).astype(x.dtype, copy=False)   # 0 or 1/(1-p)"
+   },
+   {
+    "severity": "minor",
+    "claim": "if not training or p == 0.0:\n        return x, None\n    if not 0.0 <= p < 1.0:",
+    "problem": "Invalid p (e.g. 5.0) is accepted silently in eval mode; validation should come first.",
+    "replacement": "if not 0.0 <= p < 1.0:\n        raise ValueError(\"p must be in [0, 1)\")\n    if not training or p == 0.0:\n        return x, None"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short implementation with a mask, forward/backward, and a statistical test; well-known concept.",
+  "key_concepts_findings": "All 6 discussed. Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0131",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran: train mean 1.000207, drop fraction 0.299855, plain mean 0.699771, all asserts pass. SE = sqrt(p/(1-p))/sqrt(1e6)=0.00065 so 0.005 tolerance is about 7 SE. Extras: float32 in gives float64 out (issue above); empty array OK; p=0 in training returns identity/None; p=1.0 and p=-0.1 raise ValueError; p=0.999 gives mean 1.10 on 10k elements (high variance, expected); backward equals o/x for random x. If the replacement mask dtype change is applied, the test's np.unique set check still holds for float64 ones. Quoted numbers depend on default_rng(42) PCG64 stream order (stable across numpy 1.x/2.x); the answer's displayed block matches tested code.",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0023",
+  "verdict": "correct",
+  "reasons": [
+   "Advice is broadly sound and hedged ('starting points to tune, not rules').",
+   "Two gaps: blanket 'use pretraining resolution' is wrong for small defects/microscopy, and class imbalance/metric choice is absent for a defect-type task; the FE-vs-FT decision rule is only implicit."
+  ],
+  "parts_answered": {
+   "decide feature extraction vs fine-tuning": true,
+   "which layers to unfreeze": true,
+   "starting learning rates": true,
+   "augmentation": true,
+   "validation": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Use the pretraining input normalisation and resolution.",
+    "problem": "Resolution should not be fixed to pretraining: small defects or microscopy detail can vanish when downscaled; resolution is a tuning choice.",
+    "replacement": "Use the pretraining input normalisation; start at the pretraining resolution but try higher resolution if the defects or structures are small, since downscaling can erase them."
+   },
+   {
+    "severity": "minor",
+    "claim": "Then fine-tune, since a specialised domain often differs from natural images:",
+    "problem": "Decision criterion is thin: it does not say when feature extraction alone is enough.",
+    "replacement": "Then fine-tune if it beats the baseline on validation: frozen features are often enough when the domain is close to the pretraining data, while a large domain gap (defects, microscopy) usually favours fine-tuning, with only 2,000 images limiting how much you can unfreeze."
+   },
+   {
+    "severity": "minor",
+    "claim": "report per-class metrics against the frozen-feature baseline and a majority-class baseline",
+    "problem": "Defect and microscopy datasets are usually imbalanced; accuracy and class handling are not addressed.",
+    "replacement": "report per-class precision/recall (or F1/PR-AUC if classes are imbalanced, with class weighting or oversampling) against the frozen-feature baseline and a majority-class baseline"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Applied scenario with several standard choices; judgment but no deep multi-step reasoning.",
+  "key_concepts_findings": "All 7 discussed (frozen batch norm in the LR paragraph, domain gap at end). Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0111",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0026",
+  "verdict": "correct",
+  "reasons": [
+   "Technically accurate (int8 = 1/4 of float32 weight memory, unstructured pruning no dense speedup, warm-up and percentile latency).",
+   "The question asks for trade-offs; the architecture-change item states none."
+  ],
+  "parts_answered": {
+   "quantisation": true,
+   "pruning": true,
+   "distillation": true,
+   "architecture changes": true,
+   "batching": true,
+   "trade-offs": true,
+   "validate accuracy loss": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "5. Architecture changes: efficient blocks such as depthwise separable convolutions, a smaller backbone or lower input resolution.",
+    "problem": "No trade-off stated, unlike the other items; lower resolution can hurt small objects, depthwise convs can be memory-bound and need retraining.",
+    "replacement": "5. Architecture changes: efficient blocks such as depthwise separable convolutions, a smaller backbone or lower input resolution. These need retraining, and the cost is accuracy (lower resolution loses small objects); depthwise convolutions cut FLOPs but can be memory-bound, so check real latency."
+   },
+   {
+    "severity": "minor",
+    "claim": "Go from cheap to costly.",
+    "problem": "Items 3-5 (pruning with fine-tuning, distillation, retraining) are not clearly ordered by cost.",
+    "replacement": "Go roughly from cheap to costly; steps 3 to 5 all need training, so pick by expected gain on your hardware."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open design across five technique families with trade-offs, hardware dependence and a validation plan.",
+  "key_concepts_findings": "All 7 discussed. Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0194",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": []
+ }
+]

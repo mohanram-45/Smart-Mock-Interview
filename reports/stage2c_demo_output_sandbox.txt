@@ -1,0 +1,130 @@
+Embedder: dev-lsa STAND-IN (TF-IDF+SVD, NOT MiniLM); answer scorer: STUB (demo only)
+
+=== 1. existing app is up: GET /health  [HTTP 200]
+{
+  "status": "ok"
+}
+
+=== 2a. DEFAULT (legacy) start - unchanged contract, integer id  [HTTP 200, 49.3 ms]
+{
+  "question": "What are the main edge cases and failure modes for dependency management?",
+  "question_id": 2401,
+  "question_number": 1,
+  "total_in_round": 5
+}
+
+=== 2b. retrieval status BEFORE first curated use (lazy: nothing loaded yet)  [HTTP 200]
+{
+  "mode": "not_loaded",
+  "backend": "dev-lsa",
+  "model": "dev-lsa (dev stand-in)",
+  "n_records": 666
+}
+
+=== 3. curated mode selected EXPLICITLY (question_source=curated)  [HTTP 200, 5.5 ms]
+{
+  "current_question": {
+    "difficulty": "Easy",
+    "domain": "Deep Learning",
+    "question": "What is data normalization in Deep Learning?",
+    "question_id": "smi-0083",
+    "question_number": 1,
+    "question_source": "curated",
+    "topic": "Regularisation and hyperparameters",
+    "total_in_round": 5
+  },
+  "current_round": "Easy",
+  "model": {
+    "key": "bilstm",
+    "label": "Siamese Bi-LSTM"
+  },
+  "question_source": "curated",
+  "role": "Machine Learning Engineer",
+  "selected_domains": [
+    "ML",
+    "DL",
+    "Python"
+  ],
+  "session_id": "session_20261014_133317_0bbc18",
+  "started_at": "2026-10-14T13:33:17.376979Z"
+}
+
+=== 4. related knowledge for smi-0083 (first call = cold model + index load)  [HTTP 200, 3527.9 ms]
+{
+  "mode": "semantic",
+  "score_type": "cosine",
+  "for_question_id": "smi-0083",
+  "latency_ms": 3421.524,
+  "results": [
+    {
+      "rank": 1,
+      "score": 0.740143,
+      "question_id": "smi-0304",
+      "domain": "Machine Learning",
+      "difficulty": "Easy",
+      "question": "Explain the terms Artificial Intelligence, Machine Learning, and Deep Learning."
+    },
+    {
+      "rank": 2,
+      "score": 0.703826,
+      "question_id": "smi-0200",
+      "domain": "Deep Learning",
+      "difficulty": "Medium",
+      "question": "What is deep learning, and how does it contrast with other machine learning algorithms?"
+    },
+    {
+      "rank": 3,
+      "score": 0.605932,
+      "question_id": "smi-0034",
+      "domain": "Deep Learning",
+      "difficulty": "Easy",
+      "question": "What are the deep learning frameworks or tools?"
+    }
+  ]
+}
+
+=== 5. existing evaluation path (the app's own scorer; similarity != validated correctness)  [HTTP 200, 3.2 ms]
+{
+  "similarity_score": 55.56,
+  "round_action": "continue"
+}
+
+=== 6. next question through the existing interface  [HTTP 200]
+{
+  "current_round": "Easy",
+  "difficulty": "Easy",
+  "domain": "Deep Learning",
+  "question": "What is the use of the Activation function?",
+  "question_id": "smi-0042",
+  "question_number": 2,
+  "question_source": "curated",
+  "topic": "Activation functions",
+  "total_in_round": 5
+}
+
+=== 7. warm latency + model/index loaded exactly once  [HTTP 200]
+{
+  "n": 50,
+  "http_ms": {
+    "mean": 10.99,
+    "p50": 10.93,
+    "p95": 15.48
+  },
+  "engine_ms": {
+    "mean": 7.84,
+    "p50": 7.95,
+    "p95": 8.67
+  },
+  "semantic_loads": 1,
+  "timings_s": {
+    "corpus_load_s": 0.107,
+    "index_ready_s": 0.56,
+    "model_load_s": 2.851
+  },
+  "mode": "semantic"
+}
+
+=== 8. invalid input  [HTTP 400]
+{
+  "error": "k must be a positive integer"
+}

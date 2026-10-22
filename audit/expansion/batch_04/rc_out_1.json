@@ -1,0 +1,548 @@
+[
+ {
+  "plan_id": "B4-MLO-08-2",
+  "verdict": "correct",
+  "reasons": [
+   "Applied corrections verified: 8.2 vs ceiling 8.28, 0.0002-0.0004 plain, 0.0557 and 0.093 deterministic for the 9% spike.",
+   "'most amount distributions' overstated: x100 gives PSI 8.15 at lognormal sigma 1 but 6.2 at sigma 1.5 and 4.2 at sigma 2.",
+   "'about 0.03' with 20% reference zeros not reproduced (0.016-0.030 over 3 seeds)."
+  ],
+  "rubric_points": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "suggested_key_concepts": null,
+  "added_sources": [],
+  "unsourced_claims": [
+   "Binned PSI weak for mass moving inside one bin (covered by executed simulation)"
+  ],
+  "code_patch": null,
+  "code_findings": "no code",
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "A change of units by a large factor such as 100 does exactly that for most amount distributions.",
+    "problem": "Overstated: with wider spread amounts (lognormal sigma 2) x100 gives PSI only ~4.2.",
+    "replacement": "A change of units by a large factor such as 100 does exactly that for a narrowly spread amount distribution; with a wider spread the PSI is lower (about 4 for a lognormal with sigma 2) but still far above any threshold."
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "with 20% of the reference already at zero it was about 0.03",
+    "problem": "Simulated 0.016-0.030 depending on seed/tie binning.",
+    "replacement": "with 20% of the reference already at zero it was about 0.02 to 0.03 (depending on how the ties at zero are binned)"
+   }
+  ],
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/46555.pdf",
+    "status": "supported",
+    "evidence": "Monitor 2 'Data invariants hold in training and serving inputs' using schema; 'alert when they diverge significantly'. Direct curl blocked (403) but WebFetch opened it."
+   }
+  ],
+  "parts_answered": {
+   "triage": true,
+   "what the two numbers tell": true,
+   "monitoring changes": true,
+   "retrain decision": true
+  },
+  "evidence": [
+   {
+    "claim": "x100 gives PSI ~8.2 (10 quantile bins, eps 1e-4), plain ~0.0003",
+    "method": "executed",
+    "evidence": "numpy 50k lognormal(3,1): 8.178/8.186/8.171; plain 0.0002-0.0004 across 3 seeds"
+   },
+   {
+    "claim": "ceiling ~8.3",
+    "method": "derivation",
+    "evidence": "0.9*ln(10)+9*(1e-4-0.1)*ln(1e-3)=8.28"
+   },
+   {
+    "claim": "null->0 spike PSI ~0.055 (10 bins), ~0.09 (20)",
+    "method": "derivation",
+    "evidence": "bin1 0.181 vs 0.1: 0.0557 total; 20 bins 0.0933; simulated 0.049-0.053 / 0.085-0.09"
+   },
+   {
+    "claim": "20% ref zeros -> ~0.03",
+    "method": "executed",
+    "evidence": "0.016, 0.019, 0.030 (10 bins) over seeds; depends on tie binning"
+   },
+   {
+    "claim": "x100 'for most amount distributions'",
+    "method": "executed",
+    "evidence": "sigma 0.5/1/1.5/2/2.5 -> 8.28/8.15/6.16/4.18/2.90"
+   },
+   {
+    "claim": "ML Test Score monitoring test: data matches schema, alert on divergence",
+    "method": "paper",
+    "evidence": "fetched 46555.pdf: Monitor 2 'Data invariants hold in training and serving inputs'; 'alert when they diverge significantly'"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Diagnosis from two contrasting PSI readings with quantitative reasoning about binning, imputation masking and incident triage.",
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer, ~330 words, no duplication"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All 7 specific and discussed.",
+  "nearest_existing": {
+   "id": "smi-i0006",
+   "same_intent": false
+  }
+ },
+ {
+  "plan_id": "B4-MLO-08-8",
+  "verdict": "correct",
+  "reasons": [
+   "Correction to (C) is right and consistent: weekly mean 1.0714 so weekend +16.7%, weekday -6.7%; lag 4 days = 0.2 sd; D 17.5 days = 0.875 sd; 7,200 rows = 2*(3/0.05)^2.",
+   "'tiny next to the weekly swing' depends on CV; needs a condition."
+  ],
+  "rubric_points": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "suggested_key_concepts": null,
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "code_findings": "no code",
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "is tiny next to the weekly swing and",
+    "problem": "A 25% weekday/weekend gap exceeds 0.05 sd only if sd < 5x the mean; unstated.",
+    "replacement": "is smaller than the weekly swing (unless the standard deviation exceeds about five times the mean) and"
+   }
+  ],
+  "sources_findings": [],
+  "parts_answered": {
+   "false alarms per option": true,
+   "creep detection per option": true,
+   "recommendation": true
+  },
+  "evidence": [
+   {
+    "claim": "weekend 25% higher -> pool 7% above weekday, weekend ~17% above pool, weekday ~7% below",
+    "method": "derivation",
+    "evidence": "(5+2*1.25)/7=1.0714; 1.25/1.0714=1.167; 1/1.0714=0.933"
+   },
+   {
+    "claim": "lag C 4 days -> 0.2 sd; D 17.5 -> 0.875 sd; A 60d -> 3 sd",
+    "method": "derivation",
+    "evidence": "mean ages (1..7)/7=4; (7+14+21+28)/4=17.5"
+   },
+   {
+    "claim": "7,200 rows/day to see 0.05 sd at 3 SE",
+    "method": "derivation",
+    "evidence": "two-sample SE sqrt(2/n)=0.05/3 -> n=7200 (sd=1)"
+   },
+   {
+    "claim": "tiny vs weekly swing",
+    "method": "derivation",
+    "evidence": "0.25*mean vs 0.05*sd: weekly swing larger only if sd < 5*mean"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-step quantitative comparison of four baselines plus a recommendation.",
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Good.",
+  "nearest_existing": {
+   "id": "smi-i0006",
+   "same_intent": false
+  }
+ },
+ {
+  "plan_id": "B4-MLO-10-4",
+  "verdict": "pass",
+  "reasons": [
+   "Corrections accurate: TFDV page text 'conservative heuristics ... strongly advised to review the inferred schema and refine it' matches; hedge on numeric ranges is correct. Concise 60 words, consistent with detailed."
+  ],
+  "rubric_points": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "suggested_key_concepts": null,
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "code_findings": "no code",
+  "issues": [],
+  "sources_findings": [
+   {
+    "url": "https://www.tensorflow.org/tfx/data_validation/get_started",
+    "status": "supported",
+    "evidence": "quote above"
+   },
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Data 1 and Monitor 2 titles confirmed"
+   }
+  ],
+  "parts_answered": {
+   "parts needing review": true,
+   "what inference cannot supply": true
+  },
+  "evidence": [
+   {
+    "claim": "TFDV conservative heuristics, strongly advised to review",
+    "method": "doc",
+    "evidence": "opened get_started: 'TFDV uses conservative heuristics to infer stable data properties ... strongly advised to review the inferred schema and refine it as needed, to capture any domain knowledge'"
+   },
+   {
+    "claim": "ML Test Score Data 1 and Monitor 2 as separate items",
+    "method": "paper",
+    "evidence": "'Feature expectations are captured in a schema'; 'Data invariants hold in training and serving inputs'"
+   },
+   {
+    "claim": "skew thresholds set in schema",
+    "method": "doc",
+    "evidence": "skew_comparator thresholds shown on the TFDV page"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Application of schema-validation practice; list of review items.",
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "60 words, interview-ready"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "explains each review item and validation of the baseline"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "8 specific, all discussed.",
+  "nearest_existing": {
+   "id": "smi-l0008",
+   "same_intent": false
+  }
+ },
+ {
+  "plan_id": "B4-MLO-11-4",
+  "verdict": "pass",
+  "reasons": [
+   "Added fairness bullet is appropriate for credit scoring and matches the Model Cards 'Ethical Considerations' idea; no inconsistency with concise (60-80 words, 71) which stays a subset."
+  ],
+  "rubric_points": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "suggested_key_concepts": null,
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "code_findings": "no code",
+  "issues": [],
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/1810.03993",
+    "status": "supported",
+    "evidence": "abstract: model cards are short documents accompanying trained models; performance across demographic/intersectional groups, intended contexts, evaluation details"
+   }
+  ],
+  "parts_answered": {
+   "what a model card is": true,
+   "required fields for credit model": true
+  },
+  "evidence": [
+   {
+    "claim": "Model cards: short documents reporting evaluation across conditions/groups, intended context, evaluation details",
+    "method": "paper",
+    "evidence": "arXiv abstract: 'Model cards are short documents accompanying trained machine learning models'; groups/contexts/evaluation per abstract (full abstract not quotable by tool)"
+   },
+   {
+    "claim": "regulator-required fields depend on jurisdiction",
+    "method": "background_only",
+    "evidence": "appropriately hedged"
+   }
+  ],
+  "difficulty_blind": "Easy",
+  "difficulty_rationale": "Definition plus a checklist of fields; mostly recall with domain application.",
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "71 words"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "adds gating, fairness, monitoring, review fields"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "Fine; 'fairness' could be added but not needed.",
+  "nearest_existing": {
+   "id": "smi-l0010",
+   "same_intent": false
+  }
+ },
+ {
+  "plan_id": "B4-MLO-12-5",
+  "verdict": "pass",
+  "reasons": [
+   "Table edit consistent with ladder (miss/older entry -> mode 2; defaults no longer appear); fallback mode semantics match prose.",
+   "SRE quotes verified. Only quibbles: game-day does not exercise mode 3; table has no state between 1% and 50% error rate (labelled example numbers)."
+  ],
+  "rubric_points": [
+   {
+    "decision": "Remove registry from scale-up path (bake image / read-through cache keyed by digest, refuse unverified)",
+    "tradeoff": "Scaling survives outage vs. new versions blocked and image size/cache freshness"
+   },
+   {
+    "decision": "Ordered degraded-mode ladder with explicit triggers (stale cache, request-only model, safe business default)",
+    "tradeoff": "Availability vs. prediction quality and staleness"
+   },
+   {
+    "decision": "Short timeouts, circuit breaker, jittered bounded retries, gradual re-close",
+    "tradeoff": "Protects store and latency budget vs. false opens and slower recovery"
+   },
+   {
+    "decision": "Fallback defaults identical to training imputation",
+    "tradeoff": "Avoids fallback-induced skew vs. extra pipeline coupling"
+   },
+   {
+    "decision": "Tag each prediction with mode; fallback rate as SLI; exclude degraded rows from training",
+    "tradeoff": "Clean retraining data vs. less data and logging cost"
+   },
+   {
+    "decision": "Game-day and registry drill with pass criteria",
+    "tradeoff": "Confidence in rare paths vs. test cost/risk"
+   }
+  ],
+  "suggested_type": null,
+  "type_ok": true,
+  "suggested_key_concepts": null,
+  "added_sources": [],
+  "unsourced_claims": [
+   "Circuit breaker / jitter practices (generic engineering practice)"
+  ],
+  "code_patch": null,
+  "code_findings": "no code",
+  "issues": [],
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/addressing-cascading-failures/",
+    "status": "supported",
+    "evidence": "quotes above"
+   }
+  ],
+  "parts_answered": {
+   "feature store degradation": true,
+   "registry start-up strategy": true,
+   "recovery": true,
+   "logging for retraining": true,
+   "testing": true
+  },
+  "evidence": [
+   {
+    "claim": "code path you never use is the one that often doesn't work; exercise regularly",
+    "method": "doc",
+    "evidence": "SRE Book: 'Remember that the code path you never use is the code path that (often) doesn't work' ; remedy 'regularly running a small subset of servers near overload'"
+   },
+   {
+    "claim": "serve lower-quality results as graceful degradation",
+    "method": "doc",
+    "evidence": "SRE Book: 'Serve lower-quality, cheaper-to-compute results to the user'"
+   },
+   {
+    "claim": "99.95% monthly budget ~21.6 min",
+    "method": "derivation",
+    "evidence": "43,200 min *0.0005; the 22-min outage alone exceeds it (not stated in answer)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open-ended multi-dependency reliability design with trade-offs.",
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "design reasoning"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "table and drills with numbers, labelled as examples; consistent with detailed"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Good.",
+  "nearest_existing": {
+   "id": "smi-l0035",
+   "same_intent": false
+  }
+ },
+ {
+  "plan_id": "B4-MLO-13-1",
+  "verdict": "pass",
+  "reasons": [
+   "Type change scenario->design is right (open-ended, several acceptable processes); rubric_points supplied below for the merge.",
+   "Claude docs quotes verified; claims about snapshot retirement and infrastructure changes match."
+  ],
+  "rubric_points": [
+   {
+    "decision": "Pin dated snapshot and log (model, prompt version, decoding params, schemas, guardrails) as one release unit",
+    "tradeoff": "Reproducibility and rollback vs. missing silent provider improvements"
+   },
+   {
+    "decision": "Golden set with replayed de-identified tickets, per-route metrics",
+    "tradeoff": "Detects class-level shifts vs. labelling effort and set staleness"
+   },
+   {
+    "decision": "Shadow then user-hash canary with routing share, schema validity, feedback as guardrails",
+    "tradeoff": "Real-traffic evidence vs. slower rollout"
+   },
+   {
+    "decision": "Retirement calendar, early migration, tested fallback model",
+    "tradeoff": "Lead time and double-running cost vs. forced emergency migration"
+   },
+   {
+    "decision": "Scheduled golden-set replay as drift alarm on pinned model",
+    "tradeoff": "Catches serving-side change vs. API cost"
+   },
+   {
+    "decision": "Track tokens, latency, refusals alongside quality",
+    "tradeoff": "Cost/latency regressions caught vs. more gates"
+   }
+  ],
+  "suggested_type": null,
+  "type_ok": true,
+  "suggested_key_concepts": null,
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "code_findings": "no code",
+  "issues": [],
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Monitor 1, Infra 6 present"
+   },
+   {
+    "url": "https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions",
+    "status": "supported",
+    "evidence": "all three quotes confirmed"
+   },
+   {
+    "url": "https://developers.openai.com/api/docs/deprecations",
+    "status": "partially",
+    "evidence": "page says 'Impacted customers will always be notified by email and in our documentation along with blog posts for larger changes'; the 'in advance with migration guidance' wording is not in that quote and no answer sentence depends on this source (candidate to drop)"
+   }
+  ],
+  "parts_answered": {
+   "what to pin and record": true,
+   "pre-switch tests": true,
+   "rollout": true,
+   "retirement handling": true
+  },
+  "evidence": [
+   {
+    "claim": "aliases point to latest snapshot; weights fixed per ID; infra can change; own retirement schedule",
+    "method": "doc",
+    "evidence": "Claude model-ids page quotes verified"
+   },
+   {
+    "claim": "ML Test Score lists dependency-change notification and canary",
+    "method": "paper",
+    "evidence": "Monitor 1 and Infra 6 titles confirmed (Monitor 1 concerns upstream data; hosted-model reading is the author's analogy)"
+   },
+   {
+    "claim": "9-point drop invisible in overall accuracy",
+    "method": "derivation",
+    "evidence": "31%->22% in one class"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open-ended release-process design with several trade-offs.",
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single, ~330 words"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Good.",
+  "nearest_existing": {
+   "id": "smi-l0031",
+   "same_intent": false
+  }
+ },
+ {
+  "plan_id": "B4-MLO-14-2",
+  "verdict": "correct",
+  "reasons": [
+   "Corrections consistent and hedged. One residual inconsistency: 'a different decision rate (more hold actions)' conflicts with live scores being lower.",
+   "Rules of ML #29 and 'small fraction' verified."
+  ],
+  "rubric_points": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "suggested_key_concepts": null,
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "code_findings": "no code",
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "a different decision rate (more 'hold' actions) triggers those downstream calls",
+    "problem": "Live scores are lower than shadow, so 'more hold actions' is unexplained and conflicts; the point is that acting on holds now triggers side effects.",
+    "replacement": "every 'hold' decision now triggers those downstream calls"
+   }
+  ],
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule 29 quotes confirmed"
+   }
+  ],
+  "parts_answered": {
+   "properties producing clean pass": true,
+   "changes for next shadow": true
+  },
+  "evidence": [
+   {
+    "claim": "Rules of ML: save features used at serving time",
+    "method": "doc",
+    "evidence": "'save the set of features used at serving time, and then pipe those features to a log to use them at training time'"
+   },
+   {
+    "claim": "lower live scores could follow from missing recent counts / default fallbacks",
+    "method": "background_only",
+    "evidence": "plausible, hedged with 'can'/'could'"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-symptom incident reasoning across latency, side effects and feature skew.",
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single; item 4 'No feedback' mostly repeats item 2 (minor)"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Good.",
+  "nearest_existing": {
+   "id": "smi-l0029",
+   "same_intent": false
+  }
+ }
+]

@@ -1,0 +1,36 @@
+from dec_helpers import *
+T="THIN_ANSWER"
+K(4028,"E",T,"correct one-liner")
+K(4029,"E",T,"correct")
+K(4030,"E",T,"correct; omits referential integrity / referenced primary key")
+K(4031,"E","","correct")
+K(4032,"E",T,"correct; no example")
+K(4033,"E",T,"correct; NULLs for unmatched rows not mentioned")
+K(4034,"E",T,"correct")
+K(4035,"E",T,"correct")
+K(4036,"E",T,"correct; three-valued logic / IS NULL not mentioned")
+K(4037,"E",T,"correct; NULL handling not mentioned")
+K(4038,"M",T,"correct")
+K(4039,"M",T,"correct; recursive CTEs not mentioned")
+K(4040,"M",T,"correct; normal forms not mentioned")
+K(4041,"M",T,"correct")
+K(4042,"M",T,"correct; trade-off with writes not mentioned")
+K(4043,"M",T,"correct")
+K(4044,"M",T,"correct")
+F(4045,"M","THIN_ANSWER","lists the acronym without explaining any property",
+  pa="Atomicity: a transaction is all-or-nothing - if any step fails, every change is rolled back. Consistency: a transaction moves the database from one valid state to another, respecting constraints. Isolation: concurrent transactions do not see each other's uncommitted changes (controlled by isolation levels). Durability: once committed, changes survive crashes (via write-ahead logging).",
+  state="ready_for_approval",conf="high")
+K(4046,"M",T,"correct; use case (e.g. employee-manager) not given")
+K(4047,"M",T,"correct")
+K(4048,"M",T,"correct; raw label Hard is high for a definition")
+F(4049,"M","THIN_ANSWER;IMPRECISE","omits tie behaviour of RANK (gaps) and DENSE_RANK",
+  pa="ROW_NUMBER assigns a unique sequential number to each row in the partition, breaking ties arbitrarily (or by the ORDER BY). RANK gives tied rows the same number and then skips numbers (1, 2, 2, 4). DENSE_RANK gives tied rows the same number without gaps (1, 2, 2, 3).",
+  state="ready_for_approval",conf="high")
+X(4050,"DUPLICATE;LOW_VALUE","vague definition; covered by 4056 and 4057",dup_of=4056)
+K(4051,"M",T,"correct; horizontal vs vertical partitioning not distinguished")
+K(4052,"M",T,"correct; one per table")
+K(4053,"M",T,"correct")
+K(4054,"M",T,"correct; detection and prevention not mentioned")
+K(4055,"M",T,"correct; contrast with partitioning not given")
+K(4056,"H",T,"practical question; answer is a short outline")
+K(4057,"M",T,"correct")

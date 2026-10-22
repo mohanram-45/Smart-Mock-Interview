@@ -1,0 +1,19 @@
+# Tooling configuration only (this is not a packaged library). Pytest is run from the repository root: `python -m pytest tests/...`.
+[tool.ruff]
+line-length = 160
+target-version = "py312"
+extend-exclude = ["data", "docs", "reports", "audit", "results", "mlflow", "mlruns"]
+
+[tool.ruff.lint]
+# Repository-wide gate = correctness errors only: syntax errors, undefined names, invalid comparisons/format strings.
+# The legacy code base predates any linter and several modules are FROZEN by sha256 (Stage 3C-2 freeze manifest), so they must not be reformatted
+# or auto-fixed. Stricter rules and `ruff format --check` are enforced only on the new MLOps files (see .github/workflows/ci.yml).
+select = ["E9", "F63", "F7", "F82"]
+
+[tool.ruff.lint.isort]
+# Stage 8C: the local MLflow store is a directory named `mlflow/` in the repository root. Without this line ruff treats `import mlflow` as FIRST-PARTY whenever that
+# directory exists (any machine that has run MLflow) and as third-party when it does not (a fresh GitHub checkout), so import order that passed locally failed in CI.
+known-third-party = ["mlflow"]
+
+[tool.pytest.ini_options]
+markers = ["real_stack: needs the real Sentence-BERT/FAISS/Ollama stack; run on Windows only (never in CI)"]

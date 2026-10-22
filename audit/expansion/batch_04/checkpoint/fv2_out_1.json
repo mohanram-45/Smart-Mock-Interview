@@ -1,0 +1,607 @@
+[
+ {
+  "plan_id": "B4-MLO-08-5",
+  "verdict": "correct",
+  "reasons": [
+   "Edits (tree wording, resampling caveat) are accurate and consistent. Two minor wording problems remain."
+  ],
+  "parts_answered": {
+   "how to decide harmful vs harmless without labels": true,
+   "what would change the answer": true,
+   "retrain-tonight decision": true
+  },
+  "evidence": [
+   {
+    "claim": "tree models predict a constant beyond training range",
+    "method": "background_only",
+    "evidence": "Piecewise-constant leaves; consistent with prior answer smi-0323; true for tree ensembles with constant leaves"
+   },
+   {
+    "claim": "independent resampling breaks feature correlations",
+    "method": "derivation",
+    "evidence": "Marginal resampling of a subset ignores the joint distribution; caveat now stated"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "(permutation or attribution mass on a recent sample)",
+    "problem": "Permutation importance needs labels, which the recent unlabelled sample does not have; the recent sample can only support label-free attribution.",
+    "replacement": "(permutation importance on labelled validation data, or attribution mass such as mean absolute SHAP on a recent sample)"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "analyst labels disagreeing with the model indicate real harm",
+    "problem": "Scores shifting or rows outside support are signs that drift may be harmful, not proof; a shifted score can be a correct response to a legitimately different population.",
+    "replacement": "analyst labels disagreeing with the model are signs of possible harm"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Multi-check triage procedure but single-concept domain; no calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0006",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "PSI 0.25 as a threshold is not stated as a standard in the answer (fine); none other."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-09-3",
+  "verdict": "pass",
+  "reasons": [
+   "Replacement closing paragraph is hedged (\"very likely\") and consistent with rubric and key_concepts; removes the earlier overclaim that a single guardrail is not enough."
+  ],
+  "parts_answered": {
+   "which guardrails": true,
+   "where in the pipeline each sits": true
+  },
+  "evidence": [
+   {
+    "claim": "data validation required before training to decide whether to retrain",
+    "method": "doc",
+    "evidence": "Google MLOps page: \"This step is required before model training to decide whether you should retrain the model or stop\""
+   },
+   {
+    "claim": "action limits broad enough not to trigger spuriously",
+    "method": "paper",
+    "evidence": "Sculley 2015: systems taking real-world actions should set/enforce action limits as sanity check; \"broad enough not to trigger spuriously\". Application to champion/challenger change is worded as \"a similar bound\" (analogy)."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-stage pipeline design with trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Separate data-quality alerts from drift alerts; quality failures block retraining; add persistence and cooldown",
+    "tradeoff": "Prevents chained retrains vs slower response to genuine drift"
+   },
+   {
+    "decision": "Data validation before training with quarantine of bad partitions",
+    "tradeoff": "Protects training data vs lost recent rows or failed runs"
+   },
+   {
+    "decision": "Trusted holdout: time-based validated data plus a fixed curated set",
+    "tradeoff": "Independent grading vs staleness of the curated set"
+   },
+   {
+    "decision": "Model validation vs champion on trusted slices with bounded prediction/importance change",
+    "tradeoff": "Catches AUC-gaming and corrupted behaviour vs may block legitimate large improvements"
+   },
+   {
+    "decision": "Human approval and staged rollout with rollback when money is involved or change exceeds limit",
+    "tradeoff": "Safety vs automation speed"
+   },
+   {
+    "decision": "Record data versions and excluded partitions",
+    "tradeoff": "Auditability vs bookkeeping"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0008",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://docs.cloud.google.com/architecture/mlops-continuous-delivery-and-automation-pipelines-in-machine-learning",
+    "status": "supported",
+    "evidence": "\"This step is required before model training to decide whether you should retrain the model or stop\"; triggers list matches."
+   },
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "supported",
+    "evidence": "Action limits quote verified. The \"direct feedback loops\" half of the attached support text is not used by the answer (padding, harmless)."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-11-1",
+  "verdict": "pass",
+  "reasons": [
+   "Re-ran code on 3.13/3.10/3.11: test passes; three extra edge cases pass on all. Fenced code equals solution. New text (stolen token / pipeline-job caveat, alias-move alert) agrees with rubric. Detailed answer is 449 words by whitespace count, i.e. at the 450 limit; any addition would breach it."
+  ],
+  "parts_answered": {
+   "identities and permissions": true,
+   "artifact integrity": true,
+   "dependency and image hygiene": true,
+   "approval flow": true,
+   "protects/does-not for each control": true
+  },
+  "evidence": [
+   {
+    "claim": "sha256_file/verify_artifact reject 1 appended byte; uppercase digest accepted",
+    "method": "executed",
+    "evidence": "ok on Python 3.13.16, 3.10.20, 3.11.17"
+   },
+   {
+    "claim": "extra cases: empty file digest e3b0c442..., whitespace/newline padded uppercase digest, wrong/empty/short digest, 2MiB+5 byte multi-chunk file vs hashlib, missing file -> FileNotFoundError",
+    "method": "executed",
+    "evidence": "all pass on 3 interpreters; None expected digest raises AttributeError not ValueError (acceptable)"
+   },
+   {
+    "claim": "pickle can execute arbitrary code; never unpickle untrusted/tampered data",
+    "method": "doc",
+    "evidence": "docs.python.org warning box quoted verbatim in substance"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-control security design with explicit limits of each.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Separate identities: experiments write only to an experiment namespace, only the pipeline identity registers versions, promotion is a distinct role with approval by someone other than the author, serving is read-only",
+    "tradeoff": "Friction for data scientists vs blast radius of a stolen notebook token; insider with promotion role remains"
+   },
+   {
+    "decision": "Record a content digest (ideally signed) at registration and verify it before deserialising, with the expected digest read from the registry, not from the bucket",
+    "tradeoff": "Stops swapped files but not a malicious artifact that was legitimately registered; trust moves to the registry"
+   },
+   {
+    "decision": "Treat model loading as untrusted code execution: data-only formats where possible, sandboxed loader (no egress, read-only fs, non-root)",
+    "tradeoff": "Format/framework support and some performance vs reduced blast radius; not a fix for backdoored models"
+   },
+   {
+    "decision": "Hashed lock files, internal mirror, base image pinned by digest, scheduled rebuild and scanning in CI",
+    "tradeoff": "Reproducibility vs patch lag and maintenance work; scanners miss unknown flaws and the model file"
+   },
+   {
+    "decision": "Approval flow: automated gates (tests, scan, model card) plus second-person approval only for moving the production alias; experiments need no approval",
+    "tradeoff": "Speed of iteration vs control on the one step that reaches production; reviewer fatigue"
+   },
+   {
+    "decision": "Immutable audit log of register/approve/alias-move linked to run, commit and data version, with alerts on alias moves",
+    "tradeoff": "Detection and attribution rather than prevention"
+   },
+   {
+    "decision": "State residual risk: poisoned data or backdoored behaviour passes integrity checks",
+    "tradeoff": "Needs behavioural validation and review, extra cost"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "control design"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "executed digest-verification code and startup procedure, not in detailed"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0020",
+   "same_intent": false
+  },
+  "code_findings": "Stdlib only, no 3.11+ features; passes on 3.13, 3.10, 3.11 with 3 extra edge cases; hmac.compare_digest would raise TypeError for non-ASCII str input (not a concern for hex digests).",
+  "sources_findings": [
+   {
+    "url": "https://docs.python.org/3/library/pickle.html",
+    "status": "supported",
+    "evidence": "\"Never unpickle data that could have come from an untrusted source, or that could have been tampered with\"; \"Consider signing data with hmac\"."
+   },
+   {
+    "url": "https://pip.pypa.io/en/stable/topics/secure-installs/",
+    "status": "partially",
+    "evidence": "Hash-checking mode: \"Hashes are required for all requirements\", unhashed dependency \"will result in an error\". The page does not mention lock files; the answer's \"Lock files with hashes\" is a generic practice, hash-checking mode is the pip mechanism."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Typosquatting protection via reviewed internal mirror; base-image digest pinning (general practice)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-1",
+  "verdict": "pass",
+  "reasons": [
+   "Edit (shift most traffic, keep slice/replay on v12) is consistent with practical decision rule (keep traffic on v11, continue with replay). Arithmetic: p50 +3 ms, p99 120->410 ms = 3.4x (\"more than tripled\")."
+  ],
+  "parts_answered": {
+   "investigation order": true,
+   "what each observation rules in/out": true,
+   "why offline benchmark missed": true
+  },
+  "evidence": [
+   {
+    "claim": "p99 410/120 = 3.42x; p50 41-38 = 3 ms",
+    "method": "derivation",
+    "evidence": "arithmetic"
+   },
+   {
+    "claim": "CPU quota exhaustion throttles threads until next period; cpu.stat nr_throttled/throttled_time",
+    "method": "doc",
+    "evidence": "kernel sched-bwc: \"Throttled threads will not be able to run again until the next period\"; counters documented (page describes cgroup v1 files; v2 cpu.stat has equivalent counters)"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism-based diagnosis with several candidate causes; no calculations.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "ordered reasoning"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "runbook table with quick tests and time-box rule"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0025",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://docs.kernel.org/scheduler/sched-bwc.html",
+    "status": "supported",
+    "evidence": "Throttling when quota exhausted; counters nr_throttled/throttled_time. Page documents cgroup v1 file names."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-6",
+  "verdict": "correct",
+  "reasons": [
+   "Concise answer is 70 words (<=80) and consistent with detailed. One new ambiguity from the edit: two budgets introduced, then \"the quality budget\" is unspecified."
+  ],
+  "parts_answered": {
+   "extend SLIs": true,
+   "SLOs": true,
+   "budget policy text when burning": true
+  },
+  "evidence": [
+   {
+    "claim": "example policy halts changes except P0/security fixes; exemptions; postmortem when single incident >20% budget",
+    "method": "doc",
+    "evidence": "SRE Workbook error-budget-policy page, verified"
+   },
+   {
+    "claim": "multi-window burn-rate alerts",
+    "method": "doc",
+    "evidence": "Alerting on SLOs: long window plus short window (1/12) to confirm burn continues"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "when the quality budget is exhausted, freeze non-urgent model and feature releases",
+    "problem": "The new sentence introduces a proxy budget and a matured-label budget, then says 'the quality budget' without saying which; the 99%-fresh SLO defined above is the proxy one.",
+    "replacement": "when the proxy quality budget is exhausted, freeze non-urgent model and feature releases (fixes to the data or the monitoring itself are exempt)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open design translating SLO machinery to delayed-label quality.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Define quality as countable good/bad events (fresh, non-defaulted, in-range inputs, intended model)",
+    "tradeoff": "Countable and fast but only a proxy for true quality"
+   },
+   {
+    "decision": "Fast label-free proxy SLIs: input drift, score-distribution shape, agreement with shadow/previous model; thresholds calibrated on healthy history",
+    "tradeoff": "Early detection vs false alarms"
+   },
+   {
+    "decision": "Slow ground-truth SLI on matured cohorts (e.g. share of weekly cohorts above a floor), accounted retroactively",
+    "tradeoff": "Truth but three weeks late; used to audit proxies"
+   },
+   {
+    "decision": "SLO targets over a window (e.g. 99% over 28 days) with multiwindow burn-rate alerts",
+    "tradeoff": "Detection speed vs paging noise"
+   },
+   {
+    "decision": "Policy text: freeze non-urgent model/feature releases when quality budget is spent, explicit exemptions, postmortem for large single burns",
+    "tradeoff": "Release velocity vs quality protection; fairness to teams for upstream causes"
+   },
+   {
+    "decision": "Assign accountability for upstream data (freshness checks, data contracts)",
+    "tradeoff": "Cross-team friction vs clear ownership"
+   },
+   {
+    "decision": "Review proxies against matured labels each quarter",
+    "tradeoff": "Ongoing effort vs drift of proxy meaning"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "genuinely shorter; no conflicting numbers"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "rigorous version"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0027",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://sre.google/workbook/error-budget-policy/",
+    "status": "supported",
+    "evidence": "\"halt all changes and releases other than P0 issues or security fixes until the service is back within its SLO\"; exemptions; postmortem if single incident >20% of budget over four weeks."
+   },
+   {
+    "url": "https://sre.google/sre-book/embracing-risk/",
+    "status": "supported",
+    "evidence": "Error budget = how unreliable the service is allowed to be; releases halted when spent."
+   },
+   {
+    "url": "https://sre.google/workbook/alerting-on-slos/",
+    "status": "supported",
+    "evidence": "Long and short window burn-rate alerting."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-13-1",
+  "verdict": "pass",
+  "reasons": [
+   "Edit hedges the resolved-snapshot claim (\"where the API reports it\"), which the Anthropic page neither confirms nor denies; acceptable as worded."
+  ],
+  "parts_answered": {
+   "what to pin and record": true,
+   "pre-switch testing": true,
+   "rollout": true,
+   "retirement handling": true
+  },
+  "evidence": [
+   {
+    "claim": "ML Test Score: Monitor 1 \"Dependency changes result in notification\"; Infra 6 canary",
+    "method": "paper",
+    "evidence": "verified in paper tables III and IV"
+   },
+   {
+    "claim": "serving infrastructure can change behaviour for a fixed ID; every ID has own retirement schedule",
+    "method": "doc",
+    "evidence": "Anthropic model-ids-and-versions page, verified"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Release-process design but conventional practices.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Pin a dated snapshot and log the full release tuple (model id, prompt version, decoding params, schemas, guardrail versions)",
+    "tradeoff": "Reproducibility and diagnosability vs. missing silent provider improvements and having to manage retirements."
+   },
+   {
+    "decision": "Gate with golden set including replayed human-labelled production tickets, compared per route",
+    "tradeoff": "Labelling cost vs. catching class-level shifts hidden in an overall accuracy number."
+   },
+   {
+    "decision": "Shadow then user-hash canary with route distribution, schema validity and feedback as guardrails",
+    "tradeoff": "Extra calls/cost and slower rollout vs. limited blast radius."
+   },
+   {
+    "decision": "Rollback by configuration to previous pin plus tested fallback model",
+    "tradeoff": "Availability if the old snapshot is retired vs. maintaining a second integration."
+   },
+   {
+    "decision": "Retirement calendar with migration lead time",
+    "tradeoff": "Planned effort now vs. a forced, untested migration at the deadline."
+   },
+   {
+    "decision": "Scheduled golden-set replay as drift alarm even on a pinned snapshot",
+    "tradeoff": "Ongoing eval spend vs. detecting serving-side behaviour changes."
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0005",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Both test names present as worded."
+   },
+   {
+    "url": "https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions",
+    "status": "supported",
+    "evidence": "Aliases are convenience pointers; model ID fixed; serving infrastructure can change; own retirement schedule per ID. Page does not say whether responses return a resolved snapshot (answer hedged)."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-2",
+  "verdict": "pass",
+  "reasons": [
+   "Edit to Rule #29 sentence matches the rule (log serving-time features for use at training time); the added clause about comparing with offline recomputation is a reasonable consequence, not a quote."
+  ],
+  "parts_answered": {
+   "which shadow properties gave clean pass": true,
+   "what to change in next shadow": true,
+   "link to latency/duplicates/lower scores": true
+  },
+  "evidence": [
+   {
+    "claim": "Rule #29 save features used at serving time and log them for training",
+    "method": "doc",
+    "evidence": "rules-of-ml page: \"save the set of features used at serving time\" and \"pipe those features to a log to use them at training time\""
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Subtle multi-cause debugging across latency, side effects and features.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0029",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule #29 verified."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-6",
+  "verdict": "pass",
+  "reasons": [
+   "Recomputed every figure: A 180,000 gross, +80,000 net (25%: 90,000/-10,000; 75%: 270,000/+170,000). B: incident 55,385 (24M*0.02*6/52); monitored 3,945; saving 51,439 -> 51,440; 3 incidents 154,318 -> 154,300; net year 1 34,318 -> 34,300; later years 94,318 -> 94,300; break-even 120,000/51,439 = 2.33; 60,000/51,439 = 1.17 -> 1.2; incidents 1/2/4 -> -68,561/-17,121/+85,758 = -68,600/-17,100/+85,800; alternative reading 480,000, 34,286, 445,714. All text figures agree across detailed and practical. Detailed is 438 words (whitespace count); the regex count is higher because it splits comma numbers."
+  ],
+  "parts_answered": {
+   "EV of A": true,
+   "EV of B": true,
+   "sensitivity": true,
+   "recommendation": true
+  },
+  "evidence": [
+   {
+    "claim": "all figures",
+    "method": "executed",
+    "evidence": "python recomputation as listed in reasons"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Straightforward expected-value arithmetic with sensitivity and judgement.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "model and recommendation"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "sensitivity table and alternative reading (445,700) not in detailed; detailed points to it"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0006",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "supported",
+    "evidence": "Section 7: \"Experience has shown that the external world is rarely stable\"; prediction bias diagnostic (distribution of predicted vs observed labels)."
+   },
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Monitor 3 \"Training and serving features compute the same values\", Monitor 4 \"Models are not too stale\" are monitoring tests, as worded."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ }
+]

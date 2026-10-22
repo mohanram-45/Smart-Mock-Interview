@@ -1,0 +1,32 @@
+id,plan_id,claim,evidence
+smi-j0001,B1-GEN-01-1,HNSW best latency at high recall; IVF-PQ recall ceiling fixed by re-ranking; centroids go stale; tombstone deletes implementation-dependent,"standard ANN literature/FAISS practice, hedged in text"
+smi-j0003,B1-GEN-01-3,generic chunks boosted by larger norms,now correctly hedged as encoder-dependent
+smi-j0004,B1-GEN-01-4,Same dimension does not imply shared space,standard; hedge about deliberately compatible models now present
+smi-j0004,B1-GEN-01-4,Linear map between embedding spaces is a lossy bridge,hedged in text
+smi-j0005,B1-GEN-01-5,hubness reported in high dimensions,Radovanovic et al. 2010; hedged
+smi-j0006,B1-GEN-01-6,float16 usually near-lossless; truncation only where documented,hedged
+smi-j0009,B1-GEN-02-2,"Extractors emit draw order / y-sorted text, causing column interleaving",widely documented behaviour of PDF text extraction; no tool-specific claim
+smi-j0009,B1-GEN-02-2,"Repeated header/footer detection by position across pages, digits normalised",standard technique
+smi-j0010,B1-GEN-02-3,Heading-path prefix 'often helps',"Hedged with 'often'/'cheap'; widely used contextual-header practice, not universal."
+smi-j0012,B1-GEN-02-5,"Parent text kept in a docstore, not the vector index",Standard parent-document retriever design.
+smi-j0014,B1-GEN-03-1,Dense encoders can blur rare identifiers,Hedged with 'may'
+smi-j0019,B1-GEN-03-6,Multi-query + RRF fusion raises recall for ambiguous queries at extra load,Hedged in the text
+smi-j0020,B1-GEN-03-7,Behaviour of filtered HNSW traversal is engine-dependent,"Answer hedges ""implementation-dependent""; not checked against a specific engine doc"
+smi-j0021,B1-GEN-03-8,Unjudged documents counted non-relevant under dense-only pooling understate other systems,Standard IR pooling-bias result; hedged correctly
+smi-j0022,B1-GEN-04-1,"Late-interaction stores per-token vectors, avoids per-pair transformer pass",ColBERT-style design.
+smi-j0024,B1-GEN-04-3,Mechanistic reasons ('attention can favour recency and leading tokens'),"Speculative explanation, hedged with 'can'/'might'."
+smi-j0025,B1-GEN-04-4,Jaccard >0.8 on word 5-grams; MMR lambda ~0.7,"Illustrative practical thresholds, not standards; presented as a pipeline example, should be tuned."
+smi-j0026,B1-GEN-04-5,Models can invent citation IDs; verbatim-quote substring check catches fabricated support,"Common, reproducible failure; check is deterministic."
+smi-j0027,B1-GEN-04-6,Providers either reject or (some stacks) truncate over-length prompts,behaviour varies by API/framework; answer hedges it
+smi-j0030,B1-GEN-05-3,"Faithfulness needs answer+context, relevance question+answer, correctness a reference",Standard RAG-eval definitions (e.g. RAGAS-style); no external page opened.
+smi-j0031,B1-GEN-05-4,Length/self-preference/position bias exist in LLM judges but vary by model,Zheng et al. 2023 (MT-Bench) widely cited; not opened here; answer hedges as model-dependent.
+smi-j0032,B1-GEN-05-5,"LLM-written questions copy chunk vocabulary, favouring lexical retrievers","Widely reported for synthetic query sets; answer hedges it. WebFetch to elastic.co was refused (permission not granted), so documented-behaviour claims are background_only."
+smi-j0034,B1-GEN-05-7,Pooling bias and condensed lists,Zobel 1998; Buckley & Voorhees 2004; Sakai 2007 (condensed lists); not opened in this session.
+smi-j0036,B1-GEN-06-1,filtered traversal can disconnect graph; engines switch to brute force at high selectivity,"Known behaviour (e.g. Qdrant, Weaviate flat-search cutoff); answer hedges 'implementations differ'. WebFetch to elastic.co was refused (permission not granted), so documented-behaviour claims are background_only."
+smi-j0037,B1-GEN-06-2,"HNSW layer-0 max links 2M, upper layers M, node fraction ~1/(M-1)",HNSW paper (Malkov & Yashunin) / hnswlib defaults; not opened in this session.
+smi-j0038,B1-GEN-06-3,Soft deletes/tombstones in HNSW engines,"hedged in text ('many', 'check the one you use'); not opened in this session."
+smi-j0040,B1-GEN-06-5,per-index overhead and index-count limits are engine-specific,"answer hedges 'test your own'. WebFetch to elastic.co was refused (permission not granted), so documented-behaviour claims are background_only."
+smi-j0041,B1-GEN-06-6,RRF constant 60,Cormack et al. 2009; not opened in this session.
+smi-j0042,B1-GEN-07-1,Position effects are model-dependent,"answer hedges ""model-dependent effect, so test"""
+smi-j0044,B1-GEN-07-3,Feedback bias (unhappy users click more); distribution shift; stale golden set,"Standard evaluation caveats, stated as plausible causes."
+smi-j0046,B1-GEN-07-5,Dense embeddings of rare IDs are weakly informative / conflate near-miss IDs,"Widely observed, model-dependent; answer hedges ('may be close to', 'weakly informative')."

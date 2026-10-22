@@ -1,0 +1,365 @@
+[
+ {
+  "id": "P2-PY-01",
+  "domain": "Python",
+  "question_type": "debugging",
+  "question": "A teammate wrote this helper to collect tags for a request:\n\ndef add_tag(tag, tags=[]):\n    tags.append(tag)\n    return tags\n\nprint(add_tag(\"a\"))   # ['a']\nprint(add_tag(\"b\"))   # expected ['b'], but prints ['a', 'b']\n\nExplain exactly why the state leaks between calls, fix add_tag, and then show a sentinel pattern for a function where None is itself a legitimate value the caller may pass (for example get_option(options, key, default=...) that raises KeyError only when no default was supplied at all).",
+  "answer": "Default values are evaluated once, when the def statement executes, and the resulting object is stored on the function (add_tag.__defaults__). Every call that omits tags receives that same list object, so append mutates shared state. Nothing is \"reset\" between calls.\n\nThe fix is to default to None and create a fresh list inside the body. When None is a meaningful value, use a private sentinel object that no caller can pass by accident and compare with \"is\".\n\n```python\n_MISSING = object()\n\ndef add_tag(tag, tags=None):\n    if tags is None:\n        tags = []\n    tags.append(tag)\n    return tags\n\ndef get_option(options, key, default=_MISSING):\n    if key in options:\n        return options[key]\n    if default is _MISSING:\n        raise KeyError(key)\n    return default\n```\n\nPitfalls: (1) `tags = tags or []` is wrong when the caller passes an empty list they want you to fill, because it silently replaces their list with a new one. (2) Immutable defaults (ints, strings, tuples, None) are safe; the problem is mutable defaults such as list, dict, set. (3) Sometimes the shared default is used on purpose as a cache, but that should be explicit. Dataclasses reject mutable defaults and require field(default_factory=list) for the same reason.",
+  "key_concepts": [
+   "mutable default argument",
+   "function defaults evaluated at definition time",
+   "__defaults__",
+   "None sentinel",
+   "private sentinel object",
+   "default_factory"
+  ],
+  "common_mistakes": [
+   "Using `tags = tags or []`, which replaces a caller-supplied empty list",
+   "Believing the default is re-created on each call",
+   "Using None as the 'not supplied' marker when None is a valid argument"
+  ],
+  "interview_style_note": "Explains definition-time evaluation (not 'call-time reset'), uses 'is None' rather than truthiness, and knows when a private sentinel is required.",
+  "sources": [],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "_MISSING = object()\n\ndef add_tag(tag, tags=None):\n    if tags is None:\n        tags = []\n    tags.append(tag)\n    return tags\n\ndef get_option(options, key, default=_MISSING):\n    if key in options:\n        return options[key]\n    if default is _MISSING:\n        raise KeyError(key)\n    return default",
+   "test": "\ndef buggy(tag, tags=[]):\n    tags.append(tag)\n    return tags\n\nassert buggy(\"a\") == [\"a\"]\nassert buggy(\"b\") == [\"a\", \"b\"]\nassert buggy.__defaults__[0] == [\"a\", \"b\"]\nassert buggy(\"c\") is buggy.__defaults__[0]\n\nassert add_tag(\"a\") == [\"a\"]\nassert add_tag(\"b\") == [\"b\"]\nassert add_tag.__defaults__ == (None,)\n\nmine = []\nassert add_tag(\"x\", mine) is mine and mine == [\"x\"]\nempty = []\nassert add_tag(\"y\", empty) is empty      # caller's empty list is respected\n\nopts = {\"mode\": \"fast\", \"limit\": None}\nassert get_option(opts, \"mode\") == \"fast\"\nassert get_option(opts, \"limit\", 5) is None      # present key wins\nassert get_option(opts, \"missing\", None) is None  # None accepted as default\nassert get_option(opts, \"missing\", 0) == 0\ntry:\n    get_option(opts, \"missing\")\nexcept KeyError as e:\n    assert e.args == (\"missing\",)\nelse:\n    raise AssertionError(\"expected KeyError\")\n",
+   "expected": []
+  },
+  "topic": null
+ },
+ {
+  "id": "P2-PY-02",
+  "domain": "Python",
+  "question_type": "debugging",
+  "question": "A developer builds one callback per button in a loop:\n\ncallbacks = [lambda: i for i in range(3)]\nprint([cb() for cb in callbacks])   # prints [2, 2, 2], expected [0, 1, 2]\n\nExplain why every callback sees the last value, then implement three fixes as functions make_default_arg(n), make_partial(n) and make_factory(n), each returning a list of n zero-argument callables that return 0..n-1. State one downside of the default-argument fix.",
+  "answer": "A closure captures the variable i, not its value at creation time. Python looks the name up when the lambda is called (late binding), and by then the loop has finished and i is 2 in the enclosing scope (a list comprehension has its own scope in Python 3, but all three lambdas share that one i cell). Hence [2, 2, 2].\n\nFixes: bind the current value at creation. A default argument is evaluated at definition time; functools.partial stores the value in the partial object; a factory function gives each closure its own scope with its own variable.\n\n```python\nfrom functools import partial\n\ndef _identity(x):\n    return x\n\ndef make_default_arg(n):\n    return [lambda i=i: i for i in range(n)]\n\ndef make_partial(n):\n    return [partial(_identity, i) for i in range(n)]\n\ndef _make_getter(i):\n    return lambda: i\n\ndef make_factory(n):\n    return [_make_getter(i) for i in range(n)]\n```\n\nDownside of the default-argument trick: it changes the signature, so a caller (or a framework passing an argument, such as a GUI event) can override the bound value by accident, e.g. cb(99) returns 99. partial and the factory keep the callable's real signature clean; the factory is the most explicit and works for multi-line closures. Also note this is not specific to lambdas: nested def statements in a loop behave identically.",
+  "key_concepts": [
+   "late binding",
+   "closure cell",
+   "functools.partial",
+   "default argument binding",
+   "factory function",
+   "variable scope"
+  ],
+  "common_mistakes": [
+   "Saying the lambdas 'share the same list' or blaming the list comprehension",
+   "Fixing with default arg without noticing the signature can be overridden",
+   "Thinking only lambdas are affected, not nested def"
+  ],
+  "interview_style_note": "Distinguishes capturing a variable from capturing a value, and can name a concrete drawback of the default-arg trick.",
+  "sources": [],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "from functools import partial\n\ndef _identity(x):\n    return x\n\ndef make_default_arg(n):\n    return [lambda i=i: i for i in range(n)]\n\ndef make_partial(n):\n    return [partial(_identity, i) for i in range(n)]\n\ndef _make_getter(i):\n    return lambda: i\n\ndef make_factory(n):\n    return [_make_getter(i) for i in range(n)]",
+   "test": "\nbuggy = [lambda: i for i in range(3)]\nassert [cb() for cb in buggy] == [2, 2, 2]\n\nfor maker in (make_default_arg, make_partial, make_factory):\n    cbs = maker(4)\n    assert len(cbs) == 4\n    assert [cb() for cb in cbs] == [0, 1, 2, 3], maker.__name__\n    assert maker(0) == []\n\n# downside of the default-argument fix: the bound value can be overridden\nassert make_default_arg(2)[0](99) == 99\ntry:\n    make_factory(2)[0](99)\nexcept TypeError:\n    pass\nelse:\n    raise AssertionError(\"factory closure should not accept arguments\")\n\n# nested def in a loop has the same late-binding behaviour\nfs = []\nfor k in range(3):\n    def f():\n        return k\n    fs.append(f)\nassert [f() for f in fs] == [2, 2, 2]\n",
+   "expected": []
+  },
+  "topic": null
+ },
+ {
+  "id": "P2-PY-03",
+  "domain": "Python",
+  "question_type": "coding",
+  "question": "You have a resource object with begin(), commit() and rollback() methods (think of a database connection wrapper). Write a context manager that begins a transaction on entry, commits if the with-block finishes normally, and rolls back if it raises, without ever swallowing the block's exception. Provide it twice: as a class Transaction(resource) and as a @contextlib.contextmanager function transaction(resource). Both yield the resource. If commit() itself fails, the transaction must be rolled back and the commit error must propagate.\n\nExample:\nwith transaction(conn) as c:\n    c.execute(...)   # commit at the end; rollback if execute raises",
+  "answer": "The class form returns a falsy value from __exit__ so exceptions propagate; the generator form puts yield inside try/except BaseException, rolls back, and re-raises. Catching BaseException (not Exception) makes sure KeyboardInterrupt and similar also trigger a rollback, but the exception is always re-raised. Commit goes in the success path, wrapped so that a failing commit triggers rollback and then propagates.\n\n```python\nimport contextlib\n\nclass Transaction:\n    def __init__(self, resource):\n        self.resource = resource\n\n    def __enter__(self):\n        self.resource.begin()\n        return self.resource\n\n    def __exit__(self, exc_type, exc, tb):\n        if exc_type is not None:\n            self.resource.rollback()\n            return False          # never suppress the original exception\n        try:\n            self.resource.commit()\n        except BaseException:\n            self.resource.rollback()\n            raise\n        return False\n\n@contextlib.contextmanager\ndef transaction(resource):\n    resource.begin()\n    try:\n        yield resource\n    except BaseException:\n        resource.rollback()\n        raise\n    try:\n        resource.commit()\n    except BaseException:\n        resource.rollback()\n        raise\n```\n\nPitfalls: returning True from __exit__ (or a bare `except: pass` in the generator) hides the error; forgetting the re-raise in a @contextmanager makes the generator finish without raising, which can turn a with-body failure into a RuntimeError or silent success; committing inside the except path; and not rolling back when commit fails. If rollback itself raises while handling an error, that new exception propagates and Python chains the original as __context__; decide deliberately whether that is acceptable for your resource.",
+  "key_concepts": [
+   "context manager",
+   "__enter__ and __exit__",
+   "contextlib.contextmanager",
+   "exception propagation",
+   "transaction rollback",
+   "BaseException"
+  ],
+  "common_mistakes": [
+   "Returning True from __exit__ or swallowing the exception",
+   "Forgetting to roll back when commit() fails",
+   "Omitting `raise` in the except block of a @contextmanager generator"
+  ],
+  "interview_style_note": "Never suppresses the body's exception, handles commit failure, and knows the generator version must re-raise.",
+  "sources": [],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import contextlib\n\nclass Transaction:\n    def __init__(self, resource):\n        self.resource = resource\n\n    def __enter__(self):\n        self.resource.begin()\n        return self.resource\n\n    def __exit__(self, exc_type, exc, tb):\n        if exc_type is not None:\n            self.resource.rollback()\n            return False          # never suppress the original exception\n        try:\n            self.resource.commit()\n        except BaseException:\n            self.resource.rollback()\n            raise\n        return False\n\n@contextlib.contextmanager\ndef transaction(resource):\n    resource.begin()\n    try:\n        yield resource\n    except BaseException:\n        resource.rollback()\n        raise\n    try:\n        resource.commit()\n    except BaseException:\n        resource.rollback()\n        raise",
+   "test": "\nclass FakeResource:\n    def __init__(self, fail_commit=False, fail_rollback=False):\n        self.events = []\n        self.fail_commit = fail_commit\n        self.fail_rollback = fail_rollback\n    def begin(self):\n        self.events.append(\"begin\")\n    def commit(self):\n        self.events.append(\"commit\")\n        if self.fail_commit:\n            raise IOError(\"commit failed\")\n    def rollback(self):\n        self.events.append(\"rollback\")\n        if self.fail_rollback:\n            raise RuntimeError(\"rollback failed\")\n\nfor make in (Transaction, transaction):\n    # success\n    r = FakeResource()\n    with make(r) as got:\n        assert got is r\n        r.events.append(\"work\")\n    assert r.events == [\"begin\", \"work\", \"commit\"]\n\n    # body raises: rollback, exception propagates unchanged\n    r = FakeResource()\n    seen = None\n    try:\n        with make(r):\n            raise ValueError(\"boom\")\n    except ValueError as e:\n        seen = e\n    assert seen is not None and seen.args == (\"boom\",)\n    assert r.events == [\"begin\", \"rollback\"]\n\n    # KeyboardInterrupt also rolls back\n    r = FakeResource()\n    try:\n        with make(r):\n            raise KeyboardInterrupt()\n    except KeyboardInterrupt:\n        pass\n    else:\n        raise AssertionError(\"must propagate\")\n    assert r.events == [\"begin\", \"rollback\"]\n\n    # commit fails: rollback, commit error propagates\n    r = FakeResource(fail_commit=True)\n    try:\n        with make(r):\n            pass\n    except IOError as e:\n        assert str(e) == \"commit failed\"\n    else:\n        raise AssertionError(\"must propagate\")\n    assert r.events == [\"begin\", \"commit\", \"rollback\"]\n\n    # rollback failure is chained to the original error\n    r = FakeResource(fail_rollback=True)\n    try:\n        with make(r):\n            raise ValueError(\"orig\")\n    except RuntimeError as e:\n        assert isinstance(e.__context__, ValueError)\n    else:\n        raise AssertionError(\"rollback error should propagate\")\n",
+   "expected": []
+  },
+  "topic": null
+ },
+ {
+  "id": "P2-PY-04",
+  "domain": "Python",
+  "question_type": "coding",
+  "question": "Python 3.10 has no itertools.batched. Implement two lazy generators that accept any iterable (list, generator, infinite iterator):\n\nbatched(iterable, n)         -> yields tuples of up to n items; the last may be shorter\nsliding_window(iterable, n)  -> yields overlapping tuples of exactly n items\n\nExamples:\nlist(batched(range(7), 3))          == [(0,1,2), (3,4,5), (6,)]\nlist(sliding_window(\"abcd\", 2))     == [('a','b'), ('b','c'), ('c','d')]\n\nRequirements: nothing is consumed from the source until the first item is requested, no more than one batch (or n items for the window) is held in memory, invalid n (< 1) raises ValueError immediately when the function is called (not at first next()), and an iterable shorter than n yields no window. Explain the memory difference versus slicing a fully materialised list.",
+  "answer": "Use iter() once, then pull chunks with itertools.islice, which consumes exactly n items from a shared iterator. For the window, keep a deque with maxlen=n so appending evicts the oldest item. To raise ValueError at call time, make the public function a normal function that validates and then returns an inner generator; a generator function would defer the check until the first next().\n\n```python\nfrom collections import deque\nfrom itertools import islice\n\ndef batched(iterable, n):\n    if n < 1:\n        raise ValueError(\"n must be at least 1\")\n    def gen():\n        it = iter(iterable)\n        while True:\n            batch = tuple(islice(it, n))\n            if not batch:\n                return\n            yield batch\n    return gen()\n\ndef sliding_window(iterable, n):\n    if n < 1:\n        raise ValueError(\"n must be at least 1\")\n    def gen():\n        it = iter(iterable)\n        window = deque(islice(it, n), maxlen=n)\n        if len(window) < n:\n            return\n        yield tuple(window)\n        for item in it:\n            window.append(item)\n            yield tuple(window)\n    return gen()\n```\n\nMemory: both hold O(n) items at any moment regardless of input length, so they work on infinite streams or files too large for RAM. Doing `[data[i:i+n] for i in range(0, len(data), n)]` needs the whole sequence in memory first (and len/indexing, so it fails on generators). Pitfall: calling list(it) or islice on the original iterable twice would silently skip items; only one iterator must be shared. Python 3.12's itertools.batched returns tuples too, so these are drop-in for older versions.",
+  "key_concepts": [
+   "generator",
+   "lazy evaluation",
+   "itertools.islice",
+   "collections.deque maxlen",
+   "eager argument validation",
+   "O(n) memory",
+   "iterator protocol"
+  ],
+  "common_mistakes": [
+   "Slicing with len()/indexing, which fails on generators and materialises everything",
+   "Validating n inside a generator function so the error appears late",
+   "Yielding the same mutable list/deque object each time"
+  ],
+  "interview_style_note": "Keeps a single shared iterator, stays lazy, and knows a generator function defers validation until the first next().",
+  "sources": [],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "from collections import deque\nfrom itertools import islice\n\ndef batched(iterable, n):\n    if n < 1:\n        raise ValueError(\"n must be at least 1\")\n    def gen():\n        it = iter(iterable)\n        while True:\n            batch = tuple(islice(it, n))\n            if not batch:\n                return\n            yield batch\n    return gen()\n\ndef sliding_window(iterable, n):\n    if n < 1:\n        raise ValueError(\"n must be at least 1\")\n    def gen():\n        it = iter(iterable)\n        window = deque(islice(it, n), maxlen=n)\n        if len(window) < n:\n            return\n        yield tuple(window)\n        for item in it:\n            window.append(item)\n            yield tuple(window)\n    return gen()",
+   "test": "\nfrom itertools import count\n\nassert list(batched(range(7), 3)) == [(0, 1, 2), (3, 4, 5), (6,)]\nassert list(batched([], 3)) == []\nassert list(batched(\"abc\", 5)) == [(\"a\", \"b\", \"c\")]\nassert list(batched(iter(range(4)), 2)) == [(0, 1), (2, 3)]\nassert list(sliding_window(\"abcd\", 2)) == [(\"a\", \"b\"), (\"b\", \"c\"), (\"c\", \"d\")]\nassert list(sliding_window(range(3), 3)) == [(0, 1, 2)]\nassert list(sliding_window(range(2), 3)) == []\nassert list(sliding_window([], 1)) == []\nassert list(sliding_window(range(3), 1)) == [(0,), (1,), (2,)]\n\nfor fn in (batched, sliding_window):\n    for bad in (0, -2):\n        try:\n            fn([1, 2], bad)\n        except ValueError:\n            pass\n        else:\n            raise AssertionError(\"expected eager ValueError\")\n\nclass Source:\n    def __init__(self):\n        self.pulled = 0\n        self._it = count()\n    def __iter__(self):\n        return self\n    def __next__(self):\n        self.pulled += 1\n        return next(self._it)\n\nsrc = Source()\ng = batched(src, 4)\nassert src.pulled == 0                  # lazy until first request\nassert next(g) == (0, 1, 2, 3) and src.pulled == 4\nassert next(g) == (4, 5, 6, 7) and src.pulled == 8\n\nsrc = Source()\nw = sliding_window(src, 3)\nassert src.pulled == 0\nassert next(w) == (0, 1, 2) and src.pulled == 3\nassert next(w) == (1, 2, 3) and src.pulled == 4   # one new item per window\n\n# yielded windows are independent snapshots\nsrc = Source()\nw = sliding_window(src, 2)\na, b = next(w), next(w)\nassert a == (0, 1) and b == (1, 2)\n",
+   "expected": []
+  },
+  "topic": null
+ },
+ {
+  "id": "P2-PY-05",
+  "domain": "Python",
+  "question_type": "coding",
+  "question": "Write a decorator factory retry(times, delay=0.0, backoff=2.0, exceptions=(Exception,), sleep=time.sleep) for flaky calls.\n\n- times is the total number of attempts (times=3 means 1 call + 2 retries) and must be >= 1.\n- Only exceptions in the `exceptions` tuple are retried; others propagate immediately.\n- Between attempts wait delay * backoff**k seconds (k = 0, 1, ...); never sleep after the final failed attempt.\n- After the last attempt fails, re-raise the last exception.\n- Preserve the wrapped function's __name__ and docstring (functools.wraps).\n- `sleep` is injectable so tests do not actually wait.\n\nExample: with delay=1, backoff=2, times=4, a function that always fails sleeps 1, 2, 4 seconds and then raises.",
+  "answer": "A decorator with arguments is three nested layers: retry(...) validates and returns decorator(func), which returns wrapper(*args, **kwargs). The wrapper loops over attempts, catches only the configured exceptions, sleeps between attempts, and on the final attempt re-raises. functools.wraps copies metadata and sets __wrapped__.\n\n```python\nimport functools\nimport time\n\ndef retry(times, delay=0.0, backoff=2.0, exceptions=(Exception,), sleep=time.sleep):\n    if times < 1:\n        raise ValueError(\"times must be >= 1\")\n    exceptions = tuple(exceptions)\n\n    def decorator(func):\n        @functools.wraps(func)\n        def wrapper(*args, **kwargs):\n            for attempt in range(times):\n                try:\n                    return func(*args, **kwargs)\n                except exceptions:\n                    if attempt == times - 1:\n                        raise\n                    sleep(delay * backoff ** attempt)\n        return wrapper\n    return decorator\n```\n\nDetails that matter: the bare `raise` keeps the original traceback; sleeping only when another attempt remains avoids a pointless final wait; catching `Exception` (not BaseException) keeps Ctrl-C working; and `exceptions` should be narrow in real code (network errors, not every bug). Production retries usually also add jitter and a cap on the delay to avoid synchronized retry storms, and should only wrap idempotent operations. Without functools.wraps, introspection, logging and pytest output would show the name \"wrapper\".",
+  "key_concepts": [
+   "decorator factory",
+   "functools.wraps",
+   "exponential backoff",
+   "dependency injection for testing",
+   "exception filtering",
+   "re-raising"
+  ],
+  "common_mistakes": [
+   "Sleeping after the last failed attempt",
+   "Catching every exception including ones that should not be retried",
+   "Forgetting functools.wraps or swallowing the final error by returning None"
+  ],
+  "interview_style_note": "Gets off-by-one right (no sleep after final failure), narrows caught exceptions, and makes the test instant via an injected sleep.",
+  "sources": [],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import functools\nimport time\n\ndef retry(times, delay=0.0, backoff=2.0, exceptions=(Exception,), sleep=time.sleep):\n    if times < 1:\n        raise ValueError(\"times must be >= 1\")\n    exceptions = tuple(exceptions)\n\n    def decorator(func):\n        @functools.wraps(func)\n        def wrapper(*args, **kwargs):\n            for attempt in range(times):\n                try:\n                    return func(*args, **kwargs)\n                except exceptions:\n                    if attempt == times - 1:\n                        raise\n                    sleep(delay * backoff ** attempt)\n        return wrapper\n    return decorator",
+   "test": "\nslept = []\n\nclass Flaky:\n    def __init__(self, fail_times, exc=IOError):\n        self.calls = 0\n        self.fail_times = fail_times\n        self.exc = exc\n    def __call__(self, x):\n        self.calls += 1\n        if self.calls <= self.fail_times:\n            raise self.exc(\"fail %d\" % self.calls)\n        return x * 2\n\n# succeeds on third attempt\nf = Flaky(2)\n@retry(times=4, delay=1, backoff=2, sleep=slept.append)\ndef work(x):\n    \"doc here\"\n    return f(x)\nassert work(5) == 10 and f.calls == 3\nassert slept == [1, 2]\nassert work.__name__ == \"work\" and work.__doc__ == \"doc here\"\nassert work.__wrapped__ is not None\n\n# always fails: sleeps between attempts only, then raises the last error\nslept.clear()\nf = Flaky(99)\n@retry(times=4, delay=1, backoff=2, sleep=slept.append)\ndef always(x):\n    return f(x)\ntry:\n    always(1)\nexcept IOError as e:\n    assert str(e) == \"fail 4\"\nelse:\n    raise AssertionError(\"expected IOError\")\nassert f.calls == 4 and slept == [1, 2, 4]\n\n# non-listed exception propagates immediately, no sleep\nslept.clear()\nf = Flaky(5, exc=KeyError)\n@retry(times=3, delay=1, exceptions=(IOError,), sleep=slept.append)\ndef keyerr(x):\n    return f(x)\ntry:\n    keyerr(1)\nexcept KeyError:\n    pass\nelse:\n    raise AssertionError(\"expected KeyError\")\nassert f.calls == 1 and slept == []\n\n# times=1 means no retry and no sleep\nslept.clear()\nf = Flaky(1)\n@retry(times=1, delay=3, sleep=slept.append)\ndef once(x):\n    return f(x)\ntry:\n    once(1)\nexcept IOError:\n    pass\nassert f.calls == 1 and slept == []\n\n# zero delay, kwargs forwarded, invalid times rejected\nslept.clear()\n@retry(times=2, sleep=slept.append)\ndef kw(a, b=0):\n    return a + b\nassert kw(1, b=2) == 3 and slept == []\ntry:\n    retry(times=0)\nexcept ValueError:\n    pass\nelse:\n    raise AssertionError(\"expected ValueError\")\n",
+   "expected": []
+  },
+  "topic": null
+ },
+ {
+  "id": "P2-PY-06",
+  "domain": "Python",
+  "question_type": "coding",
+  "question": "You must call a slow I/O API for 1,000 items but the server tolerates at most N requests in flight. Write\n\nasync def bounded_gather(funcs, limit)\n\nwhere funcs is a list of zero-argument async callables. It runs them concurrently with at most `limit` running at once, and returns a list of results in the same order as funcs. If a call raises, its slot in the result list holds the exception object and the others still complete (do not cancel everything). limit < 1 must raise ValueError.\n\nThen explain why asyncio does not speed up CPU-bound work and what to use instead.",
+  "answer": "Wrap each call in `async with semaphore`, then use asyncio.gather(..., return_exceptions=True). gather returns results in argument order regardless of completion order, and return_exceptions=True puts exceptions in the result list instead of raising the first one while leaving siblings running.\n\n```python\nimport asyncio\n\nasync def bounded_gather(funcs, limit):\n    if limit < 1:\n        raise ValueError(\"limit must be >= 1\")\n    sem = asyncio.Semaphore(limit)\n\n    async def run(func):\n        async with sem:\n            return await func()\n\n    return await asyncio.gather(*(run(f) for f in funcs), return_exceptions=True)\n```\n\nCPU-bound work: asyncio is single-threaded cooperative multitasking; a coroutine only yields at await points, so a long computation blocks the whole event loop and nothing runs concurrently. Threads do not help either for pure-Python CPU work in standard CPython because the GIL lets one thread execute Python bytecode at a time (some C extensions such as NumPy release it). Use multiprocessing / concurrent.futures.ProcessPoolExecutor, or call loop.run_in_executor with a process pool from async code. Threads or asyncio are the right tool for waiting on I/O.\n\nPitfalls: creating 1,000 tasks is fine, but the semaphore is what bounds concurrency (not gather); with return_exceptions=True you must inspect results for exception instances; and asyncio.TaskGroup (3.11+) cancels siblings on the first error, a different policy and unavailable on 3.10.",
+  "key_concepts": [
+   "asyncio.Semaphore",
+   "asyncio.gather",
+   "return_exceptions",
+   "bounded concurrency",
+   "GIL",
+   "ProcessPoolExecutor",
+   "event loop blocking"
+  ],
+  "common_mistakes": [
+   "Processing in fixed batches (slowest item stalls the batch) instead of a semaphore",
+   "Using gather without return_exceptions so one failure hides other results",
+   "Claiming asyncio or threads speed up CPU-bound pure Python"
+  ],
+  "interview_style_note": "Bounds concurrency with a semaphore rather than batching, preserves order, keeps failures isolated, and correctly explains GIL versus event-loop limits.",
+  "sources": [],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import asyncio\n\nasync def bounded_gather(funcs, limit):\n    if limit < 1:\n        raise ValueError(\"limit must be >= 1\")\n    sem = asyncio.Semaphore(limit)\n\n    async def run(func):\n        async with sem:\n            return await func()\n\n    return await asyncio.gather(*(run(f) for f in funcs), return_exceptions=True)",
+   "test": "\nstate = {\"in_flight\": 0, \"max\": 0}\n\ndef make(i, yields, fail=False):\n    async def job():\n        state[\"in_flight\"] += 1\n        state[\"max\"] = max(state[\"max\"], state[\"in_flight\"])\n        try:\n            for _ in range(yields):\n                await asyncio.sleep(0)\n            if fail:\n                raise ValueError(\"job %d\" % i)\n            return i * 10\n        finally:\n            state[\"in_flight\"] -= 1\n    return job\n\nasync def scenario():\n    # varying durations so completion order differs from input order\n    funcs = [make(i, (10 - i) % 4 + 1, fail=(i == 4)) for i in range(10)]\n    return await bounded_gather(funcs, 3)\n\nres = asyncio.run(scenario())\nassert state[\"max\"] == 3\nassert state[\"in_flight\"] == 0\nassert len(res) == 10\nfor i, r in enumerate(res):\n    if i == 4:\n        assert isinstance(r, ValueError) and str(r) == \"job 4\"\n    else:\n        assert r == i * 10\n\n# limit larger than number of jobs: concurrency equals number of jobs\nstate.update(in_flight=0, max=0)\nres = asyncio.run(bounded_gather([make(i, 2) for i in range(4)], 100))\nassert state[\"max\"] == 4 and res == [0, 10, 20, 30]\n\n# limit 1 serialises\nstate.update(in_flight=0, max=0)\nres = asyncio.run(bounded_gather([make(i, 3) for i in range(5)], 1))\nassert state[\"max\"] == 1 and res == [0, 10, 20, 30, 40]\n\n# empty input and invalid limit\nassert asyncio.run(bounded_gather([], 2)) == []\ntry:\n    asyncio.run(bounded_gather([], 0))\nexcept ValueError:\n    pass\nelse:\n    raise AssertionError(\"expected ValueError\")\n",
+   "expected": []
+  },
+  "topic": null
+ },
+ {
+  "id": "P2-PY-07",
+  "domain": "Python",
+  "question_type": "coding",
+  "question": "Write pairwise_sq_dists(A, B) in NumPy, with no Python loops, where A has shape (n, d) and B has shape (m, d), returning an (n, m) matrix D with D[i, j] = sum_k (A[i,k] - B[j,k])**2. Use the expansion ||a-b||^2 = ||a||^2 + ||b||^2 - 2 a.b so that the work is a matrix product. Make sure the result is never negative. Also give the plain broadcasting version pairwise_sq_dists_broadcast(A, B) using A[:, None, :] - B[None, :, :], and explain the memory trade-off and the numerical issue with the expansion.\n\nExample: A = [[0,0],[1,1]], B = [[0,0],[3,4]] gives [[0, 25], [2, 13]].",
+  "answer": "The expansion version computes row norms of A and B, adds them with broadcasting (shapes (n,1) and (1,m)), and subtracts 2*A@B.T, which uses optimised BLAS. Rounding can make tiny true-zero or near-zero entries slightly negative, so clip at 0 (important if you later take a square root, which would give NaN). Centering both sets by a common mean first reduces cancellation when the data sit far from the origin, because distances are translation invariant.\n\n```python\nimport numpy as np\n\ndef pairwise_sq_dists(A, B):\n    A = np.asarray(A, dtype=float)\n    B = np.asarray(B, dtype=float)\n    mu = np.concatenate([A, B], axis=0).mean(axis=0)\n    A = A - mu\n    B = B - mu\n    a2 = np.einsum(\"ij,ij->i\", A, A)[:, None]\n    b2 = np.einsum(\"ij,ij->i\", B, B)[None, :]\n    D = a2 + b2 - 2.0 * (A @ B.T)\n    np.maximum(D, 0.0, out=D)\n    return D\n\ndef pairwise_sq_dists_broadcast(A, B):\n    A = np.asarray(A, dtype=float)\n    B = np.asarray(B, dtype=float)\n    diff = A[:, None, :] - B[None, :, :]\n    return (diff ** 2).sum(axis=-1)\n```\n\nMemory: the broadcast version materialises an (n, m, d) temporary, e.g. 5,000 x 5,000 x 128 float64 is about 25.6 GB, while the expansion needs only the (n, m) output plus small vectors. The broadcast form is exact and simplest for small inputs, or can be processed in chunks of rows of A. Numerical issue: when ||a||^2 and ||b||^2 are large and nearly equal, subtracting them cancels most significant digits (catastrophic cancellation), so close points can get inaccurate or slightly negative distances; hence the clip and the centering. For float32 inputs the error is much larger, so accumulate in float64 if accuracy matters.",
+  "key_concepts": [
+   "broadcasting",
+   "squared Euclidean distance expansion",
+   "matrix multiplication (BLAS)",
+   "catastrophic cancellation",
+   "memory footprint of temporaries",
+   "clipping negative values"
+  ],
+  "common_mistakes": [
+   "Taking sqrt of unclipped values and getting NaN",
+   "Using the broadcast version on large n, m, d and running out of memory",
+   "Forgetting the 2*A@B.T term's transpose or the (n,1)/(1,m) shapes"
+  ],
+  "interview_style_note": "Knows why the (n,m,d) temporary is costly, why the expansion can go slightly negative, and clips before any sqrt.",
+  "sources": [],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\ndef pairwise_sq_dists(A, B):\n    A = np.asarray(A, dtype=float)\n    B = np.asarray(B, dtype=float)\n    mu = np.concatenate([A, B], axis=0).mean(axis=0)\n    A = A - mu\n    B = B - mu\n    a2 = np.einsum(\"ij,ij->i\", A, A)[:, None]\n    b2 = np.einsum(\"ij,ij->i\", B, B)[None, :]\n    D = a2 + b2 - 2.0 * (A @ B.T)\n    np.maximum(D, 0.0, out=D)\n    return D\n\ndef pairwise_sq_dists_broadcast(A, B):\n    A = np.asarray(A, dtype=float)\n    B = np.asarray(B, dtype=float)\n    diff = A[:, None, :] - B[None, :, :]\n    return (diff ** 2).sum(axis=-1)",
+   "test": "\nimport numpy as np\n\ndef naive(A, B):\n    out = np.zeros((len(A), len(B)))\n    for i in range(len(A)):\n        for j in range(len(B)):\n            s = 0.0\n            for k in range(len(A[0])):\n                s += (A[i][k] - B[j][k]) ** 2\n            out[i, j] = s\n    return out\n\nA0 = [[0, 0], [1, 1]]\nB0 = [[0, 0], [3, 4]]\nassert np.allclose(pairwise_sq_dists(A0, B0), [[0, 25], [2, 13]])\nassert np.allclose(pairwise_sq_dists_broadcast(A0, B0), [[0, 25], [2, 13]])\n\nrng = np.random.default_rng(0)\nA = rng.normal(size=(7, 5))\nB = rng.normal(size=(4, 5))\nD = pairwise_sq_dists(A, B)\nassert D.shape == (7, 4)\nassert np.allclose(D, naive(A.tolist(), B.tolist()), atol=1e-9)\nassert np.allclose(D, pairwise_sq_dists_broadcast(A, B), atol=1e-9)\n\n# self distances: zero diagonal (within tolerance), symmetric, never negative\nS = pairwise_sq_dists(A, A)\nassert S.min() >= 0.0\nassert np.allclose(np.diag(S), 0.0, atol=1e-9)\nassert np.allclose(S, S.T)\n\n# data far from the origin: centering keeps the expansion accurate\nAf = A + 1e6\nDf = pairwise_sq_dists(Af, Af)\nassert Df.min() >= 0.0\nassert np.allclose(Df, S, atol=1e-4)\n\n# single dimension, one row each\nassert np.allclose(pairwise_sq_dists([[2.0]], [[5.0]]), [[9.0]])\n# inputs are not modified\nA_copy = A.copy()\npairwise_sq_dists(A, B)\nassert np.array_equal(A, A_copy)\n",
+   "expected": []
+  },
+  "topic": null
+ },
+ {
+  "id": "P2-PY-08",
+  "domain": "Python",
+  "question_type": "debugging",
+  "question": "An orders table has 4 rows, but after a left merge to attach prices the result has 6 rows and revenue is overstated:\n\norders (order_id, product_id): (1, \"A\"), (2, \"B\"), (3, \"A\"), (4, \"Z\")\nprices (product_id, price, effective_date): (\"A\", 10.0, 2026-01-01), (\"A\", 12.0, 2026-03-01), (\"B\", 5.0, 2026-01-01)\n\norders.merge(prices, on=\"product_id\", how=\"left\")   # 6 rows\n\nWrite attach_price(orders, prices) returning a tuple (result, n_unmatched). The result must have exactly one row per order, in the original order, with a price column using the most recent price for each product (NaN when the product has no price), and n_unmatched is the number of orders whose product was not found in prices. Use validate= so a duplicate-key problem fails loudly instead of silently multiplying rows, and indicator= to count unmatched orders. It must work on pandas 2.x and 3.x.",
+  "answer": "The key product_id is not unique in prices (two rows for \"A\"), so each order for A matches two price rows: 4 + 2 extra rows = 6. Fix the data before the merge: reduce prices to one row per key (latest effective_date), then merge with validate=\"many_to_one\", which raises pandas.errors.MergeError if the right side still has duplicate keys. indicator=True adds a _merge column (\"both\"/\"left_only\") that identifies unmatched orders.\n\n```python\nimport pandas as pd\n\ndef attach_price(orders, prices):\n    latest = (\n        prices.sort_values([\"product_id\", \"effective_date\"])\n        .drop_duplicates(\"product_id\", keep=\"last\")[[\"product_id\", \"price\"]]\n    )\n    out = orders.merge(\n        latest, on=\"product_id\", how=\"left\",\n        validate=\"many_to_one\", indicator=True,\n    )\n    n_unmatched = int((out[\"_merge\"] == \"left_only\").sum())\n    out = out.drop(columns=\"_merge\")\n    return out, n_unmatched\n```\n\nDiagnosis tools: prices[\"product_id\"].duplicated().sum() or prices.duplicated(\"product_id\", keep=False) to see offending keys; comparing len() before and after a merge; and validate=\"one_to_one\" / \"many_to_one\" / \"one_to_many\" to assert the expected cardinality. A left merge preserves the left frame's row order. Pitfalls: drop_duplicates without a sort keeps an arbitrary \"first\" row, not the newest; and dropping duplicates over all columns would not remove two prices for the same key. Whether the latest price is the correct business rule (versus the price as of the order date) is a separate question; here the task states latest.",
+  "key_concepts": [
+   "left merge row multiplication",
+   "duplicate keys",
+   "merge validate",
+   "merge indicator",
+   "drop_duplicates keep last",
+   "key cardinality"
+  ],
+  "common_mistakes": [
+   "Calling drop_duplicates on the merged result, which can remove legitimate repeat orders",
+   "Using drop_duplicates without sorting so the kept price is arbitrary",
+   "Not checking row counts before/after merges"
+  ],
+  "interview_style_note": "Identifies the one-to-many fan-out, fixes the data (not the symptom), and asserts cardinality with validate.",
+  "sources": [],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import pandas as pd\n\ndef attach_price(orders, prices):\n    latest = (\n        prices.sort_values([\"product_id\", \"effective_date\"])\n        .drop_duplicates(\"product_id\", keep=\"last\")[[\"product_id\", \"price\"]]\n    )\n    out = orders.merge(\n        latest, on=\"product_id\", how=\"left\",\n        validate=\"many_to_one\", indicator=True,\n    )\n    n_unmatched = int((out[\"_merge\"] == \"left_only\").sum())\n    out = out.drop(columns=\"_merge\")\n    return out, n_unmatched",
+   "test": "\nimport pandas as pd\nfrom pandas.errors import MergeError\n\norders = pd.DataFrame({\"order_id\": [1, 2, 3, 4], \"product_id\": [\"A\", \"B\", \"A\", \"Z\"]})\nprices = pd.DataFrame({\n    \"product_id\": [\"A\", \"A\", \"B\"],\n    \"price\": [10.0, 12.0, 5.0],\n    \"effective_date\": pd.to_datetime([\"2026-01-01\", \"2026-03-01\", \"2026-01-01\"]),\n})\n\n# the bug\nbad = orders.merge(prices, on=\"product_id\", how=\"left\")\nassert len(bad) == 6\n\n# validate catches it\ntry:\n    orders.merge(prices, on=\"product_id\", how=\"left\", validate=\"many_to_one\")\nexcept MergeError:\n    pass\nelse:\n    raise AssertionError(\"expected MergeError\")\n\n# the fix\nout, n_unmatched = attach_price(orders, prices)\nassert len(out) == len(orders) == 4\nassert out[\"order_id\"].tolist() == [1, 2, 3, 4]\nassert out[\"product_id\"].tolist() == [\"A\", \"B\", \"A\", \"Z\"]\nassert out.columns.tolist() == [\"order_id\", \"product_id\", \"price\"]\nvals = out[\"price\"].tolist()\nassert vals[:3] == [12.0, 5.0, 12.0]\nassert pd.isna(vals[3])\nassert n_unmatched == 1\n\n# unsorted input still picks the newest row\nshuffled = prices.iloc[[1, 2, 0]].reset_index(drop=True)\nout2, n2 = attach_price(orders, shuffled)\nassert out2[\"price\"].tolist()[:3] == [12.0, 5.0, 12.0] and n2 == 1\n\n# inputs are not mutated\nassert len(prices) == 3 and \"_merge\" not in orders.columns\n",
+   "expected": []
+  },
+  "topic": null
+ },
+ {
+  "id": "P2-PY-09",
+  "domain": "Python",
+  "question_type": "coding",
+  "question": "Given a sales DataFrame with columns category, product, revenue (a product can appear on several rows), write\n\ntop2_with_share(df, keep_ties=False)\n\nthat returns one row per (category, product) with total revenue, the top 2 products per category, and a column share = product revenue / total revenue of its whole category (computed over all products in the category, not just the two kept). Use named aggregation and groupby().transform. Tie policy: when keep_ties=False, break revenue ties by product name ascending so exactly 2 rows per category are returned; when keep_ties=True, return every product whose revenue rank (method=\"min\") is <= 2, so more than two rows are possible. Output columns: category, product, revenue, share, sorted by category asc, revenue desc, product asc, with a fresh RangeIndex. It must work on pandas 2.x and 3.x.",
+  "answer": "First collapse duplicates with groupby(...).agg(revenue=(\"revenue\",\"sum\")) (named aggregation). Compute share before filtering, using groupby(\"category\")[\"revenue\"].transform(\"sum\"), which returns a Series aligned to the rows. For the filter: with a deterministic tie-break, sort by category, revenue desc, product asc and take groupby(\"category\").head(2); with keep_ties, use rank(method=\"min\", ascending=False) <= 2 so tied products share a rank.\n\n```python\nimport pandas as pd\n\ndef top2_with_share(df, keep_ties=False):\n    totals = df.groupby([\"category\", \"product\"], as_index=False).agg(\n        revenue=(\"revenue\", \"sum\")\n    )\n    totals[\"share\"] = (\n        totals[\"revenue\"] / totals.groupby(\"category\")[\"revenue\"].transform(\"sum\")\n    )\n    order = [\"category\", \"revenue\", \"product\"]\n    asc = [True, False, True]\n    if keep_ties:\n        rank = totals.groupby(\"category\")[\"revenue\"].rank(method=\"min\", ascending=False)\n        kept = totals[rank <= 2]\n    else:\n        kept = totals.sort_values(order, ascending=asc).groupby(\"category\").head(2)\n    return kept.sort_values(order, ascending=asc).reset_index(drop=True)\n```\n\nWhy this shape: transform keeps the original row count, so shares are computed against the full category before top-N filtering; computing them after head(2) would give shares that sum to 1 per category and be wrong. nlargest per group or head(2) after an unstable sort leaves ties to chance, which is why the tie-break column is explicit. rank(method=\"min\") gives tied values the same lowest rank (1,2,2,4), so a three-way fight for second place returns all tied products. Pitfall: groupby.apply with a lambda is slower and its output index shape has changed across pandas versions, so prefer head/transform/rank. Floating-point shares should be compared with a tolerance.",
+  "key_concepts": [
+   "groupby named aggregation",
+   "groupby transform",
+   "rank method min",
+   "tie-breaking",
+   "head per group",
+   "share of total"
+  ],
+  "common_mistakes": [
+   "Computing the share after taking the top 2, so it is relative to the wrong total",
+   "Using nlargest/head after an unspecified sort so ties are arbitrary",
+   "Forgetting to aggregate duplicate product rows first"
+  ],
+  "interview_style_note": "Computes the share before filtering, makes tie handling an explicit documented choice, and avoids apply with ambiguous output shape.",
+  "sources": [],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import pandas as pd\n\ndef top2_with_share(df, keep_ties=False):\n    totals = df.groupby([\"category\", \"product\"], as_index=False).agg(\n        revenue=(\"revenue\", \"sum\")\n    )\n    totals[\"share\"] = (\n        totals[\"revenue\"] / totals.groupby(\"category\")[\"revenue\"].transform(\"sum\")\n    )\n    order = [\"category\", \"revenue\", \"product\"]\n    asc = [True, False, True]\n    if keep_ties:\n        rank = totals.groupby(\"category\")[\"revenue\"].rank(method=\"min\", ascending=False)\n        kept = totals[rank <= 2]\n    else:\n        kept = totals.sort_values(order, ascending=asc).groupby(\"category\").head(2)\n    return kept.sort_values(order, ascending=asc).reset_index(drop=True)",
+   "test": "\nimport pandas as pd\n\ndf = pd.DataFrame({\n    \"category\": [\"Books\", \"Books\", \"Books\", \"Books\", \"Books\", \"Toys\", \"Toys\"],\n    \"product\":  [\"A\", \"A\", \"B\", \"C\", \"D\", \"X\", \"Y\"],\n    \"revenue\":  [60, 40, 50, 50, 20, 30, 10],\n})\n\nout = top2_with_share(df)\nassert out.columns.tolist() == [\"category\", \"product\", \"revenue\", \"share\"]\nassert out[\"category\"].tolist() == [\"Books\", \"Books\", \"Toys\", \"Toys\"]\nassert out[\"product\"].tolist() == [\"A\", \"B\", \"X\", \"Y\"]          # B beats C on name\nassert out[\"revenue\"].tolist() == [100, 50, 30, 10]\nshares = out[\"share\"].tolist()\nexpected = [100 / 220, 50 / 220, 30 / 40, 10 / 40]\nassert all(abs(a - b) < 1e-12 for a, b in zip(shares, expected))\nassert out.index.tolist() == [0, 1, 2, 3]\n\ntied = top2_with_share(df, keep_ties=True)\nassert tied[\"product\"].tolist() == [\"A\", \"B\", \"C\", \"X\", \"Y\"]\nassert tied[\"revenue\"].tolist() == [100, 50, 50, 30, 10]\nassert abs(tied[\"share\"].tolist()[2] - 50 / 220) < 1e-12\nassert tied.index.tolist() == [0, 1, 2, 3, 4]\n\n# input not modified; single-product category\nassert df.columns.tolist() == [\"category\", \"product\", \"revenue\"] and len(df) == 7\none = top2_with_share(pd.DataFrame({\"category\": [\"K\"], \"product\": [\"P\"], \"revenue\": [5]}))\nassert one[\"product\"].tolist() == [\"P\"] and one[\"share\"].tolist() == [1.0]\n",
+   "expected": []
+  },
+  "topic": null
+ },
+ {
+  "id": "P2-PY-10",
+  "domain": "Python",
+  "question_type": "coding",
+  "question": "This function is correct but too slow on large lists:\n\ndef has_duplicates_quadratic(items):\n    for i in range(len(items)):\n        for j in range(i + 1, len(items)):\n            if items[i] == items[j]:\n                return True\n    return False\n\nRewrite it as has_duplicates(items) running in O(n) expected time for hashable items, and as has_duplicates_sorted(items) for items that are orderable but not hashable (e.g. lists). Prove the complexity claim without wall-clock timing: write a wrapper class that counts __eq__ calls (and __hash__ / __lt__ calls) and show that on 200 unique items the quadratic version makes n(n-1)/2 comparisons while the hash version makes at most 2n hash calls and fewer than n equality calls. Finally, when would sorting beat hashing?",
+  "answer": "Hashing: add each item to a set and stop when an add does not grow the set; each add costs O(1) expected, so O(n) total, with O(n) extra memory. Sorting: sort a copy (O(n log n) comparisons), then equal items must be adjacent, so one pass over neighbouring pairs finds them; this needs only orderable items, not hashable ones.\n\n```python\ndef has_duplicates_quadratic(items):\n    for i in range(len(items)):\n        for j in range(i + 1, len(items)):\n            if items[i] == items[j]:\n                return True\n    return False\n\ndef has_duplicates(items):\n    seen = set()\n    for x in items:\n        size = len(seen)\n        seen.add(x)\n        if len(seen) == size:\n            return True\n    return False\n\ndef has_duplicates_sorted(items):\n    ordered = sorted(items)\n    return any(a == b for a, b in zip(ordered, ordered[1:]))\n```\n\nSorting beats hashing when items are unhashable but orderable (lists, or objects with __lt__ but no usable __hash__), when memory is tight (an in-place sort of data you may reorder needs O(1) extra space versus the set's O(n)), when hashing is expensive or adversarially collision-prone, or when you need the duplicates grouped anyway. Hashing wins on raw asymptotics for hashable data: expected O(n) versus O(n log n). Caveats: \"O(n)\" for sets is expected-case and assumes a good hash; the quadratic version has early exit, so its worst case is the all-unique input. Items equal by == must hash equally for the set approach to be right (e.g. 1 and 1.0 count as duplicates).",
+  "key_concepts": [
+   "time complexity O(n^2) vs O(n)",
+   "hash set",
+   "sorting and adjacent comparison",
+   "operation counting",
+   "hashability",
+   "space-time trade-off"
+  ],
+  "common_mistakes": [
+   "Using `x in seen` followed by add, which hashes twice (still O(n) but doubles the work)",
+   "Calling list.count or `in` on a list inside a loop, which is still quadratic",
+   "Claiming hashing is always O(1) worst-case"
+  ],
+  "interview_style_note": "Backs the complexity claim with counted operations rather than timing and names real conditions where sorting is preferable.",
+  "sources": [],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "def has_duplicates_quadratic(items):\n    for i in range(len(items)):\n        for j in range(i + 1, len(items)):\n            if items[i] == items[j]:\n                return True\n    return False\n\ndef has_duplicates(items):\n    seen = set()\n    for x in items:\n        size = len(seen)\n        seen.add(x)\n        if len(seen) == size:\n            return True\n    return False\n\ndef has_duplicates_sorted(items):\n    ordered = sorted(items)\n    return any(a == b for a, b in zip(ordered, ordered[1:]))",
+   "test": "\nimport math\n\nclass Counted:\n    eq_calls = 0\n    hash_calls = 0\n    lt_calls = 0\n    def __init__(self, v):\n        self.v = v\n    def __eq__(self, other):\n        Counted.eq_calls += 1\n        return self.v == other.v\n    def __hash__(self):\n        Counted.hash_calls += 1\n        return hash(self.v)\n    def __lt__(self, other):\n        Counted.lt_calls += 1\n        return self.v < other.v\n\ndef reset():\n    Counted.eq_calls = Counted.hash_calls = Counted.lt_calls = 0\n\nn = 200\nunique = [Counted(i) for i in range(n)]\n\nreset()\nassert has_duplicates_quadratic(unique) is False\nassert Counted.eq_calls == n * (n - 1) // 2\n\nreset()\nassert has_duplicates(unique) is False\nassert Counted.hash_calls <= 2 * n\nassert Counted.eq_calls < n\n\nimport random\nshuffled = unique[:]\nrandom.Random(7).shuffle(shuffled)\nreset()\nassert has_duplicates_sorted(shuffled) is False\nassert Counted.lt_calls <= n * math.ceil(math.log2(n))\n\n# correctness on small cases, including a duplicate\ncases = [([], False), ([1], False), ([1, 2, 3], False), ([1, 2, 1], True),\n         ([5, 5], True), ([\"a\", \"b\", \"a\"], True), ([1, 1.0], True)]\nfor items, expected in cases:\n    assert has_duplicates_quadratic(items) is expected\n    assert has_duplicates(items) is expected\n    assert has_duplicates_sorted(items) is expected\n\n# unhashable but orderable items\nassert has_duplicates_sorted([[1, 2], [3], [1, 2]]) is True\nassert has_duplicates_sorted([[1, 2], [3]]) is False\ntry:\n    has_duplicates([[1], [2]])\nexcept TypeError:\n    pass\nelse:\n    raise AssertionError(\"lists are unhashable\")\n\n# input list is not reordered by the sorted version\ndata = [3, 1, 2, 1]\nhas_duplicates_sorted(data)\nassert data == [3, 1, 2, 1]\n",
+   "expected": []
+  },
+  "topic": null
+ },
+ {
+  "id": "P2-PY-11",
+  "domain": "Python",
+  "question_type": "coding",
+  "question": "An application writes lines like:\n\n2026-03-01T12:00:05Z ERROR svc=auth msg=\"token \\\"abc\\\" expired\" latency_ms=250\n2026-03-01T12:00:06Z INFO svc=api\n\nWrite parse_log(lines) returning (records, n_malformed) and to_jsonl(records) returning a string with one JSON object per line.\n\nFormat: an ISO-like UTC timestamp (YYYY-MM-DDTHH:MM:SSZ), one space-separated level among DEBUG, INFO, WARNING, ERROR, then zero or more key=value pairs. Values are either a bare token without spaces or a double-quoted string in which \\\" and \\\\ are escapes. Each record is {\"ts\", \"level\", \"fields\": {...}} where fields whose bare or quoted value is an integer (optional minus sign, digits only, bare form only) become int and the rest stay strings; repeated keys: last wins. Blank lines are ignored (not counted). Any other line, including an unterminated quote, an unknown level, or junk between pairs, is counted as malformed and skipped. Use a compiled regex with named groups.",
+  "answer": "Use one compiled regex for the line prefix (ts, level, rest) and a second compiled regex with named groups for a key=value pair, applied repeatedly with .match(rest, pos) so that any text that is not a valid pair (or whitespace) is detected as malformed rather than silently skipped, which findall/finditer would do. Unescape quoted values with a small re.sub.\n\n```python\nimport json\nimport re\n\nLINE_RE = re.compile(\n    r\"^(?P<ts>\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z)\"\n    r\"\\s+(?P<level>DEBUG|INFO|WARNING|ERROR)\"\n    r\"(?P<rest>(?:\\s.*)?)$\"\n)\nPAIR_RE = re.compile(\n    r'\\s*(?P<key>\\w+)=(?:\"(?P<quoted>(?:[^\"\\\\]|\\\\.)*)\"|(?P<bare>[^\\s\"]+))'\n)\nUNESCAPE_RE = re.compile(r'\\\\([\"\\\\])')\nINT_RE = re.compile(r\"-?\\d+\")\n\ndef _parse_fields(rest):\n    fields = {}\n    pos = 0\n    while pos < len(rest):\n        if rest[pos:].strip() == \"\":\n            break\n        m = PAIR_RE.match(rest, pos)\n        if m is None:\n            return None\n        if m.group(\"quoted\") is not None:\n            value = UNESCAPE_RE.sub(r\"\\1\", m.group(\"quoted\"))\n        else:\n            value = m.group(\"bare\")\n            if INT_RE.fullmatch(value):\n                value = int(value)\n        fields[m.group(\"key\")] = value\n        pos = m.end()\n        if pos < len(rest) and not rest[pos].isspace():\n            return None\n    return fields\n\ndef parse_log(lines):\n    records = []\n    malformed = 0\n    for line in lines:\n        line = line.rstrip(\"\\r\\n\")\n        if line.strip() == \"\":\n            continue\n        m = LINE_RE.match(line)\n        fields = _parse_fields(m.group(\"rest\")) if m else None\n        if fields is None:\n            malformed += 1\n            continue\n        records.append({\"ts\": m.group(\"ts\"), \"level\": m.group(\"level\"), \"fields\": fields})\n    return records, malformed\n\ndef to_jsonl(records):\n    return \"\\n\".join(json.dumps(r, sort_keys=True, ensure_ascii=False) for r in records)\n```\n\nDesign points: the pair regex uses an alternation of a quoted string (with escapes handled by (?:[^\"\\\\]|\\\\.)*) or a bare token, so quotes containing spaces and = work. Looping with match(rest, pos) enforces that the whole remainder is consumed; finditer would skip junk and accept corrupt lines. Reject a pair directly followed by a non-space character (for example a closing quote followed by text). Return a count instead of raising so one bad line does not abort a batch, but in production you would also log a few samples. json.dumps handles escaping on output; sort_keys makes output deterministic. Regex is fine for this flat format; for nested or evolving formats, prefer emitting JSON logs at the source.",
+  "key_concepts": [
+   "compiled regex",
+   "named groups",
+   "re.match with pos",
+   "escape handling in quoted values",
+   "malformed input accounting",
+   "JSON Lines",
+   "json.dumps"
+  ],
+  "common_mistakes": [
+   "Using findall/finditer so junk between pairs is silently ignored",
+   "A quoted-string pattern like \"[^\"]*\" that breaks on escaped quotes",
+   "Letting one bad line raise and abort the whole batch"
+  ],
+  "interview_style_note": "Validates the whole line instead of using finditer, handles escapes inside quotes, and counts malformed lines rather than crashing or silently dropping them.",
+  "sources": [],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import json\nimport re\n\nLINE_RE = re.compile(\n    r\"^(?P<ts>\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z)\"\n    r\"\\s+(?P<level>DEBUG|INFO|WARNING|ERROR)\"\n    r\"(?P<rest>(?:\\s.*)?)$\"\n)\nPAIR_RE = re.compile(\n    r'\\s*(?P<key>\\w+)=(?:\"(?P<quoted>(?:[^\"\\\\]|\\\\.)*)\"|(?P<bare>[^\\s\"]+))'\n)\nUNESCAPE_RE = re.compile(r'\\\\([\"\\\\])')\nINT_RE = re.compile(r\"-?\\d+\")\n\ndef _parse_fields(rest):\n    fields = {}\n    pos = 0\n    while pos < len(rest):\n        if rest[pos:].strip() == \"\":\n            break\n        m = PAIR_RE.match(rest, pos)\n        if m is None:\n            return None\n        if m.group(\"quoted\") is not None:\n            value = UNESCAPE_RE.sub(r\"\\1\", m.group(\"quoted\"))\n        else:\n            value = m.group(\"bare\")\n            if INT_RE.fullmatch(value):\n                value = int(value)\n        fields[m.group(\"key\")] = value\n        pos = m.end()\n        if pos < len(rest) and not rest[pos].isspace():\n            return None\n    return fields\n\ndef parse_log(lines):\n    records = []\n    malformed = 0\n    for line in lines:\n        line = line.rstrip(\"\\r\\n\")\n        if line.strip() == \"\":\n            continue\n        m = LINE_RE.match(line)\n        fields = _parse_fields(m.group(\"rest\")) if m else None\n        if fields is None:\n            malformed += 1\n            continue\n        records.append({\"ts\": m.group(\"ts\"), \"level\": m.group(\"level\"), \"fields\": fields})\n    return records, malformed\n\ndef to_jsonl(records):\n    return \"\\n\".join(json.dumps(r, sort_keys=True, ensure_ascii=False) for r in records)",
+   "test": "\nimport json\n\nlines = [\n    '2026-03-01T12:00:05Z ERROR svc=auth msg=\"token \\\\\"abc\\\\\" expired\" latency_ms=250',\n    '2026-03-01T12:00:06Z INFO svc=api',\n    '',\n    '   ',\n    '2026-03-01T12:00:07Z DEBUG',\n    'garbage line',\n    '2026-03-01T12:00:08Z TRACE svc=x',\n    '2026-03-01T12:00:09Z INFO msg=\"unterminated',\n    '2026-03-01T12:00:10Z INFO svc=a junk svc2=b',\n    '2026-03-01T12:00:11Z WARNING a=1 a=2 neg=-5 f=1.5 q=\"7\" path=\"C:\\\\\\\\tmp\" eq=\"x=y z\"',\n    '2026-03-01T12:00:12Z INFO msg=\"ok\"extra=1',\n    '2026-03-01 12:00:13 INFO svc=a',\n]\nrecords, bad = parse_log(lines)\nassert bad == 6, bad\nassert len(records) == 4\n\nr0, r1, r2, r3 = records\nassert r0 == {\"ts\": \"2026-03-01T12:00:05Z\", \"level\": \"ERROR\",\n              \"fields\": {\"svc\": \"auth\", \"msg\": 'token \"abc\" expired', \"latency_ms\": 250}}\nassert r1[\"fields\"] == {\"svc\": \"api\"}\nassert r2 == {\"ts\": \"2026-03-01T12:00:07Z\", \"level\": \"DEBUG\", \"fields\": {}}\nassert r3[\"level\"] == \"WARNING\"\nf = r3[\"fields\"]\nassert f[\"a\"] == 2 and f[\"neg\"] == -5 and f[\"f\"] == \"1.5\"\nassert f[\"q\"] == \"7\" and isinstance(f[\"q\"], str)       # quoted stays a string\nassert f[\"path\"] == \"C:\\\\tmp\"\nassert f[\"eq\"] == \"x=y z\"\n\nout = to_jsonl(records)\nrows = [json.loads(x) for x in out.split(\"\\n\")]\nassert rows == records\nassert len(out.split(\"\\n\")) == 4\nassert to_jsonl([]) == \"\"\n\n# empty input and trailing newlines\nassert parse_log([]) == ([], 0)\nrec, bad = parse_log([\"2026-03-01T00:00:00Z INFO k=v\\n\", \"2026-03-01T00:00:00Z INFO k=v\\r\\n\"])\nassert len(rec) == 2 and bad == 0 and rec[0] == rec[1]\n",
+   "expected": []
+  },
+  "topic": null
+ },
+ {
+  "id": "P2-PY-12",
+  "domain": "Python",
+  "question_type": "debugging",
+  "question": "A service copies a defaults dict per request, yet one request's change leaks into later ones:\n\nDEFAULTS = {\"retries\": 3, \"hosts\": [\"a\", \"b\"]}\ncfg = DEFAULTS.copy()\ncfg[\"hosts\"].append(\"c\")\nprint(DEFAULTS[\"hosts\"])    # ['a', 'b', 'c']  <- surprise\n\nExplain what .copy() did, fix it by writing make_config(defaults, **overrides) that returns an independent configuration (overrides applied on top, defaults never modified), and also say what is wrong with grid = [[0] * 3] * 3 and how to build a proper 3x3 grid. Explain how == differs from is, and what copy.deepcopy does with shared references and cycles.",
+  "answer": "dict.copy() (like list(x), x[:], copy.copy) is a shallow copy: it creates a new outer container but stores references to the same inner objects, so cfg[\"hosts\"] and DEFAULTS[\"hosts\"] are one list. Mutating through either name changes both; rebinding a key (cfg[\"retries\"] = 5) affects only the copy. copy.deepcopy recursively copies the contents, so the result shares nothing mutable with the original.\n\n== compares values (calls __eq__); is compares object identity. A deep copy is == to the original but not the same object, and neither are its inner lists.\n\n```python\nimport copy\n\ndef make_config(defaults, **overrides):\n    cfg = copy.deepcopy(defaults)\n    cfg.update(copy.deepcopy(overrides))\n    return cfg\n\ndef make_grid(rows, cols, fill=0):\n    return [[fill] * cols for _ in range(rows)]\n```\n\n[[0] * 3] * 3 repeats a reference to one inner list three times, so grid[0][0] = 1 changes every row. The comprehension creates a new inner list per row (and [fill] * cols is fine because it copies references to an immutable int; with a mutable fill it would alias again). deepcopy keeps a memo of objects already copied, so two references to one list stay two references to one (new) list, and a self-referencing list does not recurse forever. Pitfalls: deepcopy can be slow for big structures and fails or behaves oddly for objects holding locks, sockets or open files; also the overrides are deep-copied here so the caller cannot later mutate the config through its own argument. Don't assert `is` on small ints or strings: interning is an implementation detail.",
+  "key_concepts": [
+   "shallow copy",
+   "deepcopy",
+   "aliasing",
+   "== vs is",
+   "copy.deepcopy memo and cycles",
+   "list multiplication aliasing"
+  ],
+  "common_mistakes": [
+   "Thinking dict.copy() or list slicing copies nested objects",
+   "Using `is` to compare values (e.g. strings or small ints) and relying on interning",
+   "Building a 2D grid with list multiplication on the outer list"
+  ],
+  "interview_style_note": "Separates rebinding from mutation, spots the [[0]*n]*n trap, and avoids asserting identity of interned small values.",
+  "sources": [],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import copy\n\ndef make_config(defaults, **overrides):\n    cfg = copy.deepcopy(defaults)\n    cfg.update(copy.deepcopy(overrides))\n    return cfg\n\ndef make_grid(rows, cols, fill=0):\n    return [[fill] * cols for _ in range(rows)]",
+   "test": "\nimport copy\n\nDEFAULTS = {\"retries\": 3, \"hosts\": [\"a\", \"b\"]}\n\n# the bug: shallow copy shares the nested list\nshallow = DEFAULTS.copy()\nassert shallow == DEFAULTS and shallow is not DEFAULTS\nassert shallow[\"hosts\"] is DEFAULTS[\"hosts\"]\nshallow[\"hosts\"].append(\"c\")\nassert DEFAULTS[\"hosts\"] == [\"a\", \"b\", \"c\"]\nshallow[\"retries\"] = 9                      # rebinding does not leak\nassert DEFAULTS[\"retries\"] == 3\nDEFAULTS[\"hosts\"].remove(\"c\")\n\n# the fix\nextra = [\"x\"]\ncfg = make_config(DEFAULTS, retries=5, tags=extra)\nassert cfg == {\"retries\": 5, \"hosts\": [\"a\", \"b\"], \"tags\": [\"x\"]}\nassert cfg[\"hosts\"] == DEFAULTS[\"hosts\"] and cfg[\"hosts\"] is not DEFAULTS[\"hosts\"]\ncfg[\"hosts\"].append(\"c\")\nassert DEFAULTS == {\"retries\": 3, \"hosts\": [\"a\", \"b\"]}\nextra.append(\"y\")\nassert cfg[\"tags\"] == [\"x\"]                 # caller mutation does not leak in\n\n# grid aliasing\nbad = [[0] * 3] * 3\nbad[0][0] = 1\nassert bad == [[1, 0, 0]] * 3 and bad[0] is bad[1] is bad[2]\ngood = make_grid(3, 3)\ngood[0][0] = 1\nassert good == [[1, 0, 0], [0, 0, 0], [0, 0, 0]]\nassert good[0] is not good[1]\n\n# == versus is\na = [1, 2]\nb = [1, 2]\nassert a == b and a is not b\nc = a\nassert c is a\nc.append(3)\nassert a == [1, 2, 3]\n\n# deepcopy preserves sharing structure within the copy and handles cycles\nshared = [1]\nx = [shared, shared]\ny = copy.deepcopy(x)\nassert y == x and y[0] is y[1] and y[0] is not shared\ncyc = []\ncyc.append(cyc)\ncc = copy.deepcopy(cyc)\nassert cc is not cyc and cc[0] is cc\n\n# shallow copy of a list of lists\nrows = [[1], [2]]\nsh = rows[:]\nsh[0].append(99)\nassert rows[0] == [1, 99]\nsh.append([3])\nassert len(rows) == 2                       # outer container is independent\n",
+   "expected": []
+  },
+  "topic": null
+ }
+]

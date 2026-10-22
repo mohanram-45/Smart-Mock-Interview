@@ -1,0 +1,534 @@
+[
+ {
+  "plan_id": "B4-MLO-08-1",
+  "verdict": "correct",
+  "reasons": [
+   "All numbers reproduce on 3.10/3.11/3.13 (0.232, 12.43, 3.94, 0.0894/0.0457, 0.505/0.153); fenced code equals tested solution.",
+   "One factual slip in text introduced by the fix: a 50/50 binary feature does not take the no-interior-edge fallback.",
+   "Threshold sentence ambiguous about which bin count exceeds 0.1/0.25."
+  ],
+  "parts_answered": {
+   "implement psi": true,
+   "quantile edges from reference": true,
+   "out-of-range counted": true,
+   "empty bin no log(0)": true,
+   "why 200/200/40 is poor": true
+  },
+  "evidence": [
+   {
+    "claim": "PSI 12.4 (eps 1e-6), 3.9 (eps 1e-2); shift 0.232; null mean 0.089/sd 0.046 (10 bins), 0.50/0.15 (40 bins)",
+    "method": "executed",
+    "evidence": "3.10, 3.11, 3.13 identical output"
+   },
+   {
+    "claim": "null floor (B-1)(1/n+1/m)=0.09",
+    "method": "derivation",
+    "evidence": "9*(2/200)=0.09; sim 0.0894"
+   },
+   {
+    "claim": "edge cases: all-NaN raises ValueError; int input ok; inf ignored; n_bins=1 gives nonzero (0.004) due to fallback (misuse, harmless)",
+    "method": "executed",
+    "evidence": "edge1.py"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(a constant or binary feature)",
+    "problem": "np.quantile interpolates, so a 50/50 binary feature has edges [0, 0.5, 1] (verified) and keeps one interior edge; the fallback is reached only by a constant or by an extremely imbalanced binary feature (e.g. 9,999 zeros and one 1 gives edges [0, 1]).",
+    "replacement": "(a constant, or a binary feature so imbalanced that the interpolated quantiles stay at 0 and 1; a 50/50 binary feature keeps an interior edge at 0.5)"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "and here they would be exceeded with no change at all",
+    "problem": "At 10 bins/200 rows 0.25 is exceeded in <1% of null runs (0.1 in ~39%); only the 40-bin case exceeds both essentially always (2,000-run check: mean 0.50, >0.25 in 98%).",
+    "replacement": "and with 40 bins both would be exceeded in nearly every run with no change at all (a 2,000-run check gave 98% above 0.25)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short numpy function with ties/out-of-range/eps handling plus a noise-floor explanation; no deep multi-step reasoning.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "design + noise floor"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "tested code, checks, recipe"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "3-8, specific, all discussed; no change.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0045",
+   "same_intent": false
+  },
+  "code_findings": "Passed on 3.10.20, 3.11.17, 3.13.16. Extra: imbalanced binary identical -> 0.0, vs all ones -> 18.4; reference with inf ignored; int lists fine; all-NaN raises ValueError.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/pdf/2303.01227",
+    "status": "supported",
+    "evidence": "\"the critical value of the PSI decreases with sample size and increases with the number of groups\" (Du Pisanie & Visagie, at least for equal proportions); 0.1/0.25 attributed to Lewis."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "sources_to_drop": [],
+  "code_patch": null,
+  "config_findings": "no configs"
+ },
+ {
+  "plan_id": "B4-MLO-08-7",
+  "verdict": "correct",
+  "reasons": [
+   "All arithmetic recomputed: 20,000 rows, 80 MB vs 8 GB, 0.00054, 0.18, 417/h, 0.0217, 0.0396 correct; simulations agree (50 rows: 0.22, 417: 0.0213, 500v417: 0.038).",
+   "Design gap: retention vs label delay not reconciled."
+  ],
+  "parts_answered": {
+   "what to log": true,
+   "sampling": true,
+   "daily PSI per feature": true,
+   "hourly slice": true,
+   "label join": true,
+   "show sample big enough": true,
+   "security/retention": true
+  },
+  "evidence": [
+   {
+    "claim": "numbers",
+    "method": "executed",
+    "evidence": "python arithmetic + simulation sim2.py"
+   },
+   {
+    "claim": "sample-vs-full PSI near few 1e-4",
+    "method": "executed",
+    "evidence": "nested 1% of 2M: 0.00017"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "retained for a limited period",
+    "problem": "The question has labels arriving weeks later and security wanting less retention; the retention of the raw sample must exceed the label delay or the join has nothing to attach to. Not stated.",
+    "replacement": "retained for a limited period that must still exceed the longest label delay (weeks), or the join has nothing to attach to"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-part design with sizing, weights and privacy trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Exact streaming aggregates on frozen edges",
+    "tradeoff": "cheap/exact vs no raw values"
+   },
+   {
+    "decision": "Deterministic hash sampling with stored weight",
+    "tradeoff": "joinable and reproducible vs possible key correlation (validate)"
+   },
+   {
+    "decision": "Size via (B-1)(1/n+1/m)",
+    "tradeoff": "quantified vs rough at few rows/bin"
+   },
+   {
+    "decision": "100% capture of rare slice/errors",
+    "tradeoff": "power vs storage/privacy"
+   },
+   {
+    "decision": "Minimise/pseudonymise/retain per label delay",
+    "tradeoff": "privacy vs join and debugging"
+   },
+   {
+    "decision": "Validate sampler against short full logging",
+    "tradeoff": "temporary storage vs detecting bias"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "design and sizing"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "policy + validation"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "3-8, specific, all discussed; no change.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0026",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/pdf/2303.01227",
+    "status": "partially",
+    "evidence": "supports 0.1 convention and that critical values fall with sample size and rise with number of groups; does not give the (B-1)(1/n+1/m) formula (answer does not attribute it to the paper)."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "(B-1)(1/n+1/m) is a derivation (chi-square approximation), verified by simulation, not sourced"
+  ],
+  "sources_to_drop": [],
+  "code_patch": null,
+  "config_findings": "no configs"
+ },
+ {
+  "plan_id": "B4-MLO-11-1",
+  "verdict": "correct",
+  "reasons": [
+   "Code passes 3.10/3.11/3.13; fenced == solution; fail-closed on all bad inputs.",
+   "Approval flow asked explicitly but only covered as a separate role; automated gates and no-approval experimentation lane missing."
+  ],
+  "parts_answered": {
+   "identities/permissions": true,
+   "artifact integrity": true,
+   "dependency/image hygiene": true,
+   "approval flow": "partial->fixed",
+   "protects/does not protect": true
+  },
+  "evidence": [
+   {
+    "claim": "pickle can execute code; never unpickle untrusted/tamperable data",
+    "method": "doc",
+    "evidence": "docs.python.org pickle warning"
+   },
+   {
+    "claim": "pip hash-checking requires hashes for all dependencies",
+    "method": "doc",
+    "evidence": "\"Hashes are required for all dependencies.\""
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Moving the production alias is a separate role that requires an approval by someone other than the author.",
+    "problem": "Question asks for the approval flow without blocking experimentation; automated gates and the unapproved experiment lane are not stated.",
+    "replacement": "Moving the production alias is a separate role that requires an approval by someone other than the author, after automated gates (tests, dependency scan, model card) pass; experiments in the experiment namespace need no approval."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Whole-lifecycle security design with per-control limits.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Separate identities: experiments write only to an experiment namespace, only the pipeline identity registers versions, promotion is a distinct role with approval by someone other than the author, serving is read-only",
+    "tradeoff": "Friction for data scientists vs blast radius of a stolen notebook token; insider with promotion role remains"
+   },
+   {
+    "decision": "Record a content digest (ideally signed) at registration and verify it before deserialising, with the expected digest read from the registry, not from the bucket",
+    "tradeoff": "Stops swapped files but not a malicious artifact that was legitimately registered; trust moves to the registry"
+   },
+   {
+    "decision": "Treat model loading as untrusted code execution: data-only formats where possible, sandboxed loader (no egress, read-only fs, non-root)",
+    "tradeoff": "Format/framework support and some performance vs reduced blast radius; not a fix for backdoored models"
+   },
+   {
+    "decision": "Hashed lock files, internal mirror, base image pinned by digest, scheduled rebuild and scanning in CI",
+    "tradeoff": "Reproducibility vs patch lag and maintenance work; scanners miss unknown flaws and the model file"
+   },
+   {
+    "decision": "Approval flow: automated gates (tests, scan, model card) plus second-person approval only for moving the production alias; experiments need no approval",
+    "tradeoff": "Speed of iteration vs control on the one step that reaches production; reviewer fatigue"
+   },
+   {
+    "decision": "Immutable audit log of register/approve/alias-move linked to run, commit and data version, with alerts on alias moves",
+    "tradeoff": "Detection and attribution rather than prevention"
+   },
+   {
+    "decision": "State residual risk: poisoned data or backdoored behaviour passes integrity checks",
+    "tradeoff": "Needs behavioural validation and review, extra cost"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "controls"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "tested digest check"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "3-8, specific, all discussed; no change.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0017",
+   "same_intent": false
+  },
+  "code_findings": "Edge: empty file, whitespace/uppercase digest accepted; \"\", \"sha256:\" prefix, truncated digest -> ValueError; non-ASCII str -> TypeError and None -> AttributeError (all reject, fail closed); missing file FileNotFoundError; 5MB multi-chunk hash equals hashlib one-shot. Identical on 3.10/3.11/3.13.",
+  "sources_findings": [
+   {
+    "url": "https://docs.python.org/3/library/pickle.html",
+    "status": "supported",
+    "evidence": "\"Never unpickle data that could have come from an untrusted source, or that could have been tampered with.\"; \"Consider signing data with hmac\""
+   },
+   {
+    "url": "https://pip.pypa.io/en/stable/topics/secure-installs/",
+    "status": "supported",
+    "evidence": "\"Hashes are required for all dependencies.\""
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "typosquatting/mirror and base-image-digest claims are background practice"
+  ],
+  "sources_to_drop": [],
+  "code_patch": null,
+  "config_findings": "no configs"
+ },
+ {
+  "plan_id": "B4-MLO-12-7",
+  "verdict": "correct",
+  "reasons": [
+   "Round-2 baseline fix is correct (a one-week shift overlaps the incident).",
+   "Runbook lists model rollback first, which does nothing for an upstream column rename if the old model reads the same column."
+  ],
+  "parts_answered": {
+   "quantify impact": true,
+   "why slow": true,
+   "action items": true,
+   "runbook": true,
+   "what to avoid": true
+  },
+  "evidence": [
+   {
+    "claim": "SRE book: blameless assumption; monitoring failure is a postmortem trigger",
+    "method": "doc",
+    "evidence": "\"A monitoring failure (which usually implies manual incident discovery)\""
+   },
+   {
+    "claim": "Rules of ML rule 10 stale joined table",
+    "method": "doc",
+    "evidence": "\"Suppose that a particular table that is being joined is no longer being updated.\""
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "5. Mitigate: roll back, disable the feature",
+    "problem": "Rolling back the model does not fix a renamed upstream column unless the older model avoids that column; the actual fix is restoring/mapping the column.",
+    "replacement": "5. Mitigate: restore the renamed column or add a mapping (a model rollback helps only if the older model does not read it), disable the feature"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Structured postmortem/runbook scenario, no heavy calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "postmortem content"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "runbook/timeline"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "3-8, specific, all discussed; no change.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0013",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/postmortem-culture/",
+    "status": "supported",
+    "evidence": "blameless premise and trigger list quoted"
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule 10 stale joined table"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "sources_to_drop": [],
+  "code_patch": null,
+  "config_findings": "no configs"
+ },
+ {
+  "plan_id": "B4-MLO-13-3",
+  "verdict": "pass",
+  "reasons": [
+   "All arithmetic recomputed: 4.6; 1.38M/day; 3.64 (-20.9%); 2.275 (-50.5%); 2.875 (-37.5%); 1.40/1.08=1.296; 6.2 (+34.8%); 4.92 (+7.0%).",
+   "Concise 78 words, consistent with detailed; round-2 additions correct and hedged."
+  ],
+  "parts_answered": {
+   "baseline cost": true,
+   "cache saving": true,
+   "routing saving": true,
+   "attribution/budget/alerts": true,
+   "release checks": true
+  },
+  "evidence": [
+   {
+    "claim": "all unit figures",
+    "method": "executed",
+    "evidence": "python recompute"
+   },
+   {
+    "claim": "20% share blended +7%; ~85% share needed for +30%",
+    "method": "derivation",
+    "evidence": "0.8*4.6+0.2*6.2=4.92"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Unit arithmetic plus cost-governance reasoning.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "78 words"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "math + mechanism"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "controls list"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "3-8, specific, all discussed; no change.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0008",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://developers.openai.com/api/docs/guides/prompt-caching",
+    "status": "supported",
+    "evidence": "\"Cache reuse requires the entire rendered prefix to match.\"; stable content first, dynamic content at the end; longest matching cached prefix lookup"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "sources_to_drop": [],
+  "code_patch": null,
+  "config_findings": "no configs"
+ },
+ {
+  "plan_id": "B4-MLO-14-4",
+  "verdict": "correct",
+  "reasons": [
+   "IPW/positivity and position-propensity wording is now correct (arXiv 1608.04468 Sec 5.3 swap intervention; deterministic ranker acceptable).",
+   "Rule 37 is cited for logging serving-time features, which is Rule 29; Rule 37 is the same-example score comparison.",
+   "The attached arxiv abs URL does not state the propensity-estimation claim; the PDF does."
+  ],
+  "parts_answered": {
+   "logged-data explanations": true,
+   "order of checks": true,
+   "how to change offline eval": true
+  },
+  "evidence": [
+   {
+    "claim": "direct feedback loop quote and randomization mitigation",
+    "method": "paper",
+    "evidence": "\"A model may directly influence the selection of its own future training data.\""
+   },
+   {
+    "claim": "position propensities estimable by small swap experiment; ranker may be deterministic",
+    "method": "paper",
+    "evidence": "arXiv 1608.04468 PDF Sec 5.3 and Sec 2"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "Check features logged at serving time against offline values (Rules of Machine Learning rule 37)",
+    "problem": "Logging serving-time features is Rule 29; Rule 37 is measuring skew via the same example scoring identically.",
+    "replacement": "Log the features used at serving time (Rules of Machine Learning rule 29) and compare them, and the scores they produce, with the offline pipeline on the same examples (rule 37)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Needs multi-causal diagnosis of logged-data bias with ordering and counterfactual-evaluation knowledge.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "3-8, specific, all discussed; no change.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0009",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "supported",
+    "evidence": "quoted"
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "partially",
+    "evidence": "Rule 37 supports same-example skew check; logging serving features is Rule 29"
+   },
+   {
+    "url": "https://arxiv.org/abs/1608.04468",
+    "status": "partially",
+    "evidence": "abstract page gives title/framework only; swap-intervention propensity estimation is in the PDF"
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Unbiased Learning-to-Rank with Biased Feedback (PDF)",
+    "url": "https://arxiv.org/pdf/1608.04468",
+    "supports": "Position-bias propensities estimated from a small randomized swap intervention; logging ranker may be deterministic.",
+    "quote": "the intervention only needs to be applied on a small subset of the data",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [],
+  "sources_to_drop": [
+   "https://arxiv.org/abs/1608.04468"
+  ],
+  "code_patch": null,
+  "config_findings": "no configs"
+ }
+]

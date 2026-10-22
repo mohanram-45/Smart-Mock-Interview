@@ -1,0 +1,594 @@
+[
+ {
+  "plan_id": "B2-GEN-13-1",
+  "cell_id": "GEN-13",
+  "topic": "Serving, latency and cost (KV cache, batching, quantisation, caching, token budgets)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "coding",
+  "difficulty": "Medium",
+  "question": "A team hosting a decoder-only model wants a small capacity-planning helper. Write two functions.\n\nkv_cache_bytes(n_layers, n_kv_heads, head_dim, seq_len, batch=1, bytes_per_elem=2) returns the bytes needed to cache keys and values for `batch` sequences of `seq_len` tokens.\n\nmax_concurrent_sequences(total_bytes, weight_bytes, reserve_bytes, n_layers, n_kv_heads, head_dim, seq_len, bytes_per_elem=2) returns how many full-length sequences fit after subtracting the weights and a fixed reserve (activations, runtime overhead) from the device memory. It returns 0 if not even one fits, and raises ValueError if weights plus reserve already exceed total memory.\n\nValidate inputs: every size must be an int (bool and float rejected with TypeError) and positive (ValueError); reserve_bytes may be 0. Then, for a hypothetical 32-layer model with head_dim 128, 4,096-token sequences, an fp16 cache, an 80 GiB device, 14e9 bytes of weights and a 6 GiB reserve, report how many sequences fit with 32 KV heads versus 8 KV heads, and what that tells you about the design of the attention layer.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "The cache stores one key vector and one value vector per layer, per KV head, per token, so bytes = 2 x n_layers x n_kv_heads x head_dim x seq_len x batch x bytes_per_elem. It is linear in every factor, which is why long contexts and large batches are what exhaust memory, not the weights.\n\nFor the hypothetical model: per token the cache is 2 x 32 x 32 x 128 x 2 = 524,288 bytes (0.5 MiB) with 32 KV heads, so a 4,096-token sequence needs exactly 2 GiB. With 8 KV heads it is 128 KiB per token and 512 MiB per sequence.\n\nCapacity: usable = 80 GiB - 14e9 bytes (about 13.04 GiB) - 6 GiB, roughly 60.96 GiB. Floor division by 2 GiB gives 30 sequences with 32 KV heads; dividing by 512 MiB gives 121 with 8 KV heads. At 1,024 tokens the 8-head model would hold 487.\n\nWhat it tells you: the number of KV heads is a direct lever on concurrency. Multi-query and grouped-query attention share each key/value head across several query heads, which shrinks the cache and, per the GQA paper, is aimed at faster decoder inference while staying close to multi-head quality after uptraining. The trade-off is an architectural choice that must be made at training (or uptraining) time, and quality should be checked.\n\nPitfalls: the formula is an optimistic estimate. Real servers also lose memory to fragmentation, to activations, and to allocation granularity, and they may share prefix blocks between requests, so treat the result as a planning bound. Also state your units (GiB vs GB) and the cache dtype, which can differ from the weight dtype.",
+  "practical_answer": "```python\ndef _check_pos_int(name, value):\n    if isinstance(value, bool) or not isinstance(value, int):\n        raise TypeError(f\"{name} must be an int, got {type(value).__name__}\")\n    if value <= 0:\n        raise ValueError(f\"{name} must be positive, got {value}\")\n\n\ndef kv_cache_bytes(n_layers, n_kv_heads, head_dim, seq_len, batch=1, bytes_per_elem=2):\n    \"\"\"Bytes of K and V cache for `batch` sequences of `seq_len` tokens.\"\"\"\n    for name, value in ((\"n_layers\", n_layers), (\"n_kv_heads\", n_kv_heads),\n                        (\"head_dim\", head_dim), (\"seq_len\", seq_len),\n                        (\"batch\", batch), (\"bytes_per_elem\", bytes_per_elem)):\n        _check_pos_int(name, value)\n    # factor 2 = one tensor for keys, one for values\n    return 2 * n_layers * n_kv_heads * head_dim * seq_len * batch * bytes_per_elem\n\n\ndef max_concurrent_sequences(total_bytes, weight_bytes, reserve_bytes,\n                             n_layers, n_kv_heads, head_dim, seq_len,\n                             bytes_per_elem=2):\n    \"\"\"How many full-length sequences fit after weights and a fixed reserve.\"\"\"\n    for name, value in ((\"total_bytes\", total_bytes), (\"weight_bytes\", weight_bytes)):\n        _check_pos_int(name, value)\n    if isinstance(reserve_bytes, bool) or not isinstance(reserve_bytes, int):\n        raise TypeError(\"reserve_bytes must be an int\")\n    if reserve_bytes < 0:\n        raise ValueError(\"reserve_bytes must be non-negative\")\n    usable = total_bytes - weight_bytes - reserve_bytes\n    if usable < 0:\n        raise ValueError(\"weights plus reserve exceed total memory\")\n    per_seq = kv_cache_bytes(n_layers, n_kv_heads, head_dim, seq_len, 1, bytes_per_elem)\n    return usable // per_seq\n```\n\nUsage sketch for the scenario (checked by the tests below): kv_cache_bytes(32, 32, 128, 4096) == 2 * 2**30; max_concurrent_sequences(80 * 2**30, 14 * 10**9, 6 * 2**30, 32, 32, 128, 4096) == 30 and the same call with n_kv_heads=8 returns 121. Changing bytes_per_elem to 1 (an 8-bit cache) doubles the 8-head result to roughly 243 before any quality check, because the per-sequence cost halves.",
+  "key_concepts": [
+   "KV cache size",
+   "n_kv_heads vs attention heads",
+   "grouped-query attention",
+   "bytes per element",
+   "capacity planning",
+   "input validation"
+  ],
+  "common_mistakes": [
+   "Using the number of query/attention heads instead of the number of KV heads, which overstates the cache for grouped-query models",
+   "Forgetting the factor 2 for keys and values, or mixing GB (10^9) with GiB (2^30) when subtracting weights",
+   "Rounding up instead of flooring the number of sequences, or ignoring the reserve for activations and runtime overhead"
+  ],
+  "interview_style_note": "A strong candidate writes the formula from first principles, validates inputs, and ties the numbers to a design lever (fewer KV heads, shorter sequences, a lower-precision cache).",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "def _check_pos_int(name, value):\n    if isinstance(value, bool) or not isinstance(value, int):\n        raise TypeError(f\"{name} must be an int, got {type(value).__name__}\")\n    if value <= 0:\n        raise ValueError(f\"{name} must be positive, got {value}\")\n\n\ndef kv_cache_bytes(n_layers, n_kv_heads, head_dim, seq_len, batch=1, bytes_per_elem=2):\n    \"\"\"Bytes of K and V cache for `batch` sequences of `seq_len` tokens.\"\"\"\n    for name, value in ((\"n_layers\", n_layers), (\"n_kv_heads\", n_kv_heads),\n                        (\"head_dim\", head_dim), (\"seq_len\", seq_len),\n                        (\"batch\", batch), (\"bytes_per_elem\", bytes_per_elem)):\n        _check_pos_int(name, value)\n    # factor 2 = one tensor for keys, one for values\n    return 2 * n_layers * n_kv_heads * head_dim * seq_len * batch * bytes_per_elem\n\n\ndef max_concurrent_sequences(total_bytes, weight_bytes, reserve_bytes,\n                             n_layers, n_kv_heads, head_dim, seq_len,\n                             bytes_per_elem=2):\n    \"\"\"How many full-length sequences fit after weights and a fixed reserve.\"\"\"\n    for name, value in ((\"total_bytes\", total_bytes), (\"weight_bytes\", weight_bytes)):\n        _check_pos_int(name, value)\n    if isinstance(reserve_bytes, bool) or not isinstance(reserve_bytes, int):\n        raise TypeError(\"reserve_bytes must be an int\")\n    if reserve_bytes < 0:\n        raise ValueError(\"reserve_bytes must be non-negative\")\n    usable = total_bytes - weight_bytes - reserve_bytes\n    if usable < 0:\n        raise ValueError(\"weights plus reserve exceed total memory\")\n    per_seq = kv_cache_bytes(n_layers, n_kv_heads, head_dim, seq_len, 1, bytes_per_elem)\n    return usable // per_seq",
+   "test": "GiB = 1024 ** 3\n\n# hypothetical model: 32 layers, 32 KV heads (full multi-head), head_dim 128, fp16\nper_token = kv_cache_bytes(32, 32, 128, 1)\nassert per_token == 524288                      # 0.5 MiB per token\nassert kv_cache_bytes(32, 32, 128, 4096) == 2 * GiB\nassert kv_cache_bytes(32, 32, 128, 4096, batch=16) == 32 * GiB\n# grouped-query variant with 8 KV heads is 4x smaller\nassert kv_cache_bytes(32, 8, 128, 4096) == GiB // 2\n# 8-bit cache halves it\nassert kv_cache_bytes(32, 8, 128, 4096, bytes_per_elem=1) == GiB // 4\n\n# 80 GiB device, 14e9-byte weights (fp16 7B-parameter-class), 6 GiB reserve\nw = 14 * 10 ** 9\nassert max_concurrent_sequences(80 * GiB, w, 6 * GiB, 32, 32, 128, 4096) == 30\nassert max_concurrent_sequences(80 * GiB, w, 6 * GiB, 32, 8, 128, 4096) == 121\nassert max_concurrent_sequences(80 * GiB, w, 6 * GiB, 32, 8, 128, 1024) == 487\n\n# too long for any sequence -> 0, not an error\nassert max_concurrent_sequences(16 * GiB, w, 2 * GiB, 32, 32, 128, 4096) == 0\n\nfor bad in (\n    lambda: kv_cache_bytes(0, 8, 128, 10),\n    lambda: kv_cache_bytes(32, 8, 128, -1),\n    lambda: kv_cache_bytes(32, 8, 128, 10, bytes_per_elem=0),\n):\n    try:\n        bad()\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(\"expected ValueError\")\nfor bad in (lambda: kv_cache_bytes(32.0, 8, 128, 10), lambda: kv_cache_bytes(32, True, 128, 10)):\n    try:\n        bad()\n    except TypeError:\n        pass\n    else:\n        raise AssertionError(\"expected TypeError\")\nfor bad in (lambda: max_concurrent_sequences(10 * GiB, GiB, -1, 32, 8, 128, 10),):\n    try:\n        bad()\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(\"expected ValueError\")\ntry:\n    max_concurrent_sequences(10 * GiB, GiB, 1.5, 32, 8, 128, 10)\nexcept TypeError:\n    pass\nelse:\n    raise AssertionError(\"expected TypeError\")\nassert max_concurrent_sequences(80 * GiB, w, 6 * GiB, 32, 8, 128, 4096, bytes_per_elem=1) == 243\ntry:\n    max_concurrent_sequences(10 * GiB, 12 * GiB, 0, 32, 8, 128, 10)\nexcept ValueError:\n    pass\nelse:\n    raise AssertionError(\"expected ValueError\")\nprint(\"ok\")",
+   "expected": null
+  },
+  "sources": [
+   {
+    "title": "GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints",
+    "url": "https://arxiv.org/abs/2305.13245",
+    "supports": "Multi-query attention uses a single key-value head and speeds up decoder inference; grouped-query attention uses an intermediate number of key-value heads, and uptrained GQA models approach multi-head quality at speeds comparable to MQA."
+   }
+  ],
+  "related_domains": [
+   "Deep Learning"
+  ],
+  "tags": [
+   "kv-cache",
+   "capacity-planning",
+   "serving",
+   "gqa"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Nearest existing: smi-h0017 (cached causal attention implementation) which is about correctness of caching, not memory sizing; this one is capacity arithmetic with validation and a GQA comparison.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B2-GEN-13-2",
+  "cell_id": "GEN-13",
+  "topic": "Serving, latency and cost (KV cache, batching, quantisation, caching, token budgets)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "concept",
+  "difficulty": "Medium",
+  "question": "On a hypothetical accelerator with 300 TFLOP/s of usable fp16 compute and 2 TB/s of memory bandwidth, you serve a 7B-parameter fp16 model (14 GB of weights) with 32 layers, 32 KV heads and head_dim 128. A colleague says: \"Prefill is compute-bound and decode is memory-bound, so just keep growing the decode batch until the GPU is saturated.\" Using a back-of-envelope roofline, show why batch-1 decode is bandwidth-bound, how far batching really helps with 2,000-token contexts, and what the numbers say about prefill.",
+  "answer_set": "concise+detailed",
+  "answer": null,
+  "concise_answer": "Batch-1 decode does about 2 FLOPs per parameter (1.4e10) while reading all 14 GB of weights, roughly 1 FLOP/byte against a ridge point of 150 FLOP/byte, so it is bandwidth-bound: at least 7 ms per token versus about 0.05 ms of compute. Batching shares the weight read, but each sequence's own KV cache is read separately, so gains flatten. Prefill reuses each weight across thousands of tokens and is compute-bound.",
+  "detailed_answer": "Ridge point: 300e12 FLOP/s / 2e12 B/s = 150 FLOP per byte. A kernel below that intensity is limited by bandwidth, above it by compute.\n\nBatch-1 decode: each new token costs about 2 FLOPs per parameter, so 2 x 7e9 = 1.4e10 FLOP, while every weight (14e9 bytes) must be streamed from memory. Intensity is about 1 FLOP/byte. Time is at least 14e9 / 2e12 = 7 ms per token (about 143 tokens/s), whereas the arithmetic needs only 1.4e10 / 3e14, roughly 0.05 ms. The compute units are almost idle.\n\nBatching helps because the same weight read serves B sequences: weight intensity grows roughly as B, reaching the ridge near B = 150 if weights were the only traffic. But each sequence also has its own cache. At 0.5 MiB per token (2 x 32 x 32 x 128 x 2 bytes), a 2,000-token context is about 1.05e9 bytes, read on every step. Step time is then at least (14e9 + B x 1.05e9) / 2e12: B = 1 gives 7.5 ms (about 133 tokens/s), B = 16 gives 15.4 ms (about 1,040 tokens/s), B = 64 gives 40.6 ms (about 1,580 tokens/s). Compute at B = 64 is only about 3 ms, so the step is still bandwidth-bound, and throughput approaches a ceiling of 2e12 / 1.05e9, about 1,900 tokens/s. Per-token latency also grows with B.\n\nPrefill of the 2,000-token prompt costs about 2 x 7e9 x 2,000 = 2.8e13 FLOP, around 93 ms at peak, while the weights are read once for all 2,000 tokens: intensity in the thousands, so compute-bound. Prefill therefore dominates time to first token and decode dominates inter-token latency.\n\nConsequences: fewer KV heads, a lower-precision cache, or shorter contexts raise the batching ceiling; the exact numbers are idealised and real kernels reach only a fraction of peak.",
+  "practical_answer": null,
+  "key_concepts": [
+   "arithmetic intensity",
+   "roofline ridge point",
+   "prefill vs decode",
+   "weight reads amortised over batch",
+   "KV-cache bandwidth",
+   "time to first token"
+  ],
+  "common_mistakes": [
+   "Assuming batching amortises everything: weight reads are shared across the batch but each sequence's KV cache is read separately",
+   "Saying decode is memory-bound without a number, or computing FLOPs without checking bytes moved",
+   "Treating hypothetical peak figures as achievable; real kernels reach a fraction of peak compute and bandwidth"
+  ],
+  "interview_style_note": "A strong candidate computes FLOP/byte against the ridge point, notices that KV reads cap batching gains, and links prefill to TTFT and decode to per-token latency.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "Deep Learning"
+  ],
+  "tags": [
+   "roofline",
+   "prefill",
+   "decode",
+   "memory-bandwidth",
+   "batching"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Nearest existing: smi-g0026 (generic compression) and smi-h0017 (cached attention code); this is a roofline argument about why decode throughput saturates, with numbers.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B2-GEN-13-3",
+  "cell_id": "GEN-13",
+  "topic": "Serving, latency and cost (KV cache, batching, quantisation, caching, token budgets)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "coding",
+  "difficulty": "Medium",
+  "question": "Write a small simulator that compares static and continuous batching. All requests arrive at time 0 and are served in FIFO order; request i needs lengths[i] decode steps; one decode step costs one time unit regardless of batch size, and prefill is ignored.\n\nstatic_batching(lengths, max_batch): requests are taken in groups of max_batch; a group runs until its longest member finishes, and every member is returned when the group ends.\ncontinuous_batching(lengths, max_batch): at every step boundary free slots are filled from the queue in FIFO order, and a request leaves after exactly its own number of steps.\n\nBoth return {\"total_steps\": int, \"completion\": [finish time of each request, in input order]} and raise ValueError for a non-positive max_batch or a non-positive or non-int length. Run them on lengths = [2, 10, 3, 9] with max_batch = 2, and say what this model leaves out that matters for a real serving system.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Static batching groups requests and holds every member until the longest finishes. For [2, 10, 3, 9] with max_batch 2 the groups are (2, 10) and (3, 9): the first runs 10 steps, the second 9, so total_steps = 19 and completions are [10, 10, 19, 19], a mean of 14.5. The request needing 2 steps keeps its slot idle for 8 more steps.\n\nContinuous (iteration-level) batching refills a slot as soon as it frees. Request 0 finishes at step 2 and request 2 enters then and finishes at 5; request 3 enters at step 5 and finishes at 14; request 1 finishes at 10. Completions are [2, 10, 5, 14], total_steps = 14, mean 7.75. Useful work is 24 token-steps in both; slot utilisation is 24 / (19 x 2), about 63%, for static versus 24 / (14 x 2), about 86%, for continuous.\n\nIn this FIFO model no request finishes later under continuous batching: by induction, a request's start time is no later than its static group's start, because every request in earlier static groups has already finished by then. The advantage grows with output-length variance and vanishes with equal lengths.\n\nWhat the model leaves out: per-step time increases with batch size (more KV to read, as in a bandwidth-bound decode), so a fuller batch can raise inter-token latency for requests already running; prefill work competes with decode steps and may stall them unless it is chunked or scheduled separately; admission is limited by KV-cache memory, not by a fixed slot count; real arrivals are staggered, so queueing and fairness policies matter; and preemption or eviction may be needed when memory runs out. The throughput gain is real in many setups, but the latency trade-off must be measured, not assumed.",
+  "practical_answer": "```python\nimport heapq\n\n\ndef _validate(lengths, max_batch):\n    if isinstance(max_batch, bool) or not isinstance(max_batch, int) or max_batch <= 0:\n        raise ValueError(\"max_batch must be a positive int\")\n    for n in lengths:\n        if isinstance(n, bool) or not isinstance(n, int) or n <= 0:\n            raise ValueError(\"every output length must be a positive int\")\n\n\ndef static_batching(lengths, max_batch):\n    \"\"\"FIFO groups of max_batch; a group runs for its longest request and\n    every member is returned when the group ends. Time unit = one decode step.\"\"\"\n    _validate(lengths, max_batch)\n    done, t = [], 0\n    for i in range(0, len(lengths), max_batch):\n        group = lengths[i:i + max_batch]\n        t += max(group)\n        done.extend([t] * len(group))\n    return {\"total_steps\": t, \"completion\": done}\n\n\ndef continuous_batching(lengths, max_batch):\n    \"\"\"FIFO admission at step boundaries: a request enters the moment a slot\n    frees and leaves after exactly its own number of steps.\"\"\"\n    _validate(lengths, max_batch)\n    active = []            # min-heap of finish times of running requests\n    done, last_start = [], 0\n    for n in lengths:\n        start = 0\n        if len(active) >= max_batch:\n            start = heapq.heappop(active)\n        start = max(start, last_start)   # keep FIFO order of admissions\n        last_start = start\n        finish = start + n\n        heapq.heappush(active, finish)\n        done.append(finish)\n    return {\"total_steps\": max(done) if done else 0, \"completion\": done}\n```\n\nHand check used by the tests: static_batching([2, 10, 3, 9], 2) returns total_steps 19 and completion [10, 10, 19, 19]; continuous_batching gives total_steps 14 and completion [2, 10, 5, 14]. The tests also confirm, on 300 seeded random workloads, that continuous completions are never later than static ones and respect the work-conservation lower bound ceil(sum(lengths) / max_batch).",
+  "key_concepts": [
+   "static vs continuous batching",
+   "iteration-level scheduling",
+   "slot utilisation",
+   "head-of-line waiting",
+   "mean completion time",
+   "simulation limits"
+  ],
+  "common_mistakes": [
+   "Believing continuous batching speeds up every workload; with equal output lengths the two schedules are identical",
+   "Counting the batch as finished when the first request finishes, or releasing static-batch results early",
+   "Ignoring that in a real system per-step time grows with batch size and KV memory, not slot count, limits admission"
+  ],
+  "interview_style_note": "A strong candidate reproduces the hand-checkable numbers, explains where static batching wastes slots, and names what a simulator hides.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import heapq\n\n\ndef _validate(lengths, max_batch):\n    if isinstance(max_batch, bool) or not isinstance(max_batch, int) or max_batch <= 0:\n        raise ValueError(\"max_batch must be a positive int\")\n    for n in lengths:\n        if isinstance(n, bool) or not isinstance(n, int) or n <= 0:\n            raise ValueError(\"every output length must be a positive int\")\n\n\ndef static_batching(lengths, max_batch):\n    \"\"\"FIFO groups of max_batch; a group runs for its longest request and\n    every member is returned when the group ends. Time unit = one decode step.\"\"\"\n    _validate(lengths, max_batch)\n    done, t = [], 0\n    for i in range(0, len(lengths), max_batch):\n        group = lengths[i:i + max_batch]\n        t += max(group)\n        done.extend([t] * len(group))\n    return {\"total_steps\": t, \"completion\": done}\n\n\ndef continuous_batching(lengths, max_batch):\n    \"\"\"FIFO admission at step boundaries: a request enters the moment a slot\n    frees and leaves after exactly its own number of steps.\"\"\"\n    _validate(lengths, max_batch)\n    active = []            # min-heap of finish times of running requests\n    done, last_start = [], 0\n    for n in lengths:\n        start = 0\n        if len(active) >= max_batch:\n            start = heapq.heappop(active)\n        start = max(start, last_start)   # keep FIFO order of admissions\n        last_start = start\n        finish = start + n\n        heapq.heappush(active, finish)\n        done.append(finish)\n    return {\"total_steps\": max(done) if done else 0, \"completion\": done}",
+   "test": "import random\n\nlengths = [2, 10, 3, 9]\ns = static_batching(lengths, 2)\nc = continuous_batching(lengths, 2)\nassert s == {\"total_steps\": 19, \"completion\": [10, 10, 19, 19]}\nassert c == {\"total_steps\": 14, \"completion\": [2, 10, 5, 14]}\nassert sum(s[\"completion\"]) / 4 == 14.5 and sum(c[\"completion\"]) / 4 == 7.75\n\n# equal lengths: no difference\nassert static_batching([5] * 6, 3) == continuous_batching([5] * 6, 3)\n# empty input and a batch larger than the workload\nassert static_batching([], 4)[\"total_steps\"] == 0\nassert continuous_batching([], 4)[\"total_steps\"] == 0\nassert continuous_batching([3, 4], 8)[\"completion\"] == [3, 4]\n\n# properties on seeded random workloads\nrng = random.Random(0)\nfor _ in range(300):\n    n = rng.randint(1, 40)\n    b = rng.randint(1, 8)\n    ls = [rng.randint(1, 60) for _ in range(n)]\n    s, c = static_batching(ls, b), continuous_batching(ls, b)\n    # no request finishes later under continuous batching in this FIFO model\n    assert all(ci <= si for ci, si in zip(c[\"completion\"], s[\"completion\"]))\n    # lower bounds: work conservation and the longest request\n    assert c[\"total_steps\"] >= -(-sum(ls) // b) and c[\"total_steps\"] >= max(ls)\n    assert all(ci >= li for ci, li in zip(c[\"completion\"], ls))\n\nfor bad in (lambda: static_batching([1, 0], 2), lambda: continuous_batching([1], 0),\n            lambda: continuous_batching([1.5], 2)):\n    try:\n        bad()\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(\"expected ValueError\")\nprint(\"ok\")",
+   "expected": null
+  },
+  "sources": [],
+  "related_domains": [],
+  "tags": [
+   "continuous-batching",
+   "scheduling",
+   "simulation",
+   "throughput"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Nearest existing: smi-h0028 (bounded async concurrency) and smi-h0026 (batched generator) are generic Python; this is an LLM-serving scheduling model with throughput versus latency reasoning.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B2-GEN-13-4",
+  "cell_id": "GEN-13",
+  "topic": "Serving, latency and cost (KV cache, batching, quantisation, caching, token budgets)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "A chat feature sends about 3,000-token prompts and gets about 400-token answers. Measured per request: 0.2 s queueing, 0.3 s prefill, 0.1 s network, then 25 ms for each generated token after the first. Ops proposes raising concurrency from 16 to 32 streams per GPU; a load test says per-token time becomes 40 ms (assume queueing and prefill are unchanged). Compute time to first token and total latency before and after, and the per-GPU token throughput. Then decide whether to ship the change for (a) the streamed chat UI and (b) a nightly job that needs the full JSON answer, and say which latency metric you would put the SLO on in each case.",
+  "answer_set": "single",
+  "answer": "Before: TTFT = 0.2 + 0.3 + 0.1 = 0.6 s. Total = 0.6 + 399 x 0.025 = 10.575 s, about 10.6 s. Throughput per GPU = 16 streams / 0.025 s = 640 tokens/s.\nAfter: TTFT is still 0.6 s (by assumption). Total = 0.6 + 399 x 0.04 = 16.56 s. Throughput = 32 / 0.04 = 800 tokens/s. So doubling streams buys only 1.25x throughput while per-token time rises by 60% and a 400-token answer takes about 6 s longer.\n\n(a) Streamed chat: the user feels TTFT first, then the pace of text. 25 ms per token is 40 tokens/s and 40 ms is 25 tokens/s; both may be faster than most people read, but this must be tested with real users. If the p95 inter-token latency (and the longest stall, not the mean) stays under your threshold and TTFT does not rise under the heavier load, shipping is reasonable and cuts cost per token. The catch is that real TTFT usually degrades as queues build at higher utilisation, which the stated assumption hides, so re-measure it. SLO: p95 TTFT plus p95 inter-token latency.\n\n(b) Nightly JSON job: nobody watches the stream, nothing is shown until the answer is complete and parsed, and what matters is finishing the whole batch within the window at the lowest cost. A 16.6 s versus 10.6 s per request is acceptable if throughput is what you buy. Even larger batches or a separate pool tuned for throughput may be better. SLO: job completion time and cost per successful output; per-request latency only as a loose cap.\n\nCommon error: one pool and one metric for both workloads. Splitting traffic classes (interactive pool tuned for TTFT/ITL, batch pool tuned for throughput) is often the cleaner design.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "time to first token",
+   "inter-token latency",
+   "total latency",
+   "throughput vs latency trade-off",
+   "tail percentiles",
+   "streaming vs non-streaming"
+  ],
+  "common_mistakes": [
+   "Reporting a single average latency, which hides time to first token, per-token pace and tail stalls",
+   "Assuming doubling concurrency doubles throughput; here 2x streams gives only 1.25x tokens/s",
+   "Putting the same SLO on a streamed UI and a batch job"
+  ],
+  "interview_style_note": "A strong candidate separates what a streaming user feels (TTFT and smooth pace) from what a machine consumer needs (total latency or cost per token) and does the arithmetic correctly.",
+  "code": null,
+  "sources": [],
+  "related_domains": [],
+  "tags": [
+   "latency",
+   "ttft",
+   "inter-token-latency",
+   "throughput"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Nearest existing: smi-j0027 (context token budget) and smi-h0035 (A/B sizing); this one is latency decomposition and the batching throughput/latency trade-off.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B2-GEN-13-5",
+  "cell_id": "GEN-13",
+  "topic": "Serving, latency and cost (KV cache, batching, quantisation, caching, token budgets)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "You quantise a 13B-parameter model's weights from fp16 to 4-bit (group size 128, one fp16 scale per group) so it fits a smaller GPU. The team reports the aggregate benchmark score dropped by a margin they call negligible, yet support reports wrong digits in long extracted tables and occasional broken JSON. (a) How much weight memory does this save, and what does it not save? (b) How do weight-only and weight-plus-activation quantisation differ in speed benefit and quality risk? (c) What checks would you run before approving the change?",
+  "answer_set": "single",
+  "answer": "(a) fp16 weights: 13e9 x 2 bytes = 26 GB. Raw 4-bit: 6.5 GB. One fp16 scale per 128 weights adds 16/128 = 0.125 bits per weight, so about 4.125 bits and roughly 6.7 GB (a stored zero-point per group would add more). So the saving is close to, but not exactly, 4x. It does not shrink the KV cache or activations, which stay in their own precision unless you quantise them separately, so long-context concurrency may still be limited by cache memory.\n\n(b) Weight-only schemes keep activations in higher precision and dequantise weights on the fly. They mainly help when decode is memory-bandwidth-bound, because fewer bytes are read per token; they help less in compute-bound prefill, where the matrix multiplies often still run at higher precision. Weight-plus-activation schemes also quantise activations so low-precision matrix-multiply hardware can speed up compute-bound work too, but activations often have a wide dynamic range with outlier channels, so these schemes are typically harder to keep accurate and need more careful calibration. Exact behaviour is model-, kernel- and hardware-dependent.\n\n(c) An average score can hide tail damage: errors in digits, long-range copying and strict formatting are exactly what a coarse benchmark may not exercise. Before approval: build a task-specific suite from real traffic (table extraction exact-match, numeric accuracy, JSON validity rate, long inputs, other languages); run the fp16 and 4-bit models on identical prompts and compare paired per-item outcomes with confidence intervals, not two averages; check output divergence at long lengths; use calibration data that resembles production; consider keeping the most sensitive layers at higher precision; and roll out behind a canary with the fp16 model as fallback and monitoring of parse failures.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "weight-only quantisation",
+   "group-wise scales",
+   "activation quantisation",
+   "KV cache unaffected",
+   "task-specific regression checks",
+   "outlier sensitivity"
+  ],
+  "common_mistakes": [
+   "Saying 4-bit gives exactly a 4x saving; group scales (and zero points, if used) add overhead",
+   "Assuming weight quantisation shrinks the KV cache or activations",
+   "Approving on an aggregate benchmark average instead of the failure modes users actually hit"
+  ],
+  "interview_style_note": "A strong candidate does the memory arithmetic, distinguishes memory-bound from compute-bound benefits, and designs task-level regression checks rather than trusting an average.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "Deep Learning"
+  ],
+  "tags": [
+   "quantisation",
+   "weight-only",
+   "evaluation",
+   "memory"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Nearest existing: smi-g0026 (generic shrink-and-speed walk-through); this one is a specific LLM quantisation scenario with arithmetic and a quality-check design.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B2-GEN-13-6",
+  "cell_id": "GEN-13",
+  "topic": "Serving, latency and cost (KV cache, batching, quantisation, caching, token budgets)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Hard",
+  "question": "Your support assistant has a response cache keyed on embedding similarity: if a new query has cosine similarity of at least 0.92 to a cached query, the cached answer is returned and the model is skipped. It serves 30% of 1,000,000 daily queries; a human reviews a random sample of 500 cache hits and finds 10 wrong answers. (a) Estimate daily wrong answers with a rough 95% interval. (b) Name the failure modes that tuning the threshold cannot remove (tenants, personal data, staleness, near-miss questions). (c) Redesign the cache key and invalidation, and say when you would not cache at all.",
+  "answer_set": "single",
+  "answer": "(a) 300,000 hits per day x 2% = 6,000 wrong answers. With 10 of 500 observed, a Wilson 95% interval for the hit error rate is roughly 1.1% to 3.6%, i.e. about 3,300 to 10,900 wrong answers per day. Even a modest-looking 2% is thousands of bad answers at this volume, and the sample is small enough that the rate is not pinned down.\n\n(b) A similarity threshold cannot remove: (1) near-miss questions, since embeddings capture topic more than exact constraints, so \"cancel my order\" and \"cancel my subscription\", or \"30 days\" versus \"60 days\", can score very close; (2) cross-tenant leakage, if tenant A's answer, which may contain tenant-specific policy, is returned to tenant B; (3) personal or session context: an answer built from this customer's account must never be served to others; (4) staleness: the policy, the documents, the prompt template or the model changed after the entry was written; (5) locale and permission differences.\n\n(c) Redesign: partition first, then match. Make the cache key an exact tuple of tenant, locale, permission scope, prompt-template version, model version and corpus or document version; run similarity search only inside that partition. Cache only answers derived from non-personal, retrieved public content, and tag each entry with the document IDs and versions it used so that editing a document invalidates its entries; add a TTL as a backstop. Add a cheap guard before serving a hit, for example requiring that numbers, product names and negations match the query, or a lightweight verifier. Start with an exact-match cache (normalised query), which has no near-miss errors, and add the semantic layer only if the measured wrong-hit rate is acceptable. Run in shadow mode first (compute the answer anyway and compare) and keep monitoring the wrong-hit rate with confidence intervals.\n\nDo not cache when the answer depends on user data, live state (order status, stock), or tool calls, for high-stakes domains where one wrong answer is costly, or when hit rates are low enough that the risk outweighs the saving.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "semantic cache false hits",
+   "cache key partitioning",
+   "tenant isolation",
+   "invalidation by version",
+   "Wilson interval",
+   "exact-match baseline"
+  ],
+  "common_mistakes": [
+   "Treating a higher similarity threshold as a complete fix; similar wording can differ in one critical entity, number or negation",
+   "Caching answers that used user-specific data or tool calls, so one user's answer is served to another",
+   "Ignoring prompt, model and document versions, so a cache keeps serving answers from before a policy change"
+  ],
+  "interview_style_note": "A strong candidate quantifies the wrong-hit rate with an interval, separates correctness risk from cross-tenant leakage risk, and designs the key and invalidation rather than only tuning a threshold.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "Security"
+  ],
+  "tags": [
+   "semantic-cache",
+   "tenant-isolation",
+   "staleness",
+   "cache-key-design"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Nearest existing: smi-j0040 and smi-j0020 (multi-tenant vector index design for retrieval); this one is about caching generated answers and the wrong-answer and leakage risks.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B2-GEN-13-7",
+  "cell_id": "GEN-13",
+  "topic": "Serving, latency and cost (KV cache, batching, quantisation, caching, token budgets)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "A serving stack reserves a contiguous KV-cache region for the maximum 4,096-token length for every request at admission. The model has 32 layers, 8 KV heads, head_dim 128, an fp16 cache, and 60 GiB is available for cache. In your traffic a typical request ends at about 700 tokens (prompt plus output). (a) How many concurrent requests fit, and what fraction of the reserved memory is actually used? (b) A paged scheme allocates 16-token blocks on demand: roughly how many requests fit and how much is wasted per request? (c) Why will the real throughput gain be smaller than the capacity ratio, and what else does block-level allocation enable?",
+  "answer_set": "single",
+  "answer": "Per token the cache is 2 x 32 x 8 x 128 x 2 bytes = 128 KiB.\n\n(a) Reserving 4,096 tokens costs 512 MiB per request, so 60 GiB / 512 MiB = 120 concurrent requests. A 700-token request really uses 87.5 MiB, about 17% of its reservation; the other 83% is reserved but idle.\n\n(b) With 16-token blocks, 700 tokens need ceil(700 / 16) = 44 blocks = 704 tokens = 88 MiB, wasting only 4 tokens (0.5 MiB) in the last block; the worst case is 15 tokens (1.9 MiB). 60 GiB / 88 MiB gives about 698 requests, roughly 5.8 times more, under the assumption that every request is 700 tokens.\n\n(c) Capacity is not throughput. Each decode step still reads every active sequence's cache and all weights, so step time grows with batch size and, as in a bandwidth-bound decode, tokens per second flatten well before the memory limit. Longer-tail length distributions reduce the ratio, and block tables add some indirection overhead. Requests that run out of free blocks mid-generation need preemption (swap or recompute), so a scheduler policy is required. Capacity gains also show up as queueing delay avoided when load is high, which can improve latency even if peak throughput barely moves.\n\nOther benefits of block-level allocation: blocks can be shared across sequences with a common prefix or across parallel samples, with copy-on-write on divergence, avoiding duplicated cache. The vLLM paper describes KV cache memory as large and dynamically growing, says inefficient management wastes it through fragmentation and redundant duplication and limits the batch size, and presents paging-inspired allocation as the remedy, with the authors reporting near-zero waste. Treat the 5.8x figure here as an idealised capacity ratio for this hypothetical workload.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "contiguous reservation",
+   "internal fragmentation",
+   "block allocation",
+   "KV memory per token",
+   "copy-on-write sharing",
+   "capacity vs throughput"
+  ],
+  "common_mistakes": [
+   "Equating more concurrent sequences with proportionally more tokens per second; decode steps are still limited by bandwidth and compute",
+   "Forgetting that on-demand allocation needs a policy when memory runs out mid-generation (preempt, swap or recompute)",
+   "Using the average length for every request; real length distributions have a long tail"
+  ],
+  "interview_style_note": "A strong candidate computes both capacities, names internal fragmentation, and explains why capacity gains translate only partly into throughput.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Efficient Memory Management for Large Language Model Serving with PagedAttention",
+    "url": "https://arxiv.org/abs/2309.06180",
+    "supports": "Abstract: per-request KV cache memory is huge and grows and shrinks dynamically; when managed inefficiently it can be wasted by fragmentation and redundant duplication, limiting batch size; PagedAttention is inspired by OS virtual memory and paging; the authors report near-zero waste in their system."
+   }
+  ],
+  "related_domains": [
+   "Operating Systems"
+  ],
+  "tags": [
+   "paged-attention",
+   "kv-cache",
+   "memory-fragmentation",
+   "serving"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Nearest existing: smi-j0037 (vector-index memory estimate) and smi-h0017 (cache implementation); this one is KV allocation and fragmentation arithmetic.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B2-GEN-14-1",
+  "cell_id": "GEN-14",
+  "topic": "Hallucination, grounding and long context",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "concept",
+  "difficulty": "Medium",
+  "question": "A model asked for references on a niche topic returns three plausible-looking papers with authors, titles, venues and years; two of them do not exist. A colleague asks: \"It clearly knows how to say 'I don't know' in other chats, so why did training leave it guessing here?\" Describe how the pretraining objective and the way answers are typically scored encourage confident guessing, why facts seen once or never are especially at risk, and which part of the problem retrieval can and cannot fix.",
+  "answer_set": "single",
+  "answer": "A pretrained language model is trained to put high probability on the next token of text, not to verify truth. When the training data supports a pattern strongly (the format of a citation: authors, a venue, a year), it learns to generate that pattern fluently. When a specific fact is rare or absent (the exact title of one niche paper), the likelihood objective gives no direct signal that the right output is \"I'm not sure\"; the most plausible-looking continuation is still produced. Facts that appear once or never in the training data are the hardest to learn reliably, which is why obscure references are a classic failure: the form is known, the content is not.\n\nPost-training and evaluation can reinforce this. If benchmarks score only right or wrong, a guess is never worse than abstaining, so tuning toward such scores can reward confident answers. Kalai and colleagues argue that hallucinations originate much like errors in binary classification under statistical pressures in pretraining, and that they persist because common benchmarks reward guessing over admitting uncertainty; they propose changing how existing benchmarks are scored. A model may also decline some questions in chat and still guess here, because abstention is a learned behaviour tied to the kinds of questions it was shaped to refuse, not a reliable internal check of what it knows.\n\nRetrieval can fix the part that is a knowledge gap: if a bibliography database returns the real papers, the model can quote them. It cannot fix the incentive to answer when nothing relevant is retrieved, irrelevant or outdated passages can mislead it, and it may still blend its own prior with the evidence. So the mitigation is a combination: retrieval for knowledge, instructions and training that make \"not found\" an acceptable answer, abstention thresholds, and checking citations against the source database.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "next-token likelihood",
+   "rare facts",
+   "no-abstention incentive",
+   "accuracy-only scoring",
+   "guessing vs abstaining",
+   "retrieval limits"
+  ],
+  "common_mistakes": [
+   "Saying the model is lying or has a bug; it is generating plausible continuations, not retrieving checked facts",
+   "Believing more fluent output means more reliable output",
+   "Assuming retrieval removes hallucination; it replaces missing knowledge with evidence only when relevant evidence is found and used"
+  ],
+  "interview_style_note": "A strong candidate links hallucination to objectives and incentives (not mystery), gives the rare-fact mechanism, and states clearly that retrieval fixes only knowledge gaps it can fill.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Why Language Models Hallucinate",
+    "url": "https://arxiv.org/abs/2509.04664",
+    "supports": "Hallucinations originate as errors in binary classification; models are optimised to be good test-takers and guessing when uncertain improves test performance; the authors argue training and evaluation reward guessing over admitting uncertainty and propose changing how existing benchmarks are scored."
+   }
+  ],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "hallucination",
+   "pretraining-objective",
+   "abstention-incentives",
+   "calibration"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Nearest existing: smi-j0043 (diagnosing where unsupported sentences come from in a RAG answer); this one asks why training and scoring produce guessing in the first place and what retrieval cannot fix.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B2-GEN-14-2",
+  "cell_id": "GEN-14",
+  "topic": "Hallucination, grounding and long context",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "evaluation",
+  "difficulty": "Hard",
+  "question": "A policy Q&A assistant outputs an answer and a confidence score. On 1,000 held-out questions the confidence bands look like this (hypothetical): at least 0.9: 400 questions, 380 correct; 0.7 to 0.9: 300 questions, 210 correct; 0.5 to 0.7: 200 questions, 90 correct; below 0.5: 100 questions, 20 correct. When the bot abstains the user is routed to a human, at a cost of 1 unit; a wrong answer costs 10 units. Where should the abstention threshold sit, what changes if a wrong answer costs only 3, and what must you verify before trusting these numbers?",
+  "answer_set": "concise+detailed+practical",
+  "answer": null,
+  "concise_answer": "Answer a band only if its observed accuracy exceeds 1 minus (abstain cost / wrong-answer cost). At a 10:1 ratio that is above 90%, so answer only the top band: 400 answered, 20 wrong, 600 handed off, cost 800 units versus 3,000 for answering everything. At 3:1 the bar is about 67%, so answer the top two bands (cost 630). Verify calibration, interval width and label quality first.",
+  "detailed_answer": "Decision rule: answering a question whose chance of being correct is a costs (1 - a) x C_wrong in expectation; abstaining costs C_abstain. Answer when a > 1 - C_abstain / C_wrong. With C_wrong = 10 and C_abstain = 1 the bar is 90%; with C_wrong = 3 it is about 67%. The threshold therefore comes from the cost ratio, not from a fixed confidence value like 0.8.\n\nObserved accuracy per band is 95% (380/400), 70% (210/300), 45% (90/200) and 20% (20/100). Only the top band clears 90%, so the threshold sits at confidence 0.9. At 3:1 the top two bands clear 67%, so it moves to about 0.7. The trade-off is coverage versus selective accuracy: answering the top band covers 40% of questions at 95% accuracy; the top two cover 70% at 84.3%; all four cover 100% at 70%.\n\nCheck the numbers before trusting them. (1) Calibration: the 0.7 to 0.9 band delivered 70% and the 0.5 to 0.7 band delivered 45%, i.e. the scores look overconfident in the middle bands, so the score is a ranking signal whose meaning must be re-measured, not a probability. (2) Sample size: a Wilson 95% interval for 210/300 is roughly 65% to 75%, for 380/400 roughly 92% to 97%, so a band near the break-even line could flip with more data. (3) Label quality: are 'correct' labels human-verified, or from an automated judge with its own errors? (4) Shift: thresholds fitted on a held-out set can drift as documents, questions or the model change; re-measure periodically. (5) Hidden costs: human handoff capacity, queue wait and user trust; wrong answers also differ in severity, so per-topic thresholds may be justified. (6) Report coverage and risk together, never accuracy on answered questions alone.",
+  "practical_answer": "Worked cost table (hypothetical numbers from the question; cost = wrong x C_wrong + abstained x 1). Bands answered, from the top:\n\nAnswer none: 1,000 handed off, cost 1,000.\nTop band (400 answered, 380 correct, 20 wrong, 600 abstain): 10:1 -> 20x10 + 600 = 800; 3:1 -> 20x3 + 600 = 660.\nTop two (700 answered, 590 correct, 110 wrong, 300 abstain): 10:1 -> 1,100 + 300 = 1,400; 3:1 -> 330 + 300 = 630.\nTop three (900 answered, 680 correct, 220 wrong, 100 abstain): 10:1 -> 2,300; 3:1 -> 660 + 100 = 760.\nAnswer all (1,000 answered, 700 correct, 300 wrong): 10:1 -> 3,000; 3:1 -> 900.\n\nMinimum cost: top band at 10:1 (800), top two bands at 3:1 (630). Procedure for production: sort held-out items by score, compute cumulative coverage, wrong count and cost for every candidate cut, pick the minimum for your actual cost ratio, then re-estimate on a fresh sample and set an alert on the answered-only error rate.",
+  "key_concepts": [
+   "coverage vs accuracy",
+   "cost-ratio break-even rule",
+   "calibration",
+   "answered-only accuracy",
+   "confidence intervals per band",
+   "human handoff cost"
+  ],
+  "common_mistakes": [
+   "Choosing the threshold that maximises accuracy on answered questions, which is achieved by answering almost nothing",
+   "Reading the confidence score as a probability without checking it against observed accuracy per band",
+   "Ignoring that abstentions have costs of their own (human capacity, user trust)"
+  ],
+  "interview_style_note": "A strong candidate frames abstention as an expected-cost decision, derives the break-even accuracy, notices miscalibration in the bands, and asks about interval width and label quality.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "Statistics"
+  ],
+  "tags": [
+   "abstention",
+   "selective-prediction",
+   "calibration",
+   "cost-sensitive-threshold"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Nearest existing: smi-j0030 (faithfulness/relevance/correctness of three candidate answers) and smi-j0044 (offline vs user feedback); this one is about choosing an abstention threshold from a cost ratio.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B2-GEN-14-3",
+  "cell_id": "GEN-14",
+  "topic": "Hallucination, grounding and long context",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "business_case",
+  "difficulty": "Hard",
+  "question": "Your company has a 300,000-token body of product manuals, updated weekly, and about 50,000 questions a day from customers with different entitlements. A manager says a hypothetical 400,000-token context model makes RAG unnecessary: \"just paste all the manuals into every prompt.\" Assume prefill runs at 10,000 tokens/s per GPU, a typical RAG prompt is 6,000 tokens, and the KV cache costs 128 KiB per token. Compare the two designs on latency, compute, memory, freshness and access control, and say when long context is the right choice.",
+  "answer_set": "single",
+  "answer": "Latency and compute: pasting 300,000 tokens means a prefill of 300,000 / 10,000 = 30 s before the first token, versus 6,000 / 10,000 = 0.6 s for a RAG prompt, and 50,000 x 300,000 = 1.5e10 tokens processed per day versus 3e8, a 50x difference (attention cost per token also grows with context length, so the real gap is likely larger).\n\nMemory: at 128 KiB per token, one 300,000-token prefix is about 36.6 GiB of KV cache. Prefix caching can avoid recomputing the prefill, but you must hold that much cache per cached copy, and each generated token still reads it: about 39 GB at a hypothetical 2 TB/s is roughly 20 ms per token for that sequence's cache alone, which limits concurrency. Weekly manual edits invalidate cached prefixes.\n\nQuality: a window that fits the text does not guarantee the model uses all of it equally well. Evidence buried among hundreds of thousands of irrelevant tokens can be missed or confused with similar passages, and the effect is model- and task-dependent, so measure it on your questions instead of assuming. RAG shows the model a few thousand tokens that were selected for the question.\n\nFreshness and governance: with RAG, updating the index is an incremental job and citations point to specific passages; with one shared giant prompt, customers with different entitlements cannot be separated, and every update changes the prompt. RAG can filter by permission before the model sees anything.\n\nWhen long context wins: a small, stable corpus; low query volume; tasks needing global reasoning over one document (summarise or compare clauses across a whole contract); prototypes where retrieval quality is unknown. Retrieval can miss evidence that a full read would catch, so it needs measuring too.\n\nLikely best design here: retrieve and rerank to a few documents or sections, optionally giving the model a larger window for those, and compare both designs on a labelled question set (accuracy, citation correctness, latency, tokens per day) before deciding.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "prefill cost",
+   "KV memory of a cached prefix",
+   "attention dilution",
+   "freshness",
+   "access control",
+   "hybrid design"
+  ],
+  "common_mistakes": [
+   "Assuming that because the corpus fits in the window, the model will use all of it equally well; long-context accuracy is model- and task-dependent",
+   "Ignoring that prefix caching trades prefill compute for a large memory footprint, and is invalidated by weekly edits",
+   "Overlooking per-user permissions: a shared all-manuals prompt cannot enforce entitlements"
+  ],
+  "interview_style_note": "A strong candidate does the arithmetic, treats the choice as a decision with conditions, and proposes a hybrid rather than a slogan.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "System Design"
+  ],
+  "tags": [
+   "long-context",
+   "rag",
+   "prefill-cost",
+   "prefix-caching"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Nearest existing: smi-j0024 (lost in the middle) and smi-j0027 (prompt token budget), which are about arranging context; this one is the long-context versus retrieval decision with cost, latency, memory and governance.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B2-GEN-14-4",
+  "cell_id": "GEN-14",
+  "topic": "Hallucination, grounding and long context",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "To catch hallucinations cheaply, a team proposes two signals: (1) flag any answer whose average token log-probability falls below a threshold; (2) sample the model 5 times at a non-zero temperature and flag the answer when fewer than 4 of the samples agree. Where would each signal be informative, where would it fail, and how would you decide whether to deploy either?",
+  "answer_set": "single",
+  "answer": "Token probabilities. They carry some information: in controlled settings with the right prompt format, larger models' confidence on multiple-choice and true/false questions has been found reasonably reliable, and models can also be asked to rate the probability that their own answer is correct, which works fairly well (Kadavath et al.), though less reliably on new kinds of tasks. In production free-text answers they are noisy: probability is spread across paraphrases and surface forms, so a correct answer can look low-confidence; a long answer's average is dominated by easy filler tokens, so look at the tokens carrying the claim (names, numbers, dates); preference-tuned models often have peaked or less calibrated distributions in many setups; and some APIs do not expose the values. A model can also be confidently wrong about a widely repeated misconception.\n\nSelf-consistency agreement. Disagreement among samples is a useful warning for questions with a single factual answer, because a model that does not know tends to scatter. Limits: agreement must be judged on meaning, so you need clustering or an equivalence check (\"1987\" and \"in 1987\" agree); consistent errors are common, since a systematic misconception or a wrong retrieved passage yields 5 of 5 agreement; at low temperature all samples may collapse to one answer; it costs about 5x tokens and some latency; and long answers need claim-level comparison.\n\nDeciding: collect a few hundred human-labelled answers from real traffic, compute each signal's precision and recall for flagging wrong answers, plot calibration (flag score versus observed accuracy) by question type, and pick a threshold from the cost of a missed error versus a needless escalation. Use the signal as triage: route low-confidence answers to abstention, a stronger check, or human review; do not present it to users as proof that an answer is true.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "token log-probability",
+   "paraphrase probability spreading",
+   "sample agreement",
+   "consistent errors",
+   "semantic clustering",
+   "calibration evaluation"
+  ],
+  "common_mistakes": [
+   "Treating a high-confidence answer as a verified one; systematic misconceptions can be produced confidently and consistently",
+   "Comparing sample strings literally instead of clustering by meaning",
+   "Averaging token probabilities over a long answer, where fluent filler tokens drown the few uncertain facts"
+  ],
+  "interview_style_note": "A strong candidate knows each signal's limits, designs the evaluation (precision/recall of flags against human-labelled correctness), and positions the signal as triage rather than truth.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Language Models (Mostly) Know What They Know",
+    "url": "https://arxiv.org/abs/2207.05221",
+    "supports": "Larger models give reasonably reliable confidence estimates on multiple-choice and true/false tasks when the format is right; asking a model to propose an answer then rate its probability of being correct works fairly well and improves when it considers several of its own samples; such self-assessment is less reliable on new tasks."
+   }
+  ],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "uncertainty-estimation",
+   "token-probability",
+   "self-consistency",
+   "calibration"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Nearest existing: smi-h0002 (next-token probabilities and decoding) and smi-g0005 (perplexity); this one is about whether such signals detect factual errors.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B2-GEN-14-5",
+  "cell_id": "GEN-14",
+  "topic": "Hallucination, grounding and long context",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "evaluation",
+  "difficulty": "Hard",
+  "question": "You build a hallucination detector for a RAG assistant: split each answer into sentences, run an NLI-style entailment model of (retrieved passages, sentence), and flag sentences that are not entailed. On 10,000 production sentences, 3% are truly unsupported by the retrieved context (hypothetical). The detector has 80% recall and a 5% false-positive rate. (a) What share of flags are real problems, and what does that imply for how you use the detector? (b) Beyond the threshold, what systematic error modes does this approach have? (c) How would you validate and improve it?",
+  "answer_set": "concise+detailed+practical",
+  "answer": null,
+  "concise_answer": "At 3% prevalence, 300 sentences are bad; the detector catches 240 and wrongly flags 5% of the other 9,700 (485), so precision is 240/725, about 33%: two of three flags are false alarms and 60 real errors are missed. Use it to prioritise human review and track trends, not to block answers. Errors come from decomposition, truncation, multi-passage evidence, numbers and negation, and true-but-unsupported claims.",
+  "detailed_answer": "(a) Out of 10,000 sentences, 300 are unsupported. Recall 80% gives 240 true positives and 60 misses. A 5% false-positive rate on the 9,700 supported sentences gives 485 false positives. Flags total 725, so precision = 240 / 725 = 33.1%. If the false-positive rate were 1%, there would be 97 false positives and precision would be 240 / 337 = 71.2%. The point is that precision depends heavily on prevalence and false-positive rate, so a detector that sounds accurate can flood reviewers. Implication: use it to rank answers for human review, as a monitoring metric whose trend matters, or as a trigger for a second check, rather than as an automatic blocker; set the threshold to a precision target for the action you attach to a flag.\n\n(b) Error modes beyond the threshold. Decomposition: sentences contain pronouns and context ('it', 'that plan') so isolated claims lose meaning, and one sentence can hold several claims. Premise handling: concatenated passages may exceed the model's input length and be truncated, while checking passage by passage misses claims needing two passages (a rule plus its exception). Fine-grained facts: entailment models are often weak on numbers, dates, units, negation and quantifiers. Domain shift: models trained on general text pairs can behave differently on legal, medical or product text. Semantics: a claim can be true but absent from the retrieved text (flagged, though not a hallucination in a world sense), or paraphrase and inference can be supported though not entailed word-for-word. Also, the detector does not check whether retrieved passages are themselves correct, current or relevant.",
+  "practical_answer": "Validation procedure (hypothetical sizes):\n1. Draw a stratified sample of answer sentences, over-sampling flagged ones and including a random slice of unflagged ones. To estimate precision of the flags to within about +/-5 points at 95% confidence you need roughly 1.96^2 x 0.25 / 0.05^2 = 384 labelled flagged sentences.\n2. Have two humans label each sentence supported, unsupported, or true-but-not-in-sources, using the full retrieved set as evidence; measure their agreement and settle disagreements before using the labels. If an LLM judge helps with labelling, report it as an AI label and calibrate it against the human set.\n3. Report precision and recall by error mode (numbers, negation, multi-passage, pronoun-heavy sentences, domain) so you know where false alarms concentrate, and by threshold.\n4. Fix systematically: rewrite sentences into self-contained claims before checking, score each claim against every passage and take the best score (plus a joint check for multi-evidence claims), add rule-based number and date matching alongside the model, and tune the threshold for a chosen precision.\n5. In production, send only high-score flags to reviewers, sample low-score items to estimate misses, and re-measure monthly because documents and models drift.",
+  "key_concepts": [
+   "precision at low prevalence",
+   "entailment checking",
+   "claim decomposition",
+   "multi-passage evidence",
+   "numbers and negation",
+   "true but unsupported claims"
+  ],
+  "common_mistakes": [
+   "Quoting recall and false-positive rate as if they implied precision; at 3% prevalence most flags are false alarms",
+   "Treating 'not entailed' as 'false': a claim can be true but unsupported by the retrieved text",
+   "Running the model on whole answers or truncated long premises and assuming it sees all the evidence"
+  ],
+  "interview_style_note": "A strong candidate applies Bayes at low prevalence, lists concrete failure modes, and proposes labelled validation and human-in-the-loop use.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "hallucination-detection",
+   "nli",
+   "base-rate",
+   "claim-decomposition"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Nearest existing: smi-j0029 (judge agreement with human labels) and smi-j0043 (diagnosing unsupported sentences); batch-1 faithfulness items cover the metric; this one is the precision of an NLI-style detector at low prevalence and its error modes.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B2-GEN-14-6",
+  "cell_id": "GEN-14",
+  "topic": "Hallucination, grounding and long context",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "A product team wants to show a green \"Verified by sources\" badge whenever an assistant answer includes at least one citation. A hypothetical audit of 500 badged answers found that in 430 the cited passage supports the claim, in 45 it supports only part of the claim, and in 25 it does not support it at all. What is wrong with the badge, how would you change the UI and wording to reduce over-trust, and how would you test that the change works?",
+  "answer_set": "single",
+  "answer": "The badge asserts verification, but the audit shows 70 of 500 badged answers (14%) are only partly supported (45, 9%) or unsupported (25, 5%). A binary badge based on citation presence measures the wrong thing: the model can cite a real document that does not contain the claim, or support one clause while an adjacent clause is invented. It also invites over-trust: users who see an authoritative marker may check less (automation bias is plausible here, and worth measuring rather than assuming).\n\nChanges. (1) Do not show a badge unless support is checked: run a claim-to-passage support check before display and show the badge only when it passes; remember this check has its own error rate. (2) Cite per claim, not per answer, and show the supporting passage with the relevant span highlighted next to the claim, so verification takes one click. (3) Tell the user what the answer is based on ('From the 2024 returns policy, section 4.2') including the document version or date, and say explicitly when evidence is missing, partial or conflicting ('I couldn't find this in the policy; here is the closest text'). (4) Use plain-language confidence only if it is tied to measured accuracy (for example 'checked against the source' versus 'not checked'); avoid invented percentages. (5) For high-stakes actions add friction, such as asking the user to confirm against the source or offering a human handoff. (6) Provide a one-click 'this is wrong' report that feeds the evaluation set.\n\nTest it with an experiment: show users answers of which a known fraction are wrong, compare designs (old badge, new evidence display) on the rate at which users catch wrong answers and on the rate at which they wrongly reject right ones, plus task completion and escalation rate. Keep auditing a random sample of badged answers each week, with confidence intervals, and set a launch gate on the unsupported-citation rate.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "citation presence vs support",
+   "claim-level citations",
+   "highlighted evidence span",
+   "abstention in the UI",
+   "calibrated wording",
+   "over-trust measurement"
+  ],
+  "common_mistakes": [
+   "Assuming a citation proves the claim; a link can point to a real page that does not support it",
+   "Showing a numeric 'confidence' that is not calibrated against measured accuracy",
+   "Judging the UI only by satisfaction scores rather than by whether users catch wrong answers"
+  ],
+  "interview_style_note": "A strong candidate separates citation presence from support, designs UI that makes verification cheap and honest, and proposes a measurement of user error-catching.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "UX"
+  ],
+  "tags": [
+   "citation-support",
+   "over-trust",
+   "ui-design",
+   "calibrated-wording"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Nearest existing: smi-j0026 (implementing citation attribution) and smi-j0044 (offline metrics vs user feedback); this one is user-facing trust design and an experiment to test it.",
+  "confidence": "high"
+ }
+]

@@ -1,0 +1,2669 @@
+[
+ {
+  "plan_id": "B1-GEN-01-1",
+  "claims": [
+   {
+    "claim": "HNSW usually gives the best latency at high recall",
+    "field": "concise_answer / detailed_answer",
+    "status": "partially",
+    "source_index": 0,
+    "note": "FAISS guide calls HNSW 'a very fast and accurate index' and recommends it; the same page lists an IVF/PQ option as faster; ANN-Benchmarks abstract only says very different approaches yield comparable quality-performance trade-offs. 'Usually the best' is stronger than the sources."
+   },
+   {
+    "claim": "HNSW deletes are awkward / often tombstones (implementation-dependent)",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 1,
+    "note": "FAISS states HNSW does not support removing vectors (graph structure would be destroyed). That supports 'awkward'; tombstone handling in other libraries is not sourced."
+   },
+   {
+    "claim": "IVF-PQ needs re-ranking of a short list to recover recall",
+    "field": "concise_answer / detailed_answer",
+    "status": "partially",
+    "source_index": 0,
+    "note": "FAISS guide: PQ-based option 'requires a re-ranking stage' with k_factor and nprobe parameters. Does not state that it restores most of the lost recall or that full vectors sit on SSD."
+   },
+   {
+    "claim": "nlist several times sqrt(N); 30k-100k for N=50M",
+    "field": "practical_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "4*sqrt(50M)=28.3k to 16*sqrt(50M)=113k, matching 30k-100k."
+   },
+   {
+    "claim": "HNSW memory = vector bytes + M*2*4 link bytes (256 B at M=32)",
+    "field": "practical_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Formula d*4 + M*2*4 bytes per vector."
+   },
+   {
+    "claim": "HNSW supports incremental inserts",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 2,
+    "note": "HNSW paper: incrementally builds a multi-layer structure."
+   },
+   {
+    "claim": "IVF-Flat adds are cheap; centroids go stale as distribution shifts",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative statement found."
+   },
+   {
+    "claim": "Arithmetic (153.6 GB, 4.8 GB, 166.4 GB, 11.6/s)",
+    "field": "practical_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [
+   {
+    "title": "FAISS wiki: Guidelines to choose an index",
+    "url": "https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index",
+    "type": "official_doc",
+    "quote": "\"Where K is 4*sqrt(N) to 16*sqrt(N), with N the size of the dataset.\" / \"The memory usage is (d * 4 + M * 2 * 4) bytes per vector.\" / \"HNSW is the best option, it is a very fast and accurate index.\" / \"it requires a re-ranking stage and thus there are two parameters to adjust: the k_factor of reranking and the nprobe of the IVF.\" / \"HNSW does not require training and does not support removing vectors from the index.\"",
+    "supports": "nlist range, HNSW memory formula, HNSW being fast and accurate, PQ needing a re-ranking stage, and HNSW lacking vector removal.",
+    "status": "partially"
+   },
+   {
+    "title": "FAISS wiki: Faiss indexes",
+    "url": "https://github.com/facebookresearch/faiss/wiki/Faiss-indexes",
+    "type": "official_doc",
+    "quote": "\"HNSW does not support removing vectors from the index.\" ... \"This would destroy the graph structure.\"",
+    "supports": "HNSW deletion is not natively supported in FAISS, consistent with deletes being awkward.",
+    "status": "supported"
+   },
+   {
+    "title": "Efficient and robust approximate nearest neighbor search using Hierarchical Navigable Small World graphs",
+    "url": "https://arxiv.org/abs/1603.09320",
+    "type": "paper",
+    "quote": "\"Hierarchical NSW incrementally builds a multi-layer structure.\" ... \"strongly outperform previous opensource state-of-the-art vector-only approaches\"",
+    "supports": "HNSW is built incrementally and was reported as strong versus earlier open-source methods (not that it is always the lowest latency).",
+    "status": "partially"
+   },
+   {
+    "title": "ANN-Benchmarks",
+    "url": "https://arxiv.org/abs/1807.05614",
+    "type": "paper",
+    "quote": "\"very different approaches to\" k-NN search \"yield comparable quality-performance trade-offs.\"",
+    "supports": "Cautions that no single family is universally best, supporting the narrowing fix and the 'measure, do not pick by reputation' advice.",
+    "status": "partially"
+   }
+  ],
+  "fixes": [
+   {
+    "field": "concise_answer",
+    "claim": "HNSW usually gives the best latency at high recall but is RAM-hungry",
+    "problem": "Stronger than the sources: FAISS calls HNSW 'very fast and accurate' but also lists an IVF/PQ option as faster; ANN-Benchmarks reports comparable trade-offs across approaches.",
+    "replacement": "HNSW is a fast, accurate graph index at high recall (FAISS's own guide recommends it) but is RAM-hungry"
+   },
+   {
+    "field": "detailed_answer",
+    "claim": "At high recall it usually offers the best latency per query, and it supports incremental inserts.",
+    "problem": "Same overstatement; the best method depends on dataset and recall target.",
+    "replacement": "At high recall it is often among the lowest-latency options (the best choice depends on data and recall target), and it supports incremental inserts."
+   }
+  ],
+  "residual_background_only": [
+   "IVF-Flat centroids go stale as the distribution shifts",
+   "IVF-PQ re-ranking restores most of the lost recall; full vectors on SSD",
+   "tombstone deletes in HNSW implementations other than FAISS"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-01-2",
+  "claims": [
+   {
+    "claim": "recall values 0.665...1.0, monotone in nprobe, 1.0 at nprobe=nlist, -1 padding as miss",
+    "field": "practical_answer / detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Mechanism/code question; nothing external needed."
+   },
+   {
+    "claim": "ANN recall@k definition and measurement protocol",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Standard definition; no specific page quoted. Not padded with a citation."
+   }
+  ],
+  "sources": [],
+  "fixes": [],
+  "residual_background_only": [
+   "ANN recall@k definition/protocol (standard practice, no citation added)"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-01-3",
+  "claims": [
+   {
+    "claim": "Inner product equals cosine only for unit vectors; normalise query and database vectors",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "FAISS: 'This is not by itself cosine similarity, unless the vectors are normalized.'"
+   },
+   {
+    "claim": "FAISS returns squared L2; ||x-y||^2 = 2-2<x,y> on unit vectors",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": ""
+   },
+   {
+    "claim": "Some models are trained for dot product with unnormalised outputs and should be used as documented",
+    "field": "answer",
+    "status": "partially",
+    "source_index": 1,
+    "note": "Model card lists dot-product as the score function and 'Produces normalized embeddings: No'."
+   },
+   {
+    "claim": "Long/generic chunks get larger norms and are boosted",
+    "field": "answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found for norm-vs-length behaviour; the answer already hedges 'encoder-dependent'. Mathematical boost by norm is |q||d|cos (derivation)."
+   },
+   {
+    "claim": "Inner product is not a true metric so ANN structures tuned for it on unnormalised data can behave worse",
+    "field": "answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Not found; keep hedged or drop."
+   }
+  ],
+  "sources": [
+   {
+    "title": "FAISS wiki: MetricType and distances",
+    "url": "https://github.com/facebookresearch/faiss/wiki/MetricType-and-distances",
+    "type": "official_doc",
+    "quote": "\"Faiss reports squared Euclidean (L2) distance, avoiding the square root.\" / \"This is not by itself cosine similarity, unless the vectors are normalized.\" / \"By normalizing query and database vectors beforehand, the problem can be mapped back to a maximum inner product search.\" / distances related by |x - y|^2 = 2 - 2<x, y>",
+    "supports": "Squared-L2 return, cosine requires normalisation, L2/IP equivalence on unit vectors.",
+    "status": "supported"
+   },
+   {
+    "title": "Model card: sentence-transformers/multi-qa-mpnet-base-dot-v1",
+    "url": "https://huggingface.co/sentence-transformers/multi-qa-mpnet-base-dot-v1",
+    "type": "official_doc",
+    "quote": "Score function: \"dot-product (e.g. util.dot_score)\"; \"Produces normalized embeddings: No\"",
+    "supports": "Some encoders are intended for dot product and emit unnormalised vectors.",
+    "status": "partially"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "generic/long chunks have larger norms",
+   "inner product not a true metric degrades ANN structures"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-01-4",
+  "claims": [
+   {
+    "claim": "Same dimensionality does not imply a shared embedding space; new features must be compatible to be compared with old",
+    "field": "answer",
+    "status": "partially",
+    "source_index": 0,
+    "note": "Shen et al. define compatibility as new features being directly comparable to old, and treat backfilling (recomputing all old embeddings) as the cost of an update without it. Implies, does not state, incompatibility of independently trained models."
+   },
+   {
+    "claim": "A learned linear map between embedding spaces can bridge them (lossy)",
+    "field": "answer",
+    "status": "partially",
+    "source_index": 1,
+    "note": "Mikolov et al. learn a linear mapping between word-embedding spaces of two languages; different setting from model versions, and 'lossy' is not stated."
+   },
+   {
+    "claim": "Silent failure: old-corpus retrieval collapses toward noise",
+    "field": "answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No source; answer already hedges with 'typically' and 'unless trained to be compatible'."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Towards Backward-Compatible Representation Learning (Shen et al., 2020)",
+    "url": "https://arxiv.org/abs/2003.11942",
+    "type": "paper",
+    "quote": "\"Compatible means that, if such features are used to compare images, then 'new' features can be compared directly to 'old' features\"; \"bypass computing new features for all previously seen images when updating the embedding models\" ... \"a process known as backfilling\"",
+    "supports": "Updating an embedding model normally requires backfilling, and cross-model comparability is a property that has to be trained for.",
+    "status": "partially"
+   },
+   {
+    "title": "Exploiting Similarities among Languages for Machine Translation (Mikolov et al., 2013)",
+    "url": "https://arxiv.org/abs/1309.4168",
+    "type": "paper",
+    "quote": "\"It uses distributed representation of words and learns a linear mapping between vector spaces of languages.\"",
+    "supports": "Precedent for fitting a linear map between separately trained embedding spaces.",
+    "status": "partially"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "silent degradation behaviour of mixed-model index",
+   "linear map is lossy relative to re-embedding"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-01-5",
+  "claims": [
+   {
+    "claim": "Distance concentration: nearest and farthest distances converge as dimension grows, under broad conditions",
+    "field": "concise/detailed",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Beyer abstract."
+   },
+   {
+    "claim": "Does not apply to every high-dimensional set; clustered data stays meaningful",
+    "field": "detailed",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Beyer caveat and Section 6."
+   },
+   {
+    "claim": "Hubness reported in high dimensions",
+    "field": "detailed",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Radovanovic: hubness is 'an inherent property of data distributions in high-dimensional vector space'."
+   },
+   {
+    "claim": "Learned embeddings have much lower intrinsic dimension than nominal; contrastive training separates neighbours",
+    "field": "detailed",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Not verified from a source opened here."
+   },
+   {
+    "claim": "Contrast numbers 266.6, 4.22, ...",
+    "field": "practical",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [
+   {
+    "title": "When Is Nearest Neighbor Meaningful? (Beyer et al., 1999)",
+    "url": "https://eclass.upatras.gr/modules/document/file.php/CEID1168/Papers/Beyer-WhenIsNearestNeighborMeaningful.pdf",
+    "type": "paper",
+    "quote": "\"as dimensionality increases, the distance to the nearest data point approaches the distance to the farthest data point.\" / \"These results should not be interpreted to mean that high-dimensional indexing is never meaningful\" / \"answers are meaningful when the data consists of small, well-formed clusters\"",
+    "supports": "Distance concentration and its limits.",
+    "status": "supported"
+   },
+   {
+    "title": "Hubs in Space: Popular Nearest Neighbors in High-Dimensional Data (Radovanovic et al., JMLR 2010)",
+    "url": "https://jmlr.org/papers/v11/radovanovic10a.html",
+    "type": "paper",
+    "quote": "hubness is \"a new aspect of the dimensionality curse\"; \"it is an inherent property of data distributions in high-dimensional vector space.\"",
+    "supports": "Hubness is reported in high-dimensional data.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "intrinsic dimension of learned embeddings is much lower than nominal",
+   "contrastive training places related items closer (standard, uncited)"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-01-6",
+  "claims": [
+   {
+    "claim": "HNSW layer-0 links M*2*4 B per vector (128 B at M=16)",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Formula d*4 + M*2*4 bytes per vector."
+   },
+   {
+    "claim": "float16 halves storage",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "FAISS SQfp16 listed at 2*d+8 bytes/vector."
+   },
+   {
+    "claim": "float16 is usually near-lossless",
+    "field": "answer",
+    "status": "partially",
+    "source_index": 1,
+    "note": "FAISS says fp16 'may cause some loss of precision'; no quantified claim of near-lossless found."
+   },
+   {
+    "claim": "Some models are trained so truncating to a prefix works; only use if documented",
+    "field": "answer",
+    "status": "partially",
+    "source_index": 2,
+    "note": "Matryoshka abstract: learns coarse-to-fine representations adaptable to downstream constraints; abstract does not itself mention truncation."
+   },
+   {
+    "claim": "Arithmetic totals",
+    "field": "answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [
+   {
+    "title": "FAISS wiki: Guidelines to choose an index",
+    "url": "https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index",
+    "type": "official_doc",
+    "quote": "\"The memory usage is (d * 4 + M * 2 * 4) bytes per vector.\"",
+    "supports": "HNSW link overhead per vector.",
+    "status": "supported"
+   },
+   {
+    "title": "FAISS wiki: Faiss indexes",
+    "url": "https://github.com/facebookresearch/faiss/wiki/Faiss-indexes",
+    "type": "official_doc",
+    "quote": "vectors \"compressed to 16-bit floats, which may cause some loss of precision\"; SQfp16 listed at 2*d + 8 bytes per vector",
+    "supports": "float16 halves storage with possible precision loss.",
+    "status": "partially"
+   },
+   {
+    "title": "Matryoshka Representation Learning",
+    "url": "https://arxiv.org/abs/2205.13147",
+    "type": "paper",
+    "quote": "\"MRL learns coarse-to-fine representations\" that can \"adapt to the computational constraints of downstream tasks.\"",
+    "supports": "Embeddings explicitly trained for it can be used at lower dimension.",
+    "status": "partially"
+   }
+  ],
+  "fixes": [
+   {
+    "field": "answer",
+    "claim": "float16 is usually near-lossless",
+    "problem": "FAISS documents that fp16 'may cause some loss of precision'; near-lossless is not sourced.",
+    "replacement": "float16 usually costs little accuracy (FAISS notes some precision loss is possible, so measure it)"
+   }
+  ],
+  "residual_background_only": [
+   "float16 near-lossless for retrieval recall"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-01-7",
+  "claims": [
+   {
+    "claim": "30M/4096 = 7,324 per list; skew raises recall at fixed nprobe unless the region spans more cells than nprobe",
+    "field": "answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   },
+   {
+    "claim": "For 30M vectors nlist should be larger",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "FAISS: K = 4*sqrt(N) to 16*sqrt(N); for N=30M that is about 22k to 88k, far above 4,096."
+   },
+   {
+    "claim": "Stale centroids from drift degrade recall/latency; retrain and re-add; PQ codebooks retrained",
+    "field": "answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative page found stating drift behaviour."
+   }
+  ],
+  "sources": [
+   {
+    "title": "FAISS wiki: Guidelines to choose an index",
+    "url": "https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index",
+    "type": "official_doc",
+    "quote": "\"Where K is 4*sqrt(N) to 16*sqrt(N), with N the size of the dataset.\"",
+    "supports": "A larger nlist is appropriate for 30M vectors.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "centroid drift mechanism and retraining remedy",
+   "PQ codebook retraining"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-03-1",
+  "claims": [
+   {
+    "claim": "Dense retrievers do worse than sparse on rare-entity / identifier queries",
+    "field": "answer",
+    "status": "partially",
+    "source_index": 0,
+    "note": "Sciavolino: dense retrievers 'drastically underperform sparse methods' on entity-centric questions and generalise only to common entities. Abstract says 'sparse methods', not BM25 specifically, and not product codes."
+   },
+   {
+    "claim": "BM25 is a robust baseline; do not claim dense always wins",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "BEIR: 'BM25 is a robust baseline'."
+   },
+   {
+    "claim": "Hybrid via RRF is score-free fusion",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 2,
+    "note": ""
+   },
+   {
+    "claim": "Subword tokenisation scatters identifiers so dense models cannot tell E-4417 from E-4471",
+    "field": "answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No source."
+   },
+   {
+    "claim": "Dense wins on paraphrase (b)",
+    "field": "answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No source for this specific mechanism."
+   },
+   {
+    "claim": "BM25 high idf for rare tokens",
+    "field": "answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "derivation"
+   }
+  ],
+  "sources": [
+   {
+    "title": "Simple Entity-Centric Questions Challenge Dense Retrievers",
+    "url": "https://arxiv.org/abs/2109.08535",
+    "type": "paper",
+    "quote": "\"observe that dense retrievers drastically underperform sparse methods.\" / \"dense retrievers can only generalize to common entities unless the question pattern is explicitly observed during training.\"",
+    "supports": "Dense retrievers are weak on rare entities versus sparse methods.",
+    "status": "partially"
+   },
+   {
+    "title": "BEIR: A Heterogeneous Benchmark for Zero-shot Evaluation of Information Retrieval Models",
+    "url": "https://arxiv.org/abs/2104.08663",
+    "type": "paper",
+    "quote": "\"Our results show BM25 is a robust baseline\"; dense and sparse-retrieval models \"often underperform other approaches\"",
+    "supports": "BM25 remains a strong baseline; supports not claiming universal dense superiority.",
+    "status": "partially"
+   },
+   {
+    "title": "Reciprocal Rank Fusion outperforms Condorcet and individual rank learning methods (Cormack et al., SIGIR 2009)",
+    "url": "https://cormack.uwaterloo.ca/cormacksigir09-rrf.pdf",
+    "type": "paper",
+    "quote": "RRF \"combines ranks without regard to the arbitrary scores returned by particular ranking methods.\"",
+    "supports": "RRF fuses rankings without scores.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "subword pieces poorly represent rare identifiers",
+   "dense wins on paraphrase vs BM25 (stated mechanism)"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-03-2",
+  "claims": [
+   {
+    "claim": "Tuned convex combination can beat RRF; RRF sensitive to its parameters",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": ""
+   },
+   {
+    "claim": "RRF uses ranks only, needs no score calibration",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": ""
+   },
+   {
+    "claim": "RRF is a safe default",
+    "field": "answer",
+    "status": "partially",
+    "source_index": 1,
+    "note": "Cormack: RRF consistently equaled or bettered Condorcet/CombMNZ and individual rankings; Bruch find CC better, so 'safe default' is supported only as robust baseline."
+   },
+   {
+    "claim": "Min-max is sensitive to outliers and candidate-list size",
+    "field": "answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Bruch abstract says CC learning is 'generally agnostic to the choice of score normalization'; sensitivity claim not sourced, and slight tension, so treat as unverified."
+   },
+   {
+    "claim": "BM25 unbounded/query-dependent vs cosine bounded",
+    "field": "answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "derivation"
+   }
+  ],
+  "sources": [
+   {
+    "title": "An Analysis of Fusion Functions for Hybrid Retrieval (Bruch et al.)",
+    "url": "https://arxiv.org/abs/2210.11934",
+    "type": "paper",
+    "quote": "\"CC outperforms RRF in in-domain and out-of-domain settings\"; \"Contrary to existing studies, we find RRF to be sensitive to its parameters\"; \"CC is sample efficient, requiring only a small set of training examples\"",
+    "supports": "Convex combination vs RRF and RRF parameter sensitivity.",
+    "status": "supported"
+   },
+   {
+    "title": "Reciprocal Rank Fusion outperforms Condorcet and individual rank learning methods (Cormack et al., SIGIR 2009)",
+    "url": "https://cormack.uwaterloo.ca/cormacksigir09-rrf.pdf",
+    "type": "paper",
+    "quote": "\"combines ranks without regard to the arbitrary scores returned by particular ranking methods\"; \"RRF consistently equaled or bettered other methods we tried, including ... Condorcet Fuse and CombMNZ\"",
+    "supports": "Rank-only fusion, robust baseline performance.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "min-max normalisation sensitivity to outliers and list size",
+   "calibrated-probability fusion option"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-03-3",
+  "claims": [
+   {
+    "claim": "RRF score = sum 1/(k+rank)",
+    "field": "question/answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": ""
+   },
+   {
+    "claim": "k=60 is a widely used default, not a theorem",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Cormack: k=60 'fixed during a pilot investigation', 'near-optimal, but ... the choice was not critical'. Elasticsearch default rank_constant = 60."
+   },
+   {
+    "claim": "RRF ignores score margins",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "'without regard to the arbitrary scores'"
+   },
+   {
+    "claim": "Rank-2-in-both beats rank-1-in-one at k=60; k=0 case",
+    "field": "answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [
+   {
+    "title": "Reciprocal Rank Fusion outperforms Condorcet and individual rank learning methods (Cormack et al., SIGIR 2009)",
+    "url": "https://cormack.uwaterloo.ca/cormacksigir09-rrf.pdf",
+    "type": "paper",
+    "quote": "\"RRFscore(d in D) = sum over r in R of 1/(k + r(d))\" ... \"where k = 60 was fixed during a pilot investigation and not altered during subsequent validation.\" ... \"near-optimal, but that the choice was not critical.\"",
+    "supports": "RRF formula, k=60 origin, and that 60 is a default not a theorem.",
+    "status": "supported"
+   },
+   {
+    "title": "Elasticsearch reference: Reciprocal rank fusion",
+    "url": "https://www.elastic.co/guide/en/elasticsearch/reference/current/rrf.html",
+    "type": "official_doc",
+    "quote": "\"Defaults to 60.\" (rank_constant); pseudocode \"score += 1.0 / ( k + rank( result(q), d ) )\"",
+    "supports": "Same formula and default k=60 in a production search engine.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": []
+ },
+ {
+  "plan_id": "B1-GEN-03-4",
+  "claims": [
+   {
+    "claim": "Defaults k1=1.2, b=0.75",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Lucene BM25Similarity."
+   },
+   {
+    "claim": "idf = ln(1 + (N-df+0.5)/(df+0.5))",
+    "field": "answer/question",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Lucene: 'Implemented as log(1 + (docCount - docFreq + 0.5)/(docFreq + 0.5))'. Non-negativity follows by derivation."
+   },
+   {
+    "claim": "k1 controls tf saturation; tf impact grows slowly beyond k1",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Blog is secondary but is by the Elasticsearch authors; Lucene javadoc gives k1 'non-linear term frequency normalization (saturation)'."
+   },
+   {
+    "claim": "b=0 removes length normalisation; larger b amplifies length effect",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Blog: b=0 means 'the length of the document would have no bearing on the score'. b=1 is not discussed directly; 'full proportional penalty' is derivation."
+   },
+   {
+    "claim": "Older idf goes negative for df>N/2; libraries differ",
+    "field": "answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "derivation"
+   },
+   {
+    "claim": "Code agrees with rank_bm25 apart from idf",
+    "field": "answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [
+   {
+    "title": "Lucene BM25Similarity javadoc",
+    "url": "https://lucene.apache.org/core/9_9_0/core/org/apache/lucene/search/similarities/BM25Similarity.html",
+    "type": "official_doc",
+    "quote": "BM25 default values k1 = 1.2, b = 0.75; idf \"Implemented as log(1 + (docCount - docFreq + 0.5)/(docFreq + 0.5))\"; k1 \"Controls non-linear term frequency normalization (saturation)\"; b \"Controls to what degree document length normalizes tf values.\"",
+    "supports": "Defaults, idf formula, and the roles of k1 and b.",
+    "status": "supported"
+   },
+   {
+    "title": "Elastic blog: Practical BM25 part 2 - the algorithm and its variables",
+    "url": "https://www.elastic.co/blog/practical-bm25-part-2-the-bm25-algorithm-and-its-variables",
+    "type": "secondary",
+    "quote": "\"The curve of the impact of tf on the score grows quickly when tf() <= k1 and slower and slower when tf() > k1.\" / b=0: \"the length of the document would have no bearing on the score\"",
+    "supports": "tf saturation and b=0 behaviour.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": []
+ },
+ {
+  "plan_id": "B1-GEN-03-5",
+  "claims": [
+   {
+    "claim": "MMR = argmax lambda*Sim1(d,q) - (1-lambda)*max Sim2(d,s)",
+    "field": "question/answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Fetch rendered the formula with lambda garbled as 'X'; structure confirmed."
+   },
+   {
+    "claim": "lambda=1 gives standard relevance ranking",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": ""
+   },
+   {
+    "claim": "lambda=0 gives maximal diversity ranking ignoring query",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Paper: 'maximal diversity ranking among the documents in R when X=0'."
+   },
+   {
+    "claim": "MMR cost O(n^2 d); apply to short candidate list",
+    "field": "answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "derivation"
+   },
+   {
+    "claim": "Dedup by hash/threshold is better for exact duplicates; MMR cannot resolve versions",
+    "field": "answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Engineering judgement; no source."
+   }
+  ],
+  "sources": [
+   {
+    "title": "The Use of MMR, Diversity-Based Reranking (Carbonell & Goldstein, 1998)",
+    "url": "https://www.cs.cmu.edu/~jgc/publication/The_Use_MMR_Diversity_Based_LTMIR_1998.pdf",
+    "type": "paper",
+    "quote": "MMR = argmax over Di in R\\S of [ lambda*Sim1(Di,Q) - (1-lambda)*max over Dj in S of Sim2(Di,Dj) ]; \"computes incrementally the standard relevance-ranked list when the parameter X=1\"; \"computes a maximal diversity ranking among the documents in R when X=0\"",
+    "supports": "MMR rule and the lambda=1 / lambda=0 limits.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "dedup before MMR; MMR cannot resolve document versions"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-03-6",
+  "claims": [
+   {
+    "claim": "HyDE embeds an LLM-written hypothetical answer; draft may contain hallucinated specifics",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Encoder bottleneck filtering also stated."
+   },
+   {
+    "claim": "Multi-query retrieval with RRF fusion raises recall for ambiguous queries but multiplies load and can add off-topic results",
+    "field": "answer",
+    "status": "partially",
+    "source_index": 1,
+    "note": "Method and off-topic risk supported; recall gain and load not in abstract."
+   },
+   {
+    "claim": "Fusing results with RRF",
+    "field": "answer",
+    "status": "partially",
+    "source_index": 2,
+    "note": "Supports RRF as fusion of multiple rankings; not specifically query variants."
+   },
+   {
+    "claim": "Conversational rewriting helps follow-ups; risk of wrong context/latency",
+    "field": "answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No source opened."
+   },
+   {
+    "claim": "HyDE is weak for exact identifiers and rare facts the model does not know",
+    "field": "answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No source opened."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Precise Zero-Shot Dense Retrieval without Relevance Labels (HyDE)",
+    "url": "https://arxiv.org/abs/2212.10496",
+    "type": "paper",
+    "quote": "The document captures relevance patterns but is unreal and may contain false details. ... with the encoder's dense bottleneck filtering out the incorrect details.",
+    "supports": "HyDE embeds an LLM-written hypothetical document that may contain false details.",
+    "status": "supported"
+   },
+   {
+    "title": "RAG-Fusion: a New Take on Retrieval-Augmented Generation",
+    "url": "https://arxiv.org/abs/2402.03367",
+    "type": "paper",
+    "quote": "generating multiple queries, reranking them with reciprocal scores and fusing the documents and scores ... some answers strayed off topic when the generated queries' relevance to the original query is insufficient.",
+    "supports": "Multi-query generation with reciprocal-rank fusion is a described method, and generated queries can add off-topic results; the abstract does not itself report a recall gain or extra retrieval load.",
+    "status": "partially"
+   },
+   {
+    "title": "Reciprocal Rank Fusion outperforms Condorcet and individual Rank Learning Methods",
+    "url": "https://cormack.uwaterloo.ca/cormacksigir09-rrf.pdf",
+    "type": "paper",
+    "quote": "Reciprocal Rank Fusion (RRF), a simple method for combining the document rankings from multiple IR systems, consistently yields better results than any individual system, and better results than the standard method Condorcet Fuse.",
+    "supports": "RRF is a rank-fusion method for combining multiple rankings and generally beats the individual rankers it fuses (about systems, not query variants).",
+    "status": "partially"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Conversational query rewriting helps ellipsis/pronoun follow-ups",
+   "HyDE weak on exact identifiers/rare facts",
+   "Multi-query raises recall for ambiguous queries at extra load (recall part)"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-03-7",
+  "claims": [
+   {
+    "claim": "Post-filtering on an ANN index returns fewer than k results when the filter is selective",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "10% filter, ef_search 40 -> ~4 rows."
+   },
+   {
+    "claim": "Restrictive filter during HNSW traversal can disconnect the graph and drop recall; engines add filter-aware traversal",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Engine-dependent claim also supported: article is one engine's design."
+   },
+   {
+    "claim": "Very selective filters: brute-force/exact scan or per-tenant partition",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Exact indexes for low-match conditions; partial indexing/partitioning."
+   },
+   {
+    "claim": "Retry with deeper candidate depth until k results found",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 0,
+    "note": "pgvector iterative scans scan more of the index when needed; doubling schedule is our own."
+   },
+   {
+    "claim": "Filtered HNSW traversal behaviour is engine-dependent",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 1,
+    "note": "Documented design differs per engine; no cross-engine comparison opened."
+   },
+   {
+    "claim": "IVF filtering inside probed lists wastes scanning excluded vectors",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No source opened."
+   },
+   {
+    "claim": "Probabilities/arithmetic",
+    "field": "practical_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [
+   {
+    "title": "pgvector README (Filtering section)",
+    "url": "https://github.com/pgvector/pgvector",
+    "type": "official_doc",
+    "quote": "With approximate indexes, filtering is applied after the index is scanned. If a condition matches 10% of rows, with HNSW and the default hnsw.ef_search of 40, only 4 rows will match on average. ... Exact indexes work well for conditions that match a low percentage of rows. ... For more rows, enable iterative index scans ... If filtering by only a few distinct values, consider partial indexing. If filtering by many different values, consider partitioning.",
+    "supports": "Post-filtering on an approximate index returns fewer than requested rows for selective filters; exact search suits very selective filters; partitioning/partial indexes and iterative deeper scanning are the documented mitigations.",
+    "status": "supported"
+   },
+   {
+    "title": "Qdrant: Filterable HNSW (article)",
+    "url": "https://qdrant.tech/articles/filterable-hnsw/",
+    "type": "official_doc",
+    "quote": "This threshold is due to the decomposition of the graph into small connected components. ... A connection may be lost between two categories if they lie in different clusters.",
+    "supports": "Applying a restrictive filter during HNSW traversal can break graph connectivity and sharply reduce recall; engines add filter-aware graph construction/search (article describes a 2019 design, not Qdrant's full current behaviour).",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "IVF filtering inside probed lists wastes work"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-03-8",
+  "claims": [
+   {
+    "claim": "Unjudged documents counted non-relevant under single-system pooling understate other systems",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Shallow-pooling paper (arXiv 2109.00062) and BEIR abstract opened; neither abstract states this claim, so not cited."
+   },
+   {
+    "claim": "Paired bootstrap for per-query differences",
+    "field": "practical_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [],
+  "fixes": [],
+  "residual_background_only": [
+   "Unjudged documents counted non-relevant understate non-pool systems"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-02-1",
+  "claims": [
+   {
+    "claim": "Chunk count and token arithmetic",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [],
+  "fixes": [],
+  "residual_background_only": []
+ },
+ {
+  "plan_id": "B1-GEN-02-2",
+  "claims": [
+   {
+    "claim": "Extractors emit text in drawn/written order rather than logical reading order, causing column interleaving",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Doc says text may not be in reading order; sort option sorts top-left to bottom-right. Multi-column not covered explicitly."
+   },
+   {
+    "claim": "Repeated headers/footers detectable by position across pages",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No source opened."
+   }
+  ],
+  "sources": [
+   {
+    "title": "PyMuPDF documentation: Text recipes",
+    "url": "https://pymupdf.readthedocs.io/en/latest/recipes-text.html",
+    "type": "official_doc",
+    "quote": "may not appear in any particular reading order ... This is the responsibility of the PDF creator (software or a human). ... [sort] will sort the output from top-left to bottom-right",
+    "supports": "PDF text extraction follows how content was written to the page, not logical reading order; extractors offer positional sorting or block-level data to rebuild order.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Header/footer detection by repeated position across pages"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-02-3",
+  "claims": [
+   {
+    "claim": "Prepending heading path to chunks often helps retrieval",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source opened."
+   },
+   {
+    "claim": "Headless table fragment uninterpretable",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [],
+  "fixes": [],
+  "residual_background_only": [
+   "Heading-path prefix often helps retrieval"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-02-4",
+  "claims": [
+   {
+    "claim": "Re-insert growth arithmetic",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   },
+   {
+    "claim": "Some vector stores do not free space on delete until compaction",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Not searched."
+   }
+  ],
+  "sources": [],
+  "fixes": [],
+  "residual_background_only": [
+   "Vector stores may not free space on delete until compaction"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-02-5",
+  "claims": [
+   {
+    "claim": "Parent text kept in a docstore keyed by ID, not in the vector index",
+    "field": "detailed_answer",
+    "status": "unreachable",
+    "source_index": null,
+    "note": "LangChain parent-document pages redirected to unrelated pages; not cited."
+   },
+   {
+    "claim": "Token arithmetic",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [],
+  "fixes": [],
+  "residual_background_only": [
+   "Parent text kept in docstore, children embedded"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-02-6",
+  "claims": [
+   {
+    "claim": "Access control as retrieval-time filter",
+    "field": "answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [],
+  "fixes": [],
+  "residual_background_only": []
+ },
+ {
+  "plan_id": "B1-GEN-04-1",
+  "claims": [
+   {
+    "claim": "Cross-encoder cannot be used over millions of documents; used to re-rank a shortlist from a first stage",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": ""
+   },
+   {
+    "claim": "Late-interaction models avoid per-pair transformer passes by precomputing document representations",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": ""
+   },
+   {
+    "claim": "Late interaction stores per-token vectors, trading storage for quality over single-vector bi-encoders",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 1,
+    "note": "Abstract supports precomputation and efficiency only."
+   },
+   {
+    "claim": "Latency arithmetic",
+    "field": "concise_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [
+   {
+    "title": "Sentence-Transformers: Retrieve & Re-Rank",
+    "url": "https://sbert.net/examples/sentence_transformer/applications/retrieve_rerank/README.html",
+    "type": "official_doc",
+    "quote": "Scoring thousands or millions of (query, document)-pairs would be rather slow. ... Hence, we use the retriever to create a set of e.g. 100 possible candidates which are then re-ranked by the Cross-Encoder.",
+    "supports": "A cross-encoder is too slow to score a whole corpus and is used to re-rank a shortlist (e.g. ~100) from a first-stage retriever.",
+    "status": "supported"
+   },
+   {
+    "title": "ColBERT: Efficient and Effective Passage Search via Contextualized Late Interaction over BERT",
+    "url": "https://arxiv.org/abs/2004.12832",
+    "type": "paper",
+    "quote": "ColBERT introduces a late interaction architecture that independently encodes the query and the document using BERT ... gaining the ability to pre-compute document representations offline, considerably speeding up query processing.",
+    "supports": "Late-interaction models precompute document representations offline and avoid feeding each query-document pair through a full network; the abstract does not state the per-token storage trade-off or quality vs single-vector bi-encoders.",
+    "status": "partially"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Per-token storage trade-off and quality vs single-vector bi-encoders"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-04-2",
+  "claims": [
+   {
+    "claim": "Cross-encoder reranks a first-stage shortlist (50-200 candidates)",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 0,
+    "note": "Example shortlist ~100; 50-200 range is ours."
+   },
+   {
+    "claim": "Latency arithmetic",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": ""
+   }
+  ],
+  "sources": [
+   {
+    "title": "Sentence-Transformers: Retrieve & Re-Rank",
+    "url": "https://sbert.net/examples/sentence_transformer/applications/retrieve_rerank/README.html",
+    "type": "official_doc",
+    "quote": "Scoring thousands or millions of (query, document)-pairs would be rather slow. ... Hence, we use the retriever to create a set of e.g. 100 possible candidates which are then re-ranked by the Cross-Encoder.",
+    "supports": "A cross-encoder is too slow to score a whole corpus and is used to re-rank a shortlist (e.g. ~100) from a first-stage retriever.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": []
+ },
+ {
+  "plan_id": "B1-GEN-04-3",
+  "claims": [
+   {
+    "claim": "Accuracy highest at start/end and degraded in the middle of long contexts; model-dependent",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": ""
+   },
+   {
+    "claim": "Mechanistic reasons: attention favours recency/leading tokens, dilution, distractor competition",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Abstract gives no cause; text already hedged ('can', 'might')."
+   },
+   {
+    "claim": "Newer models may show the effect less",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Not searched."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Lost in the Middle: How Language Models Use Long Contexts",
+    "url": "https://arxiv.org/abs/2307.03172",
+    "type": "paper",
+    "quote": "performance is often highest when relevant information occurs at the beginning or end of the input context, and significantly degrades when models must access relevant information in the middle of long contexts.",
+    "supports": "The position-dependent (U-shaped) accuracy effect for long contexts; the abstract gives no mechanism.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Attention-favours-recency/leading-tokens explanation",
+   "Newer models show effect less"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-04-4",
+  "claims": [
+   {
+    "claim": "MMR on reranked results reduces redundancy; use a modest diversity weight (lambda ~0.7)",
+    "field": "detailed_answer/practical_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "MMR paper defines the lambda relevance/diversity trade-off and mentions ~0.7 for a relevance-leaning setting; exact value remains a tuning choice."
+   },
+   {
+    "claim": "Near-duplicate detection via shingle overlap (Jaccard > 0.8 on word 5-grams)",
+    "field": "detailed_answer/practical_answer",
+    "status": "partially",
+    "source_index": 1,
+    "note": "Shingle resemblance (Jaccard-like) is established; the 0.8 and n=5 values are our heuristics, not from the source."
+   },
+   {
+    "claim": "Extractive and abstractive compression of retrieved context",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 2,
+    "note": "Both compressor types exist; RECOMP also supports compressing to nothing when irrelevant."
+   },
+   {
+    "claim": "Abstractive summaries can alter numbers / drop qualifiers; extractive pruning can cut an 'unless' exception",
+    "field": "detailed_answer/common_mistakes",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found; left as engineering judgement."
+   },
+   {
+    "claim": "Embedding-similarity dedup drops legitimately different near-identical clauses",
+    "field": "common_mistakes",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found; left as engineering judgement."
+   },
+   {
+    "claim": "Overlap merging, is_latest version filter, hashing exact duplicates",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Design reasoning/derivation, no external claim."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Carbonell & Goldstein 1998, The Use of MMR, Diversity-Based Reranking",
+    "url": "https://www.cs.cmu.edu/~jgc/publication/The_Use_MMR_Diversity_Based_LTMIR_1998.pdf",
+    "type": "paper",
+    "quote": "\"a linear combination of both criteria is optimized\"; MMR \"computes incrementally the standard relevance-ranked list when the parameter X=1\" and \"computes a maximal diversity ranking among the documents in R when X=0\"; the paper suggests a value near 0.7 to focus on multiple overlapping/reinforcing relevant documents and a smaller value (about 0.3) for broad exploration.",
+    "supports": "MMR trades relevance against redundancy via a lambda parameter; lambda near 0.7 is a relevance-leaning setting (our '~0.7' is a heuristic consistent with, not mandated by, the paper).",
+    "status": "supported"
+   },
+   {
+    "title": "Broder et al. 1997, On the resemblance and containment of documents",
+    "url": "https://www.cs.princeton.edu/courses/archive/spring13/cos598C/broder97resemblance.pdf",
+    "type": "paper",
+    "quote": "\"A contiguous subsequence contained in D is called a shingle.\" ... \"the resemblance r of two documents A and B is defined as\" [shared shingles over total distinct shingles]; \"Hence the resemblance is some number between 0 and 1.\"",
+    "supports": "Shingle (contiguous word n-gram) overlap, as a Jaccard-style resemblance score, is an established near-duplicate measure; the 0.8 threshold and n=5 are our own tuning choices, not from the paper.",
+    "status": "partially"
+   },
+   {
+    "title": "RECOMP: Improving Retrieval-Augmented LMs with Compression and Selective Augmentation (arXiv 2310.04408)",
+    "url": "https://arxiv.org/abs/2310.04408",
+    "type": "paper",
+    "quote": "\"an extractive compressor which selects useful sentences from retrieved documents\"; \"an abstractive compressor which generates summaries by synthesizing information from multiple documents\"; \"our compressor can return an empty string, implementing selective augmentation.\"",
+    "supports": "Extractive (sentence selection) and abstractive (model-generated summary) compression of retrieved documents are established approaches. Does not itself state the risks of dropped qualifiers or altered numbers.",
+    "status": "partially"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Jaccard >0.8 on word 5-grams threshold (heuristic value)",
+   "Abstractive summaries alter numbers/drop qualifiers; extractive pruning can cut exceptions",
+   "Embedding similarity dedup drops near-identical clauses"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-04-5",
+  "claims": [
+   {
+    "claim": "A valid citation ID does not mean the passage supports the claim; cited passages often fail to fully support statements",
+    "field": "detailed_answer/common_mistakes",
+    "status": "supported",
+    "source_index": 0,
+    "note": "51.5% of sentences fully supported by citations."
+   },
+   {
+    "claim": "Entailment-style (NLI) check of claim versus cited passage; automatic citation checks correlate with human judgement",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "ALCE uses an NLI model (TRUE) to test whether cited passages entail the generation, and reports strong correlation with humans. LLM-judge calibration advice is separate."
+   },
+   {
+    "claim": "Models can invent citation IDs; verbatim-quote substring check catches fabricated support",
+    "field": "detailed_answer/practical_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Mechanical validation is a derivation; no opened source documents invented IDs specifically."
+   },
+   {
+    "claim": "Sentence-level citation is harder for models to produce reliably than a source list at the end",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found; left as engineering judgement."
+   },
+   {
+    "claim": "Post-hoc attribution may attach a plausible passage to a claim from parametric memory",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Derivation in evidence_so_far."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Evaluating Verifiability in Generative Search Engines (arXiv 2304.09848)",
+    "url": "https://arxiv.org/abs/2304.09848",
+    "type": "paper",
+    "quote": "\"on average, a mere 51.5% of generated sentences are fully supported by citations\"; defines \"high citation precision; every cite supports its associated statement\" and \"high citation recall; all statements are fully supported by citations\".",
+    "supports": "Having a citation does not mean the cited source supports the sentence; citation precision and recall are separate properties that must be checked.",
+    "status": "supported"
+   },
+   {
+    "title": "ALCE: Enabling LLMs to Generate Text with Citations (arXiv 2305.14627)",
+    "url": "https://arxiv.org/pdf/2305.14627",
+    "type": "paper",
+    "quote": "The paper uses TRUE to \"examine whether the cited passages entail the model generation\"; \"We calculate the citation recall of each statement (0 or 1) and average over all statements\"; \"Our automatic evaluation of citation quality strongly correlates with human judgements.\" Abstract: \"even the best models lack complete citation support 50% of the time.\"",
+    "supports": "Entailment-style (NLI) checking of a statement against its cited passages is an established citation-support evaluation that correlates with human judgement, and a cited passage often does not fully support the statement.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Models can invent citation IDs",
+   "Sentence-level citation less reliable than trailing source list",
+   "Quote verification adds output tokens / brittle to paraphrase (engineering judgement)"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-04-6",
+  "claims": [
+   {
+    "claim": "8192-600-100-1200-1000 = 5,292; 11 chunks; running totals",
+    "field": "concise/detailed/practical",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Executed arithmetic."
+   },
+   {
+    "claim": "System prompt, history and generated output all count toward one context window",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Quote supports the shared-window budget; the answer reserve concept is consistent with output counting toward the window."
+   },
+   {
+    "claim": "Over-length prompt is rejected by the provider",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 0,
+    "note": "Supported for this provider (400 'prompt is too long' for oversized input). Our text already says 'depending on the stack'."
+   },
+   {
+    "claim": "Some stacks silently truncate the start or end of an over-length prompt",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No opened source documents silent truncation; the doc describes errors instead. Wording is already hedged."
+   },
+   {
+    "claim": "Word-count estimates can be off by tens of percent; tokenisation differs across models",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Not verified against an opened source."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Claude docs: Context windows",
+    "url": "https://platform.claude.com/docs/en/build-with-claude/context-windows",
+    "type": "official_doc",
+    "quote": "\"Everything in the request counts toward the context window: the system prompt, every message in messages ... The output Claude generates for the turn, including its extended thinking, counts too.\" \"If the input alone already exceeds the model's context window, the API returns a 400 invalid_request_error (\\\"prompt is too long\\\") on every model.\" \"On earlier models, the API returns a validation error instead.\"",
+    "supports": "System prompt, history, and generated output all share one window, and an over-long input is rejected with an error on this provider. Does not document silent truncation.",
+    "status": "partially"
+   }
+  ],
+  "fixes": [
+   {
+    "field": "detailed_answer",
+    "claim": "either the request fails or the provider/framework truncates silently (depending on the stack, by cutting the start or the end of the prompt)",
+    "problem": "Opened vendor documentation only supports rejection with an error; silent truncation is not documented in any source we opened.",
+    "replacement": "either the request is rejected with an error (as the Claude API does for an over-long input) or, in some frameworks, the prompt is truncated (cutting the start or the end, depending on the stack)"
+   }
+  ],
+  "residual_background_only": [
+   "Some stacks silently truncate (framework-dependent, unsourced)",
+   "Word-count token estimates off by tens of percent"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-07-1",
+  "claims": [
+   {
+    "claim": "Position/distraction effects: chunk position and extra context change accuracy",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Relevant info in the middle of long context is used less well."
+   },
+   {
+    "claim": "Position effect is model-dependent, so test it",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 0,
+    "note": "Paper shows the effect across models, including explicitly long-context ones; the 'model-dependent magnitude' wording is our hedge."
+   },
+   {
+    "claim": "Parametric override: model answers from memory instead of the context",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 1,
+    "note": "Paper shows LLMs are often receptive to conflicting context but show confirmation bias toward memory in some conditions; supports 'test it', not 'common default wins'."
+   },
+   {
+    "claim": "'30 days' is a typical notice period so the model defaults to it",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Illustrative assumption."
+   },
+   {
+    "claim": "Ablation ladder numbers",
+    "field": "practical_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Hypothetical results, derivation."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Lost in the Middle: How Language Models Use Long Contexts (arXiv 2307.03172)",
+    "url": "https://arxiv.org/abs/2307.03172",
+    "type": "paper",
+    "quote": "\"performance is often highest when relevant information occurs at the beginning or end of the input context\"; performance \"significantly degrades when models must access relevant information in the middle of long contexts\"; \"current language models do not robustly make use of information in long input contexts\".",
+    "supports": "Position of relevant information within the prompt affects answer quality, and extra irrelevant context can hurt.",
+    "status": "supported"
+   },
+   {
+    "title": "Adaptive Chameleon or Stubborn Sloth: Revealing the Behavior of LLMs in Knowledge Conflicts (arXiv 2305.13300)",
+    "url": "https://arxiv.org/abs/2305.13300",
+    "type": "paper",
+    "quote": "\"LLMs can be highly receptive to external evidence even when that conflicts with their parametric memory\"; \"LLMs also demonstrate a strong confirmation bias\" when external evidence partly matches their parametric memory, \"despite being presented with conflicting evidence at the same time.\"",
+    "supports": "Models can be pulled toward parametric memory over supplied context in some conditions, but are not uniformly stubborn, so the override test is worth running rather than assumed.",
+    "status": "partially"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "'30 days' typical default notice period (illustrative)"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-07-2",
+  "claims": [
+   {
+    "claim": "Faithfulness (claims supported by context) is distinct from correctness (claims true); a true unsupported claim is unfaithful",
+    "field": "detailed_answer/common_mistakes",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Hallucinated content can be factual yet not supported by the source."
+   },
+   {
+    "claim": "Faithfulness defined as claims supported by the retrieved context",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Direct definition."
+   },
+   {
+    "claim": "Lower temperature helps variability, not grounding",
+    "field": "detailed_answer/common_mistakes",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found; left as engineering judgement."
+   },
+   {
+    "claim": "Closed-book reappearance indicates parametric source; 512/640 arithmetic",
+    "field": "detailed_answer/practical_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Executed/derived."
+   }
+  ],
+  "sources": [
+   {
+    "title": "On Faithfulness and Factuality in Abstractive Summarization (arXiv 2005.00661)",
+    "url": "https://arxiv.org/pdf/2005.00661",
+    "type": "paper",
+    "quote": "\"the majority of hallucinations are extrinsic, which potentially could be valid abstractions that use background knowledge.\" \"Hallucinations are not necessarily erroneous.\" \"Factual hallucinations may be composed of intrinsic hallucinations or extrinsic hallucinations.\"",
+    "supports": "Content not supported by the source document (unfaithful) can still be factually true, so faithfulness and correctness are distinct properties.",
+    "status": "supported"
+   },
+   {
+    "title": "Ragas docs: Faithfulness",
+    "url": "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/faithfulness/",
+    "type": "official_doc",
+    "quote": "\"The Faithfulness metric measures how factually consistent a response is with the retrieved context.\" \"A response is considered faithful if all its claims can be supported by the retrieved context.\"",
+    "supports": "Faithfulness is defined over the response and the retrieved context (not against a reference answer).",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Lowering temperature does not fix grounding"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-07-3",
+  "claims": [
+   {
+    "claim": "Feedback bias: unhappy users click thumbs-down more; thumbs-down reflects latency/UI",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found; left as engineering judgement."
+   },
+   {
+    "claim": "Query distribution shift between team-written golden queries and real users; stale golden set",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found; left as engineering judgement."
+   },
+   {
+    "claim": "Faithfulness measures support, not usefulness",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Ragas defines faithfulness only as consistency of response claims with retrieved context, so a faithful but unhelpful answer can score well."
+   },
+   {
+    "claim": "LLM faithfulness judge may be lenient / miscalibrated against humans",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found; left as engineering judgement."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Ragas docs: Faithfulness",
+    "url": "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/faithfulness/",
+    "type": "official_doc",
+    "quote": "\"The Faithfulness metric measures how factually consistent a response is with the retrieved context.\" \"A response is considered faithful if all its claims can be supported by the retrieved context.\"",
+    "supports": "Faithfulness is defined over the response and the retrieved context (not against a reference answer).",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Feedback bias",
+   "Distribution shift and stale golden set",
+   "LLM judge leniency"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-07-4",
+  "claims": [
+   {
+    "claim": "Model effect +2, chunk effect -7",
+    "field": "practical_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Executed."
+   },
+   {
+    "claim": "New embedding model may need different query/document prefix",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Docs state some models require specific prompts; E5 example."
+   },
+   {
+    "claim": "Blue/green index with an alias; roll back with one alias flip",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Atomic alias switch."
+   },
+   {
+    "claim": "Same, for Elasticsearch",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 2,
+    "note": "Aliases allow reindex without downtime and atomic switching."
+   },
+   {
+    "claim": "Truncated input exceeding the new model's token limit",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Fetched sbert pages did not show the max_seq_length text, so not cited."
+   },
+   {
+    "claim": "256-token chunks double the chunk count",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Derivation."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Sentence Transformers docs: Computing Embeddings (prompts)",
+    "url": "https://sbert.net/examples/sentence_transformer/applications/computing-embeddings/README.html",
+    "type": "official_doc",
+    "quote": "\"Some models require using specific text prompts to achieve optimal performance.\" The E5 example prefixes queries with \"query: \" and passages with \"passage:\".",
+    "supports": "Some embedding models need specific query/document prefixes, so a model swap can silently degrade retrieval if they are omitted.",
+    "status": "supported"
+   },
+   {
+    "title": "Qdrant docs: Collections (aliases)",
+    "url": "https://qdrant.tech/documentation/concepts/collections/",
+    "type": "official_doc",
+    "quote": "\"Aliases are additional names for existing collections.\" \"Multiple alias actions are performed atomically.\" \"Since all changes of aliases happen atomically, no concurrent requests will be affected during the switch.\"",
+    "supports": "Pointing an alias at a newly built collection and switching atomically gives a one-step cutover and rollback (blue/green index versioning).",
+    "status": "supported"
+   },
+   {
+    "title": "Elasticsearch docs: Aliases",
+    "url": "https://www.elastic.co/docs/manage-data/data-store/aliases",
+    "type": "official_doc",
+    "quote": "\"You can use the aliases API to perform multiple actions in a single atomic operation.\" Benefits of aliases include \"Reindex data without downtime\" and \"Change which indices/data streams your application uses in real time.\"",
+    "supports": "Aliases allow reindexing and switching an application between indices without downtime.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Inputs exceeding the embedding model's max sequence length are truncated"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-07-5",
+  "claims": [
+   {
+    "claim": "Dense retrievers do poorly on entity-centric / rare-entity questions versus sparse methods",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 0,
+    "note": "Supports weak dense performance on entities; near-miss ID conflation is our inference."
+   },
+   {
+    "claim": "BM25 is a robust baseline; lexical retrieval complements dense",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Abstract quote."
+   },
+   {
+    "claim": "Fuse lexical and dense with RRF",
+    "field": "detailed_answer/practical_answer",
+    "status": "supported",
+    "source_index": 2,
+    "note": "Elasticsearch docs define RRF."
+   },
+   {
+    "claim": "Rare IDs tokenised into subword fragments, embeddings similar to other IDs (SLA-7 near SLA-8)",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Mechanism plausible but no opened source states it."
+   },
+   {
+    "claim": "Fine-tuning handles arbitrary IDs poorly",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found; left as engineering judgement."
+   },
+   {
+    "claim": "Hybrid table numbers",
+    "field": "practical_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Hypothetical, derivation."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Simple Entity-Centric Questions Challenge Dense Retrievers (arXiv 2109.08535)",
+    "url": "https://arxiv.org/abs/2109.08535",
+    "type": "paper",
+    "quote": "\"observe that dense retrievers drastically underperform sparse methods.\" \"dense retrievers can only generalize to common entities unless the question pattern is explicitly observed during training.\"",
+    "supports": "Dense retrievers do poorly on entity-centric questions relative to sparse (BM25-style) retrieval, which supports our diagnosis for ID/acronym queries. It does not specifically show near-miss ID conflation.",
+    "status": "partially"
+   },
+   {
+    "title": "BEIR: A Heterogeneous Benchmark for Zero-shot Evaluation of IR Models (arXiv 2104.08663)",
+    "url": "https://arxiv.org/abs/2104.08663",
+    "type": "paper",
+    "quote": "\"Our results show BM25 is a robust baseline\"; dense and sparse-retrieval models \"often underperform other approaches, highlighting the considerable room for improvement in their generalization capabilities.\"",
+    "supports": "BM25 is a robust baseline that dense models do not uniformly beat out of domain, supporting adding lexical retrieval.",
+    "status": "supported"
+   },
+   {
+    "title": "Elasticsearch docs: Reciprocal rank fusion",
+    "url": "https://www.elastic.co/docs/reference/elasticsearch/rest-apis/reciprocal-rank-fusion",
+    "type": "official_doc",
+    "quote": "\"Reciprocal rank fusion (RRF) is a method for combining multiple result sets with different relevance indicators\"; scoring: \"score += 1.0 / ( k + rank( result(q), d ) )\".",
+    "supports": "RRF is a standard way to fuse lexical and dense result lists using rank only.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [
+   {
+    "field": "detailed_answer",
+    "claim": "so their embeddings are weakly informative and similar to many other IDs",
+    "problem": "Stated as established fact; the opened source only shows dense retrievers underperform sparse methods on entity-centric questions, not the embedding-similarity mechanism.",
+    "replacement": "so their embeddings are plausibly weakly informative and may sit close to many other IDs (dense retrievers are documented to underperform sparse methods on entity-centric questions)"
+   }
+  ],
+  "residual_background_only": [
+   "Subword fragmentation makes ID embeddings near-neighbours of other IDs",
+   "Fine-tuned embedders still handle arbitrary IDs poorly"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-05-1",
+  "claims": [
+   {
+    "claim": "Paired bootstrap: resample queries with replacement, score both systems on each resample",
+    "field": "detailed_answer/practical_answer",
+    "status": "partially",
+    "source_index": 0,
+    "note": "Describes paired bootstrap resampling; percentile CI on mean difference is standard but Koehn computes win frequency."
+   },
+   {
+    "claim": "Small test sets need large gains to be significant; 40 queries too small",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Test size strongly affects significance threshold."
+   },
+   {
+    "claim": "Exact sign / McNemar-style test on discordant queries",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 2,
+    "note": "Exact binomial McNemar exists; p=2x37/256 itself is arithmetic."
+   },
+   {
+    "claim": "CI [-0.025,+0.225], SE 0.070 vs 0.112, p~0.29, 400-query CI",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Executed."
+   },
+   {
+    "claim": "Queries not independent, so cluster the resampling; percentile bootstrap approximate at small n; multiple comparisons",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found; left as engineering judgement."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Koehn 2004, Statistical Significance Tests for Machine Translation Evaluation",
+    "url": "https://aclanthology.org/W04-3250.pdf",
+    "type": "paper",
+    "quote": "\"We call this method paired bootstrap resampling, since we compare a pair of systems.\" \"create new virtual test sets by drawing sentences with replacement from the collection.\" \"For each set, we compute the evaluation metric score for both systems.\"",
+    "supports": "Resampling the test items with replacement and scoring both systems on each resample (paired bootstrap) is an established method. Koehn derives significance from win frequency; the percentile CI on the mean difference is the standard analogous use.",
+    "status": "partially"
+   },
+   {
+    "title": "Berg-Kirkpatrick et al. 2012, An Empirical Investigation of Statistical Significance in NLP",
+    "url": "https://aclanthology.org/D12-1091.pdf",
+    "type": "paper",
+    "quote": "\"As might be expected, the size of the test corpus has a large effect.\" \"the larger the corpus size, the lower the threshold for p-value < 0.05\"; \"the first 100 sentences of the Brown corpus have a threshold of 3.00 F1.\"",
+    "supports": "Small test sets need large observed gains to be significant, supporting 'the set is too small' for a 10-point gain on 40 queries.",
+    "status": "supported"
+   },
+   {
+    "title": "statsmodels docs: mcnemar",
+    "url": "https://www.statsmodels.org/stable/generated/statsmodels.stats.contingency_tables.mcnemar.html",
+    "type": "official_doc",
+    "quote": "\"If exact is True, then the binomial distribution will be used.\" \"If the exact binomial distribution is used, then this contains the min(n1, n2),\" where n1 and n2 are the counts that are zero in one sample and one in the other.",
+    "supports": "McNemar's test on a 2x2 paired table can be computed exactly with the binomial distribution on the discordant cells, matching our sign-test framing (the page does not use the word 'discordant').",
+    "status": "partially"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Clustered resampling for non-independent queries",
+   "Percentile bootstrap approximate at small n",
+   "Multiple-comparison caution"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-05-2",
+  "claims": [
+   {
+    "claim": "kappa = (p_o - p_e)/(1 - p_e) with p_e from marginals",
+    "field": "detailed_answer/practical_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Formula and marginal-based p_e confirmed."
+   },
+   {
+    "claim": "Confusion matrix 88/2/7/3, kappa 0.357, balanced 0.82, per-class recall 3/10",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Executed/derived."
+   },
+   {
+    "claim": "Kappa depends on prevalence and is not comparable across class mixes",
+    "field": "detailed_answer/common_mistakes",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Opened sklearn page is silent on prevalence."
+   },
+   {
+    "claim": "Report human-human agreement, oversample bad examples",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found; left as engineering judgement."
+   }
+  ],
+  "sources": [
+   {
+    "title": "scikit-learn docs: cohen_kappa_score",
+    "url": "https://scikit-learn.org/stable/modules/generated/sklearn.metrics.cohen_kappa_score.html",
+    "type": "official_doc",
+    "quote": "\"a score that expresses the level of agreement between two annotators on a classification problem.\" kappa = (p_o - p_e) / (1 - p_e), where p_e \"is the expected agreement when both annotators assign labels randomly. p_e is estimated using a per-annotator empirical prior over the class labels\". \"0.0 indicates no agreement beyond what would be expected by chance.\"",
+    "supports": "Kappa formula, the marginal-based chance-agreement estimate and the chance-level interpretation of 0 match our calculation. The page says nothing on prevalence effects.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Kappa prevalence dependence / non-comparability across datasets",
+   "Report human-human agreement and oversample bad items"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-05-3",
+  "claims": [
+   {
+    "claim": "Faithfulness uses answer plus context",
+    "field": "detailed_answer/concise_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Direct."
+   },
+   {
+    "claim": "Answer relevance uses question plus answer and does not assess factual accuracy",
+    "field": "detailed_answer/concise_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Direct."
+   },
+   {
+    "claim": "Correctness needs a reference answer",
+    "field": "detailed_answer/concise_answer",
+    "status": "supported",
+    "source_index": 2,
+    "note": "Direct."
+   },
+   {
+    "claim": "Faithful content can be incorrect / unfaithful content can be correct",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 3,
+    "note": "Hallucinated content may be factual."
+   },
+   {
+    "claim": "A/B/C labelling",
+    "field": "concise_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Derivation."
+   },
+   {
+    "claim": "An LLM faithfulness judge inherits errors in the context it is shown",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Follows from the definition (judged against context)."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Ragas docs: Faithfulness",
+    "url": "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/faithfulness/",
+    "type": "official_doc",
+    "quote": "\"The Faithfulness metric measures how factually consistent a response is with the retrieved context.\" \"A response is considered faithful if all its claims can be supported by the retrieved context.\"",
+    "supports": "Faithfulness is defined over the response and the retrieved context (not against a reference answer).",
+    "status": "supported"
+   },
+   {
+    "title": "Ragas docs: Answer Relevancy",
+    "url": "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/answer_relevance/",
+    "type": "official_doc",
+    "quote": "\"The Answer Relevancy metric measures how relevant a response is to the user input.\" \"This metric is calculated using the user_input and the response\" and \"focuses on how well the answer matches the intent of the question, without evaluating factual accuracy.\"",
+    "supports": "Relevance uses question plus answer and does not assess factual accuracy.",
+    "status": "supported"
+   },
+   {
+    "title": "Ragas docs: Factual Correctness",
+    "url": "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/factual_correctness/",
+    "type": "official_doc",
+    "quote": "FactualCorrectness \"compares and evaluates the factual accuracy of the generated response with the reference.\"",
+    "supports": "Correctness needs a reference answer.",
+    "status": "supported"
+   },
+   {
+    "title": "On Faithfulness and Factuality in Abstractive Summarization (arXiv 2005.00661)",
+    "url": "https://arxiv.org/pdf/2005.00661",
+    "type": "paper",
+    "quote": "\"the majority of hallucinations are extrinsic, which potentially could be valid abstractions that use background knowledge.\" \"Hallucinations are not necessarily erroneous.\" \"Factual hallucinations may be composed of intrinsic hallucinations or extrinsic hallucinations.\"",
+    "supports": "Content not supported by the source document (unfaithful) can still be factually true, so faithfulness and correctness are distinct properties.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": []
+ },
+ {
+  "plan_id": "B1-GEN-05-4",
+  "claims": [
+   {
+    "claim": "Position, verbosity and self-enhancement biases exist in LLM judges but vary by model",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Direct, with per-model differences."
+   },
+   {
+    "claim": "Answer order alone changes verdicts/rankings",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Direct."
+   },
+   {
+    "claim": "Count a win only when same system wins in both orders; disagreements are ties",
+    "field": "detailed_answer/practical_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Direct."
+   },
+   {
+    "claim": "Control for length (length-matched bins / length-adjusted win rate)",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 2,
+    "note": "Length-controlled evaluation is an established mitigation."
+   },
+   {
+    "claim": "Self-preference: a judge tends to favour text resembling its own outputs",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 0,
+    "note": "Paper reports mixed self-enhancement evidence and states it cannot determine it; wording should be hedged."
+   },
+   {
+    "claim": "Worked example arithmetic",
+    "field": "practical_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Executed."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena (arXiv 2306.05685)",
+    "url": "https://arxiv.org/pdf/2306.05685",
+    "type": "paper",
+    "quote": "\"Position bias is when an LLM exhibits a propensity to favor certain positions over others.\" \"Verbosity bias is when an LLM judge favors longer, verbose responses.\" Self-enhancement: \"the effect that LLM judges may favor the answers generated by themselves.\" Swap method: \"only declare a win when an answer is preferred in both orders\" and \"If the results are inconsistent after swapping, we can call it a tie.\" \"Only GPT-4 outputs consistent results in more than 60% of cases.\" \"GPT-4 defends significantly better than others\" against verbosity. \"Due to limited data and small differences, our study cannot determine whether the models exhibit a self-enhancement bias.\"",
+    "supports": "Position, verbosity and self-enhancement biases exist in LLM judges, vary across judge models, and the both-orders-agree-else-tie rule is a published mitigation. Self-enhancement evidence is explicitly inconclusive.",
+    "status": "supported"
+   },
+   {
+    "title": "Large Language Models are not Fair Evaluators (arXiv 2305.17926)",
+    "url": "https://arxiv.org/abs/2305.17926",
+    "type": "paper",
+    "quote": "\"the quality ranking of candidate responses can be easily hacked by simply altering their order of appearance\"; proposes \"Balanced Position Calibration, which aggregates results across various orders to determine the final score\".",
+    "supports": "Answer order alone can change an LLM evaluator's ranking; aggregating across orders is a mitigation.",
+    "status": "supported"
+   },
+   {
+    "title": "Length-Controlled AlpacaEval (arXiv 2404.04475)",
+    "url": "https://arxiv.org/abs/2404.04475",
+    "type": "paper",
+    "quote": "\"Despite being highly correlated with human preferences, AlpacaEval is known to favor models that generate longer outputs.\" \"We introduce a length-controlled AlpacaEval that aims to answer the counterfactual question:\"",
+    "supports": "Automatic judges can favour longer outputs, and length-controlled comparison is a recognised mitigation.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [
+   {
+    "field": "detailed_answer",
+    "claim": "self-preference (a judge tending to favour text resembling its own outputs, so avoid using the same model family as both generator and judge, or at least check)",
+    "problem": "Stated as an established tendency; the MT-Bench paper found mixed evidence and said it could not determine whether self-enhancement bias exists.",
+    "replacement": "self-preference (judges may favour text resembling their own outputs; evidence is mixed, so avoid using the same model family as both generator and judge, or at least check)"
+   }
+  ],
+  "residual_background_only": []
+ },
+ {
+  "plan_id": "B1-GEN-05-5",
+  "claims": [
+   {
+    "claim": "LLM-written questions copy chunk vocabulary, favouring lexical retrievers (BM25)",
+    "field": "concise_answer, detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "BEIR documents lexical bias in human-annotated pools built from lexical systems, which is a different mechanism from LLM question generation; the synthetic-test-collection paper (2405.07767) explicitly does not analyse lexical systems. Our text already hedges ('likely, not guaranteed; measure it'), so keep the hedge."
+   },
+   {
+    "claim": "Pools built from lexical systems bias a benchmark towards lexical retrieval; remedy is diverse pooling",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Supports the pooled-from-several-diverse-retrievers recommendation and the general direction of lexical bias in golden sets (not the LLM-generation case specifically)."
+   },
+   {
+    "claim": "Synthetic questions differ from real queries / are easier than real ones",
+    "field": "concise_answer, detailed_answer",
+    "status": "partially",
+    "source_index": 1,
+    "note": "Paper shows synthetic queries differ in length and have fewer relevant documents and that synthetic collections tend to be easier than real queries; it does not say they are shorter or vaguer, and it found no clear systematic bias towards LLM-based systems."
+   },
+   {
+    "claim": "Unjudged/duplicate alternative chunks are scored as misses, penalising systems that find valid alternatives",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 2,
+    "note": "Zobel: unjudged documents are assumed not relevant; a technique that did not contribute to the pool may be underestimated."
+   }
+  ],
+  "sources": [
+   {
+    "title": "BEIR: A Heterogenous Benchmark for Zero-shot Evaluation of Information Retrieval Models (Thakur et al., 2021)",
+    "url": "https://arxiv.org/pdf/2104.08663",
+    "type": "paper",
+    "quote": "Such a lexical bias disfavours approaches that don't rely on lexical matching, like dense retrieval methods; ... the annotation pool is still biased towards lexical approaches.; Better datasets, that use diverse pooling strategies",
+    "supports": "Annotation pools drawn from lexical systems bias evaluation towards lexical retrievers, and diverse pooling is the remedy.",
+    "status": "partially"
+   },
+   {
+    "title": "Synthetic Test Collections for Retrieval Evaluation (Rahmani et al., 2024)",
+    "url": "https://arxiv.org/pdf/2405.07767",
+    "type": "paper",
+    "quote": "synthetic queries contain much fewer relevant documents; ... synthetic test collections tend to be easier than real queries",
+    "supports": "LLM-generated queries are not interchangeable with real queries (they differ in length, relevant-document counts and difficulty).",
+    "status": "partially"
+   },
+   {
+    "title": "How Reliable are the Results of Large-Scale Information Retrieval Experiments? (Zobel, SIGIR 1998)",
+    "url": "https://www.cs.cornell.edu/courses/cs574/2002fa/assignments.org/zobel-sigir98.pdf",
+    "type": "paper",
+    "quote": "unjudged documents are assumed to be not relevant.; a technique that did not have an opportunity to contribute to the pool may have its effectiveness underestimated.",
+    "supports": "Single-gold or narrowly pooled labels score valid but unlabelled results as misses and disadvantage systems outside the pool.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "LLM-written questions copy chunk vocabulary, favouring BM25 (no source found for this specific mechanism; already hedged in text)"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-05-6",
+  "claims": [
+   {
+    "claim": "With long contexts, models often use evidence in the middle less reliably than at the edges",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Direct match to the abstract."
+   },
+   {
+    "claim": "Extra irrelevant chunks can distract the generator",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 0,
+    "note": "The retrieved abstract covers position effects only; distraction by irrelevant context was not confirmed in the text I opened."
+   },
+   {
+    "claim": "SE of 61% at n=200 is 3.4 points; paired SE sqrt(flips)/200",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Executed."
+   },
+   {
+    "claim": "Oracle-context and no-context baselines establish the ceiling / parametric knowledge",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Experimental-design recommendation; no source sought."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Lost in the Middle: How Language Models Use Long Contexts (Liu et al., 2023)",
+    "url": "https://arxiv.org/abs/2307.03172",
+    "type": "paper",
+    "quote": "performance is often highest when relevant information occurs at the beginning or end of the input context, and significantly degrades when models must access relevant information in the middle of long contexts.",
+    "supports": "Position effect: models use middle-of-context evidence less reliably than evidence at the edges.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "extra irrelevant chunks can distract the generator (position-effect part sourced; distraction part not confirmed)"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-05-7",
+  "claims": [
+   {
+    "claim": "Metrics treat unjudged documents as non-relevant",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "BEIR states this directly and measures Hole@10."
+   },
+   {
+    "claim": "Pooling bias: systems that did not contribute to the pool are underestimated",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Zobel."
+   },
+   {
+    "claim": "Judging the unjudged holes of the new system raises its scores (fix 2)",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "BEIR manually annotated the holes for TREC-COVID, which raised nDCG@10 for non-lexical systems such as ANCE."
+   },
+   {
+    "claim": "Pool several diverse systems and re-pool when adding a system (fix 1)",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "BEIR calls for datasets using diverse pooling strategies."
+   },
+   {
+    "claim": "Condensed lists drop unjudged documents (fix 3, sensitivity check)",
+    "field": "answer",
+    "status": "supported",
+    "source_index": 2,
+    "note": "Definition matches. Sakai also finds condensed-list metrics are not necessarily better under biased judgments, so 'sensitivity check' is the correct framing."
+   },
+   {
+    "claim": "Example numbers (recall@5 2/3, precision 2/5 vs 4/5)",
+    "field": "answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Executed/derived."
+   },
+   {
+    "claim": "More queries do not fix systematic missing labels",
+    "field": "answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Reasoning claim; follows from bias being systematic."
+   }
+  ],
+  "sources": [
+   {
+    "title": "BEIR (Thakur et al., 2021)",
+    "url": "https://arxiv.org/pdf/2104.08663",
+    "type": "paper",
+    "quote": "All other unseen documents are assumed to be irrelevant.; manually added for all systems, the missing annotation (or holes); Better datasets, that use diverse pooling strategies",
+    "supports": "Unjudged documents count as irrelevant, holes can be annotated, and diverse pooling is the remedy.",
+    "status": "supported"
+   },
+   {
+    "title": "How Reliable are the Results of Large-Scale Information Retrieval Experiments? (Zobel, SIGIR 1998)",
+    "url": "https://www.cs.cornell.edu/courses/cs574/2002fa/assignments.org/zobel-sigir98.pdf",
+    "type": "paper",
+    "quote": "unjudged documents are assumed to be not relevant.; a technique that did not have an opportunity to contribute to the pool may have its effectiveness underestimated.",
+    "supports": "Pooling bias against systems that did not contribute to the judged pool.",
+    "status": "supported"
+   },
+   {
+    "title": "On the Robustness of Information Retrieval Metrics to Biased Relevance Assessments (Sakai, 2009)",
+    "url": "https://ipsj.ixsq.nii.ac.jp/records/66516",
+    "type": "paper",
+    "quote": "metrics based on a condensed list, obtained by removing all unjudged documents from the original ranked list; these results do not hold when the relevance data are biased towards particular systems or towards the top of the pools",
+    "supports": "Defines condensed lists; shows they are not a guaranteed remedy under biased judgments, so use as a sensitivity check only.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "More queries do not help because missing labels bias every query in the same direction (reasoning, no source)"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-05-8",
+  "claims": [
+   {
+    "claim": "Evidence-coverage metric, k=3 and k=4 aggregates",
+    "field": "detailed_answer, practical_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Executed."
+   },
+   {
+    "claim": "Multi-chunk questions need all evidence present; mean coverage vs full-coverage rate",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Metric-design argument; no external source needed."
+   }
+  ],
+  "sources": [],
+  "fixes": [],
+  "residual_background_only": []
+ },
+ {
+  "plan_id": "B1-GEN-06-1",
+  "claims": [
+   {
+    "claim": "Post-filtering can leave few or no matches because the unfiltered search may contain no match at all",
+    "field": "concise_answer, detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Weaviate filtering docs."
+   },
+   {
+    "claim": "Filtered traversal can fragment the graph so recall fails past a selectivity threshold",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Qdrant article: graph decomposes into small connected components; extra edges fix it."
+   },
+   {
+    "claim": "Engines switch to brute force / full scan when the filter is selective (implementations differ)",
+    "field": "concise_answer, detailed_answer",
+    "status": "supported",
+    "source_index": 2,
+    "note": "Qdrant planner uses cardinality estimation and full scan; Weaviate uses a flat-search cutoff (source 0)."
+   },
+   {
+    "claim": "Traversal-time filtering 'still walking through non-matching nodes' and the graph of matching nodes disconnecting",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 1,
+    "note": "Qdrant's described naive method restricts the greedy search to matching nodes, which is what disconnects. Weaviate/ACORN keeps following all links. Our sentence mixes the two variants."
+   },
+   {
+    "claim": "Post-filter when most data matches; traversal filtering in the middle range; thresholds ('more than half')",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Only engine-specific cutoffs found (Weaviate ~15% of dataset size); the generic bands are heuristics."
+   },
+   {
+    "claim": "Arithmetic (100 x 0.005, ef ~2000, 307 MB)",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Executed."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Weaviate docs: Filtering (concepts)",
+    "url": "https://docs.weaviate.io/weaviate/concepts/filtering",
+    "type": "official_doc",
+    "quote": "there is a chance that the original vector search does not contain any match at all; ... The cut-off is configured at ~15% of the dataset size.",
+    "supports": "Post-filtering can return nothing for restrictive filters, and engines fall back to flat search of the matching subset.",
+    "status": "supported"
+   },
+   {
+    "title": "Qdrant: Filterable HNSW",
+    "url": "https://qdrant.tech/articles/filterable-hnsw/",
+    "type": "official_doc",
+    "quote": "This threshold is due to the decomposition of the graph into small connected components.",
+    "supports": "Applying the filter to graph nodes during search can disconnect the graph and make search fail past a threshold.",
+    "status": "supported"
+   },
+   {
+    "title": "Qdrant docs: Indexing",
+    "url": "https://qdrant.tech/documentation/concepts/indexing/",
+    "type": "official_doc",
+    "quote": "The index is also used to accurately estimate the filter cardinality; ... the query planner will use full-scan search instead of HNSW index",
+    "supports": "Engines estimate filter cardinality and switch to full scan when a filter is selective.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [
+   {
+    "field": "detailed_answer",
+    "claim": "still walking through non-matching nodes",
+    "problem": "Sources describe two variants: Qdrant's naive method walks only matching nodes (and disconnects); Weaviate/ACORN keeps traversing all links. The text attributes the disconnection to the variant that walks non-matching nodes.",
+    "replacement": "in some engines still walking through non-matching nodes and in others restricting the walk to matching ones"
+   }
+  ],
+  "residual_background_only": [
+   "generic selectivity bands for choosing post-filter vs traversal vs pre-filter",
+   "post-filter failure when the filter correlates with the query (reasoned, not quoted)"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-06-2",
+  "claims": [
+   {
+    "claim": "HNSW layer 0 allows up to 2M links per node",
+    "field": "detailed_answer, practical_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Paper: 2*M is a good choice for Mmax0."
+   },
+   {
+    "claim": "Level assigned with exponentially decaying probability; upper layers hold about n/(M-1) entries",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 0,
+    "note": "Paper gives mL=1/ln(M), i.e. skip-list p=1/M; the n/(M-1) total follows from the geometric sum n/M + n/M^2 + ... (derivation, not quoted). 'Up to M links each' in upper layers not confirmed from the text read."
+   },
+   {
+    "claim": "SQ8 uses 1 byte per dimension; PQ code size = ceil(M*nbits/8) bytes",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "FAISS wiki table. With 96 sub-quantizers x 8 bits = 96 bytes."
+   },
+   {
+    "claim": "HNSW flat memory is vector bytes plus graph links (about M*2*4 bytes per vector on layer 0)",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 1,
+    "note": "FAISS lists 4*d + x*M*2*4 bytes per vector with x undefined on the page; consistent with ours, but not an exact confirmation of the upper-layer term."
+   },
+   {
+    "claim": "int8 recall loss often small but data/model-dependent",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Hedged already; no source quoted."
+   },
+   {
+    "claim": "160.2 / 480.6 / 45.0 / 11.4 / 6.6 GB and node counts",
+    "field": "detailed_answer, practical_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Executed."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Efficient and robust approximate nearest neighbor search using Hierarchical Navigable Small World graphs (Malkov & Yashunin)",
+    "url": "https://arxiv.org/pdf/1603.09320",
+    "type": "paper",
+    "quote": "2\u2219M is a good choice for Mmax0; ... corresponds to the skip list parameter p=1/M",
+    "supports": "Layer-0 degree cap of 2M and the exponentially decaying layer assignment behind the ~1/M node fraction per layer.",
+    "status": "supported"
+   },
+   {
+    "title": "Faiss wiki: Faiss indexes",
+    "url": "https://github.com/facebookresearch/faiss/wiki/Faiss-indexes",
+    "type": "official_doc",
+    "quote": "IndexScalarQuantizer SQ8: d bytes per vector; IndexPQ: ceil(M * nbits / 8) bytes per vector; IndexHNSWFlat: 4*d + x * M * 2 * 4",
+    "supports": "int8 scalar quantisation costs one byte per dimension, PQ code size follows ceil(M*nbits/8), and HNSW adds M*2*4-byte link storage per vector.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "int8 recall loss is usually small but data-dependent",
+   "upper layers hold up to M links each (not confirmed)"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-06-3",
+  "claims": [
+   {
+    "claim": "Deleted vectors are marked, omitted from results, and remain in the index until later cleanup or replacement",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "hnswlib: mark_deleted omits from search; elements can later be replaced to save memory."
+   },
+   {
+    "claim": "Deleted objects stay connected to the HNSW graph until an async cleanup rebuilds edges",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Weaviate docs."
+   },
+   {
+    "claim": "Many soft-deleted points in the graph degrade filtered search quality",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 2,
+    "note": "Qdrant says the same problem (poor filtered traversal) can happen with many soft-deleted points. This supports a recall effect but not that deleted nodes consume ef budget."
+   },
+   {
+    "claim": "Deleted documents are reclaimed through segment merges based on a delete-percentage threshold",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 3,
+    "note": "Lucene TieredMergePolicy is a text index, but supports the compaction-by-merge pattern."
+   },
+   {
+    "claim": "Deleted nodes consume search ef budget; repeated inserts around deleted nodes reduce graph quality",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Stated as 'can' but not found in docs."
+   },
+   {
+    "claim": "Versioned ids, validity filter, alias swap, reconciliation design",
+    "field": "detailed_answer, practical_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Design recommendations."
+   }
+  ],
+  "sources": [
+   {
+    "title": "hnswlib README",
+    "url": "https://github.com/nmslib/hnswlib",
+    "type": "official_doc",
+    "quote": "marks the element as deleted, so it will be omitted from search results.; (by marking them in index, later can be replaced with other elements)",
+    "supports": "Delete in hnswlib is a mark; the element remains until replaced.",
+    "status": "supported"
+   },
+   {
+    "title": "Weaviate docs: Vector index concepts",
+    "url": "https://docs.weaviate.io/weaviate/concepts/vector-index",
+    "type": "official_doc",
+    "quote": "Prior to cleanup, objects are marked as deleted, but they are still connected to the HNSW graph.; Cleanup is an async process runs that rebuilds the HNSW graph after deletes and updates.",
+    "supports": "Deleted vectors stay in the graph until asynchronous cleanup.",
+    "status": "supported"
+   },
+   {
+    "title": "Qdrant docs: Indexing",
+    "url": "https://qdrant.tech/documentation/concepts/indexing/",
+    "type": "official_doc",
+    "quote": "The same can happen when there are a large number of soft-deleted points in the graph.",
+    "supports": "Many soft-deleted points can degrade graph search in the way described for filters.",
+    "status": "partially"
+   },
+   {
+    "title": "Lucene TieredMergePolicy javadoc",
+    "url": "https://lucene.apache.org/core/9_9_0/core/org/apache/lucene/index/TieredMergePolicy.html",
+    "type": "official_doc",
+    "quote": "Controls the maximum percentage of deleted documents that is tolerated in the index.",
+    "supports": "Deleted entries accumulate until merges reclaim them, governed by a delete-percentage threshold.",
+    "status": "partially"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "deleted nodes consume part of ef budget during traversal",
+   "inserting around deleted nodes reduces graph quality",
+   "versioned-id/validity-filter/alias-swap design (recommendations)"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-06-4",
+  "claims": [
+   {
+    "claim": "Newly written vectors/documents are invisible until the next refresh or commit; refresh interval controls freshness",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Elasticsearch NRT docs."
+   },
+   {
+    "claim": "Segments written and opened make documents searchable without full commit",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Same page."
+   },
+   {
+    "claim": "Small segments merged in the background in the style of log-structured merge designs",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Lucene merge policy is analogous but not sourced as LSM; leave as general background."
+   },
+   {
+    "claim": "200/s x 3600 = 720,000 chunks, 2.2 GB per scan",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Executed."
+   },
+   {
+    "claim": "Embedding batching and queueing often dominate the 30 s lag",
+    "field": "concise_answer, detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Practical heuristic; text says 'often' and says to measure."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Elasticsearch guide: Near real-time search",
+    "url": "https://www.elastic.co/guide/en/elasticsearch/reference/current/near-real-time.html",
+    "type": "official_doc",
+    "quote": "A refresh makes all operations performed on an index since the last refresh available for search.; Lucene allows new segments to be written and opened, making the documents they contain visible to search",
+    "supports": "Newly written documents become searchable only after a refresh that opens new segments; refresh interval is a freshness knob.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "LSM-style compaction analogy",
+   "embedding batching/queueing dominating the lag (heuristic)"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-06-5",
+  "claims": [
+   {
+    "claim": "Payload-partitioned single collection is efficient for many small similarly sized tenants; collection per tenant carries overhead",
+    "field": "concise_answer, detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Qdrant multitenancy guide. It says separate collections suit only a limited number of tenants needing strict isolation, which agrees with our hybrid (dedicated for large tenants)."
+   },
+   {
+    "claim": "In a shared collection isolation depends on every query filtering on the tenant field",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Same page."
+   },
+   {
+    "claim": "Per-tenant shards give isolation, and deleting a tenant deletes all its objects without affecting others",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Weaviate multi-tenancy."
+   },
+   {
+    "claim": "Engines differ in how many indexes they handle well",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Weaviate cites 50,000+ active shards per node bounded by file limits; Qdrant Cloud caps 1000 collections by default (source 0)."
+   },
+   {
+    "claim": "Selective tenant filter hurts ANN recall in a shared index; exact scan for small tenants",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 2,
+    "note": "Qdrant: planner full-scan for selective filters and tenant-aware indexing; recall impact itself is covered in B1-GEN-06-1 sources."
+   },
+   {
+    "claim": "300/100M = 3e-6",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Executed."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Qdrant docs: Multitenancy (multiple partitions)",
+    "url": "https://qdrant.tech/documentation/guides/multiple-partitions/",
+    "type": "official_doc",
+    "quote": "Creating a separate collection for each tenant is rarely the most efficient approach.; Each collection carries its own resource overhead, so creating many collections can quickly become expensive.; Only create multiple collections when you have a limited number of tenants that need strict isolation.",
+    "supports": "Shared partitioned collection for many small tenants, dedicated collections only for a few that need strict isolation, and per-collection overhead.",
+    "status": "supported"
+   },
+   {
+    "title": "Weaviate docs: Data concepts (multi-tenancy)",
+    "url": "https://docs.weaviate.io/weaviate/concepts/data",
+    "type": "official_doc",
+    "quote": "Each tenant's data is isolated on a dedicated shard.; deleting a tenant also deletes all of its objects.",
+    "supports": "Dedicated per-tenant storage gives isolation and simple tenant erasure.",
+    "status": "supported"
+   },
+   {
+    "title": "Qdrant docs: Indexing",
+    "url": "https://qdrant.tech/documentation/concepts/indexing/",
+    "type": "official_doc",
+    "quote": "the query planner will use full-scan search instead of HNSW index",
+    "supports": "Engines fall back to exact scan for very selective filters, as for a small tenant in a shared collection.",
+    "status": "partially"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "gateway-derived tenant id, canary documents, per-tenant encryption keys (security recommendations)",
+   "noisy-neighbour effects (general)"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-06-6",
+  "claims": [
+   {
+    "claim": "Lucene-style idf = ln(1 + (N - n + 0.5)/(n + 0.5))",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Lucene BM25Similarity javadoc; docCount is per field."
+   },
+   {
+    "claim": "Shards score with shard-local statistics, so scores differ across shards; a mode gathering global term/document frequencies first fixes it at the cost of an extra round trip",
+    "field": "concise_answer, detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Elastic blog (vendor-authored, hence secondary). The official search_type reference could not be read: the page text was truncated and the API markdown was blocked by robots."
+   },
+   {
+    "claim": "RRF scores sum 1/(k + rank) with k=60 as a widely used default",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 2,
+    "note": "Cormack et al."
+   },
+   {
+    "claim": "Per-shard rank merging or score normalisation are unsafe fallbacks when shards differ",
+    "field": "concise_answer, detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Stated cautiously, no source."
+   },
+   {
+    "claim": "Min-max / z-score normalisation is sensitive to outliers and list length",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "General statement, no source."
+   },
+   {
+    "claim": "idf values 10.72 and 8.73; RRF 0.03227 vs 0.03226",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Executed."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Lucene BM25Similarity javadoc",
+    "url": "https://lucene.apache.org/core/9_9_0/core/org/apache/lucene/search/similarities/BM25Similarity.html",
+    "type": "official_doc",
+    "quote": "Implemented as log(1 + (docCount - docFreq + 0.5)/(docFreq + 0.5)).",
+    "supports": "The Lucene idf formula used in the worked example.",
+    "status": "supported"
+   },
+   {
+    "title": "Elastic blog: Practical BM25 Part 1 - How Shards Affect Relevance Scoring in Elasticsearch",
+    "url": "https://www.elastic.co/blog/practical-bm25-part-1-how-shards-affect-relevance-scoring-in-elasticsearch",
+    "type": "secondary",
+    "quote": "By default, Elasticsearch calculates scores on a per-shard basis.; dfs_query_then_fetch first gathers the distributed term frequencies; In fact, this returns the same score as having just 1 shard.",
+    "supports": "Shard-local scoring makes scores differ across shards; a global-statistics pre-pass removes the difference at the cost of an extra round trip.",
+    "status": "supported"
+   },
+   {
+    "title": "Reciprocal Rank Fusion outperforms Condorcet and individual Rank Learning Methods (Cormack, Clarke, Buettcher, SIGIR 2009)",
+    "url": "https://cormack.uwaterloo.ca/cormacksigir09-rrf.pdf",
+    "type": "paper",
+    "quote": "where k = 60 was fixed during a pilot investigation and not altered during subsequent validation.; k = 60 was near-optimal, but that the choice was not critical.",
+    "supports": "RRF = sum of 1/(k + rank) with k = 60 as a near-optimal, non-critical default.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "rank merging and score normalisation are unsafe fallbacks when shards differ",
+   "min-max/z-score sensitivity to outliers and list length"
+  ]
+ }
+]

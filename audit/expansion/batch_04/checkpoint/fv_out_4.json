@@ -1,0 +1,832 @@
+[
+ {
+  "plan_id": "B4-MLO-11-2",
+  "id": "smi-m0019",
+  "rubric_points": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "suggested_key_concepts": null,
+  "added_sources": [
+   {
+    "title": "Pseudonymisation (ICO, UK GDPR guidance)",
+    "url": "https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/data-sharing/anonymisation/pseudonymisation/",
+    "supports": "Pseudonymised data remains personal data for whoever holds the additional information; additional information must be kept separately.",
+    "quote": "Pseudonymised data is personal data in the hands of someone who holds the additional information.",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "'logging a fraction of requests is often enough for skew and drift checks' (engineering judgement)",
+   "Retention of 'about 90 days plus a buffer' is a design choice from the label delay, not a legal figure"
+  ],
+  "code_patch": null,
+  "code_findings": "No code in record; nothing to run.",
+  "config_findings": "No configs/SQL in record.",
+  "verdict": "correct",
+  "reasons": [
+   "Technically sound and well hedged; only the unsourced jurisdiction claim and the Sweeney attribution need tightening.",
+   "No contradiction with smi-l0026 / smi-k0030 (both also say a plain hash of a guessable ID is reversible and pseudonymised data is still personal data)."
+  ],
+  "parts_answered": {
+   "what is wrong (hash, DOB+postcode, indefinite retention, over-logging)": true,
+   "what to change": true,
+   "engineer not lawyer framing": true,
+   "label-maturity-driven retention (90 days)": true
+  },
+  "evidence": [
+   {
+    "claim": "Unsalted SHA-256 of guessable IDs is reversible by hashing candidates",
+    "method": "derivation",
+    "evidence": "Standard preimage-by-enumeration argument; consistent with smi-l0026."
+   },
+   {
+    "claim": "Pseudonymised data remains personal data in the hands of whoever holds the additional information",
+    "method": "doc",
+    "evidence": "ICO pseudonymisation guidance: 'Pseudonymised data is personal data in the hands of someone who holds the additional information'; cites Recital 26 ('could be attributed to a natural person by the use of additional information should be considered to be information on an identifiable natural person') and Art 4(5) ('additional information is kept separately'). EUR-Lex pages returned no body text via WebFetch; Recital 26 wording confirmed via gdpr-info.eu (unofficial) and the ICO page quoting it."
+   },
+   {
+    "claim": "DOB + postcode is a classic quasi-identifier combination",
+    "method": "paper",
+    "evidence": "Sweeney: 87% of US population likely unique on {5-digit ZIP, gender, DOB}. Paper is US ZIP + gender, not UK postcode; answer's wording is hedged ('some rows may be')."
+   },
+   {
+    "claim": "Rules of ML: saving serving features for a small fraction is useful",
+    "method": "doc",
+    "evidence": "Rule 29 text confirmed; its purpose is train/serve parity, which the answer uses only to support sampling."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Pseudonymisation lowers risk but the data is generally still regarded as personal data in many jurisdictions, because re-identification remains possible with additional information; exactly where the line sits depends on jurisdiction and legal advice.",
+    "problem": "Central legal-ish claim is unsourced (listed as unverified). Regulator guidance can be cited, and the relevant nuance is who holds the additional information. Same text is the canonical_answer (detailed == canonical), so apply to both.",
+    "replacement": "Pseudonymisation lowers risk but pseudonymised data is generally still treated as personal data, because re-identification remains possible with additional information (the UK ICO's guidance says it is personal data in the hands of anyone who holds the additional information, which includes the team holding the key and the raw IDs); exactly where the line sits for a given recipient depends on jurisdiction and legal advice."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Date of birth plus postcode is a classic quasi-identifier combination, so even",
+    "problem": "Sweeney's cited finding is about US 5-digit ZIP + gender + date of birth; stating it without that scope overstates source fit for a UK postcode.",
+    "replacement": "Date of birth plus postcode is a classic quasi-identifier combination (Sweeney estimated that about 87% of the US population was likely unique on 5-digit ZIP, gender and date of birth), so even"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Application of several privacy-engineering concepts to a scenario; no multi-step derivation.",
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "74 words, genuinely shorter; consistent with detailed (90-day window, HMAC, minimisation)."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Identical to canonical_answer by design."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed (keep)",
+  "key_concepts_findings": "All 8 discussed in the answer; 'log sampling' and 'deletion lookup' are the lightest but present.",
+  "nearest_existing": {
+   "id": "smi-k0030",
+   "same_intent": false,
+   "note": "k0030 = privacy controls for an LLM copilot (prompts/logs/retrieval/deletion); also overlaps smi-l0026 logging. m0019 is about pseudonymisation, quasi-identifiers and retention tied to label maturity - distinct but partially overlapping on log retention and hashing."
+  },
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule 29: 'save the set of features used at serving time, and then pipe those features to a log to use them at training time'; 'Even if you can't do this for every example, do it for a small fraction'. Rule 39: A/B-measurable metrics 'are only a proxy'; 'launch decisions depend on multiple criteria'."
+   },
+   {
+    "url": "https://dataprivacylab.org/projects/identifiability/paper1.pdf",
+    "status": "partially",
+    "evidence": "Abstract: 87% of US population likely unique on {5-digit ZIP, gender, date of birth}. Supports 'classic quasi-identifier combination' but with US ZIP and gender, not UK postcode."
+   }
+  ]
+ },
+ {
+  "plan_id": "B4-MLO-11-3",
+  "id": "smi-m0020",
+  "rubric_points": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "suggested_key_concepts": null,
+  "added_sources": [],
+  "unsourced_claims": [
+   "Backup expiry and tombstone-list practice (design recommendation, correctly presented as design)",
+   "'Approximate unlearning ... research-grade' (consistent with Bourtoule; no deployment survey opened)"
+  ],
+  "code_patch": null,
+  "code_findings": "No code in record; nothing to run.",
+  "config_findings": "No configs/SQL in record.",
+  "verdict": "correct",
+  "reasons": [
+   "One major: memorisation factors list includes 'overfitting' and 'small data', which the cited Secret Sharer paper contradicts/does not support.",
+   "Rest is appropriately hedged and consistent with smi-g0011 and smi-k0030."
+  ],
+  "parts_answered": {
+   "what to delete": true,
+   "what can/cannot be said about trained models": true,
+   "design to make promise cheap": true,
+   "legal threshold deferred to counsel": true
+  },
+  "evidence": [
+   {
+    "claim": "No general exact removal of one record's influence short of retraining; SISA reduces retraining cost",
+    "method": "paper",
+    "evidence": "Bourtoule abstract: 'having models unlearn is notoriously difficult'; 'We introduce SISA training, a framework that expedites the unlearning process'; reported speed-ups over retraining from scratch."
+   },
+   {
+    "claim": "Memorisation as a retention factor",
+    "method": "paper",
+    "evidence": "Carlini et al. say of unintended memorisation: 'such memorization is not due to overtraining' (Sec 1), 'None of our results are due to overtraining' (Sec 2.3), it 'occurs early during training'; 'Larger batch sizes, and larger models, both increase the amount of memorization' (Table 5); the finding concerns generative sequence models; very rare secrets (1 in a billion) showed no memorisation (Sec 6.1). So 'overfitting' as the listed driver contradicts the cited source."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "answer",
+    "claim": "Models that memorise (for example small data, high capacity, overfitting, or rare or repeated records) are more likely to retain recognisable traces of individual records, so treat that as a factor in how aggressively you retrain; this is model- and data-dependent and absence of memorisation is hard to demonstrate.",
+    "problem": "The cited Secret Sharer paper explicitly says unintended memorisation is not due to overtraining and occurs early in training; 'small data' is not supported by it. A RAG grader would teach 'memorisation = overfitting', which the source contradicts.",
+    "replacement": "Models can retain recognisable traces of individual records (the Secret Sharer study found unintended memorisation of rare sequences in language models, arising early in training rather than only from overtraining, and increasing with model size), so treat that as a factor in how aggressively you retrain; this is model- and data-dependent and absence of memorisation is hard to demonstrate."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Scenario with cross-system inventory and the honest-promise distinction; no calculation.",
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single-field set; appropriate."
+   }
+  ],
+  "suggested_answer_set": "single (keep)",
+  "key_concepts_findings": "All 7 discussed. 'memorisation' concept should be reworded as per the fix.",
+  "nearest_existing": {
+   "id": "smi-k0030",
+   "same_intent": false,
+   "note": "k0030 deletion requests across RAG components; m0020 focuses on trained-model promise and unlearning. g0011 mentions fine-tuning cannot easily unlearn - consistent."
+  },
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/1912.03817",
+    "status": "supported",
+    "evidence": "'Yet, having models unlearn is notoriously difficult.' 'We introduce SISA training, a framework that expedites the unlearning process'."
+   },
+   {
+    "url": "https://arxiv.org/abs/1802.08232",
+    "status": "partially",
+    "evidence": "Supports rare-sequence memorisation in sequence models; does not support 'overfitting' or 'small data' as drivers (it states the opposite for overtraining)."
+   }
+  ]
+ },
+ {
+  "plan_id": "B4-MLO-11-4",
+  "id": "smi-m0021",
+  "rubric_points": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "suggested_key_concepts": null,
+  "added_sources": [],
+  "unsourced_claims": [
+   "Per-field credit-scoring requirements are design suggestions; regulator requirements correctly deferred to compliance"
+  ],
+  "code_patch": null,
+  "code_findings": "No code in record; nothing to run.",
+  "config_findings": "No configs/SQL in record.",
+  "verdict": "pass",
+  "reasons": [
+   "Abstract-supported definition; field list is clearly framed as a gate design, jurisdiction deferred.",
+   "Optional only: concise answer omits fairness/subgroup results, which is the most credit-specific field; consider adding 'fairness-relevant subgroups' to the metrics clause."
+  ],
+  "parts_answered": {
+   "what a model card is": true,
+   "required fields for credit scoring": true,
+   "gate/promotion enforcement": true
+  },
+  "evidence": [
+   {
+    "claim": "Model cards are short documents accompanying trained models reporting benchmarked evaluation across conditions/groups, intended context, evaluation procedure",
+    "method": "paper",
+    "evidence": "Abstract: 'Model cards are short documents accompanying trained machine learning models'; benchmarked performance across demographic and intersectional groups, intended use context, evaluation methods (paraphrased by fetch tool). Sec 4.2 'inform users about what machine learning systems can and cannot do'. Figure 1 sections: Model Details, Intended Use, Factors, Metrics, Evaluation Data, Training Data, Quantitative Analyses, Ethical Considerations, Caveats and Recommendations."
+   },
+   {
+    "claim": "Auto-fill numbers and block promotion on stale cards",
+    "method": "background_only",
+    "evidence": "Design recommendation, presented as such ('a gate might require')."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Definition plus domain application and gate design; no calculation.",
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "71 words, shorter and interview-ready."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Identical to canonical by design."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed (keep)",
+  "key_concepts_findings": "All 8 discussed.",
+  "nearest_existing": {
+   "id": "smi-l0020",
+   "same_intent": false,
+   "note": "l0020 is registry versioning for audit; no existing model-card question found."
+  },
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/1810.03993",
+    "status": "supported",
+    "evidence": "Abstract: 'Model cards are short documents accompanying trained machine learning models'; goal to 'minimize their usage in contexts for which they are not well suited'."
+   }
+  ]
+ },
+ {
+  "plan_id": "B4-MLO-12-2",
+  "id": "smi-m0024",
+  "rubric_points": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "suggested_key_concepts": null,
+  "added_sources": [],
+  "unsourced_claims": [
+   "Specific mechanism list (illustrative)"
+  ],
+  "code_patch": null,
+  "code_findings": "No code in record; nothing to run.",
+  "config_findings": "No configs/SQL in record.",
+  "verdict": "pass",
+  "reasons": [
+   "Mitigation, differential diagnosis and prevention all covered; sources support the two documented statements as worded.",
+   "Numbers in practical are labelled examples and internally consistent (0.1% of 2,000 rows = 2 rows; 1e-6 noise vs 1e-4 tolerance)."
+  ],
+  "parts_answered": {
+   "first hour": true,
+   "how to find cause": true,
+   "what would have prevented": true
+  },
+  "evidence": [
+   {
+    "claim": "ML Test Score lists monitoring first occurrence of NaN/inf and practising rollback",
+    "method": "doc",
+    "evidence": "Monitor 5 and Infra 7 confirmed in the PDF."
+   },
+   {
+    "claim": "Hash-pinned lockfiles",
+    "method": "doc",
+    "evidence": "pip: 'Hashes are required for all requirements' and 'for all dependencies'; unhashed dependency 'will result in an error'."
+   },
+   {
+    "claim": "Typical mechanisms (positional vs name column matching, zero-std scaler, pickle version mismatch)",
+    "method": "background_only",
+    "evidence": "Illustrative, framed as 'typical mechanisms'; pickle/version point consistent with smi-l0017."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Structured debugging and prevention for a familiar incident; breadth rather than depth.",
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Identical to canonical."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete golden-test spec with numbers; not a paraphrase."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (keep)",
+  "key_concepts_findings": "All 7 discussed.",
+  "nearest_existing": {
+   "id": "smi-l0017",
+   "same_intent": false,
+   "note": "l0017 pickle/sklearn version loading and security; l0013 rollback criteria. m0024 is NaN/narrow-score diagnosis after dependency update."
+  },
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Monitor 1 'Dependency changes result in notification'; Infra 6 'Models are tested via a canary process before they enter production serving environments'; Infra 7 'Serving models can be rolled back' (practise 'normally, when not in emergency conditions'); Monitor 5 numerical stability: monitor initial occurrence of 'any NaNs or infinities'."
+   },
+   {
+    "url": "https://pip.pypa.io/en/stable/topics/secure-installs/",
+    "status": "supported",
+    "evidence": "Hash-checking mode requires hashes for all requirements and dependencies; missing hash errors."
+   }
+  ]
+ },
+ {
+  "plan_id": "B4-MLO-12-9",
+  "id": "smi-m0031",
+  "rubric_points": [
+   {
+    "decision": "Run the nightly fine-tune on reclaimable capacity with resumable checkpoints (model, optimizer, data-loader, RNG) about every 15 min and a deadline fallback to on-demand",
+    "tradeoff": "Discount vs bounded repeated work, restore time and checkpoint overhead; risk of missing the morning deadline."
+   },
+   {
+    "decision": "Internal classifier: scale to zero with a scheduled pre-workday warm-up, or a single replica in office hours, or an async interface",
+    "tradeoff": "Idle GPU spend (about 10 h vs 24 h) vs a 3-minute first-request wait for staff."
+   },
+   {
+    "decision": "Customer endpoint: on-demand baseline with headroom for p99 300 ms, reclaimable burst replicas across zones/instance types with draining",
+    "tradeoff": "Cost saving vs SLO risk from correlated reclamation with short notice; SLO must hold if all burst capacity vanishes."
+   },
+   {
+    "decision": "Autoscale on queue depth or concurrency rather than CPU",
+    "tradeoff": "Signal reflects accelerator saturation vs extra metric plumbing."
+   },
+   {
+    "decision": "State the revisit triggers (interruption frequency, spiky traffic, acceptable degraded fallback, cold-start reduction)",
+    "tradeoff": "Avoids locking in a strategy that stops paying off as conditions change."
+   }
+  ],
+  "suggested_type": "design",
+  "type_ok": false,
+  "suggested_key_concepts": null,
+  "added_sources": [
+   {
+    "title": "Best practices for Amazon EC2 Spot (EC2 User Guide)",
+    "url": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-best-practices.html",
+    "supports": "Spreading spot requests across instance types and Availability Zones; designing for fault tolerance.",
+    "quote": "You should be flexible about which instance types you request and in which Availability Zones you can deploy your workload.",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "'Reclamation can remove many replicas at once' (hedged with 'can')",
+   "Autoscaling on queue depth / concurrency (design recommendation)"
+  ],
+  "code_patch": null,
+  "code_findings": "No code in record; nothing to run.",
+  "config_findings": "No configs/SQL in record.",
+  "verdict": "correct",
+  "reasons": [
+   "Arithmetic checks: 2 x (15 + 5) = 40 min on 420 min = 9.5%, 'about 10%' OK; 07:45-18:00 = 10.25 h, 'about 10 hours' OK.",
+   "Open-ended choose-and-justify question: better typed as design with rubric_points.",
+   "One imprecise sentence about checkpoint overhead."
+  ],
+  "parts_answered": {
+   "strategy for fine-tune": true,
+   "strategy for internal classifier": true,
+   "strategy for customer endpoint": true,
+   "what would change my mind (per workload)": true
+  },
+  "evidence": [
+   {
+    "claim": "Two interruptions with 15-min checkpoints and 5-min restores add about 40 min on a 7-h job (about 10%)",
+    "method": "derivation",
+    "evidence": "2*(15+5)=40; 40/420=9.52%. Worst case; expected redo per interruption is about half the interval."
+   },
+   {
+    "claim": "Reclaimable capacity gives short best-effort warning",
+    "method": "doc",
+    "evidence": "AWS: notice 'issued two minutes before'; 'Interruption notices are emitted on a best effort basis.' Other providers differ (answer stays generic)."
+   },
+   {
+    "claim": "Flexibility across zones/instance types for spot",
+    "method": "doc",
+    "evidence": "AWS Spot best practices: 'flexible across at least 10 instance types'; page also warns failing over to On-Demand 'can inadvertently drive interruptions for your other Spot Instances' (relevant to fleet-wide fallback, not to the single fine-tune job fallback described)."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "that checkpoint overhead is small relative to step time",
+    "problem": "Overhead of writing a checkpoint should be compared with the checkpoint interval (and total job time), not with a single training step; as worded the criterion is wrong/uninformative.",
+    "replacement": "that checkpoint write time is small relative to the checkpoint interval"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Three-way trade-off with simple arithmetic; no deep mechanism.",
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single field is appropriate."
+   }
+  ],
+  "suggested_answer_set": "single (keep)",
+  "key_concepts_findings": "All 8 discussed.",
+  "nearest_existing": {
+   "id": "smi-l0036",
+   "same_intent": false,
+   "note": "l0036 is probe/startup configuration for a slow-starting model; l0038 GPU sharing. No existing spot/scale-to-zero capacity question."
+  },
+  "sources_findings": [
+   {
+    "url": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-instance-termination-notices.html",
+    "status": "supported",
+    "evidence": "'issued two minutes before Amazon EC2 stops or terminates your Spot Instance'; 'emitted on a best effort basis'."
+   }
+  ]
+ },
+ {
+  "plan_id": "B4-MLO-13-1",
+  "id": "smi-m0032",
+  "rubric_points": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "suggested_key_concepts": null,
+  "added_sources": [],
+  "unsourced_claims": [
+   "'a newer model may be more verbose or slower' (generic expectation)"
+  ],
+  "code_patch": null,
+  "code_findings": "No code in record; nothing to run.",
+  "config_findings": "No configs/SQL in record.",
+  "verdict": "correct",
+  "reasons": [
+   "Sources support the sentences as worded; time_sensitive/review_by set appropriately.",
+   "One logical gap: diagnosability via a logged identifier only works if the identifier recorded is the resolved snapshot, not the alias that was sent."
+  ],
+  "parts_answered": {
+   "what to pin and record": true,
+   "what to test before switching": true,
+   "how to roll out": true,
+   "what to do on retirement notice": true
+  },
+  "evidence": [
+   {
+    "claim": "Aliases point to most recent snapshot; IDs fixed; per-ID retirement; infrastructure around a model can change",
+    "method": "doc",
+    "evidence": "Claude docs: pre-4.6 aliases 'point to the most recent dated snapshot'; 'Every model ID ... has its own distinct deprecation and retirement schedule'; 'Occasionally, infrastructure updates produce minor differences in observable behavior even when the model ID and weights have not changed.' Note 4.6+ dateless IDs are themselves the fixed snapshot, which the answer's 'dated snapshot where the provider offers one' wording tolerates."
+   },
+   {
+    "claim": "ML Test Score lists dependency-change notification and canary-before-serving",
+    "method": "doc",
+    "evidence": "Monitor 1 and Infra 6 confirmed."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "you can see from the logged identifier whether the underlying model changed",
+    "problem": "If the request used an alias the logged identifier is just the alias; it reveals a change only if the resolved snapshot reported in the response is what is recorded.",
+    "replacement": "you can see from the model identifier recorded on each request (the resolved snapshot returned in the response, where the API reports it) whether the underlying model changed"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Design with well-known practices (pin, gate, canary, calendar); breadth rather than a hard trade-off.",
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single field; rubric_points present (6 points, each with trade-off) and consistent with the answer."
+   }
+  ],
+  "suggested_answer_set": "single (keep)",
+  "key_concepts_findings": "All 8 discussed.",
+  "nearest_existing": {
+   "id": "smi-k0006",
+   "same_intent": false,
+   "note": "k0006 prompt versioning/regression gate; l0020 registry aliases. m0032 is about hosted-model alias re-pointing and retirement - distinct, partial overlap with k0006's model-id logging."
+  },
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Monitor 1 'Dependency changes result in notification'; Infra 6 'Models are tested via a canary process before they enter production serving environments'; Infra 7 'Serving models can be rolled back' (practise 'normally, when not in emergency conditions'); Monitor 5 numerical stability: monitor initial occurrence of 'any NaNs or infinities'."
+   },
+   {
+    "url": "https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions",
+    "status": "supported",
+    "evidence": "Aliases, fixed IDs, per-ID retirement, serving-infrastructure changes all stated."
+   }
+  ]
+ },
+ {
+  "plan_id": "B4-MLO-13-2",
+  "id": "smi-m0033",
+  "rubric_points": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "suggested_key_concepts": null,
+  "added_sources": [],
+  "unsourced_claims": [
+   "'a rise in one category most often means either a real abuse campaign or a classifier that over-triggers' - 'most often' is an unsourced empirical frequency; acceptable as heuristic but could read 'commonly'"
+  ],
+  "code_patch": null,
+  "code_findings": "No code in record; nothing to run.",
+  "config_findings": "No configs/SQL in record.",
+  "verdict": "correct",
+  "reasons": [
+   "Arithmetic OK (3.9 - 1.2 = 2.7 points); MLflow immutability/alias statements confirmed.",
+   "Minor: sampling 50-100 items gives a rough share estimate; say so."
+  ],
+  "parts_answered": {
+   "decide real traffic vs prompt/model change vs mis-calibrated guardrail": true,
+   "explain latency": true,
+   "what must be logged": true
+  },
+  "evidence": [
+   {
+    "claim": "MLflow prompt versions immutable; aliases mutable",
+    "method": "doc",
+    "evidence": "'Prompt versions in MLflow are immutable'; alias: 'An mutable named reference to the prompt.'"
+   },
+   {
+    "claim": "Share of 2.7 extra points can be estimated by labelling 50-100 items",
+    "method": "derivation",
+    "evidence": "95% CI half-width for a proportion near 0.5: 1.96*sqrt(0.25/100)=9.8 pts; n=50 gives 13.9 pts."
+   },
+   {
+    "claim": "Block-and-retry can raise p95",
+    "method": "derivation",
+    "evidence": "Hedged with 'If'; plausible because retried requests (3.9%) can push the 95th percentile into the retry-inflated tail."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Pull 50 to 100 blocked items across categories",
+    "problem": "The text then says labelling yields the share of the 2.7 extra points; with 50-100 labels that estimate is rough, which a reader may not realise.",
+    "replacement": "Pull 50 to 100 blocked items across categories (with that few labels the estimated false-positive share is rough, about plus or minus 10 to 14 points at 95% confidence for a share near 50%; label more for a tighter estimate)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Attribution of a metric change by segmentation, sampling and logging design.",
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "73 words, consistent."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Identical to canonical."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed (keep)",
+  "key_concepts_findings": "All 7 discussed.",
+  "nearest_existing": {
+   "id": "smi-k0006",
+   "same_intent": false,
+   "note": "k0006 prompt versioning gate; no existing guardrail-trigger-rate diagnosis question."
+  },
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/genai/prompt-registry/",
+    "status": "supported",
+    "evidence": "Immutable versions; mutable aliases."
+   }
+  ]
+ },
+ {
+  "plan_id": "B4-MLO-14-1",
+  "id": "smi-m0035",
+  "rubric_points": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "suggested_key_concepts": null,
+  "added_sources": [],
+  "unsourced_claims": [
+   "Selection/feedback loop (5)",
+   "Difference-in-differences and same-period-last-year fallbacks (standard methods, not sourced)"
+  ],
+  "code_patch": null,
+  "code_findings": "No code in record; nothing to run.",
+  "config_findings": "No configs/SQL in record.",
+  "verdict": "correct",
+  "reasons": [
+   "Sources support the sentences as worded (Rule 39; SRE Workbook 'sizeable and last long enough to be representative').",
+   "Minor internal inconsistency: mechanism (3) says click lift may fade, but the scenario says click-through is still up."
+  ],
+  "parts_answered": {
+   "plausible mechanisms": true,
+   "evidence to separate them": true,
+   "release practice that would have caught/made cheaper": true
+  },
+  "evidence": [
+   {
+    "claim": "Rules of ML: A/B-measurable metrics are proxies; launch decisions use multiple criteria",
+    "method": "doc",
+    "evidence": "Rule 39 confirmed."
+   },
+   {
+    "claim": "SRE workbook: canary should be sizeable and long enough to be representative",
+    "method": "doc",
+    "evidence": "'It should be sizeable and last long enough to be representative of the overall deployment.' The 'impractical for outcome metrics that mature in weeks' is the answer's own inference, not stated by the source."
+   },
+   {
+    "claim": "Holdback sizing by power calculation",
+    "method": "derivation",
+    "evidence": "Standard; hedged 'if the user base is large enough'."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "(3) Novelty and exposure effects: early click lift may fade while a narrowing of what users see (less diversity, fewer discovery items) accumulates.",
+    "problem": "In the scenario click-through is still up after six weeks, so a fading click lift is not what is observed; the relevant mechanism is cumulative narrowing/fatigue, with novelty relevant mainly to the A/B window.",
+    "replacement": "(3) Exposure and novelty effects: click-through is still up here, so the click lift has not faded, but a narrowing of what users see (less diversity, fewer discovery items) can accumulate over weeks and depress later purchases; a novelty effect also means the 2-week test window may not have been representative."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Multi-cause reasoning but each cause is a standard concept; no calculation.",
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single field."
+   }
+  ],
+  "suggested_answer_set": "single (keep)",
+  "key_concepts_findings": "All 7 discussed; 'novelty effect' still present after fix.",
+  "nearest_existing": {
+   "id": "smi-l0033",
+   "same_intent": false,
+   "note": "l0033 novelty decay and split method; i0009 offline/online mismatch; m0035 is long-term outcome vs proxy after full launch with holdback - distinct, some shared content on novelty/holdout."
+  },
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule 29: 'save the set of features used at serving time, and then pipe those features to a log to use them at training time'; 'Even if you can't do this for every example, do it for a small fraction'. Rule 39: A/B-measurable metrics 'are only a proxy'; 'launch decisions depend on multiple criteria'."
+   },
+   {
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "status": "supported",
+    "evidence": "'It should be sizeable and last long enough to be representative of the overall deployment.'"
+   }
+  ]
+ },
+ {
+  "plan_id": "B4-MLO-14-2",
+  "id": "smi-m0036",
+  "rubric_points": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "suggested_key_concepts": null,
+  "added_sources": [],
+  "unsourced_claims": [
+   "Async shadow path with own pools/capacity; idempotency (standard practice, hedged)"
+  ],
+  "code_patch": null,
+  "code_findings": "No code in record; nothing to run.",
+  "config_findings": "No configs/SQL in record.",
+  "verdict": "correct",
+  "reasons": [
+   "Four mechanisms are standard and speculative links are hedged with 'could'.",
+   "One source-fit imprecision: Rule 29's stated purpose is training on what was served, not 'checking consistency'."
+  ],
+  "parts_answered": {
+   "properties of shadow that gave a clean pass": true,
+   "links to 400 ms p99, duplicate notifications, lower live scores": true,
+   "what to change in next shadow": true
+  },
+  "evidence": [
+   {
+    "claim": "Rule 29 recommends saving serving-time features",
+    "method": "doc",
+    "evidence": "'save the set of features used at serving time, and then pipe those features to a log to use them at training time'."
+   },
+   {
+    "claim": "Shadow cannot reveal side effects/feedback/user response; side effects must be isolated",
+    "method": "background_only",
+    "evidence": "Consistent with smi-l0029."
+   },
+   {
+    "claim": "Duplicate notifications from retries without idempotency key",
+    "method": "background_only",
+    "evidence": "Consistent with smi-k0009 idempotency answer; hedged."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "recommend saving the features used at serving time so that serving and training values can be checked for consistency",
+    "problem": "Rule 29 recommends logging serving features to use at training time (train like you serve); consistency checking is a consequence, not the stated purpose.",
+    "replacement": "recommend saving the features used at serving time and logging them for use at training time, which also gives you the exact values to compare against offline recomputation"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Subtle debugging: map three live symptoms onto gaps in what shadow measures; needs several interacting causes.",
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single field."
+   }
+  ],
+  "suggested_answer_set": "single (keep)",
+  "key_concepts_findings": "All 7 discussed.",
+  "nearest_existing": {
+   "id": "smi-l0029",
+   "same_intent": false,
+   "note": "l0029 asks what shadow can/cannot tell and sequencing; m0036 diagnoses a specific post-promotion incident. Claims agree (side effects, no user response, shared resources)."
+  },
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule 29: 'save the set of features used at serving time, and then pipe those features to a log to use them at training time'; 'Even if you can't do this for every example, do it for a small fraction'. Rule 39: A/B-measurable metrics 'are only a proxy'; 'launch decisions depend on multiple criteria'."
+   }
+  ]
+ },
+ {
+  "plan_id": "B4-MLO-14-3",
+  "id": "smi-m0037",
+  "rubric_points": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "suggested_key_concepts": null,
+  "added_sources": [],
+  "unsourced_claims": [
+   "'missing users are rarely missing at random' (heuristic)",
+   "Cache/learner interference direction (hedged)"
+  ],
+  "code_patch": null,
+  "code_findings": "No code in record; nothing to run.",
+  "config_findings": "No configs/SQL in record.",
+  "verdict": "correct",
+  "reasons": [
+   "Recomputed SRM: chi-square = 2*(1000^2/50000) = 40.0, df 1, p = 2.54e-10 (erfc(sqrt(20))); matches both fields.",
+   "Minor: a single A/A run can differ by chance, so 'shows a difference' is too loose."
+  ],
+  "parts_answered": {
+   "effect of the unequal counts (SRM)": true,
+   "effect of cache": true,
+   "effect of shared online learner": true,
+   "how to test": true,
+   "how to fix": true
+  },
+  "evidence": [
+   {
+    "claim": "Chi-square 40.0, p about 2.5e-10",
+    "method": "executed",
+    "evidence": "python3: 2*(1000**2/50000)=40.0; p=erfc(sqrt(40/2))=2.5396e-10."
+   },
+   {
+    "claim": "SRM threshold typically 0.001 and do not interpret results until explained",
+    "method": "doc",
+    "evidence": "Spotify Confidence: 'typically 0.001, which is deliberately strict'; 'don't interpret these results until you've investigated and resolved the imbalance.'"
+   },
+   {
+    "claim": "Model may influence its own future training data",
+    "method": "paper",
+    "evidence": "Sculley et al. Sec 4: 'A model may directly influence the selection of its own future training data.'"
+   },
+   {
+    "claim": "Interference biases toward zero (hedged)",
+    "method": "background_only",
+    "evidence": "Direction hedged in the answer; consistent with smi-l0033 which notes marketplace interference can go either way."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "If it shows a difference or SRM, the platform is the problem, not the model.",
+    "problem": "Two identical arms will show p < 0.05 about 5% of the time by chance, so one A/A 'difference' is not proof of a platform problem.",
+    "replacement": "If it shows SRM or a repeatable significant difference between identical arms (a single A/A run will show p < 0.05 about 5% of the time by chance), the platform is the problem, not the model."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "One simple calculation plus two textbook interference channels and standard fixes; the record's Hard label is a little high.",
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Identical to canonical."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Ordered checklist adds diagnostics (segment breakdown, arm-leak check, A/A) not in the detailed answer; numbers match."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (keep)",
+  "key_concepts_findings": "All 7 discussed.",
+  "nearest_existing": {
+   "id": "smi-h0037",
+   "same_intent": false,
+   "note": "h0037 asks to implement srm_check for 50,000 vs 51,200; m0037 combines SRM with cache/learner interference and fixes. l0033 mentions shared caches/learners at a general level."
+  },
+  "sources_findings": [
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "supported",
+    "evidence": "Section 4: 'A model may directly influence the selection of its own future training data.'"
+   },
+   {
+    "url": "https://confidence.spotify.com/glossary/sample-ratio-mismatch",
+    "status": "supported",
+    "evidence": "'typically 0.001, which is deliberately strict to avoid false alarms'; 'don't interpret these results until you've investigated and resolved the imbalance.'"
+   }
+  ]
+ }
+]

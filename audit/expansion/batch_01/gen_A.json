@@ -1,0 +1,696 @@
+[
+ {
+  "plan_id": "B1-GEN-01-1",
+  "cell_id": "GEN-01",
+  "topic": "Embeddings and similarity search (metrics, normalisation, ANN: HNSW/IVF/PQ)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Hard",
+  "question": "You must pick an ANN index for 50 million 768-d float32 chunk embeddings. Constraints: about 1 million new chunks per day plus a few thousand deletions, a target of roughly 0.95 recall@10 against exact search, p95 latency under 50 ms, and 64 GB of RAM per node. Compare HNSW, IVF-Flat and IVF-PQ (with and without re-ranking from full vectors) on recall, latency, memory, build cost and update behaviour, and say which you would shortlist and why.",
+  "answer_set": "concise+detailed+practical",
+  "answer": null,
+  "concise_answer": "Raw float32 vectors are about 153.6 GB, so no full-vector index fits one 64 GB node. HNSW usually gives the best latency at high recall but is RAM-hungry, slow to build and awkward with deletes. IVF-Flat is cheap to build and update but still stores full vectors. IVF-PQ compresses about 32x, with a recall ceiling you recover by re-ranking a short list from SSD. Shortlist IVF-PQ plus re-rank (or sharded HNSW) and decide on measured recall-latency curves.",
+  "detailed_answer": "Sizing first: 50M x 768 x 4 B = 153.6 GB for raw float32, so a single 64 GB node cannot hold flat vectors in any index; you either shard, compress, or keep full vectors on disk.\n\nHNSW: a layered proximity graph. At high recall it usually offers the best latency per query, and it supports incremental inserts. Costs: graph links on top of the vectors (memory grows with M), a build time that rises with efConstruction, random memory access that wants everything in RAM, and deletes that are often implemented as tombstones (implementation-dependent), so heavy churn degrades quality until a rebuild. Recall/latency is tuned at query time via efSearch.\n\nIVF-Flat: a k-means coarse quantiser splits vectors into nlist cells; a query scans nprobe cells. Training is a one-off step on a sample, adding is cheap (assign to the nearest centroid), deletes are easy, and recall/latency is tuned with nprobe. Memory is still the full vectors. Its weakness is that the centroids are trained on a snapshot of the data (see drift).\n\nIVF-PQ: vectors are stored as short product-quantised codes (for example 96 bytes instead of 3072). Distances are approximate, so recall has a ceiling set by quantisation error, often well below the flat variant at equal nprobe. The standard remedy is to fetch a short list (say the top 100-200 by PQ distance) and re-rank with full vectors from SSD or memory-mapped storage; this restores most of the lost recall at the cost of extra I/O.\n\nUpdates at 1M/day (about 12 per second on average) are easy for IVF and feasible for HNSW; the deletions are few, so tombstones plus a periodic rebuild are acceptable.\n\nMy shortlist: IVF-PQ with re-rank (fits the memory budget), and as an alternative HNSW over sharded or compressed vectors if the latency budget is tight. I would not choose by reputation; I would build both on a 2-5M sample, compute recall against exact search, and plot recall versus p95 latency.",
+  "practical_answer": "Worked sizing (decimal GB, ignoring ids, metadata and OS headroom):\n- Raw float32: 50M x 768 x 4 B = 153.6 GB.\n- PQ with 96 sub-quantisers x 8 bits = 96 B/vector, so 50M x 96 B = 4.8 GB of codes (plus small codebooks and ids). The full vectors for re-ranking, 153.6 GB, then live on NVMe, not RAM.\n- HNSW with M = 32: layer 0 holds up to 2M = 64 links of 4 B each, about 256 B/vector, so roughly 12.8 GB of links on top of the vectors. With raw vectors in RAM that is about 166 GB, so 3 nodes at minimum, before replicas.\n- nlist for IVF is commonly set to several times sqrt(N); sqrt(50M) is about 7,071, so values around 30k-100k are typical starting points to try, then tuned.\n\nSelection procedure: (1) sample 2-5M vectors and 1-2k held-out real queries; (2) compute exact top-10 by brute force; (3) for each candidate sweep nprobe or efSearch and, for PQ, the re-rank depth; (4) record recall@10 and p95 latency under realistic concurrency; (5) keep the cheapest configuration reaching 0.95 inside 50 ms, and re-run after a month of ingestion to check drift.",
+  "key_concepts": [
+   "HNSW",
+   "IVF-Flat",
+   "IVF-PQ",
+   "efSearch",
+   "nprobe",
+   "re-ranking with full vectors",
+   "tombstone deletes",
+   "recall-latency curve"
+  ],
+  "common_mistakes": [
+   "Choosing HNSW because it is 'the fastest' without computing that the vectors do not fit in RAM",
+   "Treating PQ recall as equal to flat recall and skipping the re-rank stage",
+   "Tuning on a handful of queries rather than a held-out query set measured against exact search"
+  ],
+  "interview_style_note": "Does the arithmetic first, knows the update/build/memory behaviour of each family, and insists on measuring recall-latency curves rather than picking by reputation.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "ML Engineering"
+  ],
+  "tags": [
+   "ann",
+   "hnsw",
+   "ivf",
+   "pq",
+   "capacity-planning"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Index-family selection with sizing and update constraints; nearest existing smi-g0010 (help-centre semantic search design) is end-to-end search design, not ANN index trade-offs.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-01-2",
+  "cell_id": "GEN-01",
+  "topic": "Embeddings and similarity search (metrics, normalisation, ANN: HNSW/IVF/PQ)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "coding",
+  "difficulty": "Medium",
+  "question": "Your team says the new vector index 'has 98% recall' but nobody can say how that was measured. Describe how to measure ANN recall@k properly, then implement it: write exact_topk(queries, base, k) (brute-force L2 ground truth), ann_recall_at_k(exact_ids, approx_ids) (mean overlap fraction, ignoring -1 padding) and a small inverted-file index ToyIVF(base, nlist, seed) with search(queries, k, nprobe). Show how recall changes with nprobe and what happens when nprobe equals nlist.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "ANN recall@k is the average fraction of the true k nearest neighbours (found by exact search under the same metric) that the approximate index returns. Procedure: sample queries that look like production traffic, not a random subset of the indexed vectors (a vector queried against an index containing itself is trivially found); compute exact top-k by brute force on the same data; run the ANN index at a given parameter setting (nprobe, efSearch); average |exact ∩ approx| / k over queries. Report it together with latency, as a curve over the search parameter, because a single recall figure without the setting is meaningless.\n\nDetails that matter: ground truth and index must use the same metric and the same normalisation; ties in distance can make the 'true' top-k ambiguous (set-overlap is slightly pessimistic or optimistic in that case); k must match the k you serve; padding (-1) from an index that returned fewer than k hits must count as misses, not be dropped from the denominator. ANN recall is not task recall: an index with ANN recall 0.95 can still be fine for the task if the missed neighbours were marginal, and 100% ANN recall cannot repair a poor embedding model.\n\nIVF logic: a k-means coarse quantiser partitions the base into nlist cells; a query finds its nprobe nearest centroids and exactly ranks only the vectors in those cells. Because the candidate set grows with nprobe and the final ranking inside it is exact, recall is non-decreasing in nprobe and equals 1.0 when nprobe = nlist (it degenerates to brute force). The speed gain comes from scanning roughly nprobe/nlist of the data when cells are balanced.",
+  "practical_answer": "Reference implementation and test (the test asserts monotone recall in nprobe, exactly 1.0 at nprobe = nlist, and padding handling):\n\n```python\nimport numpy as np\n\n\ndef exact_topk(queries, base, k):\n    \"\"\"Exact L2 top-k ids (ground truth), best first, ties by lower id.\"\"\"\n    d = ((queries[:, None, :] - base[None, :, :]) ** 2).sum(axis=2)\n    return np.argsort(d, axis=1, kind=\"stable\")[:, :k]\n\n\ndef ann_recall_at_k(exact_ids, approx_ids):\n    \"\"\"Mean over queries of |exact ∩ approx| / k. Entries of -1 are padding.\"\"\"\n    exact_ids = np.asarray(exact_ids)\n    approx_ids = np.asarray(approx_ids)\n    k = exact_ids.shape[1]\n    hits = [len(set(e.tolist()) & (set(a.tolist()) - {-1}))\n            for e, a in zip(exact_ids, approx_ids)]\n    return float(np.mean(hits)) / k\n\n\nclass ToyIVF:\n    \"\"\"Inverted-file index: k-means coarse quantiser, exact rerank inside probed lists.\"\"\"\n\n    def __init__(self, base, nlist, iters=15, seed=0):\n        rng = np.random.default_rng(seed)\n        self.base = base\n        cent = base[rng.choice(len(base), nlist, replace=False)].copy()\n        for _ in range(iters):\n            assign = self._nearest(base, cent, 1)[:, 0]\n            for c in range(nlist):\n                members = base[assign == c]\n                if len(members):\n                    cent[c] = members.mean(axis=0)\n        self.cent = cent\n        assign = self._nearest(base, cent, 1)[:, 0]\n        self.lists = [np.flatnonzero(assign == c) for c in range(nlist)]\n\n    @staticmethod\n    def _nearest(x, cent, n):\n        d = ((x[:, None, :] - cent[None, :, :]) ** 2).sum(axis=2)\n        return np.argsort(d, axis=1, kind=\"stable\")[:, :n]\n\n    def search(self, queries, k, nprobe):\n        out = np.full((len(queries), k), -1, dtype=np.int64)\n        probes = self._nearest(queries, self.cent, nprobe)\n        for qi, q in enumerate(queries):\n            cand = np.concatenate([self.lists[c] for c in probes[qi]])\n            if len(cand) == 0:\n                continue\n            d = ((self.base[cand] - q) ** 2).sum(axis=1)\n            top = cand[np.argsort(d, kind=\"stable\")[:k]]\n            out[qi, :len(top)] = top\n        return out\n```\n\nOn this seeded synthetic data (20 overlapping Gaussian clusters, 2,000 vectors, 16-d, 40 noisy queries, k = 10, nlist = 20) the recall for nprobe = 1, 2, 4, 8, 20 was 0.665, 0.8775, 0.9625, 0.995, 1.0. These numbers belong to this toy data only; on real data you would produce the same curve with your own queries and the production index.",
+  "key_concepts": [
+   "ANN recall@k",
+   "exact ground truth",
+   "nprobe",
+   "coarse quantiser",
+   "k-means",
+   "-1 padding",
+   "recall-latency trade-off"
+  ],
+  "common_mistakes": [
+   "Querying with vectors that are themselves in the index, which inflates recall",
+   "Quoting a recall number without the search parameter and latency it was measured at",
+   "Comparing ANN results to ground truth computed under a different metric or without the same normalisation"
+  ],
+  "interview_style_note": "Can define and compute ANN recall against exact search, explains why it is monotone in nprobe, and separates ANN recall from end-task retrieval quality.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\n\ndef exact_topk(queries, base, k):\n    \"\"\"Exact L2 top-k ids (ground truth), best first, ties by lower id.\"\"\"\n    d = ((queries[:, None, :] - base[None, :, :]) ** 2).sum(axis=2)\n    return np.argsort(d, axis=1, kind=\"stable\")[:, :k]\n\n\ndef ann_recall_at_k(exact_ids, approx_ids):\n    \"\"\"Mean over queries of |exact ∩ approx| / k. Entries of -1 are padding.\"\"\"\n    exact_ids = np.asarray(exact_ids)\n    approx_ids = np.asarray(approx_ids)\n    k = exact_ids.shape[1]\n    hits = [len(set(e.tolist()) & (set(a.tolist()) - {-1}))\n            for e, a in zip(exact_ids, approx_ids)]\n    return float(np.mean(hits)) / k\n\n\nclass ToyIVF:\n    \"\"\"Inverted-file index: k-means coarse quantiser, exact rerank inside probed lists.\"\"\"\n\n    def __init__(self, base, nlist, iters=15, seed=0):\n        rng = np.random.default_rng(seed)\n        self.base = base\n        cent = base[rng.choice(len(base), nlist, replace=False)].copy()\n        for _ in range(iters):\n            assign = self._nearest(base, cent, 1)[:, 0]\n            for c in range(nlist):\n                members = base[assign == c]\n                if len(members):\n                    cent[c] = members.mean(axis=0)\n        self.cent = cent\n        assign = self._nearest(base, cent, 1)[:, 0]\n        self.lists = [np.flatnonzero(assign == c) for c in range(nlist)]\n\n    @staticmethod\n    def _nearest(x, cent, n):\n        d = ((x[:, None, :] - cent[None, :, :]) ** 2).sum(axis=2)\n        return np.argsort(d, axis=1, kind=\"stable\")[:, :n]\n\n    def search(self, queries, k, nprobe):\n        out = np.full((len(queries), k), -1, dtype=np.int64)\n        probes = self._nearest(queries, self.cent, nprobe)\n        for qi, q in enumerate(queries):\n            cand = np.concatenate([self.lists[c] for c in probes[qi]])\n            if len(cand) == 0:\n                continue\n            d = ((self.base[cand] - q) ** 2).sum(axis=1)\n            top = cand[np.argsort(d, kind=\"stable\")[:k]]\n            out[qi, :len(top)] = top\n        return out",
+   "test": "rng = np.random.default_rng(1)\ncenters = rng.normal(size=(20, 16)) * 1.2\nbase = np.vstack([c + rng.normal(size=(100, 16)) for c in centers])\nqueries = base[rng.choice(len(base), 40, replace=False)] + rng.normal(size=(40, 16)) * 0.8\nk = 10\ntruth = exact_topk(queries, base, k)\nassert ann_recall_at_k(truth, truth) == 1.0\nassert ann_recall_at_k([[1, 2, 3]], [[3, 9, -1]]) == 1 / 3\nindex = ToyIVF(base, nlist=20, seed=0)\nrecalls = [ann_recall_at_k(truth, index.search(queries, k, p)) for p in (1, 2, 4, 8, 20)]\nprint(recalls)\nassert all(a <= b + 1e-12 for a, b in zip(recalls, recalls[1:]))\nassert recalls[0] < 1.0\nassert recalls[-1] == 1.0",
+   "expected": null
+  },
+  "sources": [],
+  "related_domains": [],
+  "tags": [
+   "ann",
+   "recall",
+   "ivf",
+   "evaluation",
+   "numpy"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Measurement-focused coding item on ANN recall with a toy IVF; existing smi-h0010 evaluates ranking metrics (recall@k/MRR/nDCG vs labelled relevance), not approximation error vs exact search.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-01-3",
+  "cell_id": "GEN-01",
+  "topic": "Embeddings and similarity search (metrics, normalisation, ANN: HNSW/IVF/PQ)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "debugging",
+  "difficulty": "Medium",
+  "question": "A team switched their vector index from L2 to inner-product 'because cosine is better for text'. They changed only the index metric flag. Afterwards: similarity scores returned to the app range from about 0.4 to 3.1, a hard-coded 'relevant if score > 0.75' rule now passes almost everything, and some long, generic chunks appear at the top for unrelated queries. Diagnose the problem and give the fix, including what to do about the existing index.",
+  "answer_set": "single",
+  "answer": "The encoder outputs vectors with varying norms, and an inner-product index returns raw dot products, which equal cosine similarity only when both vectors have unit length. Scores above 1 are a direct symptom. Dot product = |q||d|cos(theta), so a document with a large norm gets boosted regardless of direction, which explains the generic chunks; and the threshold was calibrated on a different scale.\n\nSmall check: with q = [1, 0] and docs [0.9, 0.1], [3, 3], [2, 0.05], raw dot products give 0.9, 3.0, 2.0 so [3, 3] wins, whereas cosine gives about 0.994, 0.707, 0.9997 so the third doc wins.\n\nFix: L2-normalise every document vector at ingestion and every query vector at query time (guard zero vectors against division by zero), then rebuild the index. Normalising only the query does not help, since a per-query constant never changes the ranking of documents; the document-side norm is the problem. Rebuilding matters because graph links (HNSW) or k-means centroids and cell assignments (IVF, which clusters by L2) were built on unnormalised vectors; inner product is not a true metric, and ANN structures tuned for it on unnormalised data can behave worse. On unit vectors ||a - b||^2 = 2 - 2cos(a, b), so inner-product and L2 indexes give the same ranking, which means the original L2 index would also have been equivalent once vectors were normalised; if you keep L2, convert thresholds with cos = 1 - d^2/2.\n\nRecalibrate the threshold: 0.75 on raw scores meant something else, so choose a new cut-off from labelled relevant/irrelevant pairs. Also note that some models are trained to use dot product with unnormalised outputs and should be used as documented; the check is to follow the model's intended similarity.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "inner product vs cosine",
+   "vector norm bias",
+   "L2 normalisation at ingestion",
+   "index rebuild",
+   "threshold recalibration",
+   "L2 and cosine equivalence on unit vectors"
+  ],
+  "common_mistakes": [
+   "Normalising only the query vector",
+   "Flipping the metric flag without re-indexing",
+   "Reusing a similarity threshold calibrated on a different score scale"
+  ],
+  "interview_style_note": "Sees that the score range and long-chunk dominance both come from unnormalised norms, and gives a complete fix (both sides, rebuild, new threshold).",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "inner-product",
+   "cosine",
+   "normalisation",
+   "faiss",
+   "debugging"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Index-configuration debugging; existing smi-h0009 asks how dot, cosine and Euclidean relate and a topk_cosine implementation, not a migration bug with score thresholds and index rebuild.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-01-4",
+  "cell_id": "GEN-01",
+  "topic": "Embeddings and similarity search (metrics, normalisation, ANN: HNSW/IVF/PQ)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "You maintain a 20-million-chunk vector index built with embedding model A (1024-d). A newer model B, also 1024-d, scores better on your eval set. To save time, a colleague proposes embedding only new documents and all queries with model B and adding them to the same index, backfilling old documents 'later'. Is this safe? What happens, and how would you roll out the upgrade?",
+  "answer_set": "single",
+  "answer": "No. Equal dimensionality does not mean a shared space. Each model learns its own coordinate system, so coordinate i of model A has no relationship to coordinate i of model B, and cosine or dot product between a model-B query and a model-A document is not meaningful. The failure is silent: scores still look like plausible numbers, so nothing errors, but retrieval of the old corpus collapses toward noise, while new documents look artificially strong or weak depending on score distributions. Mixing vectors from both models in one ANN structure also distorts the graph or clusters, because neighbours are computed across incompatible geometries.\n\nSafe rollout: (1) store an embedding model/version field with every vector and treat it as part of the index identity; (2) build a separate index for B (blue/green) and backfill the whole corpus in batches while the A index keeps serving; during this period, dual-write new documents to both; (3) evaluate both indexes on the same labelled queries, comparing recall@k and downstream answer quality, plus latency and memory; (4) cut over by switching the query encoder and index pointer together, atomically; (5) keep A for a rollback window, then delete it. Budget the re-embedding cost up front: roughly corpus tokens divided by encoder throughput, which for 20M chunks is a real batch job and not an afterthought.\n\nShortcuts exist but are lossy: a learned linear map from B space to A space (or the reverse) fitted on paired embeddings can bridge them for a temporary period; it should be validated empirically and not treated as equivalent to re-embedding. Likewise asymmetric models explicitly trained with different query and document towers are the only case where query and document embeddings come from different encoders by design, and then they must still be the matched pair.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "embedding space compatibility",
+   "model version metadata",
+   "blue/green index",
+   "dual-write backfill",
+   "atomic cut-over",
+   "linear space mapping",
+   "silent retrieval degradation"
+  ],
+  "common_mistakes": [
+   "Assuming same dimensionality implies compatible vectors",
+   "Upgrading the query encoder without re-embedding the corpus",
+   "Cutting over without an offline comparison of old and new index on the same labelled queries"
+  ],
+  "interview_style_note": "Explains why cross-model similarity is meaningless and designs a versioned, reversible migration instead of a mixed index.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "MLOps"
+  ],
+  "tags": [
+   "embeddings",
+   "migration",
+   "versioning",
+   "reindexing"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Embedding-model migration scenario; no existing question covers index versioning (nearest smi-g0010 mentions index freshness only).",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-01-5",
+  "cell_id": "GEN-01",
+  "topic": "Embeddings and similarity search (metrics, normalisation, ANN: HNSW/IVF/PQ)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "concept",
+  "difficulty": "Medium",
+  "question": "A colleague says: 'In 1,024 dimensions all distances are basically equal, so nearest-neighbour search on our embeddings is meaningless and we should stop using vector search.' Evaluate the claim. What does distance concentration actually say, when does it apply, and why does ANN search still work on real text embeddings?",
+  "answer_set": "concise+detailed+practical",
+  "answer": null,
+  "concise_answer": "Distance concentration is real but narrower than the claim. For many independent coordinates, the gap between the farthest and nearest point shrinks relative to the distance as dimension grows. It bites hardest for data that fills the space, like random features. Real embeddings lie near lower-dimensional structure and are trained to put related items close, so contrast usually stays usable. Measure retrieval quality on your data instead of abandoning vector search.",
+  "detailed_answer": "Distance concentration (a 'curse of dimensionality' effect): for points with many independent, similarly distributed coordinates, the distance from a query to every point concentrates around a common value, so the relative gap between the nearest and farthest points, (d_max - d_min) / d_min, shrinks as the dimension rises. In the limit, ranking by distance is dominated by small fluctuations. This is a statement about specific data distributions (broadly: high intrinsic dimension and little structure), not about every vector set with many coordinates.\n\nWhy it does not doom embedding search: (1) intrinsic dimension. Learned embeddings occupy a much lower-dimensional region than the nominal 1,024 coordinates, and what matters for contrast is the intrinsic dimension, not the ambient one. (2) Structure by training. Contrastive training deliberately places related items closer, so there are genuine near neighbours well separated from the bulk. (3) Evaluation is relative. Retrieval needs the correct items to rank above others, not a large absolute gap.\n\nWhere concentration does matter: very high-dimensional features without structure (random hashes, raw one-hot concatenations), thresholds on absolute distance, and approximate indexes, because small contrast makes it harder for graph or cell-based search to distinguish promising regions, so more work (higher efSearch or nprobe) is needed for the same recall. Related effects, for example hubness (some points appear in many neighbour lists), are also reported in high dimensions and are worth checking, with hedged expectations, in your own data.\n\nA practical answer: quantify instead of assuming. Compute relative contrast or, more usefully, ANN recall and retrieval metrics on labelled queries from your own corpus.",
+  "practical_answer": "A seeded experiment (below) makes the point. It measures relative contrast for 2,000 uniform random points as dimension grows, and then for points with only 3 true degrees of freedom linearly embedded in 1,000 dimensions. The recorded run gave contrasts of 266.6, 4.22, 0.484 and 0.115 for 2, 10, 100 and 1,000 uniform dimensions, but only 36.0 for the 3-intrinsic-dimension data embedded in 1,000 coordinates. The absolute values depend on the seed and sample size; the ordering is the lesson.\n\n```python\nimport numpy as np\n\n\ndef relative_contrast(x, q):\n    \"\"\"(farthest - nearest) / nearest Euclidean distance from q to the rows of x.\"\"\"\n    d = np.linalg.norm(x - q, axis=1)\n    return float((d.max() - d.min()) / d.min())\n\n\ndef uniform_contrast(dim, n=2000, seed=0):\n    rng = np.random.default_rng(seed)\n    return relative_contrast(rng.random((n, dim)), rng.random(dim))\n\n\ndef low_rank_contrast(intrinsic, ambient, n=2000, seed=0):\n    \"\"\"Points with `intrinsic` true degrees of freedom linearly embedded in `ambient` dims.\"\"\"\n    rng = np.random.default_rng(seed)\n    proj = rng.standard_normal((intrinsic, ambient))\n    x = rng.random((n, intrinsic)) @ proj\n    q = rng.random(intrinsic) @ proj\n    return relative_contrast(x, q)\n```",
+  "key_concepts": [
+   "distance concentration",
+   "relative contrast",
+   "intrinsic dimension",
+   "curse of dimensionality",
+   "hubness",
+   "ANN recall",
+   "contrastive training"
+  ],
+  "common_mistakes": [
+   "Concluding that vector search cannot work in high dimension because distances 'are all equal'",
+   "Using ambient dimension instead of intrinsic dimension to judge difficulty",
+   "Not measuring retrieval quality on real data before drawing a conclusion"
+  ],
+  "interview_style_note": "Separates a real phenomenon from an over-generalisation and proposes measuring on actual data.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\n\ndef relative_contrast(x, q):\n    \"\"\"(farthest - nearest) / nearest Euclidean distance from q to the rows of x.\"\"\"\n    d = np.linalg.norm(x - q, axis=1)\n    return float((d.max() - d.min()) / d.min())\n\n\ndef uniform_contrast(dim, n=2000, seed=0):\n    rng = np.random.default_rng(seed)\n    return relative_contrast(rng.random((n, dim)), rng.random(dim))\n\n\ndef low_rank_contrast(intrinsic, ambient, n=2000, seed=0):\n    \"\"\"Points with `intrinsic` true degrees of freedom linearly embedded in `ambient` dims.\"\"\"\n    rng = np.random.default_rng(seed)\n    proj = rng.standard_normal((intrinsic, ambient))\n    x = rng.random((n, intrinsic)) @ proj\n    q = rng.random(intrinsic) @ proj\n    return relative_contrast(x, q)",
+   "test": "vals = [uniform_contrast(d) for d in (2, 10, 100, 1000)]\nprint(vals)\nassert all(a > b for a, b in zip(vals, vals[1:]))\nassert vals[0] > 10 * vals[-1]\nlr = low_rank_contrast(3, 1000)\nprint(lr, uniform_contrast(1000))\nassert lr > 10 * uniform_contrast(1000)",
+   "expected": null
+  },
+  "sources": [],
+  "related_domains": [
+   "Machine Learning"
+  ],
+  "tags": [
+   "curse-of-dimensionality",
+   "distance-concentration",
+   "intrinsic-dimension"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Challenge-the-claim concept item on dimensionality; no existing item covers distance concentration (smi-h0009 only mentions hubness and anisotropy as caveats).",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-01-6",
+  "cell_id": "GEN-01",
+  "topic": "Embeddings and similarity search (metrics, normalisation, ANN: HNSW/IVF/PQ)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "You are choosing among a 384-d, 768-d and 1,024-d embedding model for 20 million chunks, and the vector index must fit in a 64 GB node (with some headroom for the OS, metadata and query processing). Do the memory arithmetic for float32, float16 and int8 storage, add the graph overhead for HNSW with M = 16, and explain which options fit and what you would do beyond arithmetic to decide.",
+  "answer_set": "single",
+  "answer": "Raw storage is N x d x bytes_per_value (decimal GB): 20M x 384 x 4 B = 30.72 GB; 20M x 768 x 4 B = 61.44 GB; 20M x 1,024 x 4 B = 81.92 GB. Halving the precision halves these: the 1,024-d model is 40.96 GB in float16 and 20.48 GB in int8. HNSW with M = 16 stores up to 2M = 32 neighbour links at layer 0, each 4 B, so about 128 B/vector, i.e. roughly 2.56 GB for 20M vectors (upper layers add a small fraction, and exact overhead depends on the library).\n\nWhat fits in 64 GB: 384-d float32 (about 33 GB with links), 768-d float16 (about 33 GB), 1,024-d float16 (about 43.5 GB) and 1,024-d int8 (about 23 GB). The 768-d float32 index (about 64 GB) leaves no headroom, and 1,024-d float32 does not fit. Also remember ids, chunk metadata, replicas, a build phase that can need extra memory, and the fact that serving needs headroom, so treat 64 GB as about 45-50 GB of usable index, which makes 1,024-d float16 tight and the others comfortable.\n\nBeyond arithmetic: dimension does not decide quality. Evaluate each model on your own labelled queries (recall@k or nDCG), then evaluate the compression you would apply (float16 is usually near-lossless; int8 and PQ cost some recall, which you measure and may recover by re-ranking with full vectors from disk). Some models are trained so that truncating the vector to a prefix still works; use that only when the model documentation states it, and check quality. Finally weigh embedding cost and query latency, which also scale with dimension.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "embedding dimension",
+   "bytes per vector",
+   "float16",
+   "int8 scalar quantisation",
+   "HNSW link overhead",
+   "memory headroom",
+   "recall under compression"
+  ],
+  "common_mistakes": [
+   "Forgetting graph/index overhead and metadata when sizing",
+   "Assuming a larger dimension is automatically better quality",
+   "Truncating or quantising vectors without re-measuring recall"
+  ],
+  "interview_style_note": "Does the arithmetic correctly, keeps headroom in mind, and treats compression as something to evaluate rather than assume.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "ML Engineering"
+  ],
+  "tags": [
+   "memory",
+   "dimension",
+   "quantisation",
+   "capacity-planning"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Sizing arithmetic with explicit numbers; distinct from GEN-01-1 (index family trade-offs at 50M) in that it decides dimension and precision.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-01-7",
+  "cell_id": "GEN-01",
+  "topic": "Embeddings and similarity search (metrics, normalisation, ANN: HNSW/IVF/PQ)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "debugging",
+  "difficulty": "Hard",
+  "question": "An IVF index (nlist = 4,096) was trained eight months ago on a 200k sample, when the corpus was mostly consumer-electronics documents. The corpus has since grown to 30 million vectors, largely from a new product line. At launch nprobe = 16 gave about 0.95 recall@10 on exact-search checks; today the same setting gives about 0.80 on a fresh query set, and p95 latency has roughly doubled. Some inverted lists now hold more than 100 times the mean list size. Explain what happened and how you would fix and monitor it.",
+  "answer_set": "single",
+  "answer": "The coarse quantiser is stale. New vectors are still assigned to the nearest of the old centroids, but those centroids were fit to a different distribution. The new product line is therefore squeezed into a few cells, which become huge (that explains the 100x lists and the latency jump: probing a big cell scans far more vectors), while queries in that region still probe only 16 lists, so many true neighbours sit in cells that are not probed or are diluted in oversized cells. Recall falls and latency rises at the same time. This is data drift for the clustering and is not a bug in the search code.\n\nDiagnosis: (1) plot list sizes (max/mean, Gini or a histogram) and compare with the build-time distribution; (2) measure recall against exact search separately for old and new content; (3) compute mean quantisation error (distance to the assigned centroid) on a recent sample and compare with the training sample.\n\nFix: retrain the centroids on a representative, recent sample (stratified across product lines so rare areas are covered), then re-assign all vectors to the new cells, which means a full re-add. If PQ is used, its codebooks must be retrained and vectors re-encoded too, otherwise quantisation error stays high. Consider a larger nlist because 30M vectors at 4,096 cells average about 7,300 per cell. As a stopgap, a higher nprobe recovers recall at the cost of more latency, which is the wrong direction for the latency problem.\n\nPrevention: periodically retrain (or when a drift indicator trips, for example max list size above some multiple of the mean, or quantisation error rising), run a canary query set with exact ground truth on a schedule, and version the index so the rebuild is a blue/green swap. HNSW-style graphs do not have this exact issue, but have their own degradation under heavy churn.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "coarse quantiser drift",
+   "inverted list imbalance",
+   "nprobe",
+   "retraining centroids",
+   "quantisation error",
+   "full re-add",
+   "canary recall check"
+  ],
+  "common_mistakes": [
+   "Raising nprobe alone and calling it fixed",
+   "Adding new vectors indefinitely without ever retraining the centroids",
+   "Retraining on the old sample or on a non-representative sample"
+  ],
+  "interview_style_note": "Connects the recall and latency symptoms to a single cause (stale centroids, skewed lists) and proposes diagnosis, rebuild and ongoing monitoring.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "MLOps"
+  ],
+  "tags": [
+   "ivf",
+   "drift",
+   "retraining",
+   "list-imbalance",
+   "monitoring"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Update/drift behaviour of IVF (the update-behaviour angle in the cell guidance); distinct from GEN-01-1 which compares families on a fresh design.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-03-1",
+  "cell_id": "GEN-03",
+  "topic": "Retrieval strategies (dense, BM25, hybrid, RRF, query rewriting, MMR)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "An IT-helpdesk assistant retrieves from 40,000 knowledge-base articles. Three real-style queries fail in different ways: (a) 'what does error E-4417 mean?'; (b) 'laptop will not wake up after closing the lid' (the relevant article is titled 'Resume from suspend fails on battery'); (c) 'how do I request SKU AG-2291-B for a new hire?'. For each, say whether a dense retriever or BM25 is more likely to succeed, and why. What does this imply for the retrieval design?",
+  "answer_set": "single",
+  "answer": "(a) Error code E-4417: BM25 is more likely to win. The token 'E-4417' is rare, so it has a high idf and an exact lexical match dominates. A dense model may embed the string into a region of 'error code' text without distinguishing E-4417 from E-4471, because rare identifiers are poorly represented by subword pieces and carry no learned semantics. (b) Paraphrase: dense is more likely to win. 'Wake up after closing the lid' and 'resume from suspend fails' share almost no words, so BM25 has little to match, while a dense encoder maps both phrasings near each other. (c) SKU AG-2291-B inside a natural-language request: neither alone is reliable. The identifier needs lexical matching (and the tokenizer must keep it intact, otherwise 'AG', '2291' and 'B' scatter across unrelated documents), while the rest of the sentence ('request', 'new hire') is semantic. Hybrid retrieval handles this best.\n\nDesign implication: run both retrievers and fuse them (reciprocal rank fusion or a calibrated weighted combination), keep a tokeniser that preserves identifiers for the sparse side, and evaluate by query type (identifier, paraphrase, mixed) so a good aggregate does not hide a class of failures. A dense-only system will look good in demos with paraphrased questions and then fail on codes and part numbers; a BM25-only system shows the opposite pattern. Do not claim a universal ranking, because results depend on the encoder, the corpus and how well tokenisation treats identifiers.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "BM25",
+   "dense retrieval",
+   "rare-term idf",
+   "lexical mismatch",
+   "identifier tokenisation",
+   "hybrid retrieval",
+   "per-query-type evaluation"
+  ],
+  "common_mistakes": [
+   "Claiming dense retrieval always beats keyword search",
+   "Ignoring tokenisation of IDs for the sparse index",
+   "Judging a retriever only by aggregate metrics instead of failure classes"
+  ],
+  "interview_style_note": "Predicts failure per query class from the mechanism and turns it into a hybrid design with segmented evaluation.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "bm25",
+   "dense",
+   "hybrid",
+   "failure-modes"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Dense-vs-sparse failure mode prediction on three concrete queries; nearest smi-g0010 (help-centre search design) asks for the whole design, not mechanism-level failure prediction.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-03-2",
+  "cell_id": "GEN-03",
+  "topic": "Retrieval strategies (dense, BM25, hybrid, RRF, query rewriting, MMR)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "concept",
+  "difficulty": "Medium",
+  "question": "In a hybrid search system, a teammate computes final_score = bm25_score + cosine_score for each candidate and sorts. In testing, BM25 values look like 14.2, 9.8 and 3.1, while cosine scores are 0.71, 0.69 and 0.64 for the same documents. Why is this wrong, and what are the options for combining the two retrievers properly, with their trade-offs?",
+  "answer_set": "single",
+  "answer": "The two scores live on different, incomparable scales. BM25 is unbounded, depends on the query (its length and the idf of its terms) and on the corpus statistics, so a value like 14 for one query is not comparable to 14 for another. Cosine similarity is bounded in [-1, 1] and, for many encoders, concentrated in a narrow band, so differences of 0.02 can matter. Adding them means BM25 decides almost everything (differences of several points against hundredths), so the 'hybrid' is just BM25 with noise. The numbers above are illustrative.\n\nOptions: (1) Reciprocal rank fusion: score = sum over retrievers of 1 / (k + rank). It uses ranks only, needs no calibration and is robust, but throws away score margins (a runaway winner counts the same as a near-tie) and depends on list depth. (2) Normalise then weight: min-max or z-score per query over the candidate list, then alpha x dense + (1 - alpha) x sparse. It keeps magnitudes and allows tuning alpha on labelled data, but min-max is sensitive to outliers and to candidate-list size, and a document missing from one list needs a defined fill value. (3) Learn a fusion or re-ranking model (for example a cross-encoder or a small learning-to-rank model using both scores as features) over the union of candidates; the most accurate option when you have labels, with more cost and maintenance. (4) Convert scores to calibrated relevance probabilities per retriever on labelled data, then combine.\n\nGood default: start with RRF for robustness, then test a tuned weighted combination on held-out queries and keep it only if it wins consistently.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "score incomparability",
+   "BM25 scale",
+   "cosine concentration",
+   "reciprocal rank fusion",
+   "min-max normalisation",
+   "z-score normalisation",
+   "learned fusion"
+  ],
+  "common_mistakes": [
+   "Adding raw scores from different retrievers",
+   "Min-max normalising over a tiny candidate list and treating the result as calibrated",
+   "Tuning the fusion weight on the same queries used to report quality"
+  ],
+  "interview_style_note": "Explains why score scales are incomparable and offers fusion alternatives with their weaknesses.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "hybrid",
+   "fusion",
+   "normalisation",
+   "rrf"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Why raw-score addition fails and the fusion options; GEN-03-3 implements RRF, this question is conceptual and compares families.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-03-3",
+  "cell_id": "GEN-03",
+  "topic": "Retrieval strategies (dense, BM25, hybrid, RRF, query rewriting, MMR)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "coding",
+  "difficulty": "Medium",
+  "question": "Implement reciprocal rank fusion: rrf(rankings, k=60, top_n=None) takes several ranked lists of document ids (best first) and returns [(doc, score)] best first, with score = sum over lists of 1 / (k + rank), rank starting at 1. Repeats inside one list count once (first occurrence), exact ties go to the document that appears earlier (earlier list, then earlier position), and empty inputs return an empty list. Explain what k does.",
+  "answer_set": "single",
+  "answer": "Reference solution (tested; exact fractions avoid floating-point tie errors):\n\n```python\nfrom fractions import Fraction\n\n\ndef rrf(rankings, k=60, top_n=None):\n    \"\"\"Reciprocal Rank Fusion.\n\n    rankings: list of ranked lists of doc ids (best first). Repeats inside one\n    list are dropped (first occurrence kept) before ranks are assigned.\n    Returns [(doc, score)] best first; exact ties are broken by first\n    appearance (earlier list, then earlier position).\n    \"\"\"\n    scores = {}\n    first_seen = {}\n    for list_no, ranking in enumerate(rankings):\n        deduped = list(dict.fromkeys(ranking))\n        for pos, doc in enumerate(deduped, start=1):\n            scores[doc] = scores.get(doc, Fraction(0)) + Fraction(1, k + pos)\n            first_seen.setdefault(doc, (list_no, pos))\n    ordered = sorted(scores, key=lambda d: (-scores[d], first_seen[d]))\n    if top_n is not None:\n        ordered = ordered[:top_n]\n    return [(d, float(scores[d])) for d in ordered]\n```\n\nWhat k does: it damps the advantage of the very top ranks. With k = 60, rank 1 contributes 1/61 and rank 2 contributes 1/62, so the first place is only slightly better than the second, and agreement between lists outweighs a single list's top pick (a document at rank 2 in both lists beats a document at rank 1 in one list). With k = 0 the top rank dominates (1 vs 1/2). 60 is a widely used default, not a theorem; tune it on held-out queries if you can. RRF ignores score margins and treats a missing document as contributing 0, so it behaves well with differently scaled retrievers but cannot express confidence.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "reciprocal rank fusion",
+   "rank-based fusion",
+   "k constant",
+   "tie-breaking",
+   "deduplication within a list",
+   "exact fractions"
+  ],
+  "common_mistakes": [
+   "Using the raw scores instead of ranks",
+   "Counting repeated documents in one list twice, shifting ranks incorrectly",
+   "Treating k = 60 as universally optimal"
+  ],
+  "interview_style_note": "Writes a correct, deterministic fusion function and can state how k changes the behaviour.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "from fractions import Fraction\n\n\ndef rrf(rankings, k=60, top_n=None):\n    \"\"\"Reciprocal Rank Fusion.\n\n    rankings: list of ranked lists of doc ids (best first). Repeats inside one\n    list are dropped (first occurrence kept) before ranks are assigned.\n    Returns [(doc, score)] best first; exact ties are broken by first\n    appearance (earlier list, then earlier position).\n    \"\"\"\n    scores = {}\n    first_seen = {}\n    for list_no, ranking in enumerate(rankings):\n        deduped = list(dict.fromkeys(ranking))\n        for pos, doc in enumerate(deduped, start=1):\n            scores[doc] = scores.get(doc, Fraction(0)) + Fraction(1, k + pos)\n            first_seen.setdefault(doc, (list_no, pos))\n    ordered = sorted(scores, key=lambda d: (-scores[d], first_seen[d]))\n    if top_n is not None:\n        ordered = ordered[:top_n]\n    return [(d, float(scores[d])) for d in ordered]",
+   "test": "a = [\"d1\", \"d2\", \"d3\"]\nb = [\"d3\", \"d1\", \"d4\"]\nres = rrf([a, b], k=60)\nassert [d for d, _ in res] == [\"d1\", \"d3\", \"d2\", \"d4\"]\nassert abs(dict(res)[\"d1\"] - (1 / 61 + 1 / 62)) < 1e-15\nassert abs(dict(res)[\"d4\"] - 1 / 63) < 1e-15\n# exact tie -> first appearance wins\nassert [d for d, _ in rrf([[\"a\", \"b\"], [\"b\", \"a\"]])] == [\"a\", \"b\"]\n# repeats are dropped before ranking\nassert rrf([[\"x\", \"x\", \"y\"]]) == rrf([[\"x\", \"y\"]])\n# top_n and empty inputs\nassert len(rrf([a, b], top_n=2)) == 2\nassert rrf([]) == [] and rrf([[], []]) == []\n# a doc found by both lists at modest ranks beats a single-list rank-1 doc\nres = rrf([[\"solo\", \"p\", \"q\"], [\"z\", \"p2\", \"p\"]], k=60)\nassert res[0][0] == \"p\"\n# small k makes the top ranks dominate\nassert rrf([[\"solo\", \"x\", \"p\"], [\"z\", \"y\", \"p\"]], k=0)[0][0] == \"solo\"\nassert rrf([[\"solo\", \"x\", \"p\"], [\"z\", \"y\", \"p\"]], k=60)[0][0] == \"p\"",
+   "expected": null
+  },
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "rrf",
+   "fusion",
+   "hybrid",
+   "python"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Tested RRF implementation with deterministic tie rules; existing smi-h0010 implements rank metrics, not fusion.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-03-4",
+  "cell_id": "GEN-03",
+  "topic": "Retrieval strategies (dense, BM25, hybrid, RRF, query rewriting, MMR)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "coding",
+  "difficulty": "Medium",
+  "question": "Implement Okapi BM25 over tokenised documents with a class BM25(docs, k1=1.2, b=0.75) offering idf(term), score(query_tokens, doc_index) and rank(query_tokens, top_n). Use the non-negative idf ln(1 + (N - df + 0.5)/(df + 0.5)) and count repeated query terms once. Then explain, with your code, what tf saturation and length normalisation do and what happens when b = 0 or b = 1.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "BM25 scores a document by summing, over query terms, idf(t) x tf_part, where tf_part = f x (k1 + 1) / (f + k1 x (1 - b + b x dl/avgdl)), f is the term's count in the document, dl the document length and avgdl the average length.\n\nidf rewards rare terms. The version ln(1 + (N - df + 0.5)/(df + 0.5)) is never negative, whereas the older ln((N - df + 0.5)/(df + 0.5)) goes negative for terms in more than half the documents; libraries differ here, so scores from different implementations are not directly comparable.\n\nTerm-frequency saturation: as f grows, tf_part approaches k1 + 1 (when the length factor is 1), so the tenth occurrence adds much less than the second. This stops keyword stuffing and long repetitive documents from running away with the score. A small k1 saturates quickly; a large k1 behaves closer to linear tf.\n\nLength normalisation: the denominator contains k1 x (1 - b + b x dl/avgdl). For b = 0 it is ignored, so a long document with the same f scores the same as a short one; for b = 1 the full proportional penalty applies; b = 0.75 is a common default, a compromise because long documents have more chances to contain a term by accident but also may truly cover more. Whether b should be lower for corpora where length reflects content (for example long manuals) is an empirical matter.\n\nPitfalls: tokenisation and stop-word handling change scores far more than k1 or b, repeated query terms may or may not be weighted by query frequency depending on the variant, and BM25 scores are not comparable across queries or corpora, which is why they cannot be added to cosine scores directly. Pre-computing postings lists makes real systems far faster than this O(N x |query|) toy.",
+  "practical_answer": "Tested implementation. The test checks a hand-computed term score, saturation (the tf factor stays below k1 + 1 when b = 0 and each additional occurrence adds less), length normalisation (shorter document wins at b = 0.75, tie at b = 0) and that idf stays positive for a term present in every document:\n\n```python\nimport math\nfrom collections import Counter\n\n\nclass BM25:\n    \"\"\"Okapi BM25 with the non-negative idf ln(1 + (N - df + 0.5) / (df + 0.5)).\n\n    docs: list of token lists. Repeated query terms are counted once.\n    \"\"\"\n\n    def __init__(self, docs, k1=1.2, b=0.75):\n        self.k1, self.b = k1, b\n        self.tfs = [Counter(d) for d in docs]\n        self.lens = [len(d) for d in docs]\n        self.n = len(docs)\n        self.avgdl = sum(self.lens) / self.n\n        self.df = Counter()\n        for tf in self.tfs:\n            self.df.update(tf.keys())\n\n    def idf(self, term):\n        df = self.df.get(term, 0)\n        return math.log(1.0 + (self.n - df + 0.5) / (df + 0.5))\n\n    def score(self, query, i):\n        tf = self.tfs[i]\n        norm = 1.0 - self.b + self.b * self.lens[i] / self.avgdl\n        total = 0.0\n        for t in set(query):\n            f = tf.get(t, 0)\n            if f:\n                total += self.idf(t) * f * (self.k1 + 1.0) / (f + self.k1 * norm)\n        return total\n\n    def rank(self, query, top_n=None):\n        scored = [(i, self.score(query, i)) for i in range(self.n)]\n        scored.sort(key=lambda p: (-p[1], p[0]))\n        return scored[:top_n] if top_n is not None else scored\n```\n\nI also cross-checked the scores against rank_bm25's BM25Okapi with its idf replaced by the formula above (its default idf differs), and the values matched on three queries.",
+  "key_concepts": [
+   "BM25",
+   "idf",
+   "tf saturation",
+   "k1",
+   "length normalisation",
+   "b parameter",
+   "tokenisation"
+  ],
+  "common_mistakes": [
+   "Thinking BM25 term weight grows linearly with term count",
+   "Mixing idf variants and then comparing scores across libraries",
+   "Assuming b = 1 is always better because long documents are 'penalised'"
+  ],
+  "interview_style_note": "Can write BM25 from the formula and explain the two mechanisms (saturation, length normalisation) with parameter extremes.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import math\nfrom collections import Counter\n\n\nclass BM25:\n    \"\"\"Okapi BM25 with the non-negative idf ln(1 + (N - df + 0.5) / (df + 0.5)).\n\n    docs: list of token lists. Repeated query terms are counted once.\n    \"\"\"\n\n    def __init__(self, docs, k1=1.2, b=0.75):\n        self.k1, self.b = k1, b\n        self.tfs = [Counter(d) for d in docs]\n        self.lens = [len(d) for d in docs]\n        self.n = len(docs)\n        self.avgdl = sum(self.lens) / self.n\n        self.df = Counter()\n        for tf in self.tfs:\n            self.df.update(tf.keys())\n\n    def idf(self, term):\n        df = self.df.get(term, 0)\n        return math.log(1.0 + (self.n - df + 0.5) / (df + 0.5))\n\n    def score(self, query, i):\n        tf = self.tfs[i]\n        norm = 1.0 - self.b + self.b * self.lens[i] / self.avgdl\n        total = 0.0\n        for t in set(query):\n            f = tf.get(t, 0)\n            if f:\n                total += self.idf(t) * f * (self.k1 + 1.0) / (f + self.k1 * norm)\n        return total\n\n    def rank(self, query, top_n=None):\n        scored = [(i, self.score(query, i)) for i in range(self.n)]\n        scored.sort(key=lambda p: (-p[1], p[0]))\n        return scored[:top_n] if top_n is not None else scored",
+   "test": "docs = [\n    \"error e4417 timeout on payment gateway\".split(),\n    \"how to reset your password\".split(),\n    \"payment timeout error troubleshooting guide for the payment gateway and the payment api\".split(),\n    \"payment\".split(),\n]\nbm = BM25(docs, k1=1.2, b=0.75)\n# hand-computed check for doc 0, term 'e4417' (df=1, N=4, dl=6)\navgdl = sum(len(d) for d in docs) / 4\nidf = math.log(1 + (4 - 1 + 0.5) / (1 + 0.5))\nexpect = idf * 1 * 2.2 / (1 + 1.2 * (0.25 + 0.75 * 6 / avgdl))\nassert abs(bm.score([\"e4417\"], 0) - expect) < 1e-12\n# repeated query terms count once; unknown terms score 0\nassert bm.score([\"e4417\", \"e4417\"], 0) == bm.score([\"e4417\"], 0)\nassert bm.score([\"zzz\"], 0) == 0.0 and bm.idf(\"zzz\") > 0\n# term-frequency saturation: with b=0 the tf factor never exceeds k1+1\nflat = BM25([[\"a\"] * 1, [\"a\"] * 5, [\"a\"] * 50, [\"a\"] * 500, [\"b\"]], k1=1.2, b=0.0)\ns = [flat.score([\"a\"], i) / flat.idf(\"a\") for i in range(4)]\nassert all(x < 2.2 for x in s) and s == sorted(s)\nassert s[3] - s[2] < s[1] - s[0]\n# length normalisation: same tf, longer document scores lower when b > 0\npair = BM25([[\"x\", \"y\"], [\"x\"] + [\"pad\"] * 30, [\"other\"]], k1=1.2, b=0.75)\nassert pair.score([\"x\"], 0) > pair.score([\"x\"], 1)\nsame = BM25([[\"x\", \"y\"], [\"x\"] + [\"pad\"] * 30, [\"other\"]], k1=1.2, b=0.0)\nassert abs(same.score([\"x\"], 0) / same.idf(\"x\") - same.score([\"x\"], 1) / same.idf(\"x\")) < 1e-12\nassert bm.rank([\"e4417\"], top_n=1)[0][0] == 0\n# idf is positive even for a term present in every document\nallhave = BM25([[\"t\", \"a\"], [\"t\", \"b\"]])\nassert allhave.idf(\"t\") > 0",
+   "expected": null
+  },
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "bm25",
+   "sparse-retrieval",
+   "python",
+   "saturation"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Tested BM25 with explanation of k1/b; existing smi-g0002 (TF-IDF vectoriser reproduction) differs in weighting scheme and has no saturation or length normalisation.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-03-5",
+  "cell_id": "GEN-03",
+  "topic": "Retrieval strategies (dense, BM25, hybrid, RRF, query rewriting, MMR)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "coding",
+  "difficulty": "Medium",
+  "question": "A RAG retriever's top-5 contains four near-identical paragraphs from different copies of the same policy, which wastes context. Implement Maximal Marginal Relevance mmr(query, docs, k, lam=0.5) over cosine similarity (greedy; score = lam x sim(q, d) - (1 - lam) x max similarity to already selected; ties to the lower index; zero vectors score 0). Explain how lam behaves and where MMR is not the right tool.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "MMR re-ranks a candidate list greedily. At each step it picks the document maximising lam x relevance(d, q) - (1 - lam) x max over selected s of similarity(d, s). The first pick is the most relevant document (redundancy is zero), and later picks are penalised for resembling anything already chosen.\n\nlam = 1 reduces to ordinary relevance ranking; lam = 0 ignores the query after the start and selects maximally different items, which usually drags in irrelevant ones; practical values are in between and should be tuned on the downstream task (for example answer quality or coverage of distinct facts), not chosen by habit. Because similarities are cosine, relevance and redundancy are on the same scale, which is why MMR is simple to apply; with other score types (BM25) you would normalise first.\n\nCost: O(k x n x d) similarity work for n candidates, so apply it to a short list (for example the top 20-100 from the first-stage retriever), not the whole corpus.\n\nWhere it is not right: exact or near-exact duplicates are better removed up front by hashing or similarity-threshold deduplication, which is cheaper and more predictable. MMR only diversifies in embedding space; it cannot know that two different-looking chunks are different versions of one policy and that the older one is wrong, so metadata (version, date) must be handled separately. It also may drop a relevant second chunk that adds a needed detail, if it is too similar to the first; lower lam too far and answer-bearing chunks disappear.",
+  "practical_answer": "Tested implementation. The test uses a near-duplicate pair and a different-facet document: lam = 1 returns the duplicate second, lam = 0.5 skips it; k larger than the candidate count is clipped; scale invariance and zero-vector handling are asserted:\n\n```python\nimport numpy as np\n\n\ndef mmr(query, docs, k, lam=0.5):\n    \"\"\"Maximal Marginal Relevance over cosine similarity.\n\n    Greedy: at each step pick argmax of lam * sim(q, d) - (1 - lam) * max_{s in selected} sim(d, s).\n    Ties go to the lower index; a zero-norm vector is treated as similarity 0 to everything.\n    Returns the selected indices in selection order.\n    \"\"\"\n    if not 0.0 <= lam <= 1.0:\n        raise ValueError(\"lam must be in [0, 1]\")\n    q = np.asarray(query, dtype=float)\n    d = np.asarray(docs, dtype=float)\n\n    def unit(m):\n        n = np.linalg.norm(m, axis=-1, keepdims=True)\n        return np.divide(m, n, out=np.zeros_like(m), where=n > 0)\n\n    q, d = unit(q), unit(d)\n    rel = d @ q\n    pair = d @ d.T\n    remaining = list(range(len(d)))\n    chosen = []\n    while remaining and len(chosen) < k:\n        best, best_score = None, -np.inf\n        for i in remaining:\n            red = max(pair[i, j] for j in chosen) if chosen else 0.0\n            score = lam * rel[i] - (1.0 - lam) * red\n            if score > best_score:\n                best, best_score = i, score\n        chosen.append(best)\n        remaining.remove(best)\n    return chosen\n```",
+  "key_concepts": [
+   "maximal marginal relevance",
+   "lambda trade-off",
+   "redundancy penalty",
+   "cosine similarity",
+   "greedy selection",
+   "candidate short list",
+   "deduplication"
+  ],
+  "common_mistakes": [
+   "Applying MMR to the entire corpus rather than a short candidate list",
+   "Using it to fix duplicate versions of a document that metadata should resolve",
+   "Setting lam by default without evaluating answer quality"
+  ],
+  "interview_style_note": "Implements the greedy rule correctly and explains lam and the limits of embedding-space diversity.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\n\ndef mmr(query, docs, k, lam=0.5):\n    \"\"\"Maximal Marginal Relevance over cosine similarity.\n\n    Greedy: at each step pick argmax of lam * sim(q, d) - (1 - lam) * max_{s in selected} sim(d, s).\n    Ties go to the lower index; a zero-norm vector is treated as similarity 0 to everything.\n    Returns the selected indices in selection order.\n    \"\"\"\n    if not 0.0 <= lam <= 1.0:\n        raise ValueError(\"lam must be in [0, 1]\")\n    q = np.asarray(query, dtype=float)\n    d = np.asarray(docs, dtype=float)\n\n    def unit(m):\n        n = np.linalg.norm(m, axis=-1, keepdims=True)\n        return np.divide(m, n, out=np.zeros_like(m), where=n > 0)\n\n    q, d = unit(q), unit(d)\n    rel = d @ q\n    pair = d @ d.T\n    remaining = list(range(len(d)))\n    chosen = []\n    while remaining and len(chosen) < k:\n        best, best_score = None, -np.inf\n        for i in remaining:\n            red = max(pair[i, j] for j in chosen) if chosen else 0.0\n            score = lam * rel[i] - (1.0 - lam) * red\n            if score > best_score:\n                best, best_score = i, score\n        chosen.append(best)\n        remaining.remove(best)\n    return chosen",
+   "test": "q = [1.0, 0.2, 0.0]\ndocs = [\n    [1.0, 0.25, 0.0],   # 0: most relevant\n    [1.0, 0.26, 0.0],   # 1: near-duplicate of 0\n    [0.7, 0.0, 0.7],    # 2: different facet, moderately relevant\n    [0.0, 0.0, 1.0],    # 3: unrelated\n]\nassert mmr(q, docs, 3, lam=1.0) == [0, 1, 2]       # pure relevance keeps the duplicate\nassert mmr(q, docs, 3, lam=0.5)[:2] == [0, 2]      # diversity skips the duplicate\nassert mmr(q, docs, 10, lam=0.5) == mmr(q, docs, 4, lam=0.5)\nassert sorted(mmr(q, docs, 4, lam=0.0)) == [0, 1, 2, 3]\nassert mmr(q, docs, 0) == []\nassert mmr(q, [[0, 0, 0], [1, 0.2, 0]], 2, lam=0.7) == [1, 0]\n# scale invariance of cosine\nassert mmr(q, np.array(docs) * 7.0, 3, lam=0.5) == mmr(q, docs, 3, lam=0.5)",
+   "expected": null
+  },
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "mmr",
+   "diversity",
+   "reranking",
+   "python"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Tested MMR for duplicate-chunk context; no existing question covers diversification (nearest smi-h0003 diagnoses RAG failure buckets).",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-03-6",
+  "cell_id": "GEN-03",
+  "topic": "Retrieval strategies (dense, BM25, hybrid, RRF, query rewriting, MMR)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "Users of a document-QA chatbot type very short or chatty queries ('and the notice period?', 'termination'), and recall@5 is low. A teammate proposes three changes: (1) LLM query rewriting using chat history, (2) HyDE (embed an LLM-written hypothetical answer instead of the query), and (3) multi-query expansion with fusion. Explain what each does, when each helps or hurts, and what you would test before adding them.",
+  "answer_set": "single",
+  "answer": "(1) Conversational rewriting turns 'and the notice period?' into a standalone query using chat history ('notice period for terminating the supplier contract'). It helps follow-ups with pronouns or ellipsis, which is probably the main issue here. Risk: the rewriter adds wrong context or drops specifics such as identifiers, and it adds an LLM call to latency. (2) HyDE has the model draft a plausible answer and embeds that text; it can bridge the gap between a short query and long passages, because an answer-shaped text looks more like the documents. Risks: the draft may contain hallucinated specifics that pull retrieval toward the wrong place, it is weak for exact identifiers and rare domain facts the model does not know, and it costs a generation. (3) Multi-query asks for several paraphrases or sub-questions, retrieves for each and fuses (for example with RRF). It raises recall for ambiguous queries but multiplies retrieval load, can add off-topic results, and needs deduplication.\n\nTest before shipping: build a labelled set of real conversational and short queries; compare baseline against each technique and combinations on recall@k and downstream answer quality, in separate slices (follow-ups, keyword-only, identifier queries); inspect cases where the rewrite harmed; measure added latency and cost; and keep the original query in the retrieved mix, so a bad rewrite cannot lose a good literal match. Start with the cheapest one that fits the diagnosed failure: for follow-ups, history-aware rewriting; for terse keyword queries, hybrid retrieval often helps more than an LLM step.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "conversational query rewriting",
+   "HyDE",
+   "multi-query expansion",
+   "hallucinated draft",
+   "fusion of query variants",
+   "slice-based evaluation",
+   "latency cost"
+  ],
+  "common_mistakes": [
+   "Assuming HyDE is a free recall boost on every corpus",
+   "Replacing the user's literal query with the rewrite, losing exact terms",
+   "Adding all three techniques without measuring each separately"
+  ],
+  "interview_style_note": "Links each technique to the failure it addresses, names its risk, and proposes sliced evaluation.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "query-rewriting",
+   "hyde",
+   "multi-query",
+   "rag"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Trade-offs of three query transformation techniques for a stated failure; nearest smi-h0003 diagnoses retrieval versus generation failures, not query transformation.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-03-7",
+  "cell_id": "GEN-03",
+  "topic": "Retrieval strategies (dense, BM25, hybrid, RRF, query rewriting, MMR)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Hard",
+  "question": "A multi-tenant RAG service has 80 million chunks in an ANN index, with metadata for tenant, language and date. A query is restricted to one tenant that owns 1% of the chunks. The current code retrieves the top-10 vectors then drops those whose tenant does not match, and users often see 0-2 results. Explain why, compare post-filtering, pre-filtering and filter-aware ANN, and recommend a strategy as a function of filter selectivity.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Post-filtering (search first, filter afterwards) fails when the filter is selective: the global top-10 mostly belongs to other tenants. Oversampling, say fetching 1,000 candidates and then filtering, helps but is a guess, and the shortfall becomes unpredictable when the filter correlates with the query (a tenant's documents are typically about topics that other tenants' are not, or the reverse).\n\nPre-filtering (restrict to matching items, then search) returns the right number of results, but a naive ANN structure is built for the whole collection. If a graph (HNSW) is searched while skipping non-matching nodes, a restrictive filter can leave the traversal with few valid entry points or a disconnected valid subgraph, so recall may drop or latency may grow; behaviour is implementation-dependent, and engines add filter-aware traversal or fall back to other strategies. For IVF, filtering inside the probed lists is simple but wastes work scanning excluded vectors when selectivity is low.\n\nFilter-aware ANN integrates the predicate into the search (traversing and collecting only valid nodes, or using per-filter indexes), which tends to be the best general approach if your engine supports it and you test its recall under the filters you actually use.\n\nStrategy by selectivity: very selective filters (a tenant with, for example, tens of thousands of chunks) should not use the global ANN at all: use a per-tenant index/partition, or brute-force the matching set, which is exact and cheap at that size. Moderately selective filters: filter-aware ANN, verified against exact search. Loose filters (most data matches): post-filter with a modest oversampling factor plus a retry that doubles the candidate depth until k results are found or a limit is hit. Hard isolation requirements (security) are best met by separate partitions or enforced server-side filters, never by hoping that post-filtering is applied on every path.",
+  "practical_answer": "Quantifying the failure under a deliberately simple independence assumption (each candidate matches the tenant with probability 0.01): the top-10 contains on average 0.1 matching chunks. Fetching the top-100 gives on average 1 match and a probability of zero matches of 0.99^100 = 0.366. Fetching 1,000 gives on average 10 matches, but the chance of having at least 10 is only about 0.54 (binomial). Real filters are correlated with queries, so treat these as optimistic.\n\nPractical routine: (1) keep per-filter cardinality estimates (counts per tenant); (2) if count < ~100k (tune on your hardware), exact scan the tenant's vectors; (3) otherwise run filter-aware ANN and sample queries per tenant against exact results to check recall per tenant, not only on average; (4) for loose filters, post-filter with oversampling of about 2/selectivity and retry deeper if fewer than k survive; (5) log result counts below k as an alert.",
+  "key_concepts": [
+   "post-filtering",
+   "pre-filtering",
+   "filter-aware ANN",
+   "filter selectivity",
+   "oversampling",
+   "tenant partitioning",
+   "brute-force fallback",
+   "graph connectivity"
+  ],
+  "common_mistakes": [
+   "Assuming oversampling by a fixed factor always works",
+   "Applying a restrictive filter to an HNSW search and expecting unchanged recall",
+   "Relying on post-filtering for tenant isolation instead of enforced partitions or server-side filters"
+  ],
+  "interview_style_note": "Explains the shortfall with selectivity arithmetic and picks a strategy per selectivity band with attention to recall under filters.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "Databases"
+  ],
+  "tags": [
+   "metadata-filtering",
+   "pre-filter",
+   "post-filter",
+   "multi-tenant",
+   "ann"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Filtered vector search trade-offs with arithmetic; no existing question covers metadata filtering (nearest smi-g0011 mentions per-team access rules inside a broader comparison).",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B1-GEN-03-8",
+  "cell_id": "GEN-03",
+  "topic": "Retrieval strategies (dense, BM25, hybrid, RRF, query rewriting, MMR)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "evaluation",
+  "difficulty": "Hard",
+  "question": "On 300 labelled queries, a hypothetical evaluation reports MRR@10 of 0.41 for BM25, 0.49 for dense and 0.52 for hybrid (RRF). The product team wants to ship hybrid and to tune the RRF k and a dense/sparse weight on the same 300 queries. The relevance judgements were originally collected by annotators reviewing the top results of the current dense system. What is wrong with this evaluation, and how would you evaluate and tune the hybrid system properly?",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Problems: (1) Judgement bias. Annotators judged documents shown by the dense system, and unjudged documents are counted as non-relevant. Relevant items that only BM25 or hybrid surfaces were never seen, so they count as wrong, which understates BM25 and hybrid and favours the system that created the pool. Remedy: pool results from all candidate systems before annotating, or add judgements for the new systems' unjudged top results. (2) Tuning and reporting on the same queries overfits, so the 0.52 is optimistic. Use a separate tuning split or cross-validation, report on untouched data. (3) With 300 queries, 0.03 MRR can be noise; compare systems per query with a paired test or bootstrap confidence intervals. (4) Aggregates hide failures. Slice by query type (identifier-heavy, paraphrase, short keywords, long natural language) and check that hybrid does not regress on the slice that matters; a mean gain can coexist with a loss on a critical class. (5) Wrong metric for the role. If hybrid is a candidate generator in front of a re-ranker, recall@50-100 matters more than MRR@10; also evaluate downstream answer quality, latency and cost. (6) Distribution mismatch: the labelled set may not match production queries.\n\nTuning hygiene: keep the grid small (k and alpha), prefer settings that are stable across folds over the single best score, and verify that a flat optimum, not a spike, was found.",
+  "practical_answer": "Protocol with decision rule (illustrative thresholds, adjust to your risk): (1) pool the top 20 from BM25, dense and hybrid for every query and have missing judgements filled; (2) split 300 queries into 5 folds, tune k and alpha on 4 and evaluate on the held-out fold, repeating; (3) report mean MRR@10 and recall@50 per fold and the paired bootstrap 95% interval of the hybrid-minus-dense difference; (4) report the same numbers per query slice; (5) ship if the interval of the difference excludes zero overall, no critical slice regresses beyond a tolerance you set before the experiment, and latency/cost fit; (6) after launch, sample production queries monthly for fresh judgements and track the metrics.",
+  "key_concepts": [
+   "pooling bias",
+   "unjudged documents",
+   "held-out tuning",
+   "paired bootstrap",
+   "slice analysis",
+   "recall@k vs MRR",
+   "candidate generation",
+   "RRF k tuning"
+  ],
+  "common_mistakes": [
+   "Tuning fusion parameters and reporting results on the same queries",
+   "Treating unjudged documents as non-relevant when the judgement pool came from one system",
+   "Reporting only a mean metric without per-slice or confidence intervals"
+  ],
+  "interview_style_note": "Identifies evaluation bias and overfitting, and sets out a protocol with a pre-agreed decision rule.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "Statistics"
+  ],
+  "tags": [
+   "evaluation",
+   "pooling-bias",
+   "hybrid",
+   "mrr",
+   "overfitting"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Evaluation-design critique for hybrid retrieval; existing smi-h0010 implements rank metrics, this question asks about judgement bias and tuning hygiene (not about computing metrics).",
+  "confidence": "high"
+ }
+]

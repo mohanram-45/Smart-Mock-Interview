@@ -1,0 +1,986 @@
+[
+ {
+  "plan_id": "B1-GEN-05-1",
+  "verdict": "pass",
+  "reasons": [
+   "All numbers recomputed and match; code correct on 3 interpreters; fenced code equals tested solution."
+  ],
+  "parts_answered": {
+   "function with stated signature": true,
+   "what the interval tells you": true,
+   "why paired beats independent": true,
+   "what next": true
+  },
+  "evidence": [
+   {
+    "claim": "mean diff 0.10; recorded code gives (0.1,-0.025,0.225) at seed 0",
+    "method": "executed",
+    "evidence": "ran on 3.10, 3.11, sandbox 3.13: (0.1, -0.025, 0.225)"
+   },
+   {
+    "claim": "paired SE ~0.070 vs independent ~0.112",
+    "method": "executed",
+    "evidence": "d.std(ddof=1)/sqrt(40)=0.0698; sqrt(var_a/40+var_b/40)=0.1121"
+   },
+   {
+    "claim": "exact sign test two-sided p = 2x37/256 ~0.29",
+    "method": "executed",
+    "evidence": "2*sum(C(8,k),k<=2)/256 = 0.2890625"
+   },
+   {
+    "claim": "400-query version ~[+0.058,+0.143]",
+    "method": "executed",
+    "evidence": "(0.1, 0.0575, 0.1425)"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short numpy implementation plus interpretation of a paired CI; no subtle trap.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Interpretation, paired-vs-independent, sign test, pitfalls."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Reference code; not duplicated in the detailed text."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0040",
+   "same_intent": false
+  },
+  "code_findings": "Extra cases on all three interpreters: unequal lengths and empty input raise ValueError; 2-D input raises ValueError; single query (0.2 vs 0.5) gives (0.3,0.3,0.3); alpha=0.1 on [0,1,0,1] vs [1,1,0,0] gives (0.0,-0.5,0.5). stdlib+numpy only, no 3.11+ features. Memory is n_boot*n ints (fine for n up to ~1e4).",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-05-2",
+  "verdict": "pass",
+  "reasons": [
+   "Table reconstruction, kappa 0.357, per-class recall/precision and balanced-contrast kappa 0.82 all verified."
+  ],
+  "parts_answered": {
+   "reconstruct confusion matrix": true,
+   "compute kappa": true,
+   "why headline misleading": true,
+   "implement cohen_kappa": true,
+   "what else to report": true
+  },
+  "evidence": [
+   {
+    "claim": "88/2/7/3 table matches marginals 90/10 and 95/5",
+    "method": "derivation",
+    "evidence": "a+d=91, a+10-d=95 -> a=88,d=3"
+   },
+   {
+    "claim": "p_e=0.86, kappa=0.357",
+    "method": "executed",
+    "evidence": "0.05/0.14=0.35714"
+   },
+   {
+    "claim": "balanced 46/4/5/45 gives kappa 0.82",
+    "method": "executed",
+    "evidence": "p_e=0.5*0.51+0.5*0.49=0.5, kappa=0.82"
+   },
+   {
+    "claim": "judge catches 3 of 10 bad, precision 3/5, 7 in 10 pass through",
+    "method": "derivation",
+    "evidence": "from table"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Algebra to rebuild the matrix, kappa by hand, short implementation, interpretation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Numbers and reporting plan."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Code and test description."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0003",
+   "same_intent": false
+  },
+  "code_findings": "3 interpreters pass. Extra: unequal-length and empty raise ValueError; string labels; numpy array input works; ['ok']*5 vs ['bad']*5 gives 0.0; [1,1,0,0] vs [1,1,0,1] gives 0.5. stdlib only.",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-05-3",
+  "verdict": "correct",
+  "reasons": [
+   "C's faithfulness verdict is asserted without support in the stated context."
+  ],
+  "parts_answered": {
+   "A verdict": true,
+   "B verdict": true,
+   "C verdict": "overstated",
+   "inputs per judgement": true,
+   "implication for headline metric": true
+  },
+  "evidence": [
+   {
+    "claim": "Faithfulness=answer+context, relevance=question+answer, correctness=reference",
+    "method": "background_only",
+    "evidence": "Matches common RAG-eval definitions (e.g. Ragas); WebFetch to elastic.co was refused (permission not granted), so documented-behaviour claims are background_only."
+   },
+   {
+    "claim": "concise answer is 68 words",
+    "method": "executed",
+    "evidence": "word count"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "concise_answer",
+    "claim": "C is faithful, weakly relevant (it does not answer the question) and not correct.",
+    "problem": "The question never says the retrieved page mentions writing or contract terms, so C's faithfulness is not determinable; calling it faithful assumes unstated context.",
+    "replacement": "C is faithful only if the page says that (the prompt does not), weakly relevant (it does not answer the question) and not correct."
+   },
+   {
+    "severity": "major",
+    "field": "detailed_answer",
+    "claim": "C: faithful, only loosely relevant (on-topic but non-responsive), not correct. It is a typical 'safe vague' answer that high faithfulness scores reward.",
+    "problem": "Same unverifiable assumption about C's support in context.",
+    "replacement": "C: only loosely relevant (on-topic but non-responsive) and not correct. Its faithfulness depends on text we are not shown: if the retrieved page really says cancellations must be in writing under the contract terms it is faithful, otherwise it is unsupported too. When supported, it is the typical 'safe vague' answer that high faithfulness scores reward."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Conceptual separation of three metrics applied to three cases.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Genuinely shorter. Must stay <=80 words after edit (68 -> 77)."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Adds diagnosis by pattern."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "'stale context' is discussed; fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0003",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-05-4",
+  "verdict": "correct",
+  "reasons": [
+   "One overstatement: flips are 'direct evidence of position bias'."
+  ],
+  "parts_answered": {
+   "what is going on": true,
+   "other biases": true,
+   "making it usable": true
+  },
+  "evidence": [
+   {
+    "claim": "95+43+62=200; consistent-B 47.5%, consistent-A 21.5%, 95/138=0.688",
+    "method": "executed",
+    "evidence": "arithmetic"
+   },
+   {
+    "claim": "practical numbers labelled illustrative and internally consistent with 31% flips",
+    "method": "derivation",
+    "evidence": "62/200=31%"
+   },
+   {
+    "claim": "judge biases (position, verbosity, self-preference)",
+    "method": "background_only",
+    "evidence": "hedged in answer as setup-dependent; WebFetch to elastic.co was refused (permission not granted), so documented-behaviour claims are background_only."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "A 31% flip rate under order swapping is direct evidence of position bias (and general instability)",
+    "problem": "A flip on swap shows order sensitivity, not specifically position bias; plain noise or instability would also flip verdicts.",
+    "replacement": "A 31% flip rate under order swapping shows the verdict depends heavily on presentation order (position bias and/or plain instability; check whether flips favour the first slot)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Requires recognising measurement-validity problem and listing mitigations.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Biases and remedies."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked swap-consistent counts, labelled illustrative."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0009",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-05-5",
+  "verdict": "pass",
+  "reasons": [
+   "Directional bias hedged ('likely, not guaranteed'); construction and validation sound. Rubric supplied."
+  ],
+  "parts_answered": {
+   "biases named": true,
+   "which retriever favoured": true,
+   "better construction": true,
+   "validation": true,
+   "staleness": true
+  },
+  "evidence": [
+   {
+    "claim": "LLM-written questions copy chunk vocabulary, favouring lexical retrievers",
+    "method": "background_only",
+    "evidence": "Widely reported for synthetic query sets; answer hedges it. WebFetch to elastic.co was refused (permission not granted), so documented-behaviour claims are background_only."
+   },
+   {
+    "claim": "concise answer 68 words",
+    "method": "executed",
+    "evidence": "word count"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open-ended critique with several acceptable designs and trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Mix real logged queries with validated synthetic ones",
+    "tradeoff": "Realism vs coverage and annotation cost"
+   },
+   {
+    "decision": "Instruct generator to paraphrase and avoid copying rare terms; filter for standalone answerability",
+    "tradeoff": "Reduces lexical leakage favouring BM25 but may produce harder or unnatural questions"
+   },
+   {
+    "decision": "Pool top results from BM25, dense and hybrid and have humans judge all pooled candidates (multiple gold chunks)",
+    "tradeoff": "Removes single-gold and pooling bias at annotation cost"
+   },
+   {
+    "decision": "Stratify by question type and topic; include multi-hop and unanswerable items",
+    "tradeoff": "Representative diagnosis vs larger set needed per stratum"
+   },
+   {
+    "decision": "Split dev set and frozen test set",
+    "tradeoff": "Prevents tuning leakage, but halves usable data"
+   },
+   {
+    "decision": "Version the set with corpus snapshot ids and re-review on document change",
+    "tradeoff": "Staleness control vs maintenance effort"
+   },
+   {
+    "decision": "Report intervals (paired bootstrap) for retriever differences",
+    "tradeoff": "Honest uncertainty at n=500 vs a simpler headline number"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Shorter summary."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Itemised critique and design."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "Fine; 'held-out split' is brief but present.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-05-6",
+  "verdict": "correct",
+  "reasons": [
+   "Noise argument uses the SE of one accuracy instead of the paired change."
+  ],
+  "parts_answered": {
+   ">=4 reasons": true,
+   "how to tell apart": true,
+   "ceiling experiment": true
+  },
+  "evidence": [
+   {
+    "claim": "sqrt(.61*.39/200)=3.4 pts",
+    "method": "executed",
+    "evidence": "0.0345"
+   },
+   {
+    "claim": "12 newly hit = 0.06*200; 3/200 = 1.5 pts; 122->125 correct",
+    "method": "executed",
+    "evidence": "arithmetic"
+   },
+   {
+    "claim": "paired SE sqrt(10)/200=1.58 pts",
+    "method": "derivation",
+    "evidence": "SE of difference of paired proportions ~ sqrt(b+c)/n"
+   },
+   {
+    "claim": "mid-context weakness 'often'",
+    "method": "background_only",
+    "evidence": "hedged; with only 5 chunks the effect is weaker. WebFetch to elastic.co was refused (permission not granted), so documented-behaviour claims are background_only."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "detailed_answer",
+    "claim": "6. Noise. With n = 200, the standard error on a 61% accuracy is about sqrt(0.61 x 0.39 / 200) = 3.4 points, so a 1.5-point move says almost nothing alone.",
+    "problem": "3.4 points is the SE of a single accuracy; the before/after change is measured on the same 200 questions, so its SE depends on the number of flipped questions and is smaller. Conclusion (noise) still holds but the justification is mis-applied.",
+    "replacement": "6. Noise. A single 61% accuracy on n = 200 has a standard error of about 3.4 points, but for a before/after change on the same questions the relevant SE is about sqrt(number of flipped questions) / 200, for example 1.6 points if 10 questions flip. A net change of 3 questions (1.5 points) is within one standard error, so it says almost nothing alone."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-hypothesis diagnosis with per-query transition analysis and oracle ceiling.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Hypotheses, diagnostics, oracle."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Labelled hypothetical breakdown; consistent with 1.5 pts."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "'lost in the middle' is only indirectly discussed (item 4 does not use the phrase); consider replacing with 'paired noise / flipped questions'.",
+  "suggested_key_concepts": [
+   "recall@k at the k actually used",
+   "oracle context ablation",
+   "transition table",
+   "generator bottleneck",
+   "parametric knowledge",
+   "paired noise"
+  ],
+  "nearest_existing": {
+   "id": "smi-h0003",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-05-7",
+  "verdict": "correct",
+  "reasons": [
+   "'Lower bound' claim is wrong for recall."
+  ],
+  "parts_answered": {
+   "why metrics say this": true,
+   "how to fix": true
+  },
+  "evidence": [
+   {
+    "claim": "example: recall@5=2/3, P@5=2/5 measured, true P@5=4/5",
+    "method": "derivation",
+    "evidence": "d1,x,y,d2 relevant of 5 returned"
+   },
+   {
+    "claim": "pooling bias, condensed lists",
+    "method": "background_only",
+    "evidence": "Standard IR evaluation material (Sakai & Kando; Buckley & Voorhees); WebFetch to elastic.co was refused (permission not granted), so documented-behaviour claims are background_only."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "answer",
+    "claim": "(5) when labels are partial, prefer to say 'lower bound' about measured recall.",
+    "problem": "With incomplete judgments precision@k is a lower bound, but recall has an equally incomplete denominator, so it is biased and not a strict lower bound.",
+    "replacement": "(5) when labels are partial, treat measured precision@k as a lower bound (unjudged hits count as misses); measured recall is biased too, but its denominator is also incomplete, so it is not a strict bound."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism explanation with fixes.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer is appropriate."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0010",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-05-8",
+  "verdict": "correct",
+  "reasons": [
+   "Question is not self-contained (depends on data in the test)."
+  ],
+  "parts_answered": {
+   "evidence_coverage": true,
+   "aggregate": true,
+   "explain k=3 vs 4": true
+  },
+  "evidence": [
+   {
+    "claim": "k=3 mean 0.4583, rate 0.25; k=4 mean 0.5417, rate 0.25",
+    "method": "executed",
+    "evidence": "3.10, 3.11, 3.13 all print 0.4583 0.25 0.5417 0.25"
+   },
+   {
+    "claim": "coverage per query at k=3: 1,0.5,0,1/3; q4 to 2/3 at k=4",
+    "method": "derivation",
+    "evidence": "by hand"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "question",
+    "claim": "Using the four-query example in the test, explain why mean coverage and full-coverage rate move differently when k goes from 3 to 4.",
+    "problem": "The question refers to an example that only exists in the hidden test; a candidate cannot answer it, and the format of runs is unspecified.",
+    "replacement": "Here runs is a list of (ranked, groups) pairs. Use these four queries: (1) ranked [c1, c9, c2, c7], groups [{c1}, {c2, c20}]; (2) [c5, c3, c8, c4], [{c3}, {c6}]; (3) [c10, c11], [{c12}]; (4) [c1, c2, c3, c4], [{c4}, {c3}, {c40}]. Explain why mean coverage and full-coverage rate move differently when k goes from 3 to 4."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short set-based code plus reading two aggregates.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Metric rationale and worked numbers."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Code."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0010",
+   "same_intent": false
+  },
+  "code_findings": "3 interpreters pass; fenced code equals solution. Extra: empty ranked gives (0.0,False); duplicates in ranked and k larger than list fine; negative k gives (0.0,False); empty groups raises ValueError; aggregate([]) raises ZeroDivisionError (minor, undocumented). stdlib only.",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-06-1",
+  "verdict": "pass",
+  "reasons": [
+   "Arithmetic verified; filtered-HNSW claims hedged and consistent with documented engine behaviour."
+  ],
+  "parts_answered": {
+   "why post-filter fails": true,
+   "in-graph vs pre-filter": true,
+   "choose by selectivity": true
+  },
+  "evidence": [
+   {
+    "claim": "100 x 0.005 = 0.5; ef ~2000 for 10 survivors; 100k x 768 x 4 = 307 MB",
+    "method": "executed",
+    "evidence": "0.5, 2000.0, 307.2 MB"
+   },
+   {
+    "claim": "filtered traversal can disconnect graph; engines switch to brute force at high selectivity",
+    "method": "background_only",
+    "evidence": "Known behaviour (e.g. Qdrant, Weaviate flat-search cutoff); answer hedges 'implementations differ'. WebFetch to elastic.co was refused (permission not granted), so documented-behaviour claims are background_only."
+   },
+   {
+    "claim": "concise answer 61 words",
+    "method": "executed",
+    "evidence": "count"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism plus selectivity arithmetic and strategy selection.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Shorter."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Numbers and strategy table."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "ok. Note the 768-d assumption is introduced in the answer, not the question (minor).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0009",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-06-2",
+  "verdict": "correct",
+  "reasons": [
+   "Numbers all verified; decision text omits that PQ saves no nodes at the replica floor."
+  ],
+  "parts_answered": {
+   "base memory": true,
+   "node count": true,
+   "int8 and PQ comparison": true,
+   "choice and verification": true
+  },
+  "evidence": [
+   {
+    "claim": "160.2 GB copy; 480.6 GB x3; 45.0 int8; 11.4 PQ; 6.6 links",
+    "method": "executed",
+    "evidence": "160.21, 480.64, 45.01, 11.4, 6.61; test passes on 3 interpreters"
+   },
+   {
+    "claim": "upper layers n/(M-1) memberships with up to M links",
+    "method": "derivation",
+    "evidence": "sum n/M^k = n/(M-1)"
+   },
+   {
+    "claim": "ceil(160.2/100)=2 shards, 6 nodes; int8 45<100 -> 3 nodes",
+    "method": "derivation",
+    "evidence": "arithmetic"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Much cheaper, but lossy: distances are approximate, so",
+    "problem": "At 11.4 GB per copy PQ still needs 3 nodes (replica floor), the same as int8, so it is not cheaper in node count; the decision paragraph leaves this implicit.",
+    "replacement": "Each copy fits on one node, so it still needs 3 nodes (the replica count is the floor), the same as int8; the gain is only that nodes could be much smaller. It is lossy: distances are approximate, so"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-step capacity planning with trade-off decision.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "State assumptions and compute vectors + links for a full copy (~160 GB)",
+    "tradeoff": "Order-of-magnitude honesty vs engine-specific overhead"
+   },
+   {
+    "decision": "Shard to fit (2 shards) then replicate (x3) = 6 nodes",
+    "tradeoff": "Replication buys availability/throughput, not capacity; shard fan-out adds latency"
+   },
+   {
+    "decision": "int8 scalar quantisation (45 GB per copy, 3 nodes)",
+    "tradeoff": "4x vector memory cut with usually small but data-dependent recall loss"
+   },
+   {
+    "decision": "PQ 96-byte codes (11.4 GB per copy) with full-precision re-rank from SSD",
+    "tradeoff": "Smallest RAM, but lossy distances, re-rank I/O latency; graph links then dominate"
+   },
+   {
+    "decision": "Validate recall, p95 latency at target QPS, build/rebuild time, headroom for growth",
+    "tradeoff": "Measurement cost vs risk of shipping a degraded index"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Derivation and decision."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Calculator code."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0009",
+   "same_intent": false
+  },
+  "code_findings": "3 interpreters pass; fenced equals solution. Extra: n=0 gives 0.0; (1e6,128,replicas=2)=1.2885 GB; m=1 raises ZeroDivisionError (undocumented, minor). stdlib only.",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-06-3",
+  "verdict": "correct",
+  "reasons": [
+   "Practical update procedure has a window where old and new versions are both active."
+  ],
+  "parts_answered": {
+   "mechanisms": true,
+   "update/delete design": true
+  },
+  "evidence": [
+   {
+    "claim": "tombstone deletes keep nodes in graph until compaction",
+    "method": "background_only",
+    "evidence": "hnswlib mark_deleted behaviour; answer hedges 'varies by engine'. WebFetch to elastic.co was refused (permission not granted), so documented-behaviour claims are background_only."
+   },
+   {
+    "claim": "position-based ids leave orphan chunks when doc shrinks 12->9",
+    "method": "derivation",
+    "evidence": "ids 10-12 never overwritten"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "practical_answer",
+    "claim": "and attach metadata {doc_id, version, active:true}. 2) Upsert all new chunks (they become searchable once the index refresh completes). 3) After the upsert is confirmed, set active:false on, or delete by filter, all chunks where doc_id matches and version < new version. Queries add the filter active=true (or version = current version via a lookup table), so a mid-update query sees either only old chunks or a mix that the filter limits to a single consistent version.",
+    "problem": "As written, new chunks are active:true from step 2 while old ones stay active until step 3, so a query in between sees both versions (duplicate/contradictory text); the claim of a single consistent version is false.",
+    "replacement": "and attach metadata {doc_id, version, active:false}. 2) Upsert all new chunks; they stay invisible because queries always filter on active=true. 3) After the upsert is confirmed and refreshed, flip the new chunks to active:true, then set the old versions (same doc_id, version < new version) to active:false or delete them by filter. Activating first leaves a short window where both versions are visible; deactivating first leaves a short gap with neither, so choose per product, or avoid both with a per-document current_version pointer that queries filter on."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Several interacting failure mechanisms and a safe update protocol.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanisms and design."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete protocol, after fix."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-06-4",
+  "verdict": "pass",
+  "reasons": [
+   "Numbers verified; claims hedged; rubric supplied."
+  ],
+  "parts_answered": {
+   "architecture": true,
+   "where 30 s goes": true,
+   "consistency and cost trade-offs": true
+  },
+  "evidence": [
+   {
+    "claim": "200/s x 3600 = 720,000; x768x4 B = 2.21 GB",
+    "method": "executed",
+    "evidence": "2.21184 GB"
+   },
+   {
+    "claim": "5 min of ingest = 60,000 chunks ~184 MB per scan",
+    "method": "executed",
+    "evidence": "60000*3072 B"
+   },
+   {
+    "claim": "concise answer 72 words",
+    "method": "executed",
+    "evidence": "count"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open-ended system design with quantified trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Large immutable ANN main index plus small mutable fresh segment, queried together and merged",
+    "tradeoff": "Freshness without rebuild vs extra fan-out and merge latency"
+   },
+   {
+    "decision": "Exact scan on small fresh segment, flush to small ANN segments every few minutes",
+    "tradeoff": "Scan cost grows with segment size (720k chunks = 2.2 GB/query) vs segment count"
+   },
+   {
+    "decision": "Background compaction/merge of segments (LSM style)",
+    "tradeoff": "Query fan-out and tail latency vs compaction CPU/IO and write amplification"
+   },
+   {
+    "decision": "Measure the 30 s budget stage by stage (queue, fetch, chunk, embed batching, refresh, replication)",
+    "tradeoff": "Optimising the wrong stage wastes effort; embedding batching often dominates"
+   },
+   {
+    "decision": "Durable ingest log to rebuild fresh segment after crash; apply deletes to both indexes",
+    "tradeoff": "Reliability vs complexity"
+   },
+   {
+    "decision": "Score merge by same-metric similarity; rank fusion for hybrid",
+    "tradeoff": "Simplicity vs comparability of scores across segments"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Shorter."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Detailed design."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-06-5",
+  "verdict": "pass",
+  "reasons": [
+   "Comparison complete; selectivity figure (300/1e8=3e-6) correct; rubric supplied. Concise has a clumsy phrase ('a filter bug-free query path') but is intelligible."
+  ],
+  "parts_answered": {
+   "isolation": true,
+   "search quality/latency": true,
+   "cost": true,
+   "noisy neighbours": true,
+   "erasure": true,
+   "choice": true
+  },
+  "evidence": [
+   {
+    "claim": "300/100M = 3e-6",
+    "method": "executed",
+    "evidence": "arithmetic"
+   },
+   {
+    "claim": "concise answer 75 words",
+    "method": "executed",
+    "evidence": "count"
+   },
+   {
+    "claim": "per-index overhead and index-count limits are engine-specific",
+    "method": "background_only",
+    "evidence": "answer hedges 'test your own'. WebFetch to elastic.co was refused (permission not granted), so documented-behaviour claims are background_only."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-criteria design with skewed workload.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Tiered hybrid: small tenants in shared partitions, large tenants on dedicated indexes",
+    "tradeoff": "Cost and low overhead vs routing complexity and tier promotion"
+   },
+   {
+    "decision": "Exact scan within a small tenant's partition",
+    "tradeoff": "Avoids filtered-ANN recall loss; unsuitable once tenant grows"
+   },
+   {
+    "decision": "Enforce tenant scope in the data layer (namespaces, scoped credentials, row policy), tenant from auth token",
+    "tradeoff": "Strong isolation vs reliance on an application filter that one bug can bypass"
+   },
+   {
+    "decision": "Per-tenant rate limits and monitoring; dedicated shards for heavy tenants",
+    "tradeoff": "Noisy-neighbour protection vs resource fragmentation"
+   },
+   {
+    "decision": "Erasure: drop dedicated index; delete-by-tenant plus compaction and verification for shared partitions; include caches/backups",
+    "tradeoff": "Provable deletion vs operational effort"
+   },
+   {
+    "decision": "Canary documents and cross-tenant tests in CI",
+    "tradeoff": "Detects leaks early at test-maintenance cost"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Shorter."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Per-design comparison."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-06-6",
+  "verdict": "correct",
+  "reasons": [
+   "Numbers verified; rank-based cross-shard merging suggested too loosely."
+  ],
+  "parts_answered": {
+   "why it happens": true,
+   "merging": true,
+   "fusion": true
+  },
+  "evidence": [
+   {
+    "claim": "idf(250000,5)=10.72; idf(250000,40)=8.73",
+    "method": "executed",
+    "evidence": "10.7245, 8.7279"
+   },
+   {
+    "claim": "RRF 1/61+1/63=0.03227 vs 2/62=0.03226",
+    "method": "executed",
+    "evidence": "0.032266 vs 0.032258"
+   },
+   {
+    "claim": "global statistics (DFS) available in distributed engines; RRF c=60",
+    "method": "background_only",
+    "evidence": "Elasticsearch dfs_query_then_fetch; Cormack et al. 2009; WebFetch to elastic.co was refused (permission not granted), so documented-behaviour claims are background_only."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(3) Avoid relying on raw cross-shard BM25 scores: normalise per query, or use rank-based merging.",
+    "problem": "Merging shard lists by per-shard rank (round-robin) is itself unreliable when shards differ in size or content, which is exactly the resharded situation.",
+    "replacement": "(3) Avoid relying on raw cross-shard BM25 scores: normalise per query if you must, but note that merging by per-shard rank is also unsafe when shards differ in size or content, so prefer global statistics or even routing."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism (local IDF) plus fusion practicalities.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Shorter, 68 words."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Worked IDF and RRF numbers."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ }
+]

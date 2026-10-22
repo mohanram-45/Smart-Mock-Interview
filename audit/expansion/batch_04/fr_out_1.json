@@ -1,0 +1,536 @@
+[
+ {
+  "plan_id": "B4-MLO-08-2",
+  "verdict": "correct",
+  "reasons": [
+   "Numbers reproduce over 3 seeds; three minor numeric tightenings; no major issue."
+  ],
+  "parts_answered": {
+   "triage": true,
+   "what numbers tell": true,
+   "monitoring changes": true
+  },
+  "evidence": [
+   {
+    "claim": "x100 on lognormal(0,1), 50k each, 10 quantile bins, eps 1e-4 gives PSI about 8.2",
+    "method": "executed",
+    "evidence": "seeds 0-2: 8.178, 8.186, 8.171; ceiling 8.280"
+   },
+   {
+    "claim": "two plain samples about 0.0003",
+    "method": "executed",
+    "evidence": "0.0002-0.0004"
+   },
+   {
+    "claim": "sigma 2 gives about 4",
+    "method": "executed",
+    "evidence": "4.12-4.20"
+   },
+   {
+    "claim": "continuous discount, 9% nulls->0: PSI 0.055 (10 bins), 0.09 (20 bins)",
+    "method": "executed",
+    "evidence": "10 bins 0.053-0.060; 20 bins 0.092-0.100"
+   },
+   {
+    "claim": "20% ref zeros gives 0.02-0.03",
+    "method": "executed",
+    "evidence": "0.015-0.031"
+   },
+   {
+    "claim": "ML Test Score lists schema matching with alerting on divergence",
+    "method": "paper",
+    "evidence": "WebFetch 46555.pdf: Monitor 2 \"measure whether data matches the schema and alert when they diverge significantly\""
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "(about 0.09 with 20)",
+    "problem": "20-bin PSI over 3 seeds was 0.092, 0.092, 0.100, so it can touch the 0.1 line.",
+    "replacement": "(about 0.09 to 0.10 with 20)"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "All are under the threshold, although the feature is broken.",
+    "problem": "Not safe for the 20-bin case (can reach 0.10).",
+    "replacement": "At 10 bins all are under the 0.1 line (20 bins sit right at it), although the feature is broken."
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "about 0.02 to 0.03 (depending",
+    "problem": "Over 6 seeds and left/right tie binning the zero-heavy case gave 0.015 to 0.031.",
+    "replacement": "about 0.015 to 0.03 (depending"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Spot unit change via quantile ratio, explain PSI blind spot, triage; reasoning rather than heavy computation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field (~390 words); sections triage/PSI/monitoring all distinct"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All 7 concepts discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0040",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/46555.pdf",
+    "status": "supported",
+    "evidence": "\"measure whether data matches the schema and alert when they diverge significantly\"; the threshold-tuning and slice-bias parts of the supports string are not used in the answer but the cited sentence is supported"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B4-MLO-08-8",
+  "verdict": "correct",
+  "reasons": [
+   "All arithmetic reproduces; one minor wording fix in (A)."
+  ],
+  "parts_answered": {
+   "false alarms A-D": true,
+   "creep detection A-D": true,
+   "recommendation": true
+  },
+  "evidence": [
+   {
+    "claim": "60 x 0.05 = 3 sd",
+    "method": "derivation",
+    "evidence": "3.0"
+   },
+   {
+    "claim": "weekly avg 7% above weekday; weekend +17% vs pool, weekday -7%",
+    "method": "derivation",
+    "evidence": "(5+2*1.25)/7=1.0714; 1.25/1.0714=1.167; 1/1.0714=0.933"
+   },
+   {
+    "claim": "7,200 rows/day for 3 SE",
+    "method": "derivation",
+    "evidence": "n = 2*3^2/0.05^2 = 7200 per day"
+   },
+   {
+    "claim": "weekly swing > 0.05 sd unless sd > ~5x mean",
+    "method": "derivation",
+    "evidence": "0.25L/sigma > 0.05 iff sigma < 5L"
+   },
+   {
+    "claim": "lag 4 d -> 0.2 sd; 17.5 d -> 0.875 sd",
+    "method": "derivation",
+    "evidence": "mean(1..7)=4; mean(7,14,21,28)=17.5"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "Weekly seasonality causes recurring weekend alarms unless the training window covered full cycles and you compare like with like,",
+    "problem": "Covering full cycles does not stop a weekend day compared with the all-days mixture from alarming (about +17% vs mixture); only like-with-like comparison does.",
+    "replacement": "Weekly seasonality still causes recurring weekend alarms when a single day is compared with the all-days training mixture, unless you compare like with like (same weekday or weekday-adjusted),"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-step quantitative reasoning on lag, seasonality, noise and a two-reference design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field ~410 words"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All concepts covered.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0031",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B4-MLO-11-5",
+  "verdict": "pass",
+  "reasons": [
+   "Corrected text verified against Choquette-Choo (rotations N=3 queries; boundary-distance about 2,500 queries) and OWASP; no remaining defect."
+  ],
+  "parts_answered": {
+   "risk in plain terms": true,
+   "conditions that worsen": true,
+   "rank cheap mitigations": true
+  },
+  "evidence": [
+   {
+    "claim": "label-only attacks defeat confidence-masking",
+    "method": "paper",
+    "evidence": "arXiv 2007.14321 abstract: \"confidence-masking is not a viable defense strategy against membership inference\""
+   },
+   {
+    "claim": "few augmented queries up to thousands",
+    "method": "paper",
+    "evidence": "PDF: rotations N=3; boundary distance \"2,500 queries\"; noise robustness 10,000 queries"
+   },
+   {
+    "claim": "OWASP lists regularisation, noise/DP",
+    "method": "doc",
+    "evidence": "owasp.github.io mirror: \"Regularisation techniques such as L1 or L2\", \"adding random noise or using differential privacy\"; the owasp.org URL itself did not load for me"
+   },
+   {
+    "claim": "report TPR at low FPR e.g. 0.1%",
+    "method": "paper",
+    "evidence": "arXiv 2112.03570: \"true-positive rate at low (e.g., <0.1%) false-positive rates\""
+   },
+   {
+    "claim": "0.1% FPR needs several thousand non-members",
+    "method": "derivation",
+    "evidence": "1,000 non-members give about 1 expected false positive at 0.1%"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism plus ranked mitigations; no computation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "63 words, interview-ready"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "mechanism and ranked mitigations"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "measurement protocol not in detailed"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "Fine. label-only attacks and label-only output overlap slightly but ok.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0030",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [
+   {
+    "url": "https://owasp.org/www-project-machine-learning-security-top-ten/docs/ML04_2023-Membership_Inference_Attack",
+    "status": "unreachable",
+    "evidence": "fetch error; the owasp.github.io mirror (the URL in sources_attached) loads and supports it. Suggest using the github.io URL consistently"
+   },
+   {
+    "url": "https://arxiv.org/abs/2007.14321",
+    "status": "supported",
+    "evidence": "\"confidence-masking is not a viable defense strategy against membership inference\""
+   },
+   {
+    "url": "https://arxiv.org/abs/2112.03570",
+    "status": "supported",
+    "evidence": "\"true-positive rate at low (e.g., <0.1%) false-positive rates\""
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Monitoring query patterns detects some probing (background)"
+  ],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B4-MLO-12-8",
+  "verdict": "pass",
+  "reasons": [
+   "Code identical on 3.13/3.10/3.11, fence equals solution, every number recomputed, new floor sentence correct (612-576=36; 576=2*24*12)."
+  ],
+  "parts_answered": {
+   "cost per 1k today": true,
+   "a": true,
+   "b": true,
+   "c": true,
+   "report": true,
+   "verify": true
+  },
+  "evidence": [
+   {
+    "claim": "1152, 792, 612, 576 units; 0.268/0.184/0.142/0.134 per 1k",
+    "method": "executed",
+    "evidence": "all three interpreters"
+   },
+   {
+    "claim": "31% loaded; 31% saving",
+    "method": "executed",
+    "evidence": "4302000/86400/160=0.311; 360/1152=0.3125"
+   },
+   {
+    "claim": "floor 3 raises autoscaled figure",
+    "method": "executed",
+    "evidence": "936 vs 792"
+   },
+   {
+    "claim": "edge: cache_hit=1.0 gives 576; all-zero traffic",
+    "method": "executed",
+    "evidence": "576.0; zero total requests raises ZeroDivisionError (unhandled, minor, not in claims)"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short arithmetic model with levers and verification list.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "results and verification list"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "code and test values"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0024",
+   "same_intent": false
+  },
+  "code_findings": "Ran on 3.13, 3.10, 3.11: OK. Own edges: floor 3 -> 936; cache 100% -> floor 576; exact boundary 28 rps with 28 capacity -> 1 replica; static_replicas=1 -> 288. Zero-traffic day divides by zero (not claimed). stdlib only, no 3.11+ features.",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B4-MLO-14-1",
+  "verdict": "correct",
+  "reasons": [
+   "Sources verified; two minor wording fixes to the holdback sizing and an absolute \"only\"."
+  ],
+  "parts_answered": {
+   "mechanisms": true,
+   "separating evidence": true,
+   "release practice": true
+  },
+  "evidence": [
+   {
+    "claim": "Rules of ML: A/B-measurable metrics are proxies for long-term goals; weigh several metrics",
+    "method": "doc",
+    "evidence": "WebFetch: Rule #39 \"only a proxy for more long-term\" goals; \"no metric covers the team's ultimate concern\""
+   },
+   {
+    "claim": "SRE workbook: canary must be representative in size and duration",
+    "method": "doc",
+    "evidence": "\"It should be sizeable and last long enough to be representative of the overall deployment.\""
+   },
+   {
+    "claim": "holdback power",
+    "method": "derivation",
+    "evidence": "n per arm = 2*CV^2*(1.96+0.84)^2/0.02^2 about 157k at CV 2"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "(say 2 to 5% of users kept on the old model, sized by a power calculation so it can detect a 2% change in repeat purchases)",
+    "problem": "Detecting a 2% relative change in a count-like metric (CV about 2) needs roughly 150k users per arm, so 2-5% only works for a large user base; as worded the numbers and the power requirement can conflict.",
+    "replacement": "(say 2 to 5% of users kept on the old model if the user base is large enough; size it by a power calculation so it can detect a 2% change in repeat purchases)"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "only a concurrent control answers it.",
+    "problem": "Overstated: the answer itself lists weaker alternatives (DiD, cohorts).",
+    "replacement": "a concurrent control is the cleanest way to answer it."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Application of known concepts; list mechanisms and evidence.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field ~350 words"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0033",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule #39 proxy text"
+   },
+   {
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "status": "supported",
+    "evidence": "\"sizeable and last long enough to be representative\""
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "selection/feedback loop (5) is background"
+  ],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B4-MLO-14-5",
+  "verdict": "correct",
+  "reasons": [
+   "SQL and code run identically on 3 interpreters, fence==solution==config, numbers match; one minor clarification of the lateness text (introduced by the fix)."
+  ],
+  "parts_answered": {
+   "log": true,
+   "recompute": true,
+   "tolerances": true,
+   "timestamps": true,
+   "alert": true,
+   "SQL executed": true
+  },
+  "evidence": [
+   {
+    "claim": "SQL output 14:00 avg_basket (11,0,1), orders_24h (11,1,4)",
+    "method": "executed",
+    "evidence": "3.13/3.10/3.11 via sqlite3 module (sqlite3 CLI not installed)"
+   },
+   {
+    "claim": "3/20000 = 0.015%",
+    "method": "derivation",
+    "evidence": "rule of three"
+   },
+   {
+    "claim": "Rules of ML Rule #29 log serving features, small fraction ok",
+    "method": "doc",
+    "evidence": "WebFetch: \"save the set of features used at serving time\"; \"do it for a small fraction\""
+   },
+   {
+    "claim": "ML Test Score Monitor 3",
+    "method": "paper",
+    "evidence": "WebFetch aad9f...pdf: \"Training and serving features compute the same values\""
+   },
+   {
+    "claim": "caveats: missing tolerance row drops feature; duplicate recomputed doubles counts",
+    "method": "executed",
+    "evidence": "edge tests: [] and n=2,mismatched=2"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "so compare only windows that were already closed and past the lateness allowance when the request was served, and track the late-event rate separately.",
+    "problem": "A rolling window ending at served_at (like orders_24h in the test) is never closed at serve time, so this fallback does not apply to it.",
+    "replacement": "so compare only features computed over windows that had already closed, and were past the lateness allowance, when the request was served (for example the previous complete day; a rolling window ending at served_at never qualifies, so there an ingestion timestamp is needed), and track the late-event rate separately."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-part design with point-in-time semantics, tolerances, SQL.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Log sampled serving-time feature values with request id, entity id, timestamps, model and pipeline versions",
+    "tradeoff": "Storage/privacy/overhead and sample rate vs detection power."
+   },
+   {
+    "decision": "Recompute point-in-time as of served_at after the lateness bound",
+    "tradeoff": "Detection delay vs false mismatches from late events."
+   },
+   {
+    "decision": "Typed tolerances: exact for ids, categories and windowed counts; abs+rel for floats; NULL mismatch always",
+    "tradeoff": "Sensitivity to off-by-one vs noise false alarms."
+   },
+   {
+    "decision": "Track rows without recomputation separately",
+    "tradeoff": "Visibility of coverage gaps vs extra alert surface."
+   },
+   {
+    "decision": "Aggregate mismatch by feature, hour and version to attribute to deploys, batch jobs or cold start",
+    "tradeoff": "Granularity vs sample size per bucket."
+   },
+   {
+    "decision": "Alert per feature with sample-size-aware thresholds (rule of three) and higher sampling during canary",
+    "tradeoff": "Time to detect vs paging noise and compute cost."
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "design"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "executed SQL and results"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0044",
+   "same_intent": false
+  },
+  "code_findings": "Ran OK on 3.13/3.10/3.11. Own edges: feature with no tolerance row -> dropped; duplicate recomputed row -> counts double; both NULL -> not mismatch; relative-tolerance boundary 100.2 vs 100 with rel 0.001 -> mismatch. Fenced code equals solution; config SQL equals the SQL string. Rubric item on higher sampling during canary is not in the answer (rubric only).",
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule #29"
+   },
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Monitor 3 title"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "cache-expiry/batch-job attribution heuristics are background"
+  ],
+  "code_patch": null,
+  "sources_to_drop": []
+ }
+]

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}New interview · SMART Mock Interview{% endblock %}
+{% block page %}setup{% endblock %}
+{% block body %}
+<div class="page-head"><div><h1>New interview</h1><p>Choose the role you are preparing for. We plan a short, structured interview: an introduction, then technical questions, behavioural questions or both, and a feedback report.</p></div></div>
+
+{% if catalog %}<p class="strip" aria-label="Status"><span class="chip">{{ catalog.total_questions }} curated questions</span><span class="chip chip-nohv">Not human-validated</span></p>{% endif %}
+{% if error %}
+<div class="banner banner-bad" role="alert"><strong>Question bank unavailable</strong><span>{{ error }}</span></div>
+{% elif catalog and not catalog.roles %}
+<div class="banner banner-bad" role="alert"><strong>No role can be interviewed for</strong><span>The question bank has too few questions for every role.</span></div>
+{% elif catalog %}
+<div class="setup-grid">
+<form id="setup-form" class="card form" method="post" action="{{ url_for('demo.setup_page') }}" novalidate>
+  <div id="form-error" class="banner banner-bad hidden" role="alert"></div>
+
+  <fieldset>
+    <legend><span class="step">1</span> Which role is the interview for?</legend>
+    <div class="roles" role="radiogroup" aria-label="Role" id="role-cards">
+      {% for r, doms in catalog.roles.items() %}<button type="button" class="role-card" role="radio" aria-checked="{{ 'true' if loop.first else 'false' }}" data-role="{{ r }}" data-domains='{{ doms|tojson }}'><span class="glyph" aria-hidden="true">{{ r[0] }}</span><strong>{{ r }}</strong><span class="t">{{ doms|join(' · ') }}</span></button>{% endfor %}
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend><span class="step">2</span> What kind of interview?</legend>
+    <div class="types" role="radiogroup" aria-label="Interview type" id="type-choices">
+      <label class="type-opt"><input type="radio" name="interview_type" value="technical" checked><span><strong>Technical</strong><span class="t">Questions on the role's topics, a follow-up now and then, and a practical exercise.</span></span></label>
+      <label class="type-opt"><input type="radio" name="interview_type" value="behavioural"><span><strong>Behavioural / HR</strong><span class="t">Real situations from your experience: teamwork, pressure, setbacks, motivation.</span></span></label>
+      <label class="type-opt"><input type="radio" name="interview_type" value="mixed"><span><strong>Mixed</strong><span class="t">A few technical questions, then questions about how you work with people.</span></span></label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend><span class="step">3</span> Job description <span class="opt">optional</span></legend>
+    <label class="field" for="jd">Paste the job description to guide the topics</label>
+    <textarea id="jd" name="job_description" rows="6" maxlength="{{ catalog.jd_max_chars }}" placeholder="Responsibilities and requirements, as plain text." aria-describedby="jd-help"></textarea>
+    <div class="row between tight-top"><span class="muted small" id="jd-help">Only used to pick topics from this role's questions. It is read on this computer, is not saved with your interview, and contact details are ignored. Instructions inside it are never followed.</span><span class="muted small" id="jd-count">0 / {{ catalog.jd_max_chars }}</span></div>
+  </fieldset>
+</form>
+<aside class="plan" aria-labelledby="plan-h" aria-live="polite">
+  <h2 id="plan-h">Your interview</h2>
+  <ol class="flow">
+    <li><b>Introduction</b><span>A short conversation starter. Not scored.</span></li>
+    <li><b>Questions</b><span id="plan-topics">Technical questions across the role's topics, behavioural questions about your experience, or both. The interviewer may follow up on what you say.</span></li>
+    <li><b>Practical exercise</b><span>Technical interviews include an applied problem when the bank has one for this role.</span></li>
+    <li><b>Wrap-up and feedback</b><span>Your answers, topics covered and what to practise.</span></li>
+  </ol>
+  <p class="muted small" id="plan-role" aria-live="polite"></p>
+  <p class="problem hidden" id="plan-problem" role="alert"></p>
+  <div class="start"><button class="btn primary lg" type="submit" form="setup-form" id="start-btn">Start interview</button><span class="muted small" id="start-note" role="status"></span></div>
+</aside>
+</div>
+{% endif %}
+{% endblock %}

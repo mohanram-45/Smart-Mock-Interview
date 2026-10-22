@@ -1,0 +1,944 @@
+[
+ {
+  "plan_id": "B2-GEN-13-1",
+  "verdict": "correct",
+  "reasons": [
+   "Code and all numbers verified on 3 interpreters; one universal-sounding sentence should be hedged."
+  ],
+  "parts_answered": {
+   "kv_cache_bytes": true,
+   "max_concurrent_sequences": true,
+   "validation rules (bool/float TypeError, positive ValueError, reserve 0 ok)": true,
+   "30 vs 121 sequences": true,
+   "attention-design implication": true
+  },
+  "evidence": [
+   {
+    "claim": "per token 524,288 B; 4096 tokens = 2 GiB",
+    "method": "executed",
+    "evidence": "asserted in test, 3 interpreters"
+   },
+   {
+    "claim": "usable = 80 GiB - 14e9 - 6 GiB = 60.96 GiB; //2GiB=30; //512MiB=121; 1024 tokens ->487; 8-bit ->243",
+    "method": "executed",
+    "evidence": "recomputed independently: 60.9615 GiB, 30, 121, 487, 243"
+   },
+   {
+    "claim": "GQA/MQA shrink cache, aimed at faster decoding, near-MHA quality after uptraining",
+    "method": "paper",
+    "evidence": "arXiv 2305.13245 abstract opened"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "which is why long contexts and large batches are what exhaust memory, not the weights.",
+    "problem": "Stated as universal; true for this 7B-class example at 4k x 30 sequences, not for large models with short contexts/small batches.",
+    "replacement": "which is why, for a model this size with long contexts and large batches, the cache rather than the weights is what exhausts memory."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short validated code plus a unit-conversion-sensitive capacity calculation and a design inference; no subtle algorithm.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "derivation, numbers, design lesson, pitfalls"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "the code (fence identical to code.solution) plus 8-bit variant; not duplicated in detailed"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "All six discussed (input validation only in code/test, acceptable).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0017",
+   "same_intent": false
+  },
+  "code_findings": "Reran solution+test on python3.13, v310, v311: all 'ok'. Fence equals code.solution. Extra cases of mine: reserve=0 with total 10GiB -> 7372 (correct: floor(9 GiB/ (2*32*8*128*10*2=1,310,720))); tiny totals -> 0; weight_bytes=0 ValueError; seq_len=0 ValueError; batch=2.0 TypeError; total_bytes=True TypeError. All as specified. Stdlib only, no 3.11+ features.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2305.13245",
+    "status": "supported",
+    "evidence": "Abstract: MQA 'only uses a single key-value head, drastically speeds up decoder inference'; GQA uses an intermediate number of KV heads; uptrained GQA reaches quality close to MHA at speed comparable to MQA."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-13-2",
+  "verdict": "correct",
+  "reasons": [
+   "All numbers reproduce; two minor precision/consistency fixes."
+  ],
+  "parts_answered": {
+   "batch-1 decode bandwidth-bound with numbers": true,
+   "how far batching helps at 2,000-token contexts": true,
+   "prefill numbers": true,
+   "colleague's claim rebutted": true
+  },
+  "evidence": [
+   {
+    "claim": "ridge 150 FLOP/B; 7 ms/token; 0.047 ms compute",
+    "method": "executed",
+    "evidence": "computed"
+   },
+   {
+    "claim": "B=1/16/64 step 7.52/15.39/40.55 ms; 133/1040/1578 tok/s; ceiling 1907 tok/s; compute at B=64 2.99 ms",
+    "method": "executed",
+    "evidence": "computed with KV=2000*0.5MiB=1.048e9 B"
+   },
+   {
+    "claim": "prefill 2.8e13 FLOP = 93 ms; intensity ~2000 FLOP/B",
+    "method": "executed",
+    "evidence": "2.8e13/1.4e10 = 2000 (ignores attention FLOPs and activations)"
+   },
+   {
+    "claim": "roofline model",
+    "method": "derivation",
+    "evidence": "time >= max(FLOPs/peak, bytes/BW)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "intensity in the thousands, so compute-bound.",
+    "problem": "Vague; actual figure is ~2,000 FLOP/byte for the weights alone.",
+    "replacement": "intensity of about 2,000 FLOP/byte (2.8e13 FLOP over 1.4e10 weight bytes, ignoring attention and activations), well above the ridge of 150, so compute-bound."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "about 1,900 tokens/s.",
+    "problem": "B = 64 needs 64 x 1.05 GB = 67 GB of cache plus 14 GB of weights; the device memory is unspecified, so capacity may cap the batch before bandwidth does.",
+    "replacement": "about 1,900 tokens/s. (B = 64 also needs about 67 GB of cache on top of 14 GB of weights, so device memory capacity may cap the batch first.)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Multi-quantity roofline arithmetic, but a standard model.",
+  "type_ok": true,
+  "suggested_type": "scenario",
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "70 words, interview-ready"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "full derivation and batch table"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed (as is)",
+  "key_concepts_findings": "Good; 'time to first token' is discussed briefly at the end of detailed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0017",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Roofline/arithmetic-intensity framework is standard background; the answer labels numbers as idealised (derivation, no source needed)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-13-3",
+  "verdict": "pass",
+  "reasons": [
+   "Code correct (matches a brute-force step simulator on 500 random cases, 3 interpreters); hand numbers and proof sketch correct."
+  ],
+  "parts_answered": {
+   "static_batching": true,
+   "continuous_batching": true,
+   "validation": true,
+   "run on [2,10,3,9] b=2": true,
+   "what model omits": true
+  },
+  "evidence": [
+   {
+    "claim": "static: total 19, [10,10,19,19], mean 14.5; continuous: 14, [2,10,5,14], mean 7.75; utilisation 24/38=63%, 24/28=86%",
+    "method": "executed",
+    "evidence": "reproduced"
+   },
+   {
+    "claim": "continuous never later than static (FIFO)",
+    "method": "derivation",
+    "evidence": "start_i <= static group start by induction (earlier groups done, at most b-1 group mates occupy slots); also random test"
+   },
+   {
+    "claim": "heap implementation equals step-by-step simulator",
+    "method": "executed",
+    "evidence": "500 random cases (0-15 requests, b 1-5) identical"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short simulation with a heap; scheduling reasoning, not subtle.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "worked numbers, proof idea, omitted effects"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "code identical to code.solution plus test description"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "'head-of-line waiting' is not really discussed; 'idle slots / padding' is.",
+  "suggested_key_concepts": [
+   "static vs continuous batching",
+   "iteration-level scheduling",
+   "slot utilisation",
+   "idle slots in static batches",
+   "mean completion time",
+   "simulation limits"
+  ],
+  "nearest_existing": {
+   "id": "smi-h0017",
+   "same_intent": false
+  },
+  "code_findings": "3 interpreters pass. Fence == solution. My extras: continuous([5,1,1,1],2)->{5,[5,1,2,3]}; continuous([3,3,3],1)->9,[3,6,9]; static([1],1); tuple input works; max_batch=True -> ValueError; brute-force simulator match on 500 random cases. Only heapq/stdlib. Note: a generator for lengths would fail (slicing) but spec says list.",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-13-4",
+  "verdict": "correct",
+  "reasons": [
+   "Arithmetic correct; throughput definition should state that prefill time is excluded."
+  ],
+  "parts_answered": {
+   "TTFT before/after": true,
+   "total latency before/after": true,
+   "per-GPU throughput": true,
+   "ship decision (a)": true,
+   "ship decision (b)": true,
+   "SLO metric each": true
+  },
+  "evidence": [
+   {
+    "claim": "TTFT 0.6 s; total 10.575 s / 16.56 s; 640 vs 800 tok/s; 1.25x; +60% per token; ~6 s longer",
+    "method": "executed",
+    "evidence": "399*0.025, 399*0.04, 16/0.025, 32/0.04"
+   },
+   {
+    "claim": "40 vs 25 tokens/s",
+    "method": "derivation",
+    "evidence": "1/0.025, 1/0.04"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "Throughput per GPU = 16 streams / 0.025 s = 640 tokens/s.",
+    "problem": "This is the decode-phase rate while all streams generate; it ignores GPU time for prefill (0.3 s per request) which would lower end-to-end tokens/s, and the question does not quantify it.",
+    "replacement": "Decode throughput per GPU while all 16 streams are generating = 16 / 0.025 s = 640 tokens/s (this ignores GPU time spent on prefill, which the question does not quantify)."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Straight arithmetic plus a judgement about metrics per workload.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field, fine"
+   }
+  ],
+  "suggested_answer_set": "single (as is)",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0030",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'faster than most people read' is hedged (must be tested with real users)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-13-5",
+  "verdict": "correct",
+  "reasons": [
+   "Memory arithmetic correct; add real-model caveat on unquantised layers; add source for activation outliers."
+  ],
+  "parts_answered": {
+   "(a) saving and what is not saved": true,
+   "(b) weight-only vs W+A": true,
+   "(c) checks before approval": true
+  },
+  "evidence": [
+   {
+    "claim": "26 GB -> 6.5 GB raw; 4.125 bits/weight -> 6.70 GB",
+    "method": "executed",
+    "evidence": "13e9*4.125/8"
+   },
+   {
+    "claim": "activations harder to quantise than weights because of outliers",
+    "method": "paper",
+    "evidence": "SmoothQuant abstract: 'weights are easy to quantize while activations are not'"
+   },
+   {
+    "claim": "weight-only helps memory-bound decode",
+    "method": "derivation",
+    "evidence": "bytes read per token drop; hedged as model/kernel dependent in the answer"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "So the saving is close to, but not exactly, 4x.",
+    "problem": "Real checkpoints usually leave embeddings, output layer and norms in fp16, so the saving is slightly smaller still.",
+    "replacement": "So the saving is close to, but not exactly, 4x (embeddings, the output layer and norms are often left in fp16, which lowers it a little more)."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Memory arithmetic plus compare/contrast and an eval plan.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field"
+   }
+  ],
+  "suggested_answer_set": "single (as is)",
+  "key_concepts_findings": "All six discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0045",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "SmoothQuant: Accurate and Efficient Post-Training Quantization for Large Language Models",
+    "url": "https://arxiv.org/abs/2211.10438",
+    "supports": "Activations are harder to quantise than weights, because of outliers, so weight+activation schemes need more care.",
+    "quote": "weights are easy to quantize while activations are not",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [
+   "Weight-only quantisation mainly helps memory-bound decode (standard; answer hedges)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-13-6",
+  "verdict": "correct",
+  "reasons": [
+   "Numbers verified; open-ended design so rubric supplied; one overstated sentence."
+  ],
+  "parts_answered": {
+   "(a) estimate and interval": true,
+   "(b) failure modes threshold cannot fix": true,
+   "(c) key/invalidation redesign": true,
+   "when not to cache": true
+  },
+  "evidence": [
+   {
+    "claim": "300,000 hits x 2% = 6,000; Wilson 95% for 10/500 = 1.09%-3.64% -> 3,270-10,930/day",
+    "method": "executed",
+    "evidence": "Wilson computed"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "which has no near-miss errors,",
+    "problem": "Overstated: aggressive normalisation (dropping numbers, stripping negation words) re-creates near-miss errors.",
+    "replacement": "which has no near-miss errors if normalisation is conservative (case and whitespace only, never dropping numbers or negations),"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open-ended design with several risk dimensions plus an interval estimate.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Partition cache by tenant/locale/permission scope before any similarity search",
+    "tradeoff": "Prevents cross-tenant leakage; lowers hit rate"
+   },
+   {
+    "decision": "Version the key or entry with prompt template, model and source-document versions (plus TTL)",
+    "tradeoff": "Prevents stale answers; more misses after each change"
+   },
+   {
+    "decision": "Refuse to cache personalised, live-state or tool-derived answers",
+    "tradeoff": "Safety/correctness vs lower hit rate"
+   },
+   {
+    "decision": "Add a pre-serve guard (entity/number/negation match or verifier) or exact-match tier first",
+    "tradeoff": "Cuts near-miss errors; extra latency/cost and some lost hits"
+   },
+   {
+    "decision": "Shadow mode then monitor wrong-hit rate with intervals, use a launch gate",
+    "tradeoff": "Evidence before exposure vs delayed savings"
+   },
+   {
+    "decision": "Skip caching for high-stakes or low-hit-rate domains",
+    "tradeoff": "Risk avoided vs forgone cost saving"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field"
+   }
+  ],
+  "suggested_answer_set": "single (as is)",
+  "key_concepts_findings": "Wilson interval named and discussed; all six concepts present.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0011",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Semantic-cache near-miss and tenant-leak risks are engineering reasoning, not sourced."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-13-7",
+  "verdict": "pass",
+  "reasons": [
+   "All arithmetic verified; vLLM claims match the paper."
+  ],
+  "parts_answered": {
+   "(a) 120 requests and 17% used": true,
+   "(b) ~698 requests and waste": true,
+   "(c) why throughput gain smaller; other benefits": true
+  },
+  "evidence": [
+   {
+    "claim": "128 KiB/token; 512 MiB per 4096; 120; 87.5 MiB=17.1%; 44 blocks=88 MiB; waste 0.5 MiB (worst 15 tokens=1.875 MiB); 698 requests; 5.8x",
+    "method": "executed",
+    "evidence": "computed"
+   },
+   {
+    "claim": "near-zero waste; sharing within/across requests; copy-on-write at block granularity; preemption by swap or recompute",
+    "method": "paper",
+    "evidence": "arXiv 2309.06180 abstract and sections 4.4/4.5"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Straightforward capacity arithmetic plus mechanism explanation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field"
+   }
+  ],
+  "suggested_answer_set": "single (as is)",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0027",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2309.06180",
+    "status": "supported",
+    "evidence": "Abstract: KV cache memory large and dynamic, limits batch size, PagedAttention inspired by OS paging, 'near zero' waste, flexible sharing within and across requests."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "PagedAttention paper (full text), sections 4.4-4.5",
+    "url": "https://arxiv.org/pdf/2309.06180",
+    "supports": "Copy-on-write at block granularity for shared prefixes/parallel samples, and preemption by swapping or recomputation.",
+    "quote": "vLLM implements a copy-on-write mechanism at the block granularity",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-14-1",
+  "verdict": "correct",
+  "reasons": [
+   "One overstated model-behaviour claim contradicts the evidence the set itself cites (14-4); fix."
+  ],
+  "parts_answered": {
+   "how pretraining objective encourages guessing": true,
+   "how scoring encourages guessing": true,
+   "rare/once-seen facts": true,
+   "what retrieval can and cannot fix": true
+  },
+  "evidence": [
+   {
+    "claim": "Hallucinations as classification-type errors; benchmarks reward guessing; change scoring",
+    "method": "paper",
+    "evidence": "arXiv 2509.04664 abstract"
+   },
+   {
+    "claim": "facts seen once drive a floor on hallucination (singleton rate, Good-Turing)",
+    "method": "paper",
+    "evidence": "Sec 3.3.1 'the fraction of prompts appearing just once in the training data'"
+   },
+   {
+    "claim": "base models often calibrated, post-trained less so",
+    "method": "paper",
+    "evidence": "Sec 3.1 quote"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "answer",
+    "claim": "not a reliable internal check of what it knows",
+    "problem": "Universal, unsupported claim; self-knowledge studies (Kadavath et al.) find models partly know what they know, imperfectly and less on new tasks.",
+    "replacement": "only an imperfect, uneven signal of what it knows (self-assessment is decent in some settings and weaker on unfamiliar questions)"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "the most plausible-looking continuation is still produced",
+    "problem": "Base models are often reasonably calibrated; the paper's point is that errors persist anyway and that sampling still emits one specific answer.",
+    "replacement": "the model still samples one specific, fluent completion (base models can be fairly calibrated in probability and yet produce such errors)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism explanation with incentives and retrieval limits.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field"
+   }
+  ],
+  "suggested_answer_set": "single (as is)",
+  "key_concepts_findings": "Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0043",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2509.04664",
+    "status": "supported",
+    "evidence": "Abstract: hallucinations arise from training/evaluation rewarding guessing over admitting uncertainty; binary-classification errors; proposes changing scoring of existing benchmarks."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Why Language Models Hallucinate (full text, Sec 1.1/3.3.1)",
+    "url": "https://arxiv.org/pdf/2509.04664",
+    "supports": "Facts seen exactly once in training set a floor on hallucination rate (singleton rate).",
+    "quote": "the fraction of prompts appearing just once in the training data",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-14-2",
+  "verdict": "pass",
+  "reasons": [
+   "All numbers and the break-even rule verified; practical table consistent with concise/detailed."
+  ],
+  "parts_answered": {
+   "threshold at 10:1": true,
+   "change at 3:1": true,
+   "what to verify": true
+  },
+  "evidence": [
+   {
+    "claim": "accuracies 95/70/45/20%; 10:1 costs 1000/800/1400/2300/3000; 3:1 costs 1000/660/630/760/900",
+    "method": "executed",
+    "evidence": "enumerated cumulative cuts"
+   },
+   {
+    "claim": "break-even a > 1 - C_abstain/C_wrong (90% / 66.7%)",
+    "method": "derivation",
+    "evidence": "(1-a)C_w < C_a"
+   },
+   {
+    "claim": "Wilson 210/300 = 64.6-74.9%; 380/400 = 92.4-96.7%; selective accuracy 84.3% at 70% coverage",
+    "method": "executed",
+    "evidence": "computed"
+   },
+   {
+    "claim": "concise answer length",
+    "method": "executed",
+    "evidence": "68 words (<=80)"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Expected-cost derivation applied to a table; calibration critique.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "68-word summary"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "derivation, coverage trade-off, checks"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "full cost table the others only cite in part"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical (as is)",
+  "key_concepts_findings": "Good.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0031",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Cost-ratio threshold is derived, no source required."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-14-3",
+  "verdict": "correct",
+  "reasons": [
+   "Arithmetic right; the 50x gap should be qualified as no-prefix-caching and expressed in GPUs; add source for hedged long-context claim."
+  ],
+  "parts_answered": {
+   "latency": true,
+   "compute": true,
+   "memory": true,
+   "freshness": true,
+   "access control": true,
+   "when long context is right": true
+  },
+  "evidence": [
+   {
+    "claim": "30 s vs 0.6 s; 1.5e10 vs 3e8 tokens/day (50x); 36.6 GiB (39.3 GB) KV; ~19.7 ms/token to read it at 2 TB/s",
+    "method": "executed",
+    "evidence": "computed"
+   },
+   {
+    "claim": "1.5e6 GPU-s/day = 17.4 GPUs vs 3e4 = 0.35 GPU",
+    "method": "executed",
+    "evidence": "at 10,000 tok/s"
+   },
+   {
+    "claim": "long-context use is position/task dependent",
+    "method": "paper",
+    "evidence": "Lost in the Middle abstract"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "a 50x difference (attention cost per token also grows with context length, so the real gap is likely larger).",
+    "problem": "The 50x holds only without prefix caching; expressing it in GPU time makes the compute comparison concrete.",
+    "replacement": "a 50x difference. At the assumed 10,000 tokens/s that is about 1.5e6 GPU-seconds a day (roughly 17 GPUs busy all day) versus 3e4 (about 0.35 GPU). This assumes no prefix caching, and attention cost per token also grows with context length, so the real gap is likely larger."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Multi-part comparison with arithmetic; no deep technical subtlety.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field"
+   }
+  ],
+  "suggested_answer_set": "single (as is)",
+  "key_concepts_findings": "Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0011",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "Lost in the Middle: How Language Models Use Long Contexts",
+    "url": "https://arxiv.org/abs/2307.03172",
+    "supports": "Long-context accuracy depends on where information sits and degrades for the middle; models do not reliably use all long context.",
+    "quote": "significantly degrades when models must access relevant information in the middle of long contexts",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-14-4",
+  "verdict": "correct",
+  "reasons": [
+   "Sources support the Kadavath claims; the specific 4-of-5 rule is not analysed and two behaviour claims lack sources."
+  ],
+  "parts_answered": {
+   "where each signal informative": true,
+   "where each fails": true,
+   "how to decide on deployment": true,
+   "specific 4-of-5 rule": false
+  },
+  "evidence": [
+   {
+    "claim": "MC/true-false calibration; P(True) self-rating; weaker on new tasks",
+    "method": "paper",
+    "evidence": "arXiv 2207.05221 abstract opened"
+   },
+   {
+    "claim": "sampled responses consistent when model knows, diverge when hallucinated",
+    "method": "paper",
+    "evidence": "SelfCheckGPT abstract"
+   },
+   {
+    "claim": "p=0.8 per-sample correct => P(<4 of 5 agree)=1-(0.8^5+5*0.8^4*0.2)=26.3%",
+    "method": "executed",
+    "evidence": "binomial"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "it costs about 5x tokens and some latency;",
+    "problem": "Does not address the specific 'fewer than 4 of 5' cut-off, whose false-flag rate is high for answers the model gets right only some of the time.",
+    "replacement": "it costs about 5x tokens (latency can be hidden by sampling in parallel); the 4-of-5 cut-off also flags many correct answers (if the model is right on 80% of samples, about 26% of such questions are flagged), so tune it on labelled data;"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Compare two uncertainty signals and design validation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field"
+   }
+  ],
+  "suggested_answer_set": "single (as is)",
+  "key_concepts_findings": "Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0043",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2207.05221",
+    "status": "supported",
+    "evidence": "Abstract: larger models well calibrated on MC/true-false when formatted properly; P(True) self-evaluation works well, improves with multiple samples; weaker calibration on new tasks."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "SelfCheckGPT: Zero-Resource Black-Box Hallucination Detection",
+    "url": "https://arxiv.org/abs/2303.08896",
+    "supports": "Sample agreement signals knowledge; divergence suggests hallucination.",
+    "quote": "if an LLM has knowledge of a given concept, sampled responses are likely to be similar and contain consistent facts",
+    "type": "paper"
+   },
+   {
+    "title": "Why Language Models Hallucinate (Sec 3.1)",
+    "url": "https://arxiv.org/pdf/2509.04664",
+    "supports": "Base models are often calibrated, post-trained models less so.",
+    "quote": "base models are often found to be calibrated, in contrast to post-trained models",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-14-5",
+  "verdict": "correct",
+  "reasons": [
+   "Bayes arithmetic correct; one sample-size nuance."
+  ],
+  "parts_answered": {
+   "(a) precision and implication": true,
+   "(b) systematic error modes": true,
+   "(c) validate and improve": true
+  },
+  "evidence": [
+   {
+    "claim": "300 bad, 240 TP, 60 FN, 485 FP, 725 flags, precision 33.1%; at 1% FPR 97 FP, 71.2%",
+    "method": "executed",
+    "evidence": "computed"
+   },
+   {
+    "claim": "n=384 for +-5 points at p=0.5",
+    "method": "executed",
+    "evidence": "1.96^2*.25/.05^2=384.2; FPC with N=725 -> 251"
+   },
+   {
+    "claim": "concise length",
+    "method": "executed",
+    "evidence": "65 words"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "you need roughly 1.96^2 x 0.25 / 0.05^2 = 384 labelled flagged sentences.",
+    "problem": "With only about 725 flagged sentences the finite-population correction reduces this to about 250.",
+    "replacement": "you need roughly 1.96^2 x 0.25 / 0.05^2 = 384 labelled flagged sentences (about 250 after a finite-population correction when only about 725 sentences are flagged, as here)."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Bayes at low prevalence plus failure-mode knowledge.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "65 words"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "(a),(b)"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "(c) procedure, not in detailed"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical (as is)",
+  "key_concepts_findings": "Good.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0043",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Weakness of NLI models on numbers/negation/multi-premise is stated as 'often', unsourced background."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-14-6",
+  "verdict": "correct",
+  "reasons": [
+   "Numbers verified; experiment design lacks randomisation/power."
+  ],
+  "parts_answered": {
+   "what is wrong with the badge": true,
+   "UI and wording changes": true,
+   "how to test": true
+  },
+  "evidence": [
+   {
+    "claim": "70/500 = 14% (9% partial + 5% unsupported); 430+45+25=500",
+    "method": "executed",
+    "evidence": "computed"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "Test it with an experiment:",
+    "problem": "Unspecified design; needs randomisation and adequate sample size.",
+    "replacement": "Test it with a randomised experiment with enough users per arm to detect the difference you care about:"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "UI/measurement reasoning; not computationally hard.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field"
+   }
+  ],
+  "suggested_answer_set": "single (as is)",
+  "key_concepts_findings": "Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0026",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Automation bias is hedged as 'plausible, worth measuring'."
+  ],
+  "code_patch": null
+ }
+]

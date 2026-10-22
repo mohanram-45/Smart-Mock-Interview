@@ -1,0 +1,299 @@
+[
+ [
+  "GET /",
+  200,
+  {
+   "key_endpoints": {
+    "GET /api/current-question": "Get current question",
+    "GET /api/domains": "Get available domains",
+    "GET /api/models": "Get available answer-scoring models",
+    "GET /api/repeat-question": "Repeat current question",
+    "GET /api/reports/<interview_id>/pdf": "Download the completed report as PDF",
+    "GET /api/reports/<interview_id>/status": "Check background report generation",
+    "GET /api/roles": "Get available interview roles",
+    "GET /api/session-status": "Get session status",
+    "POST /api/check-round-completion": "Check if round complete and next action",
+    "POST /api/end-interview": "End interview and get report",
+    "POST /api/next-question": "Move to next question",
+    "POST /api/reports/<interview_id>/email": "Email the completed PDF report",
+    "POST /api/skip-question": "Skip current question",
+    "POST /api/start-interview": "Start new interview",
+    "POST /api/submit-answer": "Submit answer and get feedback"
+   },
+   "name": "SMART Mock Interview - Adaptive System",
+   "version": "2.0.0"
+  }
+ ],
+ [
+  "GET /health",
+  200,
+  {
+   "status": "ok"
+  }
+ ],
+ [
+  "GET /api/roles",
+  200,
+  {
+   "role_mappings": {
+    "Custom Interview": [],
+    "Data Analyst": [
+     "DATA_ANALYSIS",
+     "Python"
+    ],
+    "Data Scientist": [
+     "ML",
+     "DL",
+     "NLP",
+     "DATA_ANALYSIS",
+     "Python"
+    ],
+    "Machine Learning Engineer": [
+     "ML",
+     "DL",
+     "Python"
+    ],
+    "NLP Engineer": [
+     "NLP"
+    ],
+    "Python Developer": [
+     "Python"
+    ]
+   },
+   "roles": [
+    "Data Scientist",
+    "Machine Learning Engineer",
+    "NLP Engineer",
+    "Data Analyst",
+    "Python Developer",
+    "Custom Interview"
+   ]
+  }
+ ],
+ [
+  "GET /api/domains",
+  200,
+  {
+   "domains": [
+    "DATA_ANALYSIS",
+    "DL",
+    "ML",
+    "NLP",
+    "Python"
+   ]
+  }
+ ],
+ [
+  "GET /api/models",
+  200,
+  {
+   "default": "bilstm",
+   "models": [
+    {
+     "description": "Custom neural network trained from scratch on this project's own question/answer pairs. Fast once trained, but only ever saw exact-match positives, so it is stricter with reworded answers.",
+     "key": "bilstm",
+     "label": "Siamese Bi-LSTM"
+    },
+    {
+     "description": "Pretrained transformer (all-MiniLM-L6-v2) fine-tuned on 1B+ general sentence pairs. Best at recognizing correct answers phrased in your own words.",
+     "key": "bert",
+     "label": "Sentence-BERT"
+    },
+    {
+     "description": "Classic keyword-overlap similarity plus a grammar check. Fastest and simplest, but purely statistical - it rewards matching vocabulary rather than matching meaning.",
+     "key": "tfidf",
+     "label": "TF-IDF + Grammar"
+    }
+   ]
+  }
+ ],
+ [
+  "POST /api/start-interview",
+  200,
+  {
+   "current_question": {
+    "question": "What is decorators in Python?",
+    "question_id": 1935,
+    "question_number": 1,
+    "total_in_round": 5
+   },
+   "current_round": "Easy",
+   "model": {
+    "key": "bilstm",
+    "label": "Siamese Bi-LSTM"
+   },
+   "role": "Custom Interview",
+   "selected_domains": [
+    "Python",
+    "SQL"
+   ],
+   "session_id": "<volatile>",
+   "started_at": "<volatile>"
+  }
+ ],
+ [
+  "GET /api/current-question",
+  200,
+  {
+   "current_round": "Easy",
+   "question": "What is decorators in Python?",
+   "question_id": 1935,
+   "question_number": 1,
+   "total_in_round": 5
+  }
+ ],
+ [
+  "GET /api/repeat-question",
+  200,
+  {
+   "question": "What is decorators in Python?",
+   "question_id": 1935
+  }
+ ],
+ [
+  "GET /api/session-status",
+  200,
+  {
+   "current_round": "Easy",
+   "is_finished": false,
+   "model_choice": "bilstm",
+   "role": "Custom Interview",
+   "round_answers": 0,
+   "round_progress": "1/5",
+   "selected_domains": [
+    "Python",
+    "SQL"
+   ],
+   "session_id": "<volatile>",
+   "started_at": "<volatile>",
+   "total_questions_answered": 0
+  }
+ ],
+ [
+  "POST /api/submit-answer",
+  200,
+  {
+   "feedback": "Alright, noted. Moving on to the next one.",
+   "next_action": "continue",
+   "question_completed": true,
+   "round_action": "continue",
+   "round_complete": false,
+   "similarity_score": 33.33
+  }
+ ],
+ [
+  "POST /api/next-question",
+  200,
+  {
+   "current_round": "Easy",
+   "question": "What is correlated subqueries in SQL?",
+   "question_id": 2559,
+   "question_number": 2,
+   "total_in_round": 5
+  }
+ ],
+ [
+  "POST /api/skip-question",
+  200,
+  {
+   "consecutive_skips": 1,
+   "force_end": false,
+   "message": "Question skipped",
+   "skipped": true
+  }
+ ],
+ [
+  "POST /api/check-round-completion",
+  200,
+  {
+   "action": "continue"
+  }
+ ],
+ [
+  "POST /api/submit-answer (2)",
+  200,
+  {
+   "feedback": "Got it \u2014 on to the next question.",
+   "next_action": "continue",
+   "question_completed": true,
+   "round_action": "continue",
+   "round_complete": false,
+   "similarity_score": 20.0
+  }
+ ],
+ [
+  "GET /api/session-status (2)",
+  200,
+  {
+   "current_round": "Easy",
+   "is_finished": false,
+   "model_choice": "bilstm",
+   "role": "Custom Interview",
+   "round_answers": 3,
+   "round_progress": "4/5",
+   "selected_domains": [
+    "Python",
+    "SQL"
+   ],
+   "session_id": "<volatile>",
+   "started_at": "<volatile>",
+   "total_questions_answered": 3
+  }
+ ],
+ [
+  "POST start invalid role",
+  400,
+  {
+   "error": "Invalid role: Wizard"
+  }
+ ],
+ [
+  "POST start invalid model",
+  400,
+  {
+   "error": "Invalid model: gpt"
+  }
+ ],
+ [
+  "POST start no domains",
+  400,
+  {
+   "error": "No domains selected for role: Custom Interview"
+  }
+ ],
+ [
+  "POST start unknown domain",
+  400,
+  {
+   "error": "Failed to load questions for selected domains"
+  }
+ ],
+ [
+  "GET current-question bad session",
+  400,
+  {
+   "error": "Invalid session"
+  }
+ ],
+ [
+  "POST submit empty answer",
+  400,
+  {
+   "error": "Answer cannot be empty"
+  }
+ ],
+ [
+  "POST submit bad session",
+  400,
+  {
+   "error": "Invalid session"
+  }
+ ],
+ [
+  "GET unknown route",
+  404,
+  {
+   "error": "Endpoint not found"
+  }
+ ]
+]

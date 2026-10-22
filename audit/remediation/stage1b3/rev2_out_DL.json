@@ -1,0 +1,371 @@
+[
+ {
+  "id": "P2-DL-01",
+  "verdict": "correct",
+  "reasons": [
+   "Technically sound micrograd-style engine; examples 6.0 and 2.0 reproduce; numerical-check claim (~1e-8) holds (measured max error 1.6e-10).",
+   "Intro paragraph uses 'parents/children' inconsistently with the code comment (operands called 'parents' in sentence 1, 'children' in the code comment), which is confusing in a topological-order explanation."
+  ],
+  "parts_answered": {
+   "Value with + * - ** const, tanh, relu": true,
+   "backward fills .grad on every node": true,
+   "x*x=6.0 and x+x=2.0": true,
+   "why topological order": true,
+   "why += not =": true,
+   "how to test against numerical differentiation": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "remembers its parents and a closure that pushes out.grad back to them, multiplied by the local derivative. backward() builds a topological order with a DFS (parents appended after all their children in the graph direction)",
+    "problem": "Terminology contradicts the code (where _prev entries are called 'children' and are the operands) and is hard to parse; 'parents' here means operands.",
+    "replacement": "remembers its operands (the nodes it was computed from) and a closure that pushes out.grad back to them, multiplied by the local derivative. backward() builds a topological order with a DFS (a node is appended only after all of its operands)"
+   },
+   {
+    "severity": "minor",
+    "claim": "__sub__ defined but no __rsub__",
+    "problem": "2 - x (int minus Value) raises TypeError although the question says the engine supports '-'. Fix would need code+test change: def __rsub__(self, other): return (-self) + other (keep fence == solution).",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Standard micrograd implementation plus short justifications; single mechanism, no subtle trade-off.",
+  "key_concepts_findings": "All six concepts are discussed (computational graph via closures, topological order, +=, multi-path chain rule, numeric check). Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0015",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran solution+test from scratch (fence == solution verified) on sandbox Python 3.13 (numpy 2.5), /home/claude/work/v310 and v311 (numpy 2.2.6): all print ok. Edge cases of my own: x**0 at x=0 -> ZeroDivisionError (k*0.0**-1); x**2 at 0 -> grad 0 ok; sqrt via **0.5 ok (0.25 at 4); relu at 0 -> 0; 2-Value subtraction grads (1,-1) ok; (-x) ok; 1 - Value -> TypeError (no __rsub__); calling backward() twice gives 12.0 for x*x (answer correctly warns to zero grads); shared diamond 2^60 fan-out finishes instantly (visited set works); depth 900 ok, depth 2000 raises RecursionError at default limit (answer discloses). tanh grad matches 1-tanh^2.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-DL-02",
+  "verdict": "pass",
+  "reasons": [
+   "Gate order, shapes and example values verified (c=1.28783, h=0.62766); mechanism and hedging correct.",
+   "Claims about forget-bias heuristic are hedged; 0.5/step decay and copy behaviour verified in test."
+  ],
+  "parts_answered": {
+   "lstm_step with given shapes/order": true,
+   "example reproduced": true,
+   "additive cell update vs vanishing gradient": true,
+   "forget-gate bias init and why": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "each with W and a tanh derivative below 1",
+    "problem": "tanh' is at most 1 (equals 1 at 0); 'below 1' is trivially loose. Not worth changing.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short implementation with a mechanism explanation; no multi-step design.",
+  "key_concepts_findings": "Concepts discussed in answer. 'gradient clipping' is only mentioned in passing (one clause) - acceptable.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0113",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran solution+test from scratch (fence == solution verified) on sandbox Python 3.13 (numpy 2.5), /home/claude/work/v310 and v311 (numpy 2.2.6): all print ok. Own checks: random B=2,D=3,H=4 vs independent re-derivation: identical; B=0 works; 1-D inputs raise IndexError (documented shapes are 2-D); sigmoid(-1000) emits RuntimeWarning overflow in exp (result still correct, 0) - minor numerical-stability note, not wrong.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-DL-03",
+  "verdict": "pass",
+  "reasons": [
+   "All numbers in the answer verified by execution: 1e-7 -> 1.19e-7 (19.2% error), 1e-6 -> 1.33% error, scale 2**15 max relative error 4.4e-4 (<0.05%), 5.0*2**15 overflows with found_inf True; example output [0.0, 1.0002e-4], False reproduced.",
+   "fp16/bf16 range statements correct; fp32 list reasonable and hedged ('usually', 'typically')."
+  ],
+  "parts_answered": {
+   "fp16_roundtrip": true,
+   "to_bf16": true,
+   "example reproduced": true,
+   "scale 1 vs 2**15 demonstration": true,
+   "fp16 and bf16 ranges": true,
+   "why loss scaling works": true,
+   "what is kept in fp32": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "found_inf = bool(~np.all(np.isfinite(g16)))",
+    "problem": "Relies on np.all returning np.bool_ (~ on a Python bool would give -2, truthy). Works today but `not np.all(...)` is more robust.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Numeric-format reasoning with a small simulation; several facts but each is recall/derivation, not a design trade-off.",
+  "key_concepts_findings": "All six concepts discussed (subnormals via 1e-7 example, dynamic scaling, master weights).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0016",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran solution+test from scratch (fence == solution verified) on sandbox Python 3.13 (numpy 2.5), /home/claude/work/v310 and v311 (numpy 2.2.6): all print ok. Edge cases: NaN input -> found_inf True; empty array -> ([], False); python scalar ok; 65504 ok, 65520 -> inf (rounds up, found_inf True); negative overflow -inf flagged. to_bf16 checked against an independent struct-based round-to-nearest-even reference on 100k random values spanning 1e-20..1e20: identical; 3.4028235e38 rounds to inf (correct RNE), inf/nan inputs pass through unchanged (docstring says not handled specially). Identical results on numpy 2.2.6 and 2.5.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-DL-04",
+  "verdict": "pass",
+  "reasons": [
+   "Example row 1 verified [0.84147, 0.54030, 0.0099998, 0.99995]; rotation identity, dot-product identity and permutation equivariance verified.",
+   "Careful hedging about extrapolation and what the rotation structure guarantees."
+  ],
+  "parts_answered": {
+   "sinusoidal_pe": true,
+   "(a) range in [-1,1]": true,
+   "(b) fixed-offset matrix": true,
+   "(c) permutation equivariance": true,
+   "alternatives named without ranking": true
+  },
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Closed-form construction plus a derivation (angle addition) and a numerical equivariance test; no trade-off design.",
+  "key_concepts_findings": "Concepts all discussed; alternatives (learned, relative bias, RoPE, ALiBi) are named only, which is what the question asks.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0006",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran solution+test from scratch (fence == solution verified) on sandbox Python 3.13 (numpy 2.5), /home/claude/work/v310 and v311 (numpy 2.2.6): all print ok. Own checks: n_pos=0 returns (0,d); d=2 ok; offset_matrix for k=0, -3, 7 with d=64 over 300 positions all satisfy pe[p+k]=M@pe[p] and M is orthogonal; odd d rejected by assert; with a causal mask equivariance does fail (so the 'no mask' qualifier in the answer is necessary and present).",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-DL-05",
+  "verdict": "pass",
+  "reasons": [
+   "Cached, uncached and reference outputs agree; row counts T vs T(T+1)/2 verified; 2 GiB example exact (2**31).",
+   "Appropriately states attention still costs O(t*d) per step and that the saving is recomputation, not length dependence."
+  ],
+  "parts_answered": {
+   "Decoder with use_cache True/False": true,
+   "equality with full_causal_attention": true,
+   "K/V rows projected counts": true,
+   "kv_cache_bytes": true,
+   "example 2 GiB": true,
+   "where saving comes from": true,
+   "how cache memory grows": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "def kv_cache_bytes(n_layers, n_kv_heads, head_dim, seq_len, batch=1, bytes_per_elem=2)",
+    "problem": "Defaults for batch and bytes_per_elem are an addition to the signature in the question; harmless.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Two small implementations, equivalence test and a formula; multi-part but each part straightforward.",
+  "key_concepts_findings": "All discussed. 'grouped-query attention' appears as a one-line example, adequate.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0006",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran solution+test from scratch (fence == solution verified) on sandbox Python 3.13 (numpy 2.5), /home/claude/work/v310 and v311 (numpy 2.2.6): all print ok. Own checks with non-square projections (d_model 6/7, d_k 3/4, d_v 5/2) for T=1,2,9: cached and uncached equal the causal reference; row counts 1,3,45 for uncached; large-magnitude inputs stay finite (max-subtraction); kv_cache_bytes(...,seq_len=0)=0; GQA 8 heads batch 16 -> 8 GiB.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-DL-06",
+  "verdict": "pass",
+  "reasons": [
+   "alpha_bar example values verified (0.9999, 0.89702, 0.078587, 4.036e-05); mean/variance and chain-vs-closed-form claims verified (chain: mean 1.8942 vs 1.8942, var 0.1027 vs 0.1030).",
+   "Epsilon-prediction target and MSE loss stated correctly."
+  ],
+  "parts_answered": {
+   "make_schedule": true,
+   "q_sample": true,
+   "predict_x0": true,
+   "mean/variance test": true,
+   "closed form vs step-by-step chain": true,
+   "what network predicts + loss": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "assert abs(xt.var() - (1.0 - ab[t])) < 0.02 (test, t=0)",
+    "problem": "At t=0 the tolerance 0.02 is vacuous for the variance (true value 1e-4; also beta_0 == 1-alpha_bar_0 so a wrong beta_t variance cannot be detected there) and the mean check cannot tell alpha_bar from sqrt(alpha_bar) at t=0 or 999 (differences 1e-4 and 0.0126 < 0.02). The tests at t=99/499 do discriminate, and the answer discloses the tolerance. No change required.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Derivation of the closed form plus simulation-based verification; standard material.",
+  "key_concepts_findings": "All concepts discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0020",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran solution+test from scratch (fence == solution verified) on sandbox Python 3.13 (numpy 2.5), /home/claude/work/v310 and v311 (numpy 2.2.6): all print ok. Own checks: array-valued t raises ValueError (needs reshaping; question only specifies scalar t); t=-1 silently wraps to last element, t=1000 IndexError; T=1 schedule works. Wrong-formula sensitivity analysis done as in issue above.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-DL-07",
+  "verdict": "correct",
+  "reasons": [
+   "Numerics verified (gradient mean over 8 shards equals big-batch gradient to 8e-17; sum is 8x; ragged-chunk error 1.8e-3 vs gradient magnitude 4.6e-2; sqrt rule 0.283).",
+   "The sub-question 'when gradient accumulation is the better option' is not actually answered: the text only says accumulation keeps BN at 256 and is the closest stand-in.",
+   "Warmup length 'roughly 500 to 2000 steps' is not consistent with '3 to 5 epochs' for any stated dataset size (ImageNet-1k at batch 2048 is about 625 steps/epoch, i.e. 1,900-3,100 steps)."
+  ],
+  "parts_answered": {
+   "concrete lr value": true,
+   "warmup values": true,
+   "BN stats with/without SyncBN": true,
+   "when accumulation is better": false,
+   "verification plan": true,
+   "numpy check: averaged shard gradients equal big-batch": true,
+   "numpy check: accumulation mistakes break it": true
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "Gradient accumulation (8 micro-batches of 256 on one GPU) also keeps BN at 256 per forward pass, which is why it is the closest single-GPU stand-in; it costs wall-clock time, not accuracy.",
+    "problem": "Does not answer 'when is gradient accumulation the better option', and 'costs ... not accuracy' ignores that BN equivalence only holds if the micro-batch stays at 256.",
+    "replacement": "Gradient accumulation (8 micro-batches of 256 on one GPU) also keeps BN at 256 per forward pass, which is why it is the closest single-GPU stand-in; it costs wall-clock time, not accuracy, provided the micro-batch stays near 256. It is the better option when you do not have 8 GPUs or cannot fit a large per-GPU batch (for example 2 GPUs x 4 accumulation steps x 256 gives the same global 2048), when the all-reduce is the bottleneck (accumulate locally and synchronise once per optimiser step), or when you want a single-device reference run to debug the 8-GPU one. If memory forces micro-batches much smaller than 256, BN statistics become noisier than in the original run, so use SyncBN or GroupNorm or accept the difference."
+   },
+   {
+    "severity": "major",
+    "claim": "over the first few epochs (say 3 to 5, or roughly 500 to 2000 steps)",
+    "problem": "Step range is not derivable from the epoch range; at ImageNet scale 3-5 epochs of batch 2048 is about 1,900-3,100 steps, and for smaller datasets it is far fewer. Dataset size is not given in the question.",
+    "replacement": "over the first 3 to 5 epochs (the usual choice at ImageNet scale; that is roughly 1,900 to 3,100 steps at batch 2048 on 1.28M images, so convert with your own dataset size)"
+   },
+   {
+    "severity": "minor",
+    "claim": "for Adam-type optimisers a square-root scaling (0.1 * sqrt(8) = 0.28 in the same arithmetic)",
+    "problem": "A base lr of 0.1 is not an Adam value; 'in the same arithmetic' flags it, but it could mislead. Optional.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open-ended design with several interacting trade-offs (lr scaling, warmup, BN, accumulation, verification) plus a supporting numeric check.",
+  "key_concepts_findings": "Concepts are relevant and discussed; 'gradient accumulation' coverage is the weak spot (see issue).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0016",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran solution+test from scratch (fence == solution verified) on sandbox Python 3.13 (numpy 2.5), /home/claude/work/v310 and v311 (numpy 2.2.6): all print ok. Own checks: accumulated_grad with micro > N, micro=1 equal full gradient; warmup_steps=0 returns peak (no div by zero); N=0 gives RuntimeWarning/NaN; logistic_grad overflow warning for very large weights (value still finite). Seed 0 results reproduced.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-DL-08",
+  "verdict": "correct",
+  "reasons": [
+   "Question premise is internally inconsistent: the symptom is loss ~2.30 with always-class-0 predictions, but softmax over the wrong axis with batch 1 gives loss exactly 0, and with batch B gives loss ~ln B and predictions that are NOT all class 0 (executed: B=64 -> CE 4.16, argmax spread over classes). So it does not produce 'exactly this symptom'.",
+   "Answer partly acknowledges ('subtler with bigger batches') but never states that the 2.30 loss is not explained by this bug."
+  ],
+  "parts_answered": {
+   "ordered checklist covering labels/imbalance/normalisation/dead ReLU/lr/softmax axis": true,
+   "numpy demo of wrong-axis softmax (probs 1, argmax 0, CE 0)": true,
+   "diagnose() with histogram, majority baseline, variation flag": true,
+   "states that the demo explains the reported 2.30 loss": false
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "Then show in numpy how softmax over the wrong axis produces exactly this symptom: a batch of one sample gives probabilities of 1 for every class, argmax always returns class 0, and the cross-entropy is exactly 0.",
+    "problem": "Wrong-axis softmax reproduces always-class-0 / chance accuracy only for batch size 1, and then the loss is 0, contradicting the stated loss of 2.30. It is not 'exactly this symptom'.",
+    "replacement": "Then show in numpy how softmax over the wrong (batch) axis reproduces the always-class-0 predictions and chance accuracy when the batch holds one sample (probabilities of 1 for every class, argmax always class 0, cross-entropy exactly 0), and say why it does not explain a loss of 2.30."
+   },
+   {
+    "severity": "major",
+    "claim": "giving zero loss and zero gradient.",
+    "problem": "Needs an explicit statement that this bug does not account for the reported ln 10 loss (verified: wrong-axis loss is ln B for random logits).",
+    "replacement": "giving zero loss and zero gradient. Note that this explains the always-class-0 predictions but not the reported loss of 2.30: with a batch of B > 1 the wrong-axis loss starts near ln B (about 4.16 for B = 64) and the argmax is no longer always class 0. A loss pinned at ln 10 with constant predictions points to a uniform or input-ignoring output (dead units, too high a learning rate, unnormalised inputs, a label problem)."
+   },
+   {
+    "severity": "minor",
+    "claim": "\"row_sums_ok\": bool(np.allclose(softmax(logits, axis=1).sum(axis=1), 1.0)),",
+    "problem": "Always True by construction because diagnose computes its own softmax over axis 1; it cannot detect a wrong-axis bug in the model. The later advice to assert probs.sum(axis=1) on the model's actual probabilities is the useful version.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Checklist ordering plus small numpy demonstration; recall/application, no deep multi-step derivation.",
+  "key_concepts_findings": "Concepts discussed; 'dead ReLU' and 'input normalisation' get only one line each - acceptable for a checklist.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0016",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran solution+test from scratch (fence == solution verified) on sandbox Python 3.13 (numpy 2.5), /home/claude/work/v310 and v311 (numpy 2.2.6): all print ok. Own checks: wrong-axis CE for B=1,2,64,256 = 0, 0.693, 4.16, 5.55 (= ln B); right-axis CE with tiny logits 2.30; diagnose() on empty input gives NaN with warnings; float labels raise TypeError in bincount; labels >= n_classes silently lengthen label_hist.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-DL-09",
+  "verdict": "pass",
+  "reasons": [
+   "All worked examples and BN totals verified; additionally cross-checked against known torchvision totals: ResNet-50 layer1 = 215,808, ResNet-18 layer1 = 147,968, layer2 = 525,568 - all reproduced by the helpers.",
+   "Bottleneck and projection-shortcut explanations are correct and hedged."
+  ],
+  "parts_answered": {
+   "conv_params": true,
+   "bn_params": true,
+   "basic_block_params": true,
+   "bottleneck_params": true,
+   "worked examples 73,728 / 69,632 / 73,728": true,
+   "why bottleneck": true,
+   "when projection shortcut needed": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "conv_params(c_in, c_out, k, bias=False, groups=1)",
+    "problem": "groups is never validated or explained: conv_params(3, 8, 3, groups=2) silently returns 72 (should be an error since 3 % 2 != 0). Not used by the block helpers.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Arithmetic application with a short design rationale; low risk but more than single-fact recall.",
+  "key_concepts_findings": "'groups' is in the signature but not covered; key_concepts themselves are all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0024",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran solution+test from scratch (fence == solution verified) on sandbox Python 3.13 (numpy 2.5), /home/claude/work/v310 and v311 (numpy 2.2.6): all print ok. Own checks: depthwise conv_params(32,32,3,groups=32)=288; bias counting; c_in=0 -> 0; basic_block 64->128 with projection 230,144 reproduced.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-DL-10",
+  "verdict": "correct",
+  "reasons": [
+   "Implementation, brute-force match, ln N sanity value, overflow demonstration and ln 2 floor all verified.",
+   "One mitigation listed ('use a symmetric loss with care') does not address false negatives and is unsupported."
+  ],
+  "parts_answered": {
+   "info_nce with cosine similarity, stable": true,
+   "example eye(4) tau 0.05 ~ 0 and identical -> ln N": true,
+   "brute-force comparison": true,
+   "naive exp overflow at 1e-3": true,
+   "temperature explanation": true,
+   "false-negative floor with duplicates": true
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "mask known same-class pairs out of the denominator, or use a symmetric loss with care.",
+    "problem": "A symmetric (a->b plus b->a) loss does not remove false negatives; the clause is unsupported and misleading. (Masking should also keep the positive itself in the denominator.)",
+    "replacement": "mask known same-class pairs (other than the positive itself) out of the denominator."
+   },
+   {
+    "severity": "minor",
+    "claim": "reduction=\"mean\"",
+    "problem": "Any value other than 'mean' (including a typo or 'sum') silently returns the per-sample vector.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Standard contrastive loss with log-sum-exp stability and calibrated discussion; no design trade-off beyond temperature.",
+  "key_concepts_findings": "All six concepts discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0004",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran solution+test from scratch (fence == solution verified) on sandbox Python 3.13 (numpy 2.5), /home/claude/work/v310 and v311 (numpy 2.2.6): all print ok. Own checks: N=1 -> 0; zero-vector embeddings -> NaN (no eps in normalisation); rescaling inputs leaves loss unchanged (scale invariance); float32 at tau 1e-3 finite; loss asymmetric in (a,b) as expected (1.58 vs 2.75); three duplicates give floor ln 3 = 1.0986 (generalises the ln 2 claim); reduction='sum' returns a vector.",
+  "sources_findings": []
+ }
+]

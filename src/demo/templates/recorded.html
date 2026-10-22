@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Recorded model run · SMART Mock Interview{% endblock %}
+{% block body %}
+<section class="hero"><h1>Recorded experimental run (real local model)</h1>
+  <p class="lead">These are saved results from the frozen Stage 3C-2 experiment: 20 benchmark answers evaluated by Qwen 2.5 7B through the modular pipeline (and by the earlier single-prompt LLM evaluator). Nothing here is recomputed or re-scored.</p></section>
+<div class="banner banner-warn"><strong>The experiment did not pass its acceptance gate.</strong><span>Abstain rate 0.45 against a 0.40 limit: decision DO NOT ADVANCE. No answer has been human-reviewed. AI-drafted expectations are not shown because they are not ground truth.</span></div>
+{% if error %}
+<div class="banner banner-bad"><strong>Not available</strong><span>{{ error }}</span></div>
+{% else %}
+<div class="scroll"><table class="tbl wide">
+  <thead><tr><th>Answer</th><th>Question</th><th>Scope</th><th>Repeat 0</th><th>Repeat 1</th><th>Legacy LLM evaluator</th></tr></thead>
+  <tbody>
+  {% for v in data.views %}
+    <tr><td><a href="{{ url_for('demo.recorded_detail', sample_id=v.sample_id) }}">{{ v.sample_id }}</a></td>
+      <td>{{ v.question[:110] }}{{ '…' if v.question|length > 110 }}</td>
+      <td>{{ 'score-eligible' if v.requirements.penalty_mode == 'full' else 'advisory only' }}</td>
+      {% for m in v.modular %}{% set st = describe_state(m) %}<td><span class="st st-{{ st.state }}">{{ m.score ~ '/100' if m.score is not none else st.title.replace('No score: ', '') }}</span></td>{% endfor %}
+      {% for _ in range(2 - v.modular|length) %}<td class="muted">—</td>{% endfor %}
+      <td>{{ v.legacy.score ~ '/100' if v.legacy and v.legacy.score is not none else '—' }}</td></tr>
+  {% endfor %}
+  </tbody></table></div>
+<p class="muted small">Source: <code>{{ data.path }}</code>. Open an answer for the evidence, rubric breakdown and the exact reason for any abstention.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,649 @@
+[
+ {
+  "plan_id": "B4-MLO-08-1",
+  "verdict": "pass",
+  "reasons": [
+   "Applied correction verified: fallback for <=2 distinct edges works, NaN/inf filtered, ValueError on empty; fenced code == code.solution; docstring and prose consistent.",
+   "All quoted numbers reproduced: 12.43 (eps 1e-6), 3.94 (eps 1e-2), null mean 0.089/sd 0.046 (10 bins), 0.505/0.153 (40 bins), 9*0.01=0.09, 0.5-sd shift 0.232.",
+   "Operational-recipe rewrite (non-overlapping real-time windows) is sound and consistent with the remedies sentence."
+  ],
+  "parts_answered": {
+   "numpy-only psi with quantile edges": true,
+   "out-of-range current values counted": true,
+   "no log(0)/div-by-zero": true,
+   "explain why 200 rows/40 bins is poor": true
+  },
+  "evidence": [
+   {
+    "claim": "12.4 / 3.9 PSI for all-5.0 vs N(0,1) 20k at eps 1e-6/1e-2",
+    "method": "executed",
+    "evidence": "12.4339 / 3.9374 on 3.10, 3.11, 3.13"
+   },
+   {
+    "claim": "null PSI mean 0.089 (10 bins), 0.50 (40 bins), 300 reps",
+    "method": "executed",
+    "evidence": "0.0894/0.0457 and 0.5049/0.1533, identical on three interpreters"
+   },
+   {
+    "claim": "expected null ~ (B-1)(1/n+1/m) = 0.09",
+    "method": "derivation",
+    "evidence": "9*(1/200+1/200)=0.09; 39*0.01=0.39 for B=40 (approximation low there, as the text says)"
+   },
+   {
+    "claim": "constant ref vs 9.0 >5; binary vs ones >1",
+    "method": "executed",
+    "evidence": "constant vs 9.0 = 18.42; binary 50/50 vs all ones > 1 (asserted)"
+   },
+   {
+    "claim": "0.1/0.25 are not statistical thresholds; critical value depends on n and bins",
+    "method": "paper",
+    "evidence": "arXiv 2303.01227 Sec 3.2 (opened)"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short numpy implementation with a couple of edge cases plus a standard noise-floor argument; no subtle multi-step design. Hard is arguable only because of the degenerate-reference handling.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Design rationale, eps artefact, noise-floor derivation and simulation."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Runnable code, list of tested checks, calibration recipe. Some prose overlap with detailed on code behaviour, acceptable."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All 7 specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0045",
+   "same_intent": false
+  },
+  "code_findings": "Ran code.solution+code.test from scratch on /home/claude/work/v310, v311 and python3.13: pass, identical output. Extra edge cases (my own, all three interpreters identical): 95%-zeros spike reference self-PSI 0.0 and shifted 1.34; n_bins=1 on continuous ref gives 4.02 for a +3 shift (degenerate but no crash); integer arrays OK; +/-inf and NaN in current ignored (0.0248); all-NaN reference raises ValueError; constant 5.0 vs 6.0 and 4.0 both 18.42; 1e300 and 1e16 constants self-PSI 0.0. Fenced block equals code.solution. stdlib+numpy only, no 3.11+ features. Minor: docstring says 'two-valued reference' while the condition is 'quantile edges collapse to <=2 distinct values' (as the detailed answer words it); harmless.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/pdf/2303.01227",
+    "status": "supported",
+    "evidence": "Opened via WebFetch: 'the critical value of the PSI decreases with sample size' and 'increases with the number of groups' (Sec 3.2, stated for equal group proportions); 0.1/0.25 cut-offs quoted (Lewis). Supports the worded claim; the equal-proportion condition holds for quantile bins."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Rule-of-thumb 0.1/0.25 are 'not statistical thresholds' is the answer's own (reasonable) characterisation; paper only shows the cutoffs are conventional and critical values depend on n and bins."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-08-7",
+  "verdict": "correct",
+  "reasons": [
+   "Applied corrections (sketch caveat, slice-reference assumption, stable hash) are accurate; all arithmetic recomputed and simulated.",
+   "One additional gap: mixed-selection rows (errors, low-confidence, slice) must not be used unweighted for drift tests."
+  ],
+  "parts_answered": {
+   "what to log/aggregate": true,
+   "sampling design": true,
+   "daily PSI per feature": true,
+   "hourly 0.5% slice": true,
+   "label join weeks later": true,
+   "privacy/retention": true,
+   "show sample big enough": true
+  },
+  "evidence": [
+   {
+    "claim": "2M*1%=20,000 rows, 80 MB vs 8 GB",
+    "method": "derivation",
+    "evidence": "20,000*4KB=80 MB; 2M*4KB=8 GB"
+   },
+   {
+    "claim": "floor 9*(1e-5+5e-5)=0.0005; 50 rows -> 0.18; 417/h -> 0.02; 500-row slice ref -> 0.04",
+    "method": "executed",
+    "evidence": "Formulas give 0.00054, 0.180, 0.0217, 0.0396. Simulation (quantile bins from ref, 300 reps): 20k vs 100k mean 0.00051; 50 vs 100k 0.216 (approx slightly low at 5 rows/bin); 417 vs 100k 0.0220; 417 vs 500 0.0405"
+   },
+   {
+    "claim": "Python built-in hash() is salted",
+    "method": "background_only",
+    "evidence": "PYTHONHASHSEED per-process salting of str hashes (documented in Python docs for hash randomization)"
+   },
+   {
+    "claim": "10,000 rows/day for 0.5% slice, 417/h",
+    "method": "derivation",
+    "evidence": "2M*0.005=10,000; /24=416.7"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "each row tagged with its sampling weight (1 for 100%, 100 for the 1% sample).",
+    "problem": "Errors, low-confidence and slice rows are selected on outcomes/features; using the union unweighted for drift tests or population estimates biases them. The record never says which subset the PSI tests should run on.",
+    "replacement": "each row tagged with its sampling weight (1 for 100%, 100 for the 1% sample). Run drift tests and population estimates on the uniform hash sample (or on the union with inverse-inclusion-probability weights), never on the mixed set unweighted."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-part design: separate aggregates from sampled rows, size with noise-floor arithmetic, handle slice power, label join, privacy.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Stream exact aggregates (counters, histograms on frozen edges) over all traffic, no raw rows",
+    "tradeoff": "Tiny storage and exactness vs no raw values for ad-hoc tests"
+   },
+   {
+    "decision": "Deterministic hash-of-request-ID sampling stored with the sampling weight",
+    "tradeoff": "Reproducible, label-joinable, coordination-free vs possible correlation with ID structure (validate it)"
+   },
+   {
+    "decision": "Size samples with the PSI noise floor (B-1)(1/n+1/m) per slice and window",
+    "tradeoff": "Quantifies adequacy vs rough approximation at few rows per bin"
+   },
+   {
+    "decision": "Oversample (100% capture) rare slices, errors and low-confidence scores, with weights",
+    "tradeoff": "Adequate slice power vs more stored data/privacy exposure and the need to reweight"
+   },
+   {
+    "decision": "Minimise and pseudonymise logged data, set retention",
+    "tradeoff": "Security/privacy vs debugging depth and label-join keys"
+   },
+   {
+    "decision": "Validate the sampler against full logging for a few days",
+    "tradeoff": "Short-term extra storage vs detecting a biased sampling key"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Design plus sizing arithmetic."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete policy and validation experiment; the 'few 0.0001s' check is consistent with 0.0005 floor (nested sample actually slightly lower)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "7 concepts, all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0026",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/pdf/2303.01227",
+    "status": "supported",
+    "evidence": "Opened via WebFetch: 'the critical value of the PSI decreases with sample size' and 'increases with the number of groups' (Sec 3.2, stated for equal group proportions); 0.1/0.25 cut-offs quoted (Lewis). Supports the worded claim; the equal-proportion condition holds for quantile bins."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Hash-sampling is uncorrelated with feature values 'by construction' assumes IDs are random/opaque; the answer does say to validate and repeat after ID format changes.",
+   "Privacy retention statement is hedged to jurisdiction/legal advice."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-10-2",
+  "verdict": "pass",
+  "reasons": [
+   "Applied corrections verified: the label_ts assumption (label never earlier than prediction) makes rows_after_label a subset of rows_from_future and is stated; gate wording (fail on rows_after_label>0, block on future-only unless reviewed exception) is internally consistent.",
+   "Query, expected output, 470.0 h and 15.0 h recomputed by hand and by sqlite3."
+  ],
+  "parts_answered": {
+   "one SQLite query per feature with count/share/max hours/after-label": true,
+   "only offending features": true,
+   "interpret on example": true,
+   "what query cannot catch": true
+  },
+  "evidence": [
+   {
+    "claim": "refund_flag max 470 h ahead (row 1: 03-21 00:00 vs 03-01 10:00)",
+    "method": "derivation",
+    "evidence": "20 days - 10 h = 470 h; all 4 after label"
+   },
+   {
+    "claim": "days_since_login 3/4 future, max 15.0 h (23:59 vs 09:00 = 14.98 h)",
+    "method": "executed",
+    "evidence": "sqlite3 3.45.1 output ('days_since_login',4,3,0.75,15.0,0)"
+   },
+   {
+    "claim": "HAVING on an alias and ORDER BY alias are legal in SQLite",
+    "method": "executed",
+    "evidence": "query runs; also verified with NULL feature_ts/label_ts, empty table, mixed 'T'/space formats"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Single aggregation query with conditional sums and a short interpretation; the leakage reasoning is applied, not deep.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Interpretation and limits."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Query, output, CI gate. Output numbers repeated from detailed but consistent."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All 7 specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0041",
+   "same_intent": false
+  },
+  "code_findings": "Ran on 3.10, 3.11, 3.13: asserts pass, rows identical. Own edge cases: NULL label_ts gives rows_after_label 0 (NULL comparison silently not counted; a limitation not mentioned, minor); NULL feature_ts ignored; empty features table returns []; mixed 'T' vs ' ' timestamps misclassify equal times as future (max_hours 0.0), consistent with the stated ISO-format caveat. SQL fenced block == configs[0].content == SQL string in solution. SQLite dialect only; no yaml/Dockerfile. Nothing claimed as 'applied' beyond the in-memory test. No contradiction with smi-l0041/l0044 answers as far as their questions show.",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Nightly-snapshot-joined-by-date mechanism is illustrative."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-11-3",
+  "verdict": "pass",
+  "reasons": [
+   "Applied hedge on memorisation is appropriate and correctly scoped (model- and data-dependent).",
+   "No stated universal claims; legal threshold deferred to counsel as the question requests."
+  ],
+  "parts_answered": {
+   "what to delete": true,
+   "what can/cannot be said about trained models": true,
+   "system design for cheap promise": true,
+   "legal threshold left to counsel": true
+  },
+  "evidence": [
+   {
+    "claim": "unlearning is notoriously difficult; SISA reduces unlearning overhead",
+    "method": "paper",
+    "evidence": "arXiv 1912.03817 abstract (opened): 'having models unlearn is notoriously difficult'; SISA 'reduces the computational overhead associated with unlearning'"
+   },
+   {
+    "claim": "rare/unique records more likely to be memorised",
+    "method": "paper",
+    "evidence": "Carlini et al., Secret Sharer abstract (opened): 'rare or unique training-data sequences are unintentionally memorized'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Scenario synthesis (governance + ML systems); no calculations; mostly breadth.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single comprehensive answer; ~340 words, acceptable for answer_set single."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "7 concepts, all present.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0020",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/1912.03817",
+    "status": "supported",
+    "evidence": "'Yet, having models unlearn is notoriously difficult.' and SISA 'reduces the computational overhead associated with unlearning' (abstract). The answer text states only the difficulty; SISA is in the supports line, which is also supported."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "The Secret Sharer: Evaluating and Testing Unintended Memorization in Neural Networks (Carlini et al.)",
+    "url": "https://arxiv.org/abs/1802.08232",
+    "supports": "Rare or unique training records can be unintentionally memorised by generative sequence models, so memorisation is a factor for retention of individual records (the finding is for sequence models; the answer rightly calls it model- and data-dependent).",
+    "quote": "the risk that rare or unique training-data sequences are unintentionally memorized by generative sequence models",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [
+   "'For most model types there is no general, exact operation short of retraining' is background knowledge consistent with the Bourtoule abstract; exceptions exist (e.g. SISA-style sharded training, some convex models).",
+   "Backup expiry and tombstone-list practices are design recommendations, not sourced."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-4",
+  "verdict": "pass",
+  "reasons": [
+   "Applied correction fixed an internal inconsistency (old text shifted traffic to 0% after enabling old path then rolled forward). New wording (restore old feature path or safe default, then roll back; else roll forward behind flag/canary) matches the detailed policy.",
+   "Sources opened: ML Test Score Infra 7 'Serving models can be rolled back' and 'operators should practice doing it normally, when not in emergency conditions'; SRE Book lists 'On-call engineer intervention (release rollback, rerouting of traffic, etc.)' as a postmortem trigger."
+  ],
+  "parts_answered": {
+   "how to decide rollback vs roll-forward": true,
+   "what do you need to know": true,
+   "first five minutes": true
+  },
+  "evidence": [
+   {
+    "claim": "Rollback is Infra 7 in ML Test Score and recommends practising it",
+    "method": "paper",
+    "evidence": "Opened PDF: table label 'Serving models can be rolled back'; text 'operators should practice doing it normally'"
+   },
+   {
+    "claim": "rollback/traffic rerouting is a postmortem trigger",
+    "method": "doc",
+    "evidence": "SRE Book postmortem-culture list, third bullet"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Judgement under uncertainty with explicit decision inputs; no quantitative derivation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Decision inputs, policy, first five minutes."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Scoring grid and replay-based decision rule; the 5 min / 25 min figures are labelled illustrative."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "8 concepts, all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0032",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Infra 7 label and practice sentence confirmed; NaN monitoring is Monitor 5, as the corrected supports line says."
+   },
+   {
+    "url": "https://sre.google/sre-book/postmortem-culture/",
+    "status": "supported",
+    "evidence": "'On-call engineer intervention (release rollback, rerouting of traffic, etc.)'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'Traffic shifting is often faster than either' and the 2-minute replay are practical judgement."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-9",
+  "verdict": "pass",
+  "reasons": [
+   "Arithmetic: 2*(15+5)=40 min of 420 = 9.5% (about 10%); 07:45-18:00 = 10.25 h; both consistent.",
+   "Type change business_case->scenario is reasonable (workload-by-workload choice with 'change my mind'); could also be tagged design but a single defensible answer with conditions is given.",
+   "AWS quote verified: two-minute notice, best effort; the answer itself makes no numeric claim about notice, only 'short'."
+  ],
+  "parts_answered": {
+   "strategy for fine-tune": true,
+   "strategy for internal classifier": true,
+   "strategy for customer endpoint": true,
+   "what would change your mind": true
+  },
+  "evidence": [
+   {
+    "claim": "2 interruptions x (15 min lost + 5 min restore) = 40 min = 9.5% of 7 h",
+    "method": "derivation",
+    "evidence": "40/420=0.095"
+   },
+   {
+    "claim": "weekday 07:45-18:00 is about 10 h of 24",
+    "method": "derivation",
+    "evidence": "10.25 h"
+   },
+   {
+    "claim": "Spot interruption warning is short and best effort",
+    "method": "doc",
+    "evidence": "AWS EC2 User Guide: 'two minutes before ... best effort basis' (opened)"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Three small applied choices with simple bounds; no deep trade-off derivation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer, ~330 words, covers all three workloads."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "8 concepts, all present.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0024",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [
+   {
+    "url": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-instance-termination-notices.html",
+    "status": "supported",
+    "evidence": "'A Spot Instance interruption notice is a warning that is issued two minutes before Amazon EC2 stops or terminates your Spot Instance.' 'Interruption notices are emitted on a best effort basis.'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Autoscaling on queue depth/concurrency rather than CPU is a design recommendation (consistent with smi-l0024).",
+   "'Reclamation can remove many replicas at once' is plausible but provider/pool dependent; phrased with 'can'."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-1",
+  "verdict": "correct",
+  "reasons": [
+   "Applied correction (conditional repurchase interval) is good, but its added tail 'which a slow outcome metric can never satisfy' is overstated.",
+   "Holdback of 2 to 5% is given without any power caveat for detecting a 2% change in a per-user rate."
+  ],
+  "parts_answered": {
+   "plausible mechanisms": true,
+   "evidence to separate them": true,
+   "release practice to catch earlier / cheaper": true
+  },
+  "evidence": [
+   {
+    "claim": "Rule 39: A/B-measurable metrics are only proxies for long-term goals; launch decisions depend on several criteria",
+    "method": "doc",
+    "evidence": "Opened Rules of ML: 'These metrics that are measureable in A/B tests in themselves are only a proxy for more long-term goals'; Alice example, launch depends on several criteria"
+   },
+   {
+    "claim": "Canary should be sizeable and last long enough to be representative",
+    "method": "doc",
+    "evidence": "Opened SRE Workbook: 'It should be sizeable and last long enough to be representative of the overall deployment.'"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "which a slow outcome metric can never satisfy",
+    "problem": "Overstated: a canary can in principle run long; the point is that it is impractical for a metric that takes weeks to mature.",
+    "replacement": "which is impractical for an outcome metric that takes weeks to mature"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "(say 2 to 5% of users kept on the old model)",
+    "problem": "A 2% effect on a per-user repeat-purchase rate may not be detectable with a small holdback in a few weeks; sizing should be checked.",
+    "replacement": "(say 2 to 5% of users kept on the old model, sized by a power calculation so it can detect a 2% change in repeat purchases)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Breadth of mechanisms plus experiment-design reasoning; no calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer ~330 words."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "7 concepts, all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0033",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule #39 proxy sentence quoted verbatim; 'launch decisions depend on several criteria' also supported by the Alice example."
+   },
+   {
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "status": "supported",
+    "evidence": "'sizeable and last long enough to be representative of the overall deployment'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Novelty-effect fade and exposure narrowing are stated as mechanisms that 'may' occur; no empirical source, appropriately hedged."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-6",
+  "verdict": "correct",
+  "reasons": [
+   "All arithmetic recomputed and correct (A 180,000/80,000; B 55,385, 3,945, 51,440 saving, 154,320, net 34,320, break-even 2.33, sensitivity rows).",
+   "Two unstated modelling assumptions should be explicit: 2% is read as a rate while degraded, and monitoring catches every incident in 3 days.",
+   "'prediction-distribution' checks are not an item in the ML Test Score monitoring list (closest: Monitor 7 prediction bias option); claim as worded partially unsupported.",
+   "Applied correction (A higher in later years too) is arithmetically true (180,000 vs 94,300) but ignores that A is modelled with no upkeep; acceptable given the hypothetical label."
+  ],
+  "parts_answered": {
+   "EV of A": true,
+   "EV of B": true,
+   "sensitivity": true,
+   "recommendation": true
+  },
+  "evidence": [
+   {
+    "claim": "A: 0.015*0.5*24M=180,000; net 80,000; 25%->-10,000; 75%->170,000",
+    "method": "executed",
+    "evidence": "python recompute"
+   },
+   {
+    "claim": "B: 24M*0.02*6/52=55,385; *3/365=3,945; saving 51,440; x3=154,320; yr1 net 34,320; later 94,320",
+    "method": "executed",
+    "evidence": "python recompute (answer rounds to 55,400/3,900/51,400/154,300/34,300/94,300)"
+   },
+   {
+    "claim": "break-even 120,000/51,440=2.33; 60,000/51,440=1.17",
+    "method": "executed",
+    "evidence": "matches 2.3 and 1.2"
+   },
+   {
+    "claim": "sensitivity: 1 incident -68,600; 2 -17,100; 4 +85,800",
+    "method": "executed",
+    "evidence": "using unrounded saving: -68,560; -17,120; +85,760"
+   },
+   {
+    "claim": "external world rarely stable",
+    "method": "paper",
+    "evidence": "Sculley et al. Sec 7: 'Experience has shown that the external world is rarely stable.' (opened)"
+   },
+   {
+    "claim": "ML Test Score monitoring includes training/serving skew and staleness",
+    "method": "paper",
+    "evidence": "Monitor 3 'Training and serving are not skewed', Monitor 4 'Models are not too stale'; no dedicated prediction-distribution test"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "so one incident costs 24M x 0.02 x 6/52 = 55,400.",
+    "problem": "The question's '2% of the model's margin until noticed' is ambiguous (rate while degraded vs one-off loss); the answer silently picks the rate reading.",
+    "replacement": "so, reading the 2% as the share of margin lost while an incident lasts, one incident costs 24M x 0.02 x 6/52 = 55,400."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Saving per incident about 51,400;",
+    "problem": "Assumes monitoring detects every incident within 3 days; unstated.",
+    "replacement": "Saving per incident about 51,400 (assuming monitoring catches every incident within 3 days);"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(feature consistency, prediction-distribution and freshness checks, which the ML Test Score lists among its monitoring tests)",
+    "problem": "The ML Test Score lists training/serving skew and staleness as monitoring tests; prediction-distribution is not a separate item there.",
+    "replacement": "(training-serving feature consistency and staleness checks, both monitoring tests in the ML Test Score, plus prediction-distribution or prediction-bias checks as discussed in Hidden Technical Debt)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Straightforward expected-value arithmetic with a sensitivity table and a judgement call.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Full EV derivation and reasoning."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Sensitivity table, break-evens, decision questions; numbers consistent with detailed."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "7 concepts, all present.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0042",
+   "same_intent": false
+  },
+  "code_findings": "Not code. Arithmetic recomputed in python.",
+  "sources_findings": [
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "supported",
+    "evidence": "'Experience has shown that the external world is rarely stable.' (Sec 7)"
+   },
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "partially",
+    "evidence": "28 tests incl. Monitor 3 skew, Monitor 4 staleness, Monitor 7 prediction quality; no dedicated prediction-distribution test (fixed by issue 3)."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'Monitoring enables A' is a reasoning claim, not sourced."
+  ],
+  "code_patch": null
+ }
+]

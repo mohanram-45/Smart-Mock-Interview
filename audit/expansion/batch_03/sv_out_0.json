@@ -1,0 +1,215 @@
+[
+ {
+  "entry_id": "B3-MLO-01-1#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Answer says MLflow Tracking describes itself as an API and UI for logging parameters, code versions, metrics and output files; page says exactly that.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-01-5#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Page: 'API and UI for logging parameters, code versions, metrics, and output files'; 'Each run records metadata (... metrics, parameters, start and end times)' and artifacts such as model weights. Matches the answer's description.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-01-6#1",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "dvc gc page: description 'Remove unused files and directories from cache or remote storage'; nothing runs without a scope option (--workspace, --all-branches, --all-tags, --all-commits); data kept is determined by DVC files in commits of the chosen scope. Supports the answer's 'garbage collection deleting objects that old manifests still reference' and the retention-scope point.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-02-1#1",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "Rule 29 states the best way to train like you serve is to save the features used at serving time and log them; this is the only rule 02-1 relies on (Rules 5, 8, 9 in the supports text are not used in this answer).",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-02-3#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Rule 9 'Do sanity checks right before you export the model' supports the answer's sentence about Google's Rules of ML advising sanity checks before export.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-02-5#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Rule 5 'Test the infrastructure independently from the machine learning' supports the answer's sentence verbatim in substance.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-02-8#1",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "partial",
+  "note": "The PDF lists all quoted tests (11 verbatim; the integration test appears as 'The ML pipeline is Integration tested' in Table III, capitalisation only). However the 02-8 answer text never cites or relies on the ML Test Score rubric; only Rules of ML (freshness, Rule 8) is used. The source is therefore not attached to any specific sentence.",
+  "narrowed_supports": "Lists tests including 'Training is reproducible', 'The ML pipeline is Integration tested', 'Models are canaried before serving' and 'Training and serving are not skewed' (not used by any sentence in this answer; consider dropping from sources).",
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-03-2#1",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "Page states pickle/joblib must not be loaded from untrusted sources; no supported way to load models across scikit-learn versions and InconsistentVersionWarning is raised (models might load but give different results or crash); same packages and versions needed; ONNX environment need not include Python, not all estimators supported; arbitrary computation can be represented in ONNX so sandboxing recommended. All match the answer's wording (answer correctly says 'may emit an inconsistent-version warning').",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-03-3#2",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "partial",
+  "note": "Page says 'In most cases, float and double comparison gives the same result' and that the probability of differing is not null, so the answer's 'float and double comparisons give the same result in most cases' is supported. The TreeEnsemble remark is narrower than the supports text: the page says ONNX ML operators only allow float coefficients for TreeEnsembleRegressor (a regression example), not for the classifier ensemble in this question, and does not mention thresholds.",
+  "narrowed_supports": "Float/double comparisons in trees give the same result in most cases but can differ; ONNX ML only allows float coefficients for TreeEnsembleRegressor (regression example).",
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-03-5#0",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "Page: centralized model store with set of APIs and UI; each new model registered under the same name increments the version; lineage (which experiment and run produced the model); tags and Markdown annotations; aliases are 'a mutable, named reference to a particular version of a registered model'. Answer's atomicity claim is explicitly hedged as not stated by the page.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-04-2#2",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "partial",
+  "note": "Page confirms Envoy proxy forwards gRPC-Web browser requests to the gRPC backend (as its example). It does NOT state that browsers cannot call native gRPC directly, which is what the answer asserts. The 'uses a gateway' half is supported.",
+  "narrowed_supports": "gRPC-Web lets browsers access gRPC services; the guide's example uses an Envoy proxy to forward browser requests to the backend gRPC server (it does not itself state that native gRPC is impossible from browsers).",
+  "fixes": [
+   {
+    "field": "detailed_answer",
+    "claim": "(2) browsers cannot call native gRPC directly, so the dashboard keeps REST or uses a gateway",
+    "replacement": "(2) browsers generally cannot speak native gRPC directly, so the dashboard keeps REST or goes through a gRPC-Web proxy (the gRPC-Web guide's example uses Envoy)"
+   }
+  ]
+ },
+ {
+  "entry_id": "B3-MLO-04-5#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "SRE book: 'It's important to distinguish between the latency of successful requests and the latency of failed requests.' Supports the answer's 'monitor ... latency of failed requests separately from successful ones, as the SRE book recommends'.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-04-6#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Four golden signals named exactly; the book distinguishes success vs failure latency (fast 500s can distort latency) and warns against mean-based design, recommending distributions/histograms (percentile tails). Supports the answer's golden-signal list and the 'not the mean' / 'failed requests tracked separately' statements. The p50/p95/p99 per model version split is the answer's own design.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-05-1#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Fowler: two production environments as identical as possible; switch the router; 'if anything goes wrong you switch the router back to your blue environment'; database/schema changes complicate the switch (separate schema changes from application upgrades). Matches the blue-green paragraph and the shared-state caveat. Duplicate-capacity cost and '100% exposed at flip' are inferences, not stated.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-05-3#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Workbook: canarying is 'a partial and time-limited deployment of a change in a service and its evaluation'; canary should be 'sizeable and last long enough to be representative'; a handful of queries gives no useful signal. Supports the 'window should span a representative period' sentence. The power/non-inferiority arithmetic is the answer's own derivation, not sourced.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-05-6#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Paper abstract: a simple statistical check detects SRM and SRM is 'a symptom for a variety of data quality issues'; supports the answer's 'verify with a sample-ratio check; deviation beyond chance indicates an assignment or logging bug' (paper's taxonomy covers such causes).",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-06-1#0",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "Docker docs: 'If a layer changes, all other layers that come after it are also affected' and 'all downstream layers need to be rebuilt'. Matches the answer's wording.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-06-2#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "'cpu limits are enforced by CPU throttling'; 'memory limits are enforced by the kernel with out of memory (OOM) kills'; 'The OOMKilled reason shows that the container tried to use more memory than its limit'; Pending while request cannot be satisfied; extended resources whole numbers, cannot be overcommitted, request and limit equal. Supports all sentences in 06-2 that cite this page. Page text read from the official kubernetes/website markdown source on GitHub because kubernetes.io was blocked/returned navigation only; same content.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-06-3#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "'A pod with containers reporting that they are not ready does not receive traffic through Kubernetes Services'; liveness failure -> kubelet kills the container and restarts it; 'Readiness probes run on the container during its whole lifecycle'. Page text read from the official kubernetes/website markdown source on GitHub because kubernetes.io was blocked/returned navigation only; same content.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-06-5#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "GPUs 'only supposed to be specified in the limits section'; limit alone used as default request; both allowed but must be equal; 'You cannot specify GPU requests without specifying limits' (supports the answer's 'requests without limits are not allowed'); node labels + selectors to target GPU types. Page text read from the official kubernetes/website markdown source on GitHub because kubernetes.io was blocked/returned navigation only; same content.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-06-6#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Job docs: .spec.backoffLimit = number of retries before the Job is considered failed; 'the same program may sometimes be started twice'; 'your application needs to handle the case when it is restarted in a new pod'. The 'at-least-once execution' framing for orchestrators generally is the answer's inference. Page text read from the official kubernetes/website markdown source on GitHub because kubernetes.io was blocked/returned navigation only; same content.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-07-2#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Feature view page: TTL 'limits how far back Feast will look when generating historical datasets'. Supports the TTL-bounds-staleness sentence. (The point-in-time join description in the answer is attributed to the separate Feast point-in-time-joins source, not this page.)",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B3-MLO-07-4#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Page: 'Users define python transformation logic which is executed in both the historical retrieval and online retrieval paths'; feature marked Alpha, matching the answer's alpha-stage hedge.",
+  "narrowed_supports": null,
+  "fixes": []
+ }
+]

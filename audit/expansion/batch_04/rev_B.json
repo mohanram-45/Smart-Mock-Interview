@@ -1,0 +1,1251 @@
+[
+ {
+  "plan_id": "B4-MLO-10-2",
+  "verdict": "correct",
+  "reasons": [
+   "All numbers (4/4, 1.0, 470.0, 4; 4/3/0.75/15.0/0) recomputed by hand and by execution on 3.10, 3.11, 3.13; query, config and fenced SQL are byte-identical.",
+   "Two minor fixes: pipeline-gate advice contradicts the 'fix the join and re-run until empty' instruction by only warning on pure point-in-time violations; rows_after_label is a subset of rows_from_future only if label_ts >= prediction_ts, which is not stated."
+  ],
+  "parts_answered": {
+   "one SQLite query per feature": true,
+   "rows from future count": true,
+   "share": true,
+   "worst case hours ahead": true,
+   "count later than label": true,
+   "only offending features": true,
+   "interpret on a small example": true,
+   "what the query cannot catch": true
+  },
+  "evidence": [
+   {
+    "claim": "refund_flag: 4 rows, 4 future, share 1.0, max 470.0 h, 4 after label",
+    "method": "executed",
+    "evidence": "Ran solution+test on /home/claude/work/dep, v310, v311 and system python3 (sqlite 3.45.1): rows == [('refund_flag',4,4,1.0,470.0,4),('days_since_login',4,3,0.75,15.0,0)]. Hand check: row1 2026-03-21 00:00 minus 2026-03-01 10:00 = 19d14h = 470 h; label 03-20 < 03-21."
+   },
+   {
+    "claim": "days_since_login: 3 of 4 future, at most 15 h, none after label",
+    "method": "executed",
+    "evidence": "Row3 23:59 vs 09:00 next day gives 14.98 h -> 15.0 after ROUND; row4 17:30 < 18:00 so not future; labels all later than 03-02 23:59."
+   },
+   {
+    "claim": "orders_30d absent",
+    "method": "executed",
+    "evidence": "assert all(r[0] != 'orders_30d')."
+   },
+   {
+    "claim": "ISO text compares correctly as strings only if same format and timezone",
+    "method": "executed",
+    "evidence": "Edge: prediction '2026-01-01 10:00:00' vs feature '2026-01-01T09:00:00' is flagged (T > space) with max_hours_ahead -1.0 (false positive); '09:00-05:00' (=14:00Z, truly later) is NOT flagged. NULL feature_ts and equal timestamps are silently not counted; missing feature rows (inner join) are invisible."
+   },
+   {
+    "claim": "HAVING rows_from_future > 0 uses a select alias",
+    "method": "executed",
+    "evidence": "Works in SQLite; not portable to standard SQL, and the record says 'SQLite dialect'."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Comparing feature_ts with label_ts separates two different failures:",
+    "problem": "rows_after_label is only a subset of rows_from_future when label_ts >= prediction_ts. If a row has label_ts earlier than prediction_ts (bad data), rows_after_label counts values that are not 'even later' than the prediction-time violations (edge test returned 1 after-label for a row whose label precedes prediction).",
+    "replacement": "Comparing feature_ts with label_ts (assuming label_ts is never earlier than prediction_ts, so rows_after_label is a subset of rows_from_future) separates two different failures:"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "and by warning (with the share) when only rows_from_future is positive",
+    "problem": "A feature that is only a point-in-time violation (days_since_login) still leaks future information and inflates offline metrics; warn-only contradicts the same sentence's 'fix the join, then re-run until the result set is empty'.",
+    "replacement": "and by blocking promotion (reporting the share) when only rows_from_future is positive, unless a reviewed exception documents the tolerated lag"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short SQL with conditional aggregation and a timestamp comparison plus interpretation; no subtle algorithm.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Interpretation of the example, leakage vs label leakage distinction and limits."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "The query, exact output and gate policy; numbers repeat the detailed answer consistently."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Sound; 'leakage audit query' is generic but acceptable.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0041",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran solution+test from scratch on 3.13 (dep venv), 3.10, 3.11 and system 3.13: pass. Extra edge cases: equality of feature_ts and prediction_ts not flagged; empty tables -> []; NULL feature_ts -> not flagged; T-vs-space format mix -> false positive; timezone offset mix -> missed; label before prediction -> after_label counted; orphan feature rows dropped by inner join. Stdlib only (sqlite3), no 3.11+ features. Fenced SQL equals code SQL equals configs[0].content (asserted).",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'a nightly snapshot stamped at end of day and joined by date leaks a few hours' is an illustrative scenario, consistent with the question; no external claim."
+  ],
+  "code_patch": null,
+  "config_findings": "Only a SQL config. Executed against SQLite 3.45.1 via the test: valid. yaml/kubernetes_validate/dockerfile not applicable. Prose describes it correctly; no claim that anything was built or applied. No contradiction with mlops_existing.txt (questions only; smi-l0041/l0044 are consistent: as-of join, late-arriving data)."
+ },
+ {
+  "plan_id": "B4-MLO-10-3",
+  "verdict": "pass",
+  "reasons": [
+   "All four silent-pass paths in the question are identified and fixed; NaN, all([]) and exit-status statements verified."
+  ],
+  "parts_answered": {
+   "how it can pass silently (4 causes)": true,
+   "fixes": true,
+   "how to test the validator itself": true,
+   "fully-null feature slipping through": true
+  },
+  "evidence": [
+   {
+    "claim": "any ordered comparison with NaN is False; `not (value <= limit)` fails on NaN",
+    "method": "executed",
+    "evidence": "python: nan>1 False, nan<1 False, not(nan<=1) True."
+   },
+   {
+    "claim": "all([]) is True",
+    "method": "executed",
+    "evidence": "python: all([]) -> True."
+   },
+   {
+    "claim": "Rules of ML: test getting data into the algorithm / check populated columns",
+    "method": "doc",
+    "evidence": "Fetched Rules of ML: 'Test getting data into the algorithm. Check that feature columns that should be populated are populated.'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Code-reading diagnosis with four independent defects and a testing plan; each individually is standard.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Diagnosis and fixes."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Mutation-style test suite and run-time guards; the fixes are not just restated."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Good and specific.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0009",
+   "same_intent": false
+  },
+  "code_findings": "No code in record.",
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "'Test getting data into the algorithm. Check that feature columns that should be populated are populated.' (Rule #5 infrastructure section)"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-10-4",
+  "verdict": "correct",
+  "reasons": [
+   "TFDV and ML Test Score claims are supported; two generalisations about 'tools' and observed min/max ranges are stated as universal and conflict with the cited TFDV wording (conservative heuristics, no documented numeric range inference)."
+  ],
+  "parts_answered": {
+   "which parts need human review": true,
+   "what must be added beyond single-snapshot inference": true
+  },
+  "evidence": [
+   {
+    "claim": "TFDV advises reviewing and refining the inferred schema",
+    "method": "doc",
+    "evidence": "Fetched get_started: 'In general, TFDV uses conservative heuristics ... It is strongly advised to review the inferred schema and refine it as needed, to capture any domain knowledge ...'"
+   },
+   {
+    "claim": "skew comparator thresholds are set in the schema",
+    "method": "doc",
+    "evidence": "get_started shows tfdv.get_feature(schema,'payment_type').skew_comparator.infinity_norm.threshold = 0.01."
+   },
+   {
+    "claim": "ML Test Score lists schema expectations (Data 1) and data invariants in training and serving (Monitor 2) as separate items",
+    "method": "paper",
+    "evidence": "Fetched PDF: 'Feature expectations are captured in a schema' (Data 1); 'Data invariants hold in training and serving inputs' (Monitor 2)."
+   },
+   {
+    "claim": "TFDV infers numeric min/max ranges",
+    "method": "doc",
+    "evidence": "Not found in get_started or infer_schema page; page documents type, presence, valency and domains only. Treated as tool-dependent."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Tools generally infer conservatively, and TensorFlow Data Validation's documentation, for example, strongly advises",
+    "problem": "'Tools generally infer conservatively' is an unsupported universal and sits oddly with the next paragraph, where observed min/max ranges are described as inferred.",
+    "replacement": "Inference tools differ in how aggressively they generalise from a snapshot; TensorFlow Data Validation's documentation, for example, says it uses conservative heuristics and strongly advises"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "What to review. Numeric ranges taken from observed min and max will reject",
+    "problem": "Observed min/max ranges are produced by some profiling tools, not documented for TFDV's default inference; stated as universal.",
+    "replacement": "What to review. Where a tool derives numeric ranges from observed min and max (not every tool does), those ranges will reject"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Conceptual list with application judgement; no calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "60 words, interview-ready and consistent with the detailed answer."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Explains each failure mode."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "Fine; 'category domain' is TFDV vocabulary but explained.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0009",
+   "same_intent": false
+  },
+  "code_findings": "No code in record.",
+  "sources_findings": [
+   {
+    "url": "https://www.tensorflow.org/tfx/data_validation/get_started",
+    "status": "supported",
+    "evidence": "'strongly advised to review the inferred schema and refine it as needed' and skew_comparator threshold example."
+   },
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Data 1 'Feature expectations are captured in a schema'; Monitor 2 'Data invariants hold in training and serving inputs'. The record's supports text says 'among its data tests', but Monitor 2 is a monitoring test; the answer sentence itself is correct."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Set thresholds from natural variation between healthy days (practitioner advice)",
+   "Validate schema on past good and bad periods (practice)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-11-1",
+  "verdict": "correct",
+  "reasons": [
+   "Question asks for protects/does-not-protect statements for EACH control; controls 3 (loader hardening), 4 (dependencies/images) and 5 (audit) have none.",
+   "Code and pickle claims verified."
+  ],
+  "parts_answered": {
+   "identities and permissions": true,
+   "artifact integrity": true,
+   "dependency and image hygiene": true,
+   "approval flow": true,
+   "without blocking experimentation": true,
+   "protects against / does not protect for each control": "partial: only controls 1 and 2"
+  },
+  "evidence": [
+   {
+    "claim": "pickle docs: unpickling can run arbitrary code; never unpickle untrusted/tamperable data; consider hmac signing",
+    "method": "doc",
+    "evidence": "Fetched docs.python.org pickle warning: 'Never unpickle data that could have come from an untrusted source, or that could have been tampered with. Consider signing data with hmac ...'"
+   },
+   {
+    "claim": "verify_artifact rejects 1 appended byte, accepts upper-case digest",
+    "method": "executed",
+    "evidence": "Solution+test pass on 3.10/3.11/3.13; extra: empty file digest e3b0c442..., whitespace+upper-case accepted, '' / 'abc' / one-nibble-changed digest rejected, 2 MiB+1 file matches hashlib one-shot, missing file raises FileNotFoundError, non-ASCII expected digest raises TypeError (fails closed)."
+   },
+   {
+    "claim": "hashed lock files protect against tampered packages",
+    "method": "doc",
+    "evidence": "pip docs: 'Hashes are required for all dependencies.'"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "detailed_answer",
+    "claim": "minimal secrets in the process.",
+    "problem": "Question: 'For each control say what it protects against and what it does not'. Control 3 has neither.",
+    "replacement": "minimal secrets in the process. Protects against: a payload that gets past the other controls doing damage beyond the loader (exfiltration, lateral movement). Does not protect against: the model's own malicious behaviour or an attacker who controls the data the loader legitimately reads."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "base images pinned by digest and rebuilt on a schedule.",
+    "problem": "Control 4 lacks protects/does-not-protect.",
+    "replacement": "base images pinned by digest and rebuilt on a schedule. Protects against: tampered or typosquatted packages and silent upstream base-image changes. Does not protect against: a malicious or vulnerable version you pinned on purpose, or a flaw the scanner does not yet know."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "linked to run, code commit and data version.",
+    "problem": "Control 5 lacks protects/does-not-protect.",
+    "replacement": "linked to run, code commit and data version. Protects against: undetected or deniable promotions and slow forensics. Does not protect against: the attack itself, since it detects and attributes after the fact."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-control security design with trust-anchor reasoning (where the digest comes from) and explicit residual risks.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Separate identities: experiments write only to an experiment namespace, only the pipeline identity registers versions, promotion is a distinct role with approval by someone other than the author, serving is read-only",
+    "tradeoff": "Friction for data scientists vs blast radius of a stolen notebook token; insider with promotion role remains"
+   },
+   {
+    "decision": "Record a content digest (ideally signed) at registration and verify it before deserialising, with the expected digest read from the registry, not from the bucket",
+    "tradeoff": "Stops swapped files but not a malicious artifact that was legitimately registered; trust moves to the registry"
+   },
+   {
+    "decision": "Treat model loading as untrusted code execution: data-only formats where possible, sandboxed loader (no egress, read-only fs, non-root)",
+    "tradeoff": "Format/framework support and some performance vs reduced blast radius; not a fix for backdoored models"
+   },
+   {
+    "decision": "Hashed lock files, internal mirror, base image pinned by digest, scheduled rebuild and scanning in CI",
+    "tradeoff": "Reproducibility vs patch lag and maintenance work; scanners miss unknown flaws and the model file"
+   },
+   {
+    "decision": "Approval flow: automated gates (tests, scan, model card) plus second-person approval only for moving the production alias; experiments need no approval",
+    "tradeoff": "Speed of iteration vs control on the one step that reaches production; reviewer fatigue"
+   },
+   {
+    "decision": "Immutable audit log of register/approve/alias-move linked to run, commit and data version, with alerts on alias moves",
+    "tradeoff": "Detection and attribution rather than prevention"
+   },
+   {
+    "decision": "State residual risk: poisoned data or backdoored behaviour passes integrity checks",
+    "tradeoff": "Needs behavioural validation and review, extra cost"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Control design."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Executable digest check and procedure; not in the detailed answer."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Strong, all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0017",
+   "same_intent": false
+  },
+  "code_findings": "Fenced python in practical_answer equals code.solution exactly (asserted). Ran solution+test on 3.10.20, 3.11.17, 3.13.16 with -I: 'ok'. Edge cases above (empty file, whitespace/upper-case, wrong lengths, chunk boundary, missing file, non-ASCII). stdlib only; no 3.11+ features. Note: smi-l0017 overlaps (joblib in shared bucket, security of loading) but asks only about the loading path; no contradiction.",
+  "sources_findings": [
+   {
+    "url": "https://docs.python.org/3/library/pickle.html",
+    "status": "supported",
+    "evidence": "'It is possible to construct malicious pickle data which will execute arbitrary code during unpickling. Never unpickle data that could have come from an untrusted source, or that could have been tampered with. Consider signing data with hmac ...'"
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Secure installs: hash-checking mode (pip docs)",
+    "url": "https://pip.pypa.io/en/stable/topics/secure-installs/",
+    "supports": "Lock files that pin every dependency with hashes: hash-checking mode requires hashes for all requirements and dependencies and errors on any unhashed dependency.",
+    "quote": "Hashes are required for all dependencies.",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Base image pinned by digest (Docker docs page read only up to 'Image tags are mutable'; digest text not seen)",
+   "Sandboxed loader with no egress / read-only fs / non-root is practitioner guidance"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-11-2",
+  "verdict": "correct",
+  "reasons": [
+   "Sound and well hedged; one internal tension: a 'rotatable' HMAC key conflicts with keeping a stable lookup for deletion and label joins unless re-keying is planned."
+  ],
+  "parts_answered": {
+   "what is wrong (hash, DOB+postcode, indefinite retention, log everything)": true,
+   "what to change": true,
+   "retention tied to 90-day labels": true,
+   "engineer not lawyer": true
+  },
+  "evidence": [
+   {
+    "claim": "Rules of ML #29: save serving features; do it for a small fraction if not all",
+    "method": "doc",
+    "evidence": "Fetched: 'Even if you can't do this for every example, do it for a small fraction'."
+   },
+   {
+    "claim": "DOB+postcode is a quasi-identifier",
+    "method": "paper",
+    "evidence": "Sweeney, Simple Demographics Often Identify People Uniquely: 87% of the US population likely unique by {5-digit ZIP, gender, DOB} (US ZIP; UK postcodes are finer)."
+   },
+   {
+    "claim": "unsalted hash of low-entropy ID is reversible by candidate hashing",
+    "method": "derivation",
+    "evidence": "Deterministic hash: attacker computes H(candidate) for the ID space and compares."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "separate from the warehouse and rotatable)",
+    "problem": "Rotating the key changes every pseudonym, which breaks joins with older rows and the deletion lookup unless a re-keying job is planned.",
+    "replacement": "separate from the warehouse; rotating it changes every pseudonym, so plan a re-keying job or accept broken linkage with older rows)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Application of privacy-engineering basics to a concrete logging design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "74 words, genuinely shorter and consistent."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Reasoning for each change."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "Good.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0030",
+   "same_intent": false
+  },
+  "code_findings": "No code in record.",
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule #29: 'Even if you can't do this for every example, do it for a small fraction' (record text says 'small fraction'; the supports field is consistent)."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Simple Demographics Often Identify People Uniquely (Sweeney, Carnegie Mellon)",
+    "url": "https://dataprivacylab.org/projects/identifiability/paper1.pdf",
+    "supports": "Date of birth plus a postal/ZIP code (with gender) is a classic quasi-identifier combination.",
+    "quote": "87% (216 million of 248 million) of the population in the United States",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [
+   "Pseudonymised data generally still personal data in many jurisdictions (hedged; legal question)",
+   "Retention about 90 days plus buffer (design judgement tied to question)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-11-3",
+  "verdict": "correct",
+  "reasons": [
+   "Well hedged overall; the closing memorisation sentence compares 'high capacity' models with 'large models' in a muddled and unsupported way."
+  ],
+  "parts_answered": {
+   "what to delete": true,
+   "what can/cannot be said about trained models": true,
+   "design to keep promise cheaply": true,
+   "legal threshold left to counsel": true
+  },
+  "evidence": [
+   {
+    "claim": "exact removal of one person's influence from weights generally needs retraining",
+    "method": "paper",
+    "evidence": "Bourtoule et al., Machine Unlearning (arXiv 1912.03817): 'having models unlearn is notoriously difficult'; SISA is a framework to expedite unlearning relative to retraining from scratch."
+   },
+   {
+    "claim": "nightly retrain with tombstone list excludes the person from the next cycle",
+    "method": "derivation",
+    "evidence": "If the tombstone is applied at read time, the next job's training set no longer contains the IDs."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "Models that memorise (small data, high capacity, overfitted) pose more residual risk than large models trained once over many records, so treat that as a factor in how aggressively you retrain.",
+    "problem": "Stated as a general ranking; 'high capacity' and 'large models' pull in opposite directions, and memorisation depends on model, data and duplication.",
+    "replacement": "Models that memorise (for example small data, high capacity, overfitting, or rare or repeated records) are more likely to retain recognisable traces of individual records, so treat that as a factor in how aggressively you retrain; this is model- and data-dependent and absence of memorisation is hard to demonstrate."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Scenario judgement; needs lineage thinking and honest limits, no calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer (323 words) covers all three parts; acceptable as 'single'."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Good; 'memorisation' discussed in last sentence only.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0030",
+   "same_intent": false
+  },
+  "code_findings": "No code in record.",
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "Machine Unlearning (Bourtoule et al., arXiv 1912.03817)",
+    "url": "https://arxiv.org/abs/1912.03817",
+    "supports": "Removing one record's influence from a trained model is hard in general; research proposals such as SISA training reduce retraining cost versus retraining from scratch.",
+    "quote": "having models unlearn is notoriously difficult",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [
+   "Backups with bounded expiry (operational practice)",
+   "Legal sufficiency of retrain vs residual influence (deliberately deferred to counsel)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-11-4",
+  "verdict": "correct",
+  "reasons": [
+   "Definition matches the paper; field list is good but omits an ethical/fairness-considerations field that the original model card framework includes and that matters for credit scoring."
+  ],
+  "parts_answered": {
+   "what is a model card": true,
+   "fields required before promotion for a credit model": true
+  },
+  "evidence": [
+   {
+    "claim": "Model cards: short documents with benchmarked evaluation across conditions/groups, intended context, evaluation details",
+    "method": "paper",
+    "evidence": "arXiv 1810.03993 abstract (fetched summary; fetch tool limits verbatim quotes): 'we recommend that released models be accompanied by documentation detailing their performance characteristics'; cards report benchmarked evaluation across demographic/intersectional groups, intended use and how evaluation was done."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "- Monitoring and rollback: what is tracked in production and who is on call.",
+    "problem": "For a credit model a fairness/ethical-considerations field is expected (the model card paper has an Ethical Considerations section); absent from the required list.",
+    "replacement": "- Ethical and fairness considerations: sensitive attributes used or excluded, subgroup error-rate gaps, and the sign-off decision on them.\n- Monitoring and rollback: what is tracked in production and who is on call."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Definition plus domain-specific field selection; mostly recall with some application.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "71 words, standalone."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Field-by-field gate and trust mechanics."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0005",
+   "same_intent": false
+  },
+  "code_findings": "No code in record.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/1810.03993",
+    "status": "supported",
+    "evidence": "Abstract: model cards are short documents accompanying trained models that provide benchmarked evaluation in different conditions (cultural, demographic, phenotypic and intersectional groups), disclose intended context of use and evaluation procedures."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Generated, gated release artifact (practice recommendation)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-11-5",
+  "verdict": "correct",
+  "reasons": [
+   "Good hedging. Two fixes: rate limits claim names the wrong example of a query-hungry attack; AUC check should also look at low false-positive-rate behaviour. The listed OWASP URL (…security-top-ten…) is wrong; correct path is …security-top-10…."
+  ],
+  "parts_answered": {
+   "risk in plain terms": true,
+   "conditions that make it worse": true,
+   "ranking cheap mitigations by what they do/do not achieve": true
+  },
+  "evidence": [
+   {
+    "claim": "OWASP lists regularisation and noise/differential privacy among prevention methods",
+    "method": "doc",
+    "evidence": "Fetched owasp.github.io ML04 page (redirect target): 'Regularisation techniques such as L1 or L2 regularization can help prevent overfitting ...'; 'adding random noise or using differential privacy techniques'."
+   },
+   {
+    "claim": "label-only attacks exist and confidence masking is not a viable defence",
+    "method": "paper",
+    "evidence": "Choquette-Choo et al. abstract: 'confidence-masking is not a viable defense strategy against membership inference'."
+   },
+   {
+    "claim": "Label-only attacks need many queries per record",
+    "method": "paper",
+    "evidence": "Paper text: boundary-distance attack ~2,500 queries, noise-robustness <300, rotation attack N=3 queries per sample."
+   },
+   {
+    "claim": "Average-case AUC can hide strong low-FPR attacks",
+    "method": "paper",
+    "evidence": "Carlini et al. (LiRA) abstract: attacks should be scored by 'true-positive rate at low (e.g., <0.1%) false-positive rates'."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(for example building reference models)",
+    "problem": "Reference/shadow models are trained locally by the attacker and do not need queries to your API; the query-hungry attacks are label-only attacks that probe each record with many perturbed queries (hundreds to thousands per record).",
+    "replacement": "(for example label-only attacks that probe each record with hundreds or thousands of perturbed queries)"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "This tests only the simplest attack; a low AUC is not a proof of safety, only evidence that cheap attacks fail.",
+    "problem": "Average AUC can look near 0.5 while a few records are identified with high confidence.",
+    "replacement": "This tests only the simplest attack; a low AUC is not a proof of safety, only evidence that cheap attacks fail. Also report the true-positive rate at a low false-positive rate (for example 0.1%), since a near-0.5 AUC can hide a handful of confidently identified records."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism explanation plus ranking of mitigations; no calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "63 words, consistent."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Risk, conditions, ranked mitigations."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Measurement procedure not in the detailed answer; the AUC threshold is labelled a judgement."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "'model inversion' appears only as a one-sentence contrast, so it is a weak concept; 'label-only attacks' is discussed and more central.",
+  "suggested_key_concepts": [
+   "membership inference",
+   "overfitting gap",
+   "label-only attacks",
+   "output rounding",
+   "label-only output",
+   "rate limiting",
+   "differential privacy",
+   "attack AUC measurement"
+  ],
+  "nearest_existing": {
+   "id": "smi-k0029",
+   "same_intent": false
+  },
+  "code_findings": "No code in record.",
+  "sources_findings": [
+   {
+    "url": "https://owasp.org/www-project-machine-learning-security-top-ten/docs/ML04_2023-Membership_Inference_Attack",
+    "status": "unreachable",
+    "evidence": "Recorded path ('top-ten') fails to load; the real page is …/www-project-machine-learning-security-top-10/…, which redirects to owasp.github.io and there lists regularisation and noise/differential privacy among prevention methods. The record correctly says the attack description is loose."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "OWASP ML04:2023 Membership Inference Attack (correct URL)",
+    "url": "https://owasp.github.io/www-project-machine-learning-security-top-10/docs/ML04_2023-Membership_Inference_Attack",
+    "supports": "Regularisation and adding noise / differential privacy are listed as prevention methods.",
+    "quote": "Regularisation techniques such as L1 or L2 regularization can help prevent overfitting of the model to the training data",
+    "type": "secondary"
+   },
+   {
+    "title": "Label-Only Membership Inference Attacks (Choquette-Choo et al.)",
+    "url": "https://arxiv.org/abs/2007.14321",
+    "supports": "Label-only attacks exist, so returning only a label or masking confidence is a partial mitigation.",
+    "quote": "confidence-masking is not a viable defense strategy against membership inference",
+    "type": "paper"
+   },
+   {
+    "title": "Membership Inference Attacks From First Principles (Carlini et al.)",
+    "url": "https://arxiv.org/abs/2112.03570",
+    "supports": "Attacks should be evaluated at low false-positive rates, not only by average-case metrics.",
+    "quote": "true-positive rate at low (e.g., <0.1%) false-positive rates",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [
+   "Members tend to have higher confidence/lower loss, worse with overfitting and rare records (widely reported; the Shokri abstract I opened does not name overfitting, so left hedged as 'usually')",
+   "DP training gives formal bound at an accuracy cost (standard result; not opened)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-1",
+  "verdict": "correct",
+  "reasons": [
+   "Technically sound and appropriately hedged; the question asks what EACH observation rules in or out, and the unchanged error rate is never interpreted."
+  ],
+  "parts_answered": {
+   "order of investigation": true,
+   "p50 vs p99 observation interpreted": true,
+   "offline benchmark observation interpreted": true,
+   "unchanged error rate interpreted": false
+  },
+  "evidence": [
+   {
+    "claim": "p99 120->410 ms is 3.4x ('more than tripled'); p50 +3 ms",
+    "method": "derivation",
+    "evidence": "410/120 = 3.42; 41-38 = 3 ms."
+   },
+   {
+    "claim": "CPU limits throttle rather than kill",
+    "method": "doc",
+    "evidence": "Linux CFS bandwidth control doc: 'Throttled threads will not be able to run again until the next period when the quota is replenished.'; cpu.stat exposes nr_throttled / throttled_time."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "The pattern is the clue: the median barely moved (+3 ms) while the tail more than tripled.",
+    "problem": "Unchanged error rate (one of the question's four observations) is not interpreted.",
+    "replacement": "The pattern is the clue: the median barely moved (+3 ms) while the tail more than tripled, and the unchanged error rate says the slow requests still finish inside client timeouts (check retry counts, because retries can hide a failing tail)."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Hypothesis ordering over a familiar set of tail-latency causes; no calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Reasoning and order."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Table partly restates causes but adds quick tests, so keep; flagged as borderline."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Good.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0025",
+   "same_intent": false
+  },
+  "code_findings": "No code in record.",
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "CFS Bandwidth Control (Linux kernel docs)",
+    "url": "https://docs.kernel.org/scheduler/sched-bwc.html",
+    "supports": "A container with a CPU limit is throttled when its quota is exhausted within a period, which can add latency in bursts; throttling counters are in cpu.stat.",
+    "quote": "Throttled threads will not be able to run again until the next period when the quota is replenished.",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "GC pauses and warm-up / lazy-init as tail causes (practitioner knowledge)",
+   "Larger batch wait adds queueing latency (derivation)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-2",
+  "verdict": "pass",
+  "reasons": [
+   "Answer sentences about the ML Test Score are accurate (NaN monitoring is Monitor 5; rollback practice is Infra 7). Only the sources[].supports text mislabels 'Serving models can be rolled back' as a monitoring test; corrected via added_sources."
+  ],
+  "parts_answered": {
+   "first hour": true,
+   "finding the cause": true,
+   "prevention": true
+  },
+  "evidence": [
+   {
+    "claim": "ML Test Score lists monitoring first occurrence of NaNs/infinities and practising rollback",
+    "method": "paper",
+    "evidence": "Fetched PDF: Monitor 5 'Explicitly monitor the initial occurrence of any NaNs or infinities.' (in the numerical-stability context); Infra 7 'operators should practice doing it normally, when not in emergency conditions'."
+   },
+   {
+    "claim": "tolerance 1e-4 vs noise 1e-6 example",
+    "method": "derivation",
+    "evidence": "Hundredfold margin; labelled example."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Broad incident playbook; individual steps are standard.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mitigation, localisation, prevention."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete golden-test spec with labelled example numbers."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Good.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0017",
+   "same_intent": false
+  },
+  "code_findings": "No code in record.",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "partially",
+    "evidence": "NaN item exists (Monitor 5) and rollback item exists, but 'Serving models can be rolled back' is Infra 7 (ML Infrastructure), not a 'monitoring test' as the supports text says."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "The ML Test Score rubric (Google Research), Infra 7 and Monitor 5",
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "supports": "'Serving models can be rolled back' is an ML Infrastructure test (Infra 7) that says rollback should be practised outside emergencies; NaN/infinity monitoring is Monitor 5 (numerical stability), not the rollback item.",
+    "quote": "Because rolling back is an emergency procedure, operators should practice doing it normally, when not in emergency conditions.",
+    "type": "paper"
+   },
+   {
+    "title": "Secure installs: hash-checking mode (pip docs)",
+    "url": "https://pip.pypa.io/en/stable/topics/secure-installs/",
+    "supports": "Lock files that pin every dependency with hashes: hash-checking mode requires hashes for all requirements and dependencies and errors on any unhashed dependency.",
+    "quote": "Hashes are required for all dependencies.",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Mechanisms such as positional vs name column matching, scaler divide-by-zero (illustrative, framed as 'typical mechanisms')"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-3",
+  "verdict": "pass",
+  "reasons": [
+   "All arithmetic verified; hedged claims."
+  ],
+  "parts_answered": {
+   "leak vs bounded cache vs fragmentation": true,
+   "finding the source without profiling": true,
+   "keeping service healthy": true
+  },
+  "evidence": [
+   {
+    "claim": "1.1 GiB / 11 h = 0.1 GiB/h = 102.4 MiB/h",
+    "method": "executed",
+    "evidence": "python: 0.1, 102.4"
+   },
+   {
+    "claim": "36,000 requests/hour; 2.9 KiB per request",
+    "method": "executed",
+    "evidence": "10*3600 = 36000; 1.1*1024*1024/11/36000 = 2.913 KiB"
+   },
+   {
+    "claim": "200,000 requests at 10 rps = 5.6 h",
+    "method": "executed",
+    "evidence": "5.56 h"
+   },
+   {
+    "claim": "alert at 3 h left = 1.7 GiB",
+    "method": "executed",
+    "evidence": "2 - 0.1*3 = 1.7"
+   },
+   {
+    "claim": "tracemalloc supports snapshot comparison",
+    "method": "doc",
+    "evidence": "Python docs: 'Compute the differences between two snapshots to detect memory leaks'; Snapshot.compare_to."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Simple arithmetic plus a standard diagnosis ladder.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Classification and method."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked numbers and experiment ladder; numbers consistent."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Good.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0035",
+   "same_intent": false
+  },
+  "code_findings": "No code in record.",
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "tracemalloc - Trace memory allocations (Python docs)",
+    "url": "https://docs.python.org/3/library/tracemalloc.html",
+    "supports": "The standard library's tracemalloc can compare two snapshots to find where memory grew.",
+    "quote": "Compute the differences between two snapshots to detect memory leaks",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Output tensors retaining gradient history when gradients are not disabled at inference (known PyTorch pitfall; torch.no_grad page redirect could not be read)",
+   "Fragmentation is usually bounded (hedged)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-4",
+  "verdict": "correct",
+  "reasons": [
+   "Decision framework is sound; the practical decision rule's second branch is ambiguous (shifting traffic to 0% on the new model is a rollback, but it is presented together with roll-forward). The source supports text mislabels the rollback item as a monitoring test."
+  ],
+  "parts_answered": {
+   "how to decide rollback vs roll-forward": true,
+   "what you need to know": true,
+   "first five minutes": true
+  },
+  "evidence": [
+   {
+    "claim": "'Serving models can be rolled back' implies rehearsed rollback",
+    "method": "paper",
+    "evidence": "ML Test Score Infra 7: 'operators should practice doing it normally, when not in emergency conditions.'"
+   },
+   {
+    "claim": "on-call rollback/rerouting is a postmortem trigger",
+    "method": "doc",
+    "evidence": "SRE Book: 'On-call engineer intervention (release rollback, rerouting of traffic, etc.)'."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "if they are broken (missing or defaulted inputs), shift traffic to 0% on the new model only after enabling the old feature path or a default, and roll forward with the fix behind a feature flag in a small canary first.",
+    "problem": "Ambiguous: reads as rollback and roll-forward at once.",
+    "replacement": "if they are broken (missing or defaulted inputs), restore the old feature path or a safe default first and then roll back; if that cannot be done within minutes, roll forward with the fix behind a feature flag in a small canary first."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Decision under uncertainty with explicit inputs; numbers are inputs from the question.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Decision inputs and policy."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Scoring grid and rule; some restatement but adds the replay test."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Good.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0032",
+   "same_intent": false
+  },
+  "code_findings": "No code in record.",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "partially",
+    "evidence": "Rollback item exists and supports 'rehearsed', but it is Infra 7, not a monitoring test as the supports text says."
+   },
+   {
+    "url": "https://sre.google/sre-book/postmortem-culture/",
+    "status": "supported",
+    "evidence": "'On-call engineer intervention (release rollback, rerouting of traffic, etc.)'"
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "The ML Test Score rubric (Google Research), Infra 7 and Monitor 5",
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "supports": "'Serving models can be rolled back' is an ML Infrastructure test (Infra 7) that says rollback should be practised outside emergencies; NaN/infinity monitoring is Monitor 5 (numerical stability), not the rollback item.",
+    "quote": "Because rolling back is an emergency procedure, operators should practice doing it normally, when not in emergency conditions.",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [
+   "Mitigate-first guidance (standard incident practice)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-5",
+  "verdict": "correct",
+  "reasons": [
+   "Design is sound; the example degradation table contradicts itself (mode 1 fills 'others default' while mode 2 triggers on cache miss, and mode 1 allows 60 min although entries age out after 15 min)."
+  ],
+  "parts_answered": {
+   "registry degradation and recovery": true,
+   "feature store degradation and recovery": true,
+   "logging so retraining is not polluted": true,
+   "testing": true
+  },
+  "evidence": [
+   {
+    "claim": "monthly 99.95% budget is about 21.6 min (30 days); 22-minute outage alone exceeds it",
+    "method": "executed",
+    "evidence": "43200*0.0005 = 21.6"
+   },
+   {
+    "claim": "graceful degradation and untested paths fail",
+    "method": "doc",
+    "evidence": "SRE Book cascading failures: 'Remember that the code path you never use is the code path that (often) doesn't work.' and graceful degradation as decreasing response quality."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "| 1 stale cache | 5 consecutive failures or 50% errors in 10 s (circuit opens) | cached features no older than 15 min; others default | 60 min |",
+    "problem": "Contradicts the mode 2 trigger ('cache miss') and the warning about arbitrary defaults; with a 15-minute age limit cached entries cannot serve for 60 minutes of outage.",
+    "replacement": "| 1 stale cache | 5 consecutive failures or 50% errors in 10 s (circuit opens) | cached features no older than 15 min; a miss or older entry sends that request to mode 2 | about 15 min (then entries have aged out) |"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Two dependency types, degradation ladder, SLI accounting, data hygiene and test plan.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Take the registry off the scale-up path: bake the approved model into the image or use a regional read-through cache keyed by digest",
+    "tradeoff": "Larger images and coupling of model and deploy vs scaling that survives a registry outage"
+   },
+   {
+    "decision": "On registry outage start from the last known good verified artifact; refuse unverified ones",
+    "tradeoff": "May serve a slightly older model vs safety and availability"
+   },
+   {
+    "decision": "Feature store degradation ladder: stale cache with per-feature age bound, request-only fallback model, business-defined safe default",
+    "tradeoff": "Prediction quality vs availability; cost of building and maintaining a fallback model"
+   },
+   {
+    "decision": "Short timeouts, circuit breaker, bounded retries with jitter, gradual re-close",
+    "tradeoff": "Fast failover vs flapping and thundering herd on recovery"
+   },
+   {
+    "decision": "Keep fallback defaults identical to training-time missing-value handling; tag each prediction with its mode; exclude or mark degraded predictions from retraining and evaluation",
+    "tradeoff": "Lost training rows vs learning from degraded behaviour as normal"
+   },
+   {
+    "decision": "Treat fallback rate as its own SLI and decide in advance whether fallback responses count as good events",
+    "tradeoff": "Honest quality measurement vs availability numbers"
+   },
+   {
+    "decision": "Test with registry-block drill and feature-store fault-injection game days; keep warm headroom replicas",
+    "tradeoff": "Engineering time and risk of tests vs confidence the rarely used paths work"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Design."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Example table, drill and game-day criteria, labelled as examples."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Good.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0027",
+   "same_intent": false
+  },
+  "code_findings": "No code in record.",
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/addressing-cascading-failures/",
+    "status": "supported",
+    "evidence": "'Serve lower-quality, cheaper-to-compute results to the user.' and 'the code path you never use is the code path that (often) doesn't work' with regular exercise of degradation."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Circuit breaker and jitter practice (standard; the SRE chapter covers jittered backoff but circuit breaker text not verified)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-6",
+  "verdict": "pass",
+  "reasons": [
+   "SRE workbook and book claims verified word-for-word; hedged proxy claims."
+  ],
+  "parts_answered": {
+   "extend SLIs": true,
+   "SLOs": true,
+   "budget policy": true,
+   "policy text when quality budget burns": true,
+   "three-week label delay handled": true
+  },
+  "evidence": [
+   {
+    "claim": "example policy halts changes other than P0/security until back within SLO; exemptions; postmortem when one incident consumes >20% of budget over four weeks",
+    "method": "doc",
+    "evidence": "Fetched sre.google/workbook/error-budget-policy: 'we will halt all changes and releases other than P0 issues or security fixes until the service is back within its SLO.'; '...more than 20% of error budget over four weeks, then the team must conduct a postmortem.'"
+   },
+   {
+    "claim": "burn-rate alerts over short and long windows",
+    "method": "doc",
+    "evidence": "SRE Workbook alerting on SLOs: multiwindow, multi-burn-rate alerting is recommended; short window ~1/12 of long window."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Needs translating the SLO/error-budget machinery to delayed-label quality with proxy vs ground truth reasoning.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Define quality as countable good/bad events (fresh, non-defaulted, in-range inputs, intended model)",
+    "tradeoff": "Countable and fast but only a proxy for true quality"
+   },
+   {
+    "decision": "Fast label-free proxy SLIs: input drift, score-distribution shape, agreement with shadow/previous model; thresholds calibrated on healthy history",
+    "tradeoff": "Early detection vs false alarms"
+   },
+   {
+    "decision": "Slow ground-truth SLI on matured cohorts (e.g. share of weekly cohorts above a floor), accounted retroactively",
+    "tradeoff": "Truth but three weeks late; used to audit proxies"
+   },
+   {
+    "decision": "SLO targets over a window (e.g. 99% over 28 days) with multiwindow burn-rate alerts",
+    "tradeoff": "Detection speed vs paging noise"
+   },
+   {
+    "decision": "Policy text: freeze non-urgent model/feature releases when quality budget is spent, explicit exemptions, postmortem for large single burns",
+    "tradeoff": "Release velocity vs quality protection; fairness to teams for upstream causes"
+   },
+   {
+    "decision": "Assign accountability for upstream data (freshness checks, data contracts)",
+    "tradeoff": "Cross-team friction vs clear ownership"
+   },
+   {
+    "decision": "Review proxies against matured labels each quarter",
+    "tradeoff": "Ongoing effort vs drift of proxy meaning"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "70 words, standalone and consistent."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Full design."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "Good.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0027",
+   "same_intent": false
+  },
+  "code_findings": "No code in record.",
+  "sources_findings": [
+   {
+    "url": "https://sre.google/workbook/error-budget-policy/",
+    "status": "supported",
+    "evidence": "P0/security halt, exemptions (company-wide networking problem, out-of-scope users) and 20% single-incident postmortem all present."
+   },
+   {
+    "url": "https://sre.google/sre-book/embracing-risk/",
+    "status": "supported",
+    "evidence": "'as long as there is error budget remaining—new releases can be pushed'; 'releases are temporarily halted while additional resources are invested in system testing and development'."
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule #8 asks how much performance degrades with a day/week/quarter-old model; Rule #10 'a particular table that is being joined is no longer being updated'."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Alerting on SLOs (Google SRE Workbook)",
+    "url": "https://sre.google/workbook/alerting-on-slos/",
+    "supports": "Burn-rate alerting over a long and a short window, as used for availability and proposed here for quality.",
+    "quote": "Burn rate is how fast, relative to the SLO, the service consumes the error budget.",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Proxy SLI definitions (practitioner design; flagged as proxies in the answer)"
+  ],
+  "code_patch": null
+ }
+]

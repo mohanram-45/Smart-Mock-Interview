@@ -1,0 +1,767 @@
+[
+ {
+  "plan_id": "B2-GEN-11-1",
+  "cell_id": "GEN-11",
+  "topic": "Fine-tuning vs RAG vs prompting (LoRA/QLoRA, SFT, forgetting, data needs)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "business_case",
+  "difficulty": "Medium",
+  "question": "A 40-agent helpdesk wants every internal ticket summary in one fixed five-section layout (Issue, Impact, Steps tried, Current status, Next action). A developer proposes fine-tuning a model on 300 past summaries. Today, a plain zero-shot prompt produces the layout correctly in about 60% of cases, and the content is usually accurate. A manager asks if fine-tuning is the right first move. What do you recommend, and what result would change your mind?",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Start with prompting. The observed problem is format adherence, not missing knowledge: content is usually right and only the layout is wrong 40% of the time. That kind of gap is often closed by cheaper levers: explicit section instructions, two or three representative examples, and a deterministic validator that checks the five headings appear in order and triggers one retry with the error message. All of these can be built and measured in a day or two, they can be changed without a training run, and they keep working if the underlying model is swapped.\n\nFine-tuning on 300 examples is not free even if training itself is cheap. Someone must clean the examples (historical summaries written by 40 people are likely inconsistent, and the model will learn that inconsistency), hold out an evaluation set, run and version training jobs, store and serve the adapter or tuned weights, and repeat the work when the base model changes. A tuned model can also regress on things you did not test.\n\nThe decision should come from a fair baseline, not from intuition. Evaluate on held-out tickets that were never used as examples. If an engineered prompt plus validator reaches the target, ship it. Fine-tuning becomes attractive when: the engineered prompt plateaus below the target after honest effort; the prompt needed (long instructions plus many examples) is so large that cost or latency at your volume is unacceptable and a tuned model could do the same job with a short prompt; or you need behaviour that is stable across many prompt variations and a prompt alone cannot hold it.\n\nA fine-tune can still be right later, but the evidence should be a measured gap against the best prompt, not the absence of an attempt.",
+  "practical_answer": "Plan with hypothetical numbers.\n1. Freeze 100 held-out tickets that appear in no prompt or training set. Write a checker that passes only if the five headings appear exactly once and in order. Separately, have two reviewers rate content faithfulness on a 30-ticket sample.\n2. Run three variants on the same 100 tickets: (a) instructions only, (b) instructions plus 3 examples, (c) (b) plus the validator with a single retry feeding back the missing-heading error.\n3. Decision rule agreed in advance: if (c) reaches at least 95% layout-valid and the content rating is not below the zero-shot baseline, ship (c). If (c) plateaus below target, or the prompt grows so large that per-ticket cost or latency is unacceptable at current volume, then clean the 300 examples (dedupe, fix layout violations), fine-tune, and compare the tuned model against (c), not against zero-shot, on the same 100 tickets.\n4. Also record what the fine-tune must justify: the extra pipeline (data cleaning, training, versioning, re-training on base change) against the measured gain.",
+  "key_concepts": [
+   "format adherence",
+   "few-shot examples",
+   "output validator with retry",
+   "prompt baseline",
+   "SFT data curation",
+   "operational cost of fine-tuning",
+   "plateau criterion"
+  ],
+  "common_mistakes": [
+   "Jumping to fine-tuning because the output is 'not consistent' without first trying instructions, examples and a validator.",
+   "Treating the 300 historical summaries as clean labels when they may themselves be inconsistent in layout and quality.",
+   "Comparing a fine-tuned model against an untuned, zero-shot prompt instead of a prompt that received comparable engineering effort."
+  ],
+  "interview_style_note": "Shows a prompting-first mindset: diagnoses the gap as format/style, proposes cheap measurable levers, and states explicit conditions for escalating to fine-tuning.",
+  "code": null,
+  "sources": [
+   {
+    "title": "LIMA: Less Is More for Alignment (Zhou et al.)",
+    "url": "https://arxiv.org/abs/2305.11206",
+    "supports": "Abstract: the authors argue almost all knowledge is learned in pretraining and that only limited instruction-tuning data (1,000 curated prompts and responses in their experiment) is needed to produce high quality output."
+   }
+  ],
+  "related_domains": [
+   "MLOps"
+  ],
+  "tags": [
+   "helpdesk",
+   "prompting-first",
+   "format adherence",
+   "few-shot",
+   "validator",
+   "fine-tuning decision",
+   "baseline"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Business case whose right answer is prompting first; distinct from smi-g0011 (three-way architecture choice for a policy QA assistant) because the gap here is format adherence, not knowledge.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B2-GEN-11-2",
+  "cell_id": "GEN-11",
+  "topic": "Fine-tuning vs RAG vs prompting (LoRA/QLoRA, SFT, forgetting, data needs)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "concept",
+  "difficulty": "Medium",
+  "question": "A product team lists three needs for a single assistant: (A) answer HR questions from policy documents that are edited every week, (B) always reply in a warm, concise brand voice with a fixed sign-off, and (C) pull 12 fields from scanned expense reports into a strict schema with at least 98% field accuracy. Someone says 'just fine-tune one model for all three'. How would you map each need to prompting, retrieval or fine-tuning, and which of your choices is the weakest?",
+  "answer_set": "single",
+  "answer": "Treat the three needs as three different kinds of gap.\n\n(A) is a knowledge need with a short shelf life. Fine-tuning stores information in weights, which makes updates slow and unverifiable, and in published comparisons of knowledge injection, retrieval often beat unsupervised fine-tuning, which struggled to absorb new facts (Ovadia et al.; results are setup-dependent). Retrieval lets a weekly edit take effect after re-indexing, supports citations, and allows per-user access filtering. So: retrieval plus a grounded prompt.\n\n(B) is a style need. It requires no new facts, only consistent behaviour. Instructions and a few exemplar replies often get most of the way; if you find the voice drifts across many different questions or the prompt becomes long and expensive, a small supervised fine-tune on a few hundred to a few thousand curated replies is a reasonable next step. Curated data matters more than volume (the LIMA authors argue limited, high-quality instruction data can suffice for output style, in their setup).\n\n(C) is a skill need: reading messy scans and emitting a strict schema. Start with a schema-constrained prompt, deterministic validation (types, ranges, totals that must sum) and a retry. If measured field accuracy on a held-out set plateaus below 98%, supervised fine-tuning on labelled reports is the natural escalation, and an OCR or layout step upstream may matter as much as the language model.\n\nThe weakest choice is (C): it is a numeric target, and neither prompting nor fine-tuning guarantees it. It is also the one where errors are costly, so it needs field-level evaluation, not an overall impression.\n\nA single fine-tuned model for all three would couple three different release cycles and would still need retrieval for (A), so it is usually the worst of the options.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "new knowledge vs style",
+   "retrieval freshness",
+   "few-shot style transfer",
+   "SFT for skills",
+   "schema validation",
+   "evaluation per need"
+  ],
+  "common_mistakes": [
+   "Using fine-tuning to teach facts that change weekly, which makes every policy edit a retraining job and gives no citation or access control.",
+   "Using retrieval for style, which supplies facts but not behaviour.",
+   "Assuming one approach must serve all needs instead of combining them per requirement."
+  ],
+  "interview_style_note": "Separates knowledge, style and skill, ties each to update cost and verifiability, and names the weakest link rather than defending a tidy story.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Fine-Tuning or Retrieval? Comparing Knowledge Injection in LLMs (Ovadia et al.)",
+    "url": "https://arxiv.org/abs/2312.05934",
+    "supports": "Abstract: in their comparison of unsupervised fine-tuning and RAG, RAG consistently outperformed fine-tuning for both existing and new knowledge, and models struggled to learn new facts through unsupervised fine-tuning."
+   },
+   {
+    "title": "LIMA: Less Is More for Alignment (Zhou et al.)",
+    "url": "https://arxiv.org/abs/2305.11206",
+    "supports": "Abstract: the authors argue almost all knowledge is learned in pretraining and that only limited instruction-tuning data (1,000 curated prompts and responses in their experiment) is needed to produce high quality output."
+   }
+  ],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "decision framework",
+   "knowledge vs style vs skill",
+   "knowledge freshness",
+   "brand voice",
+   "structured extraction"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Per-requirement mapping with three different needs in one product; distinct from smi-g0011 which compares the three approaches for a single policy-QA need.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B2-GEN-11-3",
+  "cell_id": "GEN-11",
+  "topic": "Fine-tuning vs RAG vs prompting (LoRA/QLoRA, SFT, forgetting, data needs)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "evaluation",
+  "difficulty": "Hard",
+  "question": "After LoRA supervised fine-tuning, your support-intent classifier scores 80% on a 400-item held-out set. Your best hand-tuned prompt on the untuned model scored 74% on the same 400 items. The team wants to declare that fine-tuning beat prompting. What would you check before accepting this, and how would you decide whether a 6-point gap is real?",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "A 6-point gap on 400 items is neither obviously real nor obviously noise; several things must hold before you accept it.\n\nFairness of the baseline. The prompt should have received comparable effort: clear label definitions, a few representative examples chosen from training data, the same output format constraint. If the fine-tune had weeks of tuning and the prompt had an afternoon, the comparison measures effort, not method. Also compare at matched deployment conditions (same output parsing, same decoding settings).\n\nLeakage and selection. The 400 items must be absent from the SFT data, the few-shot examples and any data used to choose hyperparameters or prompts. Near-duplicate tickets across the split count as leakage. If the prompt or the training run was iterated against these 400, you need a fresh untouched set for the final claim.\n\nStatistics. Both systems were scored on the same items, so use a paired analysis. Count items where only the fine-tune is correct (b) and only the prompt is correct (c); items both get right or wrong carry no information about the difference. The exact McNemar test is a binomial test on the discordant pairs. A 6-point gap means b minus c equals 24 on 400 items; whether that is significant depends on how those 24 arise. With b=44 and c=20 the exact two-sided p-value is about 0.004. With b=30 and c=22 the net gain is only 8 items (2 points) and p is about 0.33.\n\nBeyond significance. Check per-class results (a gain concentrated in a frequent class may hide a loss in a rare, important one), the variance from decoding randomness if outputs are sampled, and whether the model still behaves well outside the task. Finally, price the gain: extra data work, training, versioning, and retraining when the base model changes.",
+  "practical_answer": "Worked check with hypothetical counts, computed by running an exact binomial test on the discordant pairs.\nSetup: 400 paired items. Prompt correct on 296 (74%), fine-tune correct on 320 (80%). Net difference = 24 items.\nCase 1: fine-tune-only correct b=44, prompt-only correct c=20 (so b-c=24). Exact McNemar two-sided p = 0.0037. Evidence the fine-tune is better on this distribution, subject to the leakage and fairness checks above.\nCase 2: a different split with b=30, c=22 (net 8 items, 2 points, so it would not match the 6-point gap above). Exact p = 0.33. Not distinguishable from noise at this sample size.\nProcedure: (1) list the discordant items and read 20 of them, since if the fine-tune wins mostly on label-format quirks you may be able to fix those in the prompt; (2) re-run both systems on a fresh 400 items drawn after all tuning is done; (3) report the point difference with an interval from the paired data, not just p; (4) decide using the pre-agreed minimum gain that justifies the extra operational cost.",
+  "key_concepts": [
+   "fair baseline",
+   "test-set leakage",
+   "paired comparison",
+   "McNemar exact test",
+   "discordant pairs",
+   "prompt-effort parity",
+   "confidence interval"
+  ],
+  "common_mistakes": [
+   "Comparing two accuracies as if they were independent samples when both systems were scored on the same items.",
+   "Tuning the prompt on the test set, or tuning the fine-tune's hyperparameters on it, then reporting that same set as the result.",
+   "Ignoring cost and robustness: a 6-point gain can still lose if it needs a retrain on each base-model change."
+  ],
+  "interview_style_note": "Insists on a fair baseline, a paired significance test and leakage checks, and ties the decision to effect size and operating cost rather than a single headline number.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "Statistics"
+  ],
+  "tags": [
+   "fair baseline",
+   "paired comparison",
+   "McNemar test",
+   "held-out leakage",
+   "prompt tuning effort",
+   "sampling variance"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Evaluation of fine-tune vs prompt; distinct from smi-h0004 (LoRA parameter arithmetic) and from GEN-10 style suite design because the focus is baseline fairness and a paired test.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B2-GEN-11-4",
+  "cell_id": "GEN-11",
+  "topic": "Fine-tuning vs RAG vs prompting (LoRA/QLoRA, SFT, forgetting, data needs)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Hard",
+  "question": "A team ran full-parameter supervised fine-tuning for 3 epochs on 6,000 internal ticket-classification examples. The classifier meets its target. During release testing, though, the model ignores formatting rules in the system prompt, answers unrelated general questions more tersely, and declines clearly out-of-scope requests less often than before. What probably happened, what checks should have caught it, and how would you change the training pipeline?",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Likely cause. Three epochs of full-parameter training on a narrow, single-format dataset pushes the weights toward one input-output pattern (short label outputs). The model's behaviour on prompts unlike the training data can drift: terse answers, weaker adherence to system-prompt style rules and shifted refusal behaviour are all plausible consequences, because instruction-following and safety behaviour were themselves learned in earlier stages and nothing in your loss preserves them. This is often called catastrophic forgetting or, more loosely, capability regression. The exact mix of symptoms is model- and data-dependent, so confirm rather than assume.\n\nChecks that should have existed. A regression suite that is independent of the target task: (1) instruction-following prompts with verifiable constraints (format, length, language), (2) a sample of general question-answering and summarisation prompts scored against the pre-fine-tune model, (3) a small safety and out-of-scope set measuring refusal or deflection rate, and (4) a calibration of your pass criteria, e.g. no more than a few points of drop on any slice, decided before training. Run it on checkpoints, not only the final model.\n\nPipeline changes. Prefer a lower learning rate, fewer epochs and early stopping chosen by both target and regression metrics. Mix in replay data: a fraction of general instruction-following examples (ideally the model's own earlier outputs or curated data) alongside the task data. Consider adapter-based tuning: one study of continued training on code and maths found that LoRA learned less than full fine-tuning in standard low-rank settings but forgot less of the base model's behaviour outside the target domain, so there is a trade-off, not a free fix. If the task is only classification, a separate small classifier head or a dedicated model may avoid the problem entirely by not altering the general assistant.",
+  "practical_answer": "Regression gate sketch with hypothetical thresholds.\nData: 6,000 task examples; add 1,500 general instruction examples (20% of the mixture) with verifiable format rules.\nTraining: 1 to 2 epochs with checkpoints every 200 steps, learning rate lowered until the general-slice score on the held-out suite is within 2 points of the pre-tuning model.\nGate before release (all must hold on held-out data never trained on): target macro-F1 at or above the agreed target; instruction-following pass rate within 2 points of the base; out-of-scope deflection rate not lower than base by more than 3 points; no regressions in sampled human review of 50 random general chats.\nIf the gate fails, bisect: lower learning rate or rank first, then increase replay fraction, then consider an adapter or a separate classifier so the general assistant is untouched.",
+  "key_concepts": [
+   "catastrophic forgetting",
+   "narrow-distribution SFT",
+   "regression suite on base capabilities",
+   "replay or data mixing",
+   "adapter-based tuning",
+   "lower learning rate and early stopping",
+   "safety behaviour regression"
+  ],
+  "common_mistakes": [
+   "Evaluating only the target task, so general regressions are invisible until users find them.",
+   "Assuming forgetting only means losing facts; instruction following, format and refusal behaviour can shift too.",
+   "Believing LoRA fully prevents forgetting; it often reduces it but also often learns less."
+  ],
+  "interview_style_note": "Links symptoms to narrow-distribution SFT and forgetting, and proposes measurable regression gates, data mixing and conservative training rather than a vague 'use LoRA'.",
+  "code": null,
+  "sources": [
+   {
+    "title": "LoRA Learns Less and Forgets Less (Biderman et al.)",
+    "url": "https://arxiv.org/abs/2405.09673",
+    "supports": "Abstract: in standard low-rank settings LoRA substantially underperforms full finetuning on programming and math target domains, but better maintains base-model performance outside the target domain and mitigates forgetting more than weight decay and dropout."
+   },
+   {
+    "title": "LoRA: Low-Rank Adaptation of Large Language Models (Hu et al.)",
+    "url": "https://arxiv.org/abs/2106.09685",
+    "supports": "Abstract: LoRA freezes the pretrained weights and injects trainable low-rank decomposition matrices into each layer, greatly reducing trainable parameters, with no additional inference latency compared with adapter layers."
+   }
+  ],
+  "related_domains": [
+   "Deep Learning"
+  ],
+  "tags": [
+   "catastrophic forgetting",
+   "regression suite",
+   "narrow SFT",
+   "replay data",
+   "LoRA vs full fine-tuning",
+   "learning rate"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Scenario on forgetting and regression checks after SFT; distinct from smi-h0011 (inference mismatch after a tokenizer or batching change) because this is a training-data and objective effect.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B2-GEN-11-5",
+  "cell_id": "GEN-11",
+  "topic": "Fine-tuning vs RAG vs prompting (LoRA/QLoRA, SFT, forgetting, data needs)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "concept",
+  "difficulty": "Medium",
+  "question": "Your team can LoRA fine-tune a mid-sized decoder on two GPUs, but only one is available this quarter, and someone suggests QLoRA. Describe what QLoRA changes relative to plain LoRA, what you give up, and what you would verify before shipping an adapter trained that way.",
+  "answer_set": "single",
+  "answer": "Plain LoRA freezes the base weights, usually held in 16-bit, and trains low-rank adapter matrices, so optimiser state and gradients exist only for the small adapters. QLoRA goes one step further: the frozen base is stored in a 4-bit quantised format, and gradients flow through it into the adapters (Dettmers et al. also introduce a 4-bit data type tuned for normally distributed weights, quantisation of the quantisation constants, and paged optimiser states to absorb memory spikes). During the forward and backward pass, weight blocks are dequantised to a higher-precision compute type as they are needed, and adapters stay in higher precision.\n\nWhat you gain: the dominant fixed cost, the base weights, shrinks by roughly a factor of four relative to 16-bit, which is why a model that needed two GPUs may fit on one. The authors report that task performance matched 16-bit fine-tuning in their experiments; treat that as evidence about their setups, not a guarantee for yours.\n\nWhat you give up. Activation memory (which grows with batch size and sequence length) is not reduced by quantising weights, so long sequences can still run out of memory unless you also use gradient checkpointing or shorter sequences. Dequantisation adds compute, so steps are often slower than LoRA with a 16-bit base on hardware where that fits. Quantisation introduces approximation error in the frozen weights, which the adapter partly absorbs during training but which can hurt on sensitive tasks.\n\nBefore shipping: evaluate on your held-out task and on general-behaviour regressions; decide the serving form up front. If you serve with the same quantised base, evaluate that. If you merge the adapter into a 16-bit base, the weights differ from what training saw, so re-evaluate the merged model rather than assuming equivalence.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "frozen 4-bit base weights",
+   "dequantise on the fly",
+   "higher-precision adapters",
+   "activation memory",
+   "step-time overhead",
+   "merging adapters into a different-precision base",
+   "evaluate the deployed artefact"
+  ],
+  "common_mistakes": [
+   "Assuming QLoRA reduces activation memory too; it mainly shrinks the stored base weights.",
+   "Assuming it is faster because it is smaller; dequantising on the fly often makes each step slower.",
+   "Merging the trained adapter into a full-precision base and shipping without re-evaluating, though training saw the quantised base."
+  ],
+  "interview_style_note": "Explains where the memory saving comes from and where it does not, names the speed and fidelity costs, and insists on evaluating exactly what gets deployed.",
+  "code": null,
+  "sources": [
+   {
+    "title": "QLoRA: Efficient Finetuning of Quantized LLMs (Dettmers et al.)",
+    "url": "https://arxiv.org/abs/2305.14314",
+    "supports": "Abstract: gradients are backpropagated through a frozen 4-bit quantized pretrained model into low-rank adapters; introduces NF4, double quantization and paged optimizers; authors report preserving 16-bit finetuning task performance in their experiments."
+   },
+   {
+    "title": "LoRA: Low-Rank Adaptation of Large Language Models (Hu et al.)",
+    "url": "https://arxiv.org/abs/2106.09685",
+    "supports": "Abstract: LoRA freezes the pretrained weights and injects trainable low-rank decomposition matrices into each layer, greatly reducing trainable parameters, with no additional inference latency compared with adapter layers."
+   }
+  ],
+  "related_domains": [
+   "Deep Learning"
+  ],
+  "tags": [
+   "QLoRA",
+   "quantised base",
+   "dequantisation",
+   "adapter",
+   "memory vs speed",
+   "merge mismatch"
+  ],
+  "time_sensitive": false,
+  "change_notes": "QLoRA trade-off at the concept level; distinct from smi-h0004 which does LoRA parameter arithmetic and does not discuss quantised bases.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B2-GEN-11-6",
+  "cell_id": "GEN-11",
+  "topic": "Fine-tuning vs RAG vs prompting (LoRA/QLoRA, SFT, forgetting, data needs)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Hard",
+  "question": "A team has 200 high-quality human-written support replies and plans to prompt a larger model to generate 20,000 more, then run supervised fine-tuning on all 20,200 to improve a smaller deployed model. What are the main risks, which controls would you add, and how would you decide whether the synthetic expansion actually helped?",
+  "answer_set": "single",
+  "answer": "Why 20,200 is not obviously better than 200. The 200 human examples carry the target behaviour and real phrasing; the 20,000 generated ones carry whatever the generator tends to produce. Fine-tuning mostly teaches style and format, and some work (for example LIMA) argues a small, carefully curated set can be enough for that, so the marginal value of volume can be low while the marginal risk is not.\n\nMain risks. (1) Error and bias inheritance: if the generator invents policy details or gets tone wrong 5% of the time, 1,000 faulty examples enter training and the student learns them as truth. (2) Narrowing: generated text tends to be more uniform than real human text; training on it can shrink diversity. Shumailov et al. report that indiscriminately training on model-generated data across generations loses the tails of the original distribution (they call it model collapse); a single round of augmentation is milder than their recursive setting, so treat it as a caution about direction, not a prediction. (3) Near-duplicates inflate apparent dataset size and overweight a few patterns. (4) Circular evaluation: scoring on generator-written test cases rewards imitation. (5) Terms: the generating model's usage terms may restrict using its outputs to train another model; check this with the relevant policy rather than assuming.\n\nControls. Seed generation prompts from real, varied ticket types and vary them; deduplicate by embedding or n-gram similarity; apply rule checks (no invented policy numbers, required sign-off, length limits); have people review a random sample (for example 200) and measure error rate; keep the human examples in every training run, perhaps upweighted.\n\nDecision. Run an ablation: human-only, human plus a small synthetic slice, human plus the full set, each with the same hyperparameters, evaluated on a held-out set of human-written tickets graded by humans. Prefer the smallest set that reaches the target; add volume only if the human-graded metric improves beyond noise.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "model-generated training data",
+   "diversity collapse",
+   "error propagation",
+   "near-duplicate filtering",
+   "human-only evaluation set",
+   "mixing ratio ablation",
+   "data licence and terms review"
+  ],
+  "common_mistakes": [
+   "Assuming more data is always better regardless of source and diversity.",
+   "Evaluating the tuned model on synthetic held-out data produced by the same generator, which flatters it.",
+   "Overlooking that the generating model's mistakes and style become the student's ceiling."
+  ],
+  "interview_style_note": "Weighs quantity against quality and diversity, protects the evaluation set from the generator's bias, and proposes an ablation instead of assuming synthetic data helps.",
+  "code": null,
+  "sources": [
+   {
+    "title": "LIMA: Less Is More for Alignment (Zhou et al.)",
+    "url": "https://arxiv.org/abs/2305.11206",
+    "supports": "Abstract: the authors argue almost all knowledge is learned in pretraining and that only limited instruction-tuning data (1,000 curated prompts and responses in their experiment) is needed to produce high quality output."
+   },
+   {
+    "title": "The Curse of Recursion: Training on Generated Data Makes Models Forget (Shumailov et al.)",
+    "url": "https://arxiv.org/abs/2305.17493",
+    "supports": "Abstract: the authors report that indiscriminately training on model-generated content causes defects they call model collapse, in which tails of the original content distribution disappear."
+   }
+  ],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "synthetic data",
+   "SFT data quality",
+   "distribution narrowing",
+   "model collapse",
+   "deduplication",
+   "held-out human evaluation"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Data needs and model-generated data risk for SFT; distinct from any existing LoRA/RAG question because it targets data provenance and evaluation, not architecture.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B2-GEN-12-1",
+  "cell_id": "GEN-12",
+  "topic": "Safety, security and privacy (prompt injection, PII, jailbreaks, red teaming)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "An email-triage assistant summarises a user's inbox and can draft replies. A security reviewer shows that a message from an external sender can steer the assistant's behaviour even though the user never typed anything unusual. The team's first fix is a filter that blocks emails containing phrases such as 'ignore previous instructions'. Explain the distinction between direct and indirect prompt injection here, and why that filter is a weak defence.",
+  "answer_set": "single",
+  "answer": "Direct injection comes from the person interacting with the application, who types text intended to override the developer's instructions. Indirect injection is delivered through data the application ingests: an email body, a web page, a document in a vector index, a tool result. The attacker never talks to the assistant. The victim's own session carries the attacker's text into the prompt, which is why this is dangerous in an assistant with the user's mailbox privileges. Greshake et al. describe the root issue as LLM-integrated applications blurring the line between data and instructions.\n\nWhy the blocklist fails. A language model has no hard channel separating 'text to obey' from 'text to read'. Everything is tokens in one context, and the model decides from the content whether something reads like an instruction. A filter keyed on known phrases catches only the phrasing its authors thought of. The same intent can be expressed with synonyms, in another language, spread over several sentences, framed as a quote or a role-play, or placed in a part of the email you do not scan (headers, HTML comments, alt text, attachments). Making the filter broader increases false positives on legitimate mail such as 'please follow the instructions below', and attackers adapt faster than lists.\n\nA filter can still be one cheap, noisy layer. The robust approach assumes some injected text will get through and bounds the damage: give the assistant least privilege (read-only by default), require human confirmation before sending mail, forwarding or changing settings, restrict what outputs can contain, and mark external content as untrusted data in the prompt while recognising that marking reduces but does not eliminate the risk.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "direct injection",
+   "indirect injection",
+   "untrusted data in context",
+   "blocklist limits",
+   "no instruction/data separation",
+   "defence in depth"
+  ],
+  "common_mistakes": [
+   "Treating prompt injection as a keyword problem that a blocklist can solve.",
+   "Assuming only the user can inject, ignoring content the model reads on the user's behalf.",
+   "Concluding that a better filter makes the problem go away instead of limiting what a hijacked model can do."
+  ],
+  "interview_style_note": "Distinguishes who supplies the malicious text, explains why a language model cannot reliably tell data from instructions, and moves the discussion to blast-radius reduction.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Not what you've signed up for: Compromising Real-World LLM-Integrated Applications with Indirect Prompt Injection (Greshake et al.)",
+    "url": "https://arxiv.org/abs/2302.12173",
+    "supports": "Abstract: indirect prompt injection places instructions in data likely to be retrieved by LLM-integrated applications; such applications blur the line between data and instructions; the authors state effective mitigations were lacking at the time of writing."
+   }
+  ],
+  "related_domains": [
+   "Cybersecurity"
+  ],
+  "tags": [
+   "indirect prompt injection",
+   "instruction-data boundary",
+   "blocklist filter",
+   "paraphrase evasion",
+   "untrusted content"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Concept and diagnosis of direct vs indirect injection with the blocklist fallacy; distinct from smi-j0030 (RAG answer from stale document) which is about correctness, not adversarial input.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B2-GEN-12-2",
+  "cell_id": "GEN-12",
+  "topic": "Safety, security and privacy (prompt injection, PII, jailbreaks, red teaming)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Hard",
+  "question": "You are asked to ship an assistant that can read a user's email and calendar, search the web, and (when asked) send email and create events. Design a layered defence against prompt injection from external content. For each layer say what it stops and what it cannot stop, and be explicit about the residual risk.",
+  "answer_set": "concise+detailed+practical",
+  "answer": null,
+  "concise_answer": "Layer 1: least privilege, so the model can read by default and anything that sends, deletes or shares is a separate, narrowly scoped capability. Layer 2: human confirmation of side effects showing the actual recipient and content. Layer 3: keep untrusted content clearly marked and out of the instruction position. Layer 4: validate outputs and restrict egress (recipients, links, images). Layer 5: log and monitor. None is complete, so keep the blast radius small.",
+  "detailed_answer": "Assume injected text will sometimes influence the model. Design so that influence cannot cause irreversible harm.\n\n1. Least privilege. Separate read tools from write tools; scope each to the minimum (read mail from one mailbox, send only from the user's address, create events only on the user's own calendar). This stops a hijacked model from using powers it never had. It does not stop misuse of powers it does have.\n\n2. Human confirmation for side effects. Before sending, forwarding, deleting or sharing, show a plain summary of the real action (recipient, subject, body, attachments) generated from the structured call, not from model prose. This stops silent actions. It fails if users approve reflexively (confirmation fatigue) or the preview hides the harmful part, so keep prompts rare and informative.\n\n3. Separate trusted from untrusted content. Put system rules in the instruction position, wrap external content in clearly delimited data sections and tell the model to treat it as data. Where possible, process untrusted content with a model call that has no tools, then pass only a constrained structured result (for example a summary field) onward. This reduces how often injections work; it cannot guarantee it because the model still reads the text.\n\n4. Output validation and egress control. Validate tool arguments against a schema and policy (recipient must be in an allowed set or require confirmation; no arbitrary URLs). Restrict what rendered output can fetch.\n\n5. Monitoring. Log tool calls with their provenance, alert on unusual patterns such as a send immediately after reading external content, and keep a way to revoke tokens quickly.\n\nResidual risk. A determined attacker may still influence summaries, drafts or what the user is shown. The goal is that the worst outcome is bounded and visible, not that injection is eliminated.",
+  "practical_answer": "Policy table for the four tools (hypothetical):\n- read_mail: auto-allowed, returns text tagged source=external or source=user; results go only to a tool-less summariser.\n- search_web: auto-allowed; results tagged untrusted; no tool calls may be made in the same step as ingesting web text without the summariser stage.\n- create_event: allowed without confirmation only if attendees are empty or already on the user's contact list; otherwise confirmation.\n- send_email: always confirmation; recipient must be in the thread or contacts, else a stronger warning; at most 5 sends per hour per user; body and recipients shown from the structured arguments.\nAcceptance test: run 100 red-team scenarios (see the red-team plan question) and require zero side-effecting calls without a human approval, while tracking how often users approve and how often confirmations are shown, to keep approval rate informative (if approvals exceed 99% of prompts, review whether you are over-prompting).",
+  "key_concepts": [
+   "least privilege",
+   "human-in-the-loop confirmation",
+   "separating trusted and untrusted content",
+   "output validation",
+   "egress restrictions",
+   "audit logging",
+   "residual risk"
+  ],
+  "common_mistakes": [
+   "Relying on a single prompt instruction such as 'never follow instructions in documents' as the defence.",
+   "Giving the assistant send and delete permissions by default for convenience, then trying to detect misuse afterwards.",
+   "Claiming a layered design makes injection impossible rather than limiting impact."
+  ],
+  "interview_style_note": "Designs layers around impact reduction, matches each layer to a failure mode, and states that none is complete.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Not what you've signed up for: Compromising Real-World LLM-Integrated Applications with Indirect Prompt Injection (Greshake et al.)",
+    "url": "https://arxiv.org/abs/2302.12173",
+    "supports": "Abstract: indirect prompt injection places instructions in data likely to be retrieved by LLM-integrated applications; such applications blur the line between data and instructions; the authors state effective mitigations were lacking at the time of writing."
+   }
+  ],
+  "related_domains": [
+   "Cybersecurity",
+   "Software Engineering"
+  ],
+  "tags": [
+   "defence in depth",
+   "least privilege",
+   "human confirmation",
+   "output validation",
+   "data/instruction separation",
+   "residual risk"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Design with trade-offs for layered injection defence; GEN-09 covers agent control flow, this covers the defensive stack and its honest limits; distinct from smi-j0020/j0040 (tenant filtering performance).",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B2-GEN-12-3",
+  "cell_id": "GEN-12",
+  "topic": "Safety, security and privacy (prompt injection, PII, jailbreaks, red teaming)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "debugging",
+  "difficulty": "Medium",
+  "question": "A chat assistant renders model output as markdown, including images. A security test shows that after the assistant summarised a shared document, the user's browser made an outbound request to an unfamiliar domain, and the request contained fragments of the user's earlier conversation. No tool call was involved. Walk through how this can happen, why it is hard to notice, and what you would change. Describe the mechanism and fixes, not attack text.",
+  "answer_set": "single",
+  "answer": "The mechanism has three parts. First, an injection: the shared document (untrusted data) contains text that the model treats as an instruction. Second, the model's output is attacker-influenced: it can include a markdown image or hyperlink whose URL includes text copied from the conversation. Third, the client behaviour: the UI renders markdown to HTML, and an image tag causes the browser to issue a GET request to that URL as soon as the message is displayed. The remote server receives the URL, and with it whatever the model placed in it. No tool call, no user click, and often no visible image (a one-pixel or broken image looks harmless).\n\nIt is hard to notice because the model's visible text looks normal, server-side tool logs are clean, and the request originates from the user's browser rather than your servers. You find it only by inspecting rendered output or network traffic.\n\nFixes, in order of strength: (1) Do not let rendered output load resources from arbitrary origins. Use a content security policy that restricts image sources to your own origin, or route allowed images through a proxy that enforces a domain allowlist. (2) Strip or neutralise markdown images and links in model output when they point to non-allowlisted domains; display link targets so a user can see where a click goes, and consider requiring a click rather than auto-fetch. (3) Limit the sensitive content that can enter the prompt along with untrusted documents (tenant and user scoping), and avoid including secrets in context. (4) Add monitoring: log URLs in model output and flag unknown domains. Prompt instructions like 'never output links' can help as a soft layer, but they are not a security control because the same channel that carries the attack can override them.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "markdown image fetch",
+   "indirect injection",
+   "URL as data channel",
+   "image proxy or allowlist",
+   "content security policy",
+   "link display",
+   "no automatic rendering of external URLs"
+  ],
+  "common_mistakes": [
+   "Looking only at tool calls and missing that the rendering client itself performs the network request.",
+   "Fixing the prompt wording and calling it done, while the client still fetches arbitrary URLs.",
+   "Assuming that no tool access means no data can leave."
+  ],
+  "interview_style_note": "Identifies the client-side rendering path as the exfiltration channel, and fixes it with deterministic controls instead of prompt instructions.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Not what you've signed up for: Compromising Real-World LLM-Integrated Applications with Indirect Prompt Injection (Greshake et al.)",
+    "url": "https://arxiv.org/abs/2302.12173",
+    "supports": "Abstract: indirect prompt injection places instructions in data likely to be retrieved by LLM-integrated applications; such applications blur the line between data and instructions; the authors state effective mitigations were lacking at the time of writing."
+   }
+  ],
+  "related_domains": [
+   "Cybersecurity",
+   "Software Engineering"
+  ],
+  "tags": [
+   "markdown rendering",
+   "data exfiltration",
+   "image fetch",
+   "egress allowlist",
+   "content security policy"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Debugging an exfiltration path via rendered markdown; distinct from GEN-12-1 because the channel is output rendering, not the instruction hijack itself.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B2-GEN-12-4",
+  "cell_id": "GEN-12",
+  "topic": "Safety, security and privacy (prompt injection, PII, jailbreaks, red teaming)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Hard",
+  "question": "A support-copilot stores full prompts, retrieved chunks and model responses in application logs for 90 days. Retrieved chunks come from past tickets that contain names, emails, order numbers and sometimes health information. All tenants share one vector index with a tenant_id filter. Design the privacy controls for this system across prompts, logs, retrieval and deletion requests, and say where each control is weakest.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Treat PII as data that flows through four places: the index, the prompt, the model output and the logs. Each needs its own control, enforced by code outside the model.\n\nIngestion and minimisation. Decide what actually needs to be in the index. Redact or tokenise direct identifiers (emails, phone numbers, account numbers) before embedding where answers do not need them, and keep a mapping in a protected store if re-identification is needed. Detectors (pattern-based and learned) miss free-text identifiers and sensitive details, so measure recall on a labelled sample and do not claim completeness. Classify documents by sensitivity (for example health-related) and exclude or segregate the highest class.\n\nRetrieval and tenant isolation. Enforce authorisation inside the retrieval call, using filters or partitioning, so chunks the requester may not see are never fetched and therefore can never appear in the prompt. Filtering after generation is too late; filtering after retrieval but before prompting works only if the code path is exercised by tests for cross-tenant leakage. For highly sensitive tenants, separate indexes or separate encryption keys reduce blast radius at higher operational cost. Embeddings can leak information about the source text, so treat vector stores as holding sensitive data.\n\nLogs. Full prompt logging is the usual privacy failure: it copies retrieved PII into a second store with weaker access control. Log identifiers and metadata (chunk ids, hashes, token counts) by default; keep full text only for a short window, encrypted, with role-based access and audit. Ninety days of raw text needs a documented purpose; shorten it where possible.\n\nDeletion. A deletion or erasure request must reach the source record, the chunks and vectors, caches (response and embedding caches), logs and any fine-tuning sets. Backups and derived artefacts are the weakest point; define how long they persist and how deleted items are suppressed meanwhile. Check applicable legal requirements with counsel; this is an engineering outline, not legal advice.",
+  "practical_answer": "Concrete configuration (hypothetical).\n- Retention: raw prompt/response text 7 days, encrypted, readable by an on-call role with audit; metadata-only (ids, token counts, latency) for 90 days.\n- Redaction: run an email/phone/order-number detector at ingestion and on logged text; target measured recall of at least 95% on a 500-chunk labelled sample for those types, and route chunks flagged health-related to a restricted collection that the copilot cannot query by default.\n- Retrieval: tenant_id is injected by the server from the session, never taken from the model or client; a unit test inserts a canary document for tenant B and asserts that 1,000 queries from tenant A never return it.\n- Deletion: a job that deletes by source_record_id from the document store, vector index, caches and log store, with a verification query; backups age out on a stated schedule and a suppression list prevents restored data from being re-served.",
+  "key_concepts": [
+   "PII redaction",
+   "data minimisation",
+   "retention limits",
+   "access control at retrieval time",
+   "tenant isolation",
+   "deletion from index and backups",
+   "embedding leakage"
+  ],
+  "common_mistakes": [
+   "Redacting only at display time while raw PII remains in logs and embeddings.",
+   "Assuming a regex PII detector catches everything, including free-text identifiers and health details.",
+   "Applying the tenant filter after retrieval and generation, so other tenants' text can already be in the prompt."
+  ],
+  "interview_style_note": "Treats privacy as a lifecycle across ingestion, retrieval, logging and deletion with enforcement points outside the model, and is honest about detector recall and backup deletion.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "Cybersecurity",
+   "Data Engineering"
+  ],
+  "tags": [
+   "PII",
+   "data minimisation",
+   "log retention",
+   "tenant isolation",
+   "erasure",
+   "access control"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Privacy lifecycle design in a shared vector index; distinct from smi-j0020 (filtered ANN recall/latency) and smi-j0040 (index-per-tenant vs shared) because the concern is data protection, not performance. Not legal advice.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B2-GEN-12-5",
+  "cell_id": "GEN-12",
+  "topic": "Safety, security and privacy (prompt injection, PII, jailbreaks, red teaming)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "evaluation",
+  "difficulty": "Hard",
+  "question": "You must red-team a customer-facing assistant that has read access to internal knowledge and one write tool, before launch. Describe a red-team plan, how you would define and measure attack success rate (ASR), and what you would conclude if 200 attack attempts all fail. Include how to treat adaptive attackers and what the plan cannot prove.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Plan. Start with a threat model: who attacks (a user, an outside content author), what they want (read other tenants' data, trigger the write tool, make the bot say something harmful or off-brand), and through which channels (chat, retrieved documents, uploaded files). From that, enumerate categories and build scenarios per category with a written success criterion. Use a mix of people and tooling, include testers outside the build team, and give them the real system, including its tools and retrieval content, because many failures are about the system, not the model alone.\n\nDefining success. Define ASR as the fraction of attempts that achieve a defined harmful outcome, not that the model said something odd. Examples: a canary secret from another tenant appears in the output; the write tool is called with attacker-chosen arguments without approval; a policy-forbidden output category is produced. Judge with deterministic checks where possible (canary strings, tool-call logs) and human review where not; if you use a model-based grader, validate it against human labels first. Report ASR per category with attempt counts, not only one overall number.\n\nZero failures. 0 successes out of 200 does not show the true rate is zero. Using a one-sided 95% bound, the upper limit on the true success probability is about 1.5% (the 'rule of three', roughly 3/200); a two-sided exact 95% interval has an upper limit near 1.8%. So the honest statement is that, for this attack distribution, the rate is probably below about 1.5%. That is also only relevant if the 200 attempts were independent samples of the attacks you care about; they were chosen by testers, not drawn randomly from attackers.\n\nAdaptive attackers. Attackers observe responses and iterate, so a static set underestimates risk. Include time-boxed adaptive rounds where testers see outputs and refine. Keep successful attacks in a regression suite that runs on every prompt, model or tool change, but do not treat a pass as a safety proof. What the plan cannot prove: absence of vulnerabilities, resistance to novel techniques, or safety after configuration changes.",
+  "practical_answer": "Worked numbers (computed with an exact binomial calculation).\n- 0 of 200 succeed: one-sided 95% upper bound 1.49%; Wilson 95% interval 0% to 1.9%.\n- 2 of 200 succeed (1.0%): Wilson 95% interval 0.3% to 3.6%.\n- 3 of 200 succeed (1.5%): Wilson 95% interval 0.5% to 4.3%.\nTo claim an upper bound below 0.5% at 95% confidence with zero observed failures you need roughly 600 independent attempts (3/0.005); this is a planning heuristic that assumes independence.\nLaunch gate (hypothetical): no successful cross-tenant leak or unapproved write across 400 scripted attempts plus a 2-day adaptive round by 3 testers outside the team; each finding is fixed, added to the regression suite, and re-run before launch. Residual risk is reported as an upper bound, not as zero.",
+  "key_concepts": [
+   "threat model",
+   "attack categories",
+   "success criteria",
+   "attack success rate",
+   "upper confidence bound on zero failures",
+   "adaptive attacks",
+   "regression test set"
+  ],
+  "common_mistakes": [
+   "Reporting 0 successes out of 200 as a 0% attack success rate.",
+   "Counting only whether the model refused rather than whether the harmful outcome (data leak, unauthorised action) occurred.",
+   "Using a fixed attack list forever, which measures resistance to old attacks only."
+  ],
+  "interview_style_note": "Defines success by outcomes, quantifies uncertainty even at zero failures, and separates a fixed regression set from continued adaptive testing.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "Statistics",
+   "Cybersecurity"
+  ],
+  "tags": [
+   "red teaming",
+   "attack success rate",
+   "threat model",
+   "rule of three",
+   "adaptive attacker",
+   "regression suite"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Evaluation of red teaming with ASR and statistical uncertainty; distinct from GEN-12-1/2 (mechanisms and layers) and GEN-10 (benchmarks) because it covers measuring attack outcomes.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B2-GEN-12-6",
+  "cell_id": "GEN-12",
+  "topic": "Safety, security and privacy (prompt injection, PII, jailbreaks, red teaming)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "concept",
+  "difficulty": "Medium",
+  "question": "In a security review a colleague says 'jailbreaks and prompt injection are the same thing, so one safety classifier covers both'. Give a precise distinction between the two, say who the attacker and the victim are in each case, and explain why the mitigations only partly overlap.",
+  "answer_set": "single",
+  "answer": "The cleanest distinction is the trust boundary being attacked.\n\nJailbreak: the person talking to the model tries to get content or behaviour that the model's safety training or provider policy is meant to prevent. The attacker is the user; they have chosen to send adversarial input to the service. The 'victim' is the policy (and potentially people harmed by the output). There may be no tool, document or third party involved.\n\nPrompt injection: text that the application does not trust, or that the user did not write, ends up in the model's context and is followed as if it were an instruction from the developer or user. In indirect injection the attacker is a third party who authored a web page, email or document; the victim is the user or the application owner, whose permissions and data are used. The core cause is that applications put instructions and data in one channel (Greshake et al.).\n\nThe two overlap: both manipulate model behaviour with crafted text, and the same technique can serve either purpose. The same string may be a jailbreak when typed by a user and an injection when found in a document. But the harm model and the controls differ.\n\nMitigations. Jailbreak: stronger model-level training, input and output moderation, rate limits and abuse detection. Injection: least privilege for tools, confirmation of side effects, separation and marking of untrusted data, output and egress restrictions, and provenance logging. A classifier on user messages alone does nothing about a hostile document retrieved later, and a safe-behaving model still obeys an injected instruction to call a legitimate tool. Neither category has a complete defence, so test both with their own threat models.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "jailbreak",
+   "prompt injection",
+   "threat model",
+   "safety training bypass",
+   "trust boundary",
+   "tool permissions",
+   "content classifier"
+  ],
+  "common_mistakes": [
+   "Equating any unwanted output with injection.",
+   "Believing a content-safety classifier on user input will stop attacks that arrive via retrieved or tool content.",
+   "Assuming a robust model-level refusal makes application-level controls unnecessary."
+  ],
+  "interview_style_note": "Frames each by attacker, victim and trust boundary, and maps defences to the correct layer instead of treating safety as one switch.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Not what you've signed up for: Compromising Real-World LLM-Integrated Applications with Indirect Prompt Injection (Greshake et al.)",
+    "url": "https://arxiv.org/abs/2302.12173",
+    "supports": "Abstract: indirect prompt injection places instructions in data likely to be retrieved by LLM-integrated applications; such applications blur the line between data and instructions; the authors state effective mitigations were lacking at the time of writing."
+   }
+  ],
+  "related_domains": [
+   "Cybersecurity"
+  ],
+  "tags": [
+   "jailbreak",
+   "prompt injection",
+   "threat model",
+   "attacker and victim",
+   "instruction hierarchy"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Concept distinction jailbreak vs injection; distinct from GEN-12-1 which focuses on direct/indirect injection and blocklists.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B2-GEN-15-1",
+  "cell_id": "GEN-15",
+  "topic": "GenAI product scenarios (support bot, document QA)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "business_case",
+  "difficulty": "Hard",
+  "question": "A retailer's support team handles about 12,000 conversations a month. The ten most common intents (order status, returns, delivery changes and so on) make up roughly 45% of volume. Leadership wants an LLM support bot live in 8 weeks and quotes 'containment rate' as the success target. Design the launch: scope, escalation, rollout, metrics beyond containment, how to handle wrong answers and legal risk, and a measurable go/no-go gate.",
+  "answer_set": "concise+detailed+practical",
+  "answer": null,
+  "concise_answer": "Start narrow: serve the ten high-volume, low-risk intents, with a clear and always-available route to a human. Measure resolution, not just containment: a conversation counts as resolved only if there is no re-contact in 7 days, and track satisfaction and escalation quality. Run shadow mode, then a small A/B rollout. Gate on a confidence lower bound for correct, policy-compliant answers, and keep a kill switch and an audit trail for disputes.",
+  "detailed_answer": "Scope. Roughly 45% of volume sits in ten intents, which is where to start. Pick intents with stable policies and low harm if wrong (order status, standard return window). Keep money-moving, legal, safety and complaint-escalation topics out of the first release, and route anything off-scope or low-confidence to a human with the conversation summary attached so customers do not repeat themselves. Make the human route visible at any point; hiding it inflates containment and damages trust.\n\nMetrics. Containment (no human involved) rewards deflection, including useless deflection. Add: resolution (contained and no re-contact on the same issue within 7 days), customer satisfaction on contained and escalated chats separately (watching survey response bias), correct-and-policy-compliant rate from sampled human review, escalation rate and handoff quality, and average handling time of escalated chats. Track wrong-answer severity separately: a wrong tracking number is not a wrong refund promise.\n\nRollout. Weeks 1-3: build against recorded conversations with grounded answers from policy and order systems, and define review rubrics. Weeks 4-5: shadow mode, where the bot drafts answers that are scored but not sent. Weeks 6-7: limited live traffic, for example 5% then 20%, randomised, with a human fallback and daily review. Week 8: decide.\n\nWrong answers and legal risk. Ground replies in approved policy text and live order data, not model memory; show what was used; avoid making commitments (refunds, compensation) outside policy; keep logs and versions of policy/prompt so you can reconstruct what a customer was told; let customers reach a person; have legal review of disclosures and of what the bot may promise. A kill switch and a fast correction process matter as much as accuracy. Regulations on automated customer interaction differ by jurisdiction, so involve counsel.",
+  "practical_answer": "Hypothetical launch gate.\nShadow stage: score 1,500 bot drafts against policy by human review. Observed: 1,380 correct and policy-compliant = 92.0%. Wilson 95% interval = 90.5% to 93.3%. Gate: lower bound must be at least 90%, so this passes. If instead 1,350 of 1,500 (90.0%) were correct, the lower bound would be 88.4% and the gate fails despite the point estimate hitting 90%.\nAdditional gates: zero severity-1 errors (wrong refund or legal commitments) in the reviewed sample; escalation to a human possible within two turns in 100% of test scripts; satisfaction on bot-handled chats no more than 3 points below human-handled in the pilot; re-contact within 7 days not worse than the human baseline by more than 3 points.\nLive stage: 5% then 20% of traffic, randomised by conversation. Automatic rollback if the daily sampled correct rate (n of at least 100 reviewed) drops below 88% or any severity-1 error occurs.",
+  "key_concepts": [
+   "containment vs resolution",
+   "scope limiting",
+   "human handoff",
+   "shadow mode",
+   "re-contact within 7 days",
+   "Wilson lower bound",
+   "rollback"
+  ],
+  "common_mistakes": [
+   "Optimising containment alone, which rewards bots that make it hard to reach a person.",
+   "Launching to all traffic and all intents at once without shadow mode or a rollback path.",
+   "Treating a point estimate on a small sample as a launch gate instead of a lower confidence bound."
+  ],
+  "interview_style_note": "Reframes the headline metric, scopes to measurable intents, uses shadow mode and staged rollout, and sets a statistical gate with explicit handling for wrong answers and complaints.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "Business Analytics"
+  ],
+  "tags": [
+   "containment rate",
+   "shadow mode",
+   "escalation to human",
+   "launch gate",
+   "re-contact rate",
+   "A/B rollout"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Product-level launch design for a support bot; distinct from smi-g0011 (architecture of an internal policy QA assistant) because it covers rollout, metrics and risk.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B2-GEN-15-2",
+  "cell_id": "GEN-15",
+  "topic": "GenAI product scenarios (support bot, document QA)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Hard",
+  "question": "A legal-tech team is building a contract question-answering product. Lawyers upload their own contracts, ask things like 'what is the notice period for termination?' and expect answers with exact clause references. Say what you would and would not promise users, how you would present answers and citations, how access control must work, and what evaluation results you would require before launch.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "What to promise. Position the product as an assistant that finds and summarises relevant text with traceable references, not as legal advice. Promise things the system can show: here is the clause, here is the quoted text, here is a plain-language reading. Do not promise that it catches every relevant clause, or that its interpretation is correct. State that lawyers remain responsible for conclusions, and make that visible in the interface.\n\nAnswers and citations. Each claim should link to a specific passage (document, page, clause number) and show the quoted text beside the answer. Verify citations programmatically: confirm that the quoted span actually exists in the cited document, and flag answers that contain statements with no supporting quote. Handle contract-specific difficulty: definitions that change a term's meaning, amendments and side letters that override earlier clauses, cross-references (see Section 12), and tables or scanned pages where text extraction fails. When information is absent or contradictory, the product should say so (and show the competing clauses) instead of choosing one.\n\nAccess control. Contracts are confidential. Enforce permissions in the retrieval layer using the user's identity and the document ACL, so text from documents the user cannot see never enters the prompt. Isolate customers, log access, and treat uploaded contracts as untrusted content that may contain instruction-like text.\n\nEvaluation before launch. Build a test set from real contracts (with consent and redaction) across types, lengths, scanned and native files, and questions that include unanswerable and multi-clause cases. Measure answer correctness graded by lawyers, citation validity (does the quoted text support the claim), recall of relevant clauses, abstention behaviour, and latency. Report results by contract type and by question type, with confidence intervals, and decide thresholds with the lawyers who will use it.",
+  "practical_answer": "Hypothetical launch gate on a lawyer-labelled set of 300 questions over 60 contracts (including 60 questions whose answer is absent and 40 needing two clauses).\n- Answer correct with a valid supporting quote: need 285 or more of 300 (95%); at 285 the Wilson 95% interval is 91.9% to 96.9%, with lower bound above 90% required for launch. At 270 of 300 (90%) the interval is 86.1% to 92.9% and the gate fails.\n- Absent-answer questions: the product must abstain or say 'not found' on at least 54 of 60 (90%).\n- Citation check: 100% of displayed quotes must exist verbatim in the cited document; any mismatch is a release blocker.\n- Cross-tenant canary: documents seeded for tenant B never appear for tenant A in 2,000 queries.\n- Pilot: 10 friendly lawyers for 4 weeks with a thumbs-down plus reason capture; every severity-1 miss (a clause missed that changes the answer) is root-caused before widening the release.",
+  "key_concepts": [
+   "clause-level citation",
+   "abstention on missing information",
+   "per-document access control",
+   "quote verification",
+   "scope of promise",
+   "evaluation set from real contracts",
+   "human review for high stakes"
+  ],
+  "common_mistakes": [
+   "Promising 'accurate legal answers' rather than assisted retrieval and extraction with verification.",
+   "Showing a citation that points to the right document but not to text that supports the claim.",
+   "Evaluating on a few friendly contracts instead of varied formats, scanned pages, amendments and cross-references."
+  ],
+  "interview_style_note": "Scopes the promise to verifiable extraction with citations, enforces access outside the model, and sets evaluation gates that include abstention and multi-document edge cases.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP",
+   "Cybersecurity"
+  ],
+  "tags": [
+   "document QA",
+   "citation",
+   "access control",
+   "abstention",
+   "answer verification",
+   "evaluation before launch"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Document-QA product design with promises, citations and launch gates; distinct from smi-j0019 (query rewriting for retrieval recall) and smi-j0030 (stale source answer).",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B2-GEN-15-3",
+  "cell_id": "GEN-15",
+  "topic": "GenAI product scenarios (support bot, document QA)",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "business_case",
+  "difficulty": "Medium",
+  "question": "An A/B test of a support bot ran on 10,000 conversations, 5,000 per arm. The bot arm resolves 39% of conversations without a human versus 31% for the control (which has a simple FAQ widget). However, among conversations marked 'resolved without a human', 21% of the bot arm contacted support again within 7 days about the same issue versus 12% in the control. Customer satisfaction scores are 0.1 points lower in the bot arm on a 5-point scale, from a survey answered by about 8% of users. Should you ship? Argue with the numbers.",
+  "answer_set": "single",
+  "answer": "Headline versus net. Containment rose by 8 points (31% to 39%), but a contained conversation that comes back is not resolved. Computing net resolution: control 31% x (1 - 0.12) = 27.3%; bot 39% x (1 - 0.21) = 30.8%. So the real gain is about 3.5 points, less than half the headline, and each re-contact costs the customer effort.\n\nIs the re-contact difference noise? Contained counts are about 1,550 (control) and 1,950 (bot). Re-contact rates of 12% (about 186 people) and 21% (about 410) differ by 9 points; a two-proportion z-test gives z of about 7, so chance is not a plausible explanation, and the 95% intervals (roughly 10.5% to 13.7% versus 19.3% to 22.9%) do not overlap. The headline containment gain (z of about 8) is also clearly real. Both are real effects pulling in opposite directions.\n\nSatisfaction. A 0.1 point difference on a 5-point scale with only 8% responding is weak evidence either way, because responders differ systematically from non-responders (very happy and very unhappy users answer more). Do not use it as the deciding metric; supplement with behavioural signals such as re-contact, abandonment and escalation request rates.\n\nDecision. Break results down by intent. If a few intents drive the re-contact (for example answers that sound final but leave a step undone), restrict the bot to intents where re-contact is no worse than control, improve the rest, and re-test. Check whether the bot's wrong 'resolved' judgments come from users leaving rather than being helped. Define the success metric as net resolution with a guardrail on re-contact and satisfaction proxies, and agree it before the next test.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "containment",
+   "true resolution",
+   "re-contact within 7 days",
+   "guardrail metrics",
+   "survey non-response",
+   "two-proportion test",
+   "segment analysis"
+  ],
+  "common_mistakes": [
+   "Shipping on the headline containment gain without looking at repeat contacts.",
+   "Treating a 0.1-point survey difference with an 8% response rate as either proof of harm or proof of no harm.",
+   "Ignoring that the two arms differ in what 'resolved' means for the user."
+  ],
+  "interview_style_note": "Converts containment into net resolution, checks significance and guardrails, questions survey bias, and recommends a conditional, segmented decision with a follow-up experiment.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "Statistics",
+   "Business Analytics"
+  ],
+  "tags": [
+   "A/B test",
+   "containment vs resolution",
+   "re-contact rate",
+   "survey response bias",
+   "guardrail metric",
+   "decision under mixed results"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Business-case interpretation of a mixed A/B result; distinct from GEN-15-1 which designs the launch rather than reading results.",
+  "confidence": "high"
+ }
+]

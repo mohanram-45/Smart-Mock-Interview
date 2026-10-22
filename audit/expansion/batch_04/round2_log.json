@@ -1,0 +1,277 @@
+{
+ "applied": [
+  [
+   "B4-MLO-08-7",
+   "practical_answer",
+   "each row tagged with its sampling weight (1 for 100%, 100 for the 1% sample).",
+   "each row tagged with its sampling weight (1 for 100%, 100 for the 1% sample). Run drift tests and population estimates on the uniform hash sample (or on the union with inverse-inclusion-probability weights), never on the mixed set unweighted.",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-14-1",
+   "answer",
+   "which a slow outcome metric can never satisfy",
+   "which is impractical for an outcome metric that takes weeks to mature",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-14-1",
+   "answer",
+   "(say 2 to 5% of users kept on the old model)",
+   "(say 2 to 5% of users kept on the old model, sized by a power calculation so it can detect a 2% change in repeat purchases)",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-14-6",
+   "detailed_answer",
+   "so one incident costs 24M x 0.02 x 6/52 = 55,400.",
+   "so, reading the 2% as the share of margin lost while an incident lasts, one incident costs 24M x 0.02 x 6/52 = 55,400.",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-14-6",
+   "detailed_answer",
+   "Saving per incident about 51,400;",
+   "Saving per incident about 51,400 (assuming monitoring catches every incident within 3 days);",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-14-6",
+   "detailed_answer",
+   "(feature consistency, prediction-distribution and freshness checks, which the ML Test Score lists among its monitoring tests)",
+   "(training-serving feature consistency and staleness checks, both monitoring tests in the ML Test Score, plus prediction-distribution or prediction-bias checks as discussed in Hidden Technical Debt)",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-08-2",
+   "answer",
+   "A change of units by a large factor such as 100 does exactly that for most amount distributions.",
+   "A change of units by a large factor such as 100 does exactly that for a narrowly spread amount distribution; with a wider spread the PSI is lower (about 4 for a lognormal with sigma 2) but still far above any threshold.",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-08-2",
+   "answer",
+   "with 20% of the reference already at zero it was about 0.03",
+   "with 20% of the reference already at zero it was about 0.02 to 0.03 (depending on how the ties at zero are binned)",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-08-8",
+   "answer",
+   "is tiny next to the weekly swing and",
+   "is smaller than the weekly swing (unless the standard deviation exceeds about five times the mean) and",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-14-2",
+   "answer",
+   "a different decision rate (more 'hold' actions) triggers those downstream calls",
+   "every 'hold' decision now triggers those downstream calls",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-11-1",
+   "detailed_answer",
+   "Protects against: tampered or typosquatted packages and silent upstream base-image changes.",
+   "Protects against: packages whose contents change after you locked them, typosquatted names when the internal mirror serves only reviewed packages, and silent upstream base-image changes.",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-11-5",
+   "detailed_answer",
+   "(for example label-only attacks that probe each record with hundreds or thousands of perturbed queries)",
+   "(for example label-only attacks, which probe each record with a few augmented queries up to thousands for boundary-distance attacks)",
+   "recheck_major"
+  ],
+  [
+   "B4-MLO-11-5",
+   "detailed_answer",
+   "but do nothing against a single-query threshold test by an authorised caller.",
+   "but do nothing against a single-query threshold test by an authorised caller, and per-key limits can be sidestepped with many keys.",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-11-5",
+   "practical_answer",
+   "(for example 0.1%), since a near-0.5 AUC can hide a handful of confidently identified records.",
+   "(for example 0.1%, which needs several thousand non-members to estimate), since a near-0.5 AUC can hide a handful of confidently identified records.",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-12-7",
+   "detailed_answer",
+   "compare CTR in the 19-day window to the same period a week or a month earlier, adjusting for seasonality,",
+   "compare CTR in the 19-day window to the pre-rename baseline (the preceding weeks, matched by weekday and adjusted for seasonality; a window shifted by only a week would overlap the incident),",
+   "recheck_major"
+  ],
+  [
+   "B4-MLO-13-2",
+   "detailed_answer",
+   "a step change exactly at the deploy implicates your change (prompt, model, classifier version or threshold);",
+   "a step change exactly at the deploy implicates your change (prompt, model, classifier version or threshold) unless an external event, such as a campaign or a new customer, landed the same day;",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-13-2",
+   "detailed_answer",
+   "This yields the share of the 2.7 extra points",
+   "Labelling especially the newly blocked items (those the previous versions would have passed) yields the share of the 2.7 extra points",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-14-4",
+   "answer",
+   "counterfactual evaluation (inverse-propensity weighting) works only if the logging policy was stochastic and its propensities were recorded, since items the old ranker never showed cannot be reweighted into the data",
+   "counterfactual evaluation (inverse-propensity weighting) needs known or estimated propensities: for item exposure the logging policy must have been stochastic with recorded propensities, since items the old ranker never showed cannot be reweighted into the data (position-bias propensities can instead be estimated from a small randomisation experiment)",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-14-4",
+   "answer",
+   "Plan (the skew check in item 4 is cheapest and can run first): reproduce the offline metric per position, replay with propensity weighting where propensities were logged,",
+   "Plan, in the order of items 1 to 4 (the skew check is cheap, so start it in parallel): reproduce the offline metric per position, replay with propensity weighting where propensities were logged, re-score with nDCG@5 or a conversion-weighted metric,",
+   "recheck_major"
+  ],
+  [
+   "B4-MLO-08-4",
+   "answer",
+   "gave KS statistic 0.14 (p about 8e-9) and PSI about 0.10",
+   "gave, in one draw, KS statistic 0.14 (p about 8e-9) and PSI about 0.10 (PSI varied roughly 0.07 to 0.16 across draws)",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-10-1",
+   "code_patch.solution",
+   "import numpy as np\n\n\ndef invariance_failures(predict, X, col, perturb, tol=0.01)",
+   "import numpy as np\n\n\ndef _as_float(X):\n    \"\"\"Float matrix (integer input is cas",
+   "recheck_patch"
+  ],
+  [
+   "B4-MLO-10-1",
+   "code_patch.test",
+   "def _make_model(leak_weight):\n    w = np.array([0.9, 1.1, 0.0, leak_weight])  # ",
+   "def _make_model(leak_weight):\n    w = np.array([0.9, 1.1, 0.0, leak_weight])  # ",
+   "recheck_patch"
+  ],
+  [
+   "B4-MLO-10-1",
+   "practical_answer",
+   "import numpy as np\n\n\ndef invariance_failures(",
+   "import numpy as np\n\n\ndef _as_float(X):\n    \"\"\"Float matrix (integer input is cast so a fractional step is not truncated; float32 stays float32).\"\"\"\n    X = np.asarray(X)\n    return X if X.dtype.kind == \"f\" else X.astype(float)\n\n\ndef invariance_failures(",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-10-1",
+   "practical_answer",
+   "moves the score by more than tol.\"\"\"",
+   "moves the score by more than tol (a NaN score counts as a failure).\"\"\"",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-10-1",
+   "practical_answer",
+   "    X2 = np.array(X, dtype=float)\n    X2[:, col] = perturb(X[:, col])\n    return np.flatnonzero(np.abs(predict(X2) - predict(X)) > tol)",
+   "    X = _as_float(X)\n    X2 = X.copy()\n    X2[:, col] = perturb(X[:, col])\n    return np.flatnonzero(~(np.abs(predict(X2) - predict(X)) <= tol))",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-10-1",
+   "practical_answer",
+   "against `direction` (+1 or -1).\"\"\"",
+   "against `direction` (+1 or -1); NaN scores count as failures.\"\"\"",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-10-1",
+   "practical_answer",
+   "    X2 = np.array(X, dtype=float)\n    X2[:, col] = X[:, col] + step\n    delta = (predict(X2) - predict(X)) * direction\n    return np.flatnonzero(delta < -tol)",
+   "    X = _as_float(X)\n    X2 = X.copy()\n    X2[:, col] = X[:, col] + step\n    delta = (predict(X2) - predict(X)) * direction\n    return np.flatnonzero(~(delta >= -tol))",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-10-1",
+   "practical_answer",
+   "(they are cast to float first).",
+   "(they are cast to float first), float32 input stays float32 (no cast noise), and a NaN score counts as a failure rather than a silent pass.",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-10-1",
+   "detailed_answer",
+   "tree ensembles and neural networks are piecewise and can wiggle locally",
+   "an unconstrained tree ensemble or neural network fits whatever the noisy data and feature interactions support, so the response along one feature can dip locally even when the overall trend is monotone",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-12-1",
+   "detailed_answer",
+   "the unchanged error rate says the slow requests still finish inside client timeouts",
+   "the unchanged error rate suggests the slow requests still finish inside client timeouts",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-12-8",
+   "detailed_answer",
+   "(c) Adding a 20% cache hit rate: 576 units, 0.134 per 1,000, about half of today's cost.",
+   "(c) Adding a 20% cache hit rate: 576 units, 0.134 per 1,000, about half of today's cost. Note that 576 is exactly the floor (2 replicas x 24 h x 12), so the cache adds only 36 units over (b) and any further efficiency gain is capped by the floor.",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-13-3",
+   "concise_answer",
+   "Cost per request must have risen about 30% (1.40/1.08), most likely through more tokens per request (or retries, tool rounds, model mix), so attribute",
+   "Cost per request must have risen about 30% (1.40/1.08), likely from more tokens, retries or model mix, so attribute",
+   "recheck_major"
+  ],
+  [
+   "B4-MLO-13-3",
+   "detailed_answer",
+   "its per-request cost goes from 4.6 to 6.2 units (+35%).",
+   "its per-request cost goes from 4.6 to 6.2 units (+35%). That explains the 30% rise only if the tenant is most of the traffic: at a 20% share the blended cost per request rises by just 7% (0.8 x 4.6 + 0.2 x 6.2 = 4.92), so check the other drivers too.",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-13-3",
+   "detailed_answer",
+   "Note that every edit to the fixed prefix (system prompt, policy text, tool definitions) invalidates the cached prefix",
+   "Note that an edit to the fixed prefix (system prompt, policy text, tool definitions) invalidates the cache from the edited point onward",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-14-5",
+   "detailed_answer",
+   "Windowed counts that depend on event lateness: keep the tolerance at zero but compare only rows whose window closed before the lateness bound (a non-zero tolerance would hide the off-by-one incident in the question), and track the late-event rate separately.",
+   "Windowed counts that depend on event lateness: keep the tolerance at zero (a non-zero tolerance would hide the off-by-one incident in the question) and make the recomputation point-in-time on arrival time, using only events that had arrived by served_at, which needs an ingestion timestamp. If the offline source has no arrival time, late events make offline counts exceed served ones, so compare only windows that were already closed and past the lateness allowance when the request was served, and track the late-event rate separately.",
+   "recheck_major"
+  ],
+  [
+   "B4-MLO-14-5",
+   "practical_answer",
+   "A mismatch that begins in the hour after a deploy is where to start reading the diff.",
+   "A mismatch that begins in the hour after a deploy is where to start reading the diff. Caveats: the inner join to tolerances silently drops any feature that has no tolerance row, so require one per logged feature, and recomputed must be unique per (request_id, feature) or the counts double.",
+   "recheck_minor"
+  ],
+  [
+   "B4-MLO-11-5",
+   "detailed_answer",
+   "but are partial; label-only attacks exist, so they do not guarantee safety",
+   "but label-only attacks exist and defeat defences that only mask confidence scores (Choquette-Choo et al.), so they should not be relied on as a defence on their own",
+   "source_verifier"
+  ]
+ ],
+ "skipped": [
+  [
+   "B4-MLO-14-1",
+   "answer",
+   "which a slow outcome metric can never satisfy",
+   "source_verifier"
+  ],
+  [
+   "B4-MLO-14-6",
+   "detailed_answer",
+   "(feature consistency, prediction-distribution and freshness checks, wh",
+   "source_verifier"
+  ]
+ ]
+}

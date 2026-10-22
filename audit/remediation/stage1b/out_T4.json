@@ -1,0 +1,382 @@
+[
+ {
+  "id": "smi-0120",
+  "status": "ok",
+  "question": "Is trying the following learning rates: 0.1,0.2,\u2026,0.5 a good strategy to optimize the learning rate?",
+  "answer": "No. A linear grid like 0.1 to 0.5 only spans a factor of 5, whereas a good learning rate can differ from a poor one by orders of magnitude, and the useful range depends on the optimizer, architecture, batch size and data scaling. The loss responds roughly multiplicatively to the learning rate (going from 1e-3 to 1e-2 matters about as much as 0.01 to 0.1), so candidates should be spaced on a logarithmic scale, e.g. 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, or sampled as 10**uniform(-5, 0) in a random search. A common procedure is to find the right order of magnitude coarsely, then refine within a narrower log range. Values like 0.1 to 0.5 are also very large for Adam-type optimizers (typical values are around 1e-4 to 1e-2) and may diverge, so the whole grid could be wasted. Judge each candidate by validation loss or metric, not training loss alone, and consider a learning-rate range test or a schedule rather than one fixed value.",
+  "key_concepts": [
+   "learning rate",
+   "logarithmic scale search",
+   "random search",
+   "hyperparameter tuning",
+   "validation loss",
+   "learning rate schedule"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Kept the 'No, use log scale' answer; added why (orders of magnitude, multiplicative effect), random search in log space, optimizer dependence and validation-based selection.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0127",
+  "status": "ok",
+  "question": "What happens if we use a ReLU activation and then a sigmoid as the final layer?",
+  "answer": "If ReLU is applied directly to the final pre-activation (logit) and its output is fed to a sigmoid, the sigmoid input is always >= 0, so the output probability is always >= 0.5. With the usual 0.5 decision threshold the network therefore predicts the positive class for every input, and it can never express a confident negative. Any sample whose logit would be negative gets ReLU output 0, sigmoid output exactly 0.5, and zero gradient through the ReLU, so training cannot push it toward the negative class either (dead-unit behaviour). The loss on negative examples stays high. The statement only holds with a 0.5 threshold; a different threshold would be arbitrary and the probabilities would be uncalibrated, so this is a design error either way. Fix: use no activation (a linear output) before the sigmoid, or equivalently output the raw logit and use a loss that takes logits (e.g. BCE with logits). Using ReLU in hidden layers is fine; the problem is only at the layer just before the sigmoid.",
+  "key_concepts": [
+   "ReLU",
+   "sigmoid output layer",
+   "logit",
+   "decision threshold",
+   "dead ReLU",
+   "binary cross-entropy"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original claim 'always one class' is only true for a 0.5 threshold and when ReLU acts on the logit; stated the condition, added the zero-gradient issue and the fix.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0129",
+  "status": "ok",
+  "question": "Is it necessary to shuffle the training data when using batch gradient descent?",
+  "answer": "No. Batch (full-batch) gradient descent computes the gradient of the loss over the entire training set for every update, and that sum or mean does not depend on the order of the examples (apart from tiny floating-point differences). So shuffling has no effect on the trajectory. Shuffling matters for stochastic and mini-batch gradient descent, where each update uses a subset: without reshuffling each epoch, batches are built from the same ordering, can be correlated (e.g. sorted by class or time), give biased or oscillating gradient estimates and can hurt convergence. Pitfall: the word 'batch' is often used loosely for mini-batch in deep learning frameworks; if the 'batch' is a mini-batch, you should shuffle (except in cases where order is meaningful, such as some sequence or time-series setups, where you shuffle windows or sequences rather than steps inside them).",
+  "key_concepts": [
+   "batch gradient descent",
+   "mini-batch SGD",
+   "shuffling",
+   "full-dataset gradient",
+   "gradient estimate bias"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Kept 'No' with its reasoning; clarified it applies to full-batch GD only, contrasted with mini-batch/SGD, and flagged loose use of 'batch'.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0131",
+  "status": "ok",
+  "question": "Is dropout used on the test set?",
+  "answer": "No. Dropout is a regularization technique applied only during training: each unit is randomly zeroed with probability p so the network cannot rely on specific co-adapted units. At test (inference) time all units are active so predictions are deterministic. To keep activation magnitudes consistent, implementations use inverted dropout: during training the surviving activations are scaled by 1/(1-p), so no extra scaling is needed at inference (the older formulation instead scales weights by (1-p) at test time). In frameworks this means switching to evaluation mode (e.g. model.eval() in PyTorch, or training=False in Keras), which also affects layers like batch normalization. Forgetting this gives noisy, worse predictions. The exception is Monte Carlo dropout, where dropout is deliberately kept on at inference and several stochastic forward passes are averaged to approximate predictive uncertainty. Also note the validation set is evaluated without dropout too.",
+  "key_concepts": [
+   "dropout",
+   "inverted dropout",
+   "regularization",
+   "inference mode",
+   "Monte Carlo dropout"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Kept the correct core; added inverted-dropout scaling, eval-mode pitfall and the MC-dropout exception.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0133",
+  "status": "ok",
+  "question": "Suppose the training error/cost is high and that the validation cost/error is almost equal to it. What does it mean? What should be done?",
+  "answer": "This indicates underfitting (high bias): the model cannot even fit the training data well, and since validation error is close to training error, the gap (variance) is small. 'High' should be judged against an achievable baseline such as human-level or a strong reference model. Remedies address capacity and optimization: use a more expressive model (more layers/units/parameters, richer features, interaction terms), reduce regularization (lower weight decay, dropout or L2 strength), train longer or tune the optimizer and learning rate (check that the loss has actually converged), and fix feature or label problems. Collecting more data alone usually does not help, because the learning curves have already converged at a high error. A learning curve (error versus training-set size) is a good diagnostic: both curves plateau high when the problem is bias. If the training error were low and validation error much higher, it would be overfitting instead, which needs the opposite remedies.",
+  "key_concepts": [
+   "underfitting",
+   "high bias",
+   "learning curves",
+   "model capacity",
+   "regularization strength",
+   "train-validation gap"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was correct; added the baseline condition, optimization checks, why more data does not help, and the overfitting contrast.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0156",
+  "status": "ok",
+  "question": "How does the k-means clustering algorithm work, and what are its main assumptions and limitations?",
+  "answer": "K-means partitions n observations into k clusters so that each observation belongs to the cluster with the nearest mean (centroid), by (approximately) minimizing the within-cluster sum of squared Euclidean distances (inertia). Lloyd's algorithm: choose k initial centroids (k-means++ is the usual smart seeding), assign every point to its nearest centroid, recompute each centroid as the mean of its points, and repeat until assignments stop changing. Each step cannot increase the objective, so it converges, but only to a local minimum, so run several restarts and keep the lowest inertia. Limitations: k must be chosen in advance (elbow, silhouette or domain knowledge); it favours roughly spherical, similarly sized, similar-density clusters; it is sensitive to outliers and to feature scale, so standardize features; it needs numeric features where a mean makes sense (k-medoids or k-modes otherwise). Cost per iteration is O(n*k*d). Example below on two well-separated blobs.\n\n```python\nimport numpy as np\nfrom sklearn.cluster import KMeans\n\nX = np.array([[0, 0], [0, 1], [1, 0], [1, 1],\n              [10, 10], [10, 11], [11, 10], [11, 11]], dtype=float)\nkm = KMeans(n_clusters=2, init=\"k-means++\", n_init=10, random_state=0).fit(X)\ncenters = sorted(km.cluster_centers_.tolist())\nprint(centers, km.inertia_)\n```",
+  "key_concepts": [
+   "k-means",
+   "Lloyd's algorithm",
+   "centroid",
+   "inertia",
+   "k-means++ initialization",
+   "choosing k",
+   "local minimum"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\nfrom sklearn.cluster import KMeans\n\nX = np.array([[0, 0], [0, 1], [1, 0], [1, 1],\n              [10, 10], [10, 11], [11, 10], [11, 11]], dtype=float)\nkm = KMeans(n_clusters=2, init=\"k-means++\", n_init=10, random_state=0).fit(X)\ncenters = sorted(km.cluster_centers_.tolist())\nprint(centers, km.inertia_)",
+   "test": "assert len(set(km.labels_[:4])) == 1 and len(set(km.labels_[4:])) == 1\nassert km.labels_[0] != km.labels_[4]\nassert np.allclose(centers, [[0.5, 0.5], [10.5, 10.5]])\nassert abs(km.inertia_ - 4.0) < 1e-9",
+   "expected": [
+    [
+     [
+      0.5,
+      0.5
+     ],
+     [
+      10.5,
+      10.5
+     ]
+    ],
+    4.0
+   ]
+  },
+  "sources": [],
+  "change_notes": "Question was a bare fragment ('K-means Clustering?'); rewritten as a proper question on the same topic. Answer expanded with algorithm, objective, local-minimum caveat and limitations; difficulty raised to Medium. Code run: centers [[0.5,0.5],[10.5,10.5]], inertia 4.0.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0275",
+  "status": "ok",
+  "question": "What are hyperparameters and how are they different from parameters?",
+  "answer": "Parameters are values the model learns from the training data by optimization, e.g. neural-network weights and biases, linear/logistic regression coefficients, or the split features and thresholds of a decision tree. Hyperparameters are configuration choices set before (or outside) the training procedure that control the model's structure or the learning process itself, e.g. learning rate, number of layers or units, batch size, regularization strength, tree depth, k in k-NN, or SVM C and gamma. The training algorithm does not update hyperparameters by gradient descent on the training loss; they are chosen by tuning: grid search, random search or Bayesian optimization, evaluated on a validation set or by cross-validation. The final test set must stay untouched, otherwise the performance estimate is optimistically biased through tuning leakage. Hyperparameters strongly affect capacity (bias-variance trade-off) and optimization behaviour. The boundary is conventional: automated methods or hypernetworks can learn some of them, but they are still not fit by the ordinary training loss.",
+  "key_concepts": [
+   "hyperparameters",
+   "model parameters",
+   "validation set",
+   "cross-validation",
+   "random search",
+   "test-set leakage"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original correct but thin; added examples for both, how hyperparameters are tuned, test-set leakage pitfall, and the conventional nature of the boundary.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0287",
+  "status": "ok",
+  "question": "What is a voting model?",
+  "answer": "A voting model (voting ensemble) combines the predictions of several different base models into one prediction. In hard voting each classifier casts a class vote and the majority (plurality for more than two classes) wins. In soft voting the predicted class probabilities are averaged (optionally weighted) and the class with the highest average probability is chosen; this requires models that output reasonably calibrated probabilities and often does better than hard voting because confident models count for more. For regression the analogue is averaging the predictions. It works because, if the members make partly independent errors, the combined error is lower than the typical member's; so diversity matters (different algorithms, features or hyperparameters), and combining near-identical models gains little. It does not guarantee beating the best single model, and costs more training and inference time. Example: scikit-learn's VotingClassifier with logistic regression, a random forest and an SVM. Unlike stacking, there is no meta-learner; the combination rule is fixed.",
+  "key_concepts": [
+   "voting ensemble",
+   "hard voting",
+   "soft voting",
+   "model diversity",
+   "probability calibration",
+   "stacking"
+  ],
+  "difficulty": "Easy",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original only described hard voting; added soft voting, why it works (diverse errors), caveats and difference from stacking.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0288",
+  "status": "ok",
+  "question": "What are the hyperparameters of an SVM?",
+  "answer": "The main SVM hyperparameters are: C, the regularization (penalty) parameter: small C gives a wider margin and tolerates more margin violations (more regularization, higher bias), large C penalizes violations heavily (narrower margin, risk of overfitting). The kernel (linear, polynomial, RBF, sigmoid) sets the shape of the decision boundary. Kernel parameters: gamma for RBF/polynomial/sigmoid (large gamma means each point has a narrow influence, giving a wiggly, overfit boundary; small gamma gives a smoother, more linear one), degree for polynomial, and coef0 for polynomial/sigmoid. For support vector regression there is also epsilon, the width of the insensitive tube. Other settings include class_weight for imbalance and the solver tolerance. Because C and gamma interact, tune them together, typically with cross-validated grid or random search on a logarithmic scale (e.g. 1e-3 to 1e3), and always scale the features first, since SVMs are distance/dot-product based. A linear kernel has only C to tune.",
+  "key_concepts": [
+   "SVM hyperparameters",
+   "regularization parameter C",
+   "kernel",
+   "gamma",
+   "RBF kernel",
+   "support vector regression epsilon",
+   "feature scaling"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original listed three names; added the effect of each, additional hyperparameters (degree, coef0, epsilon, class_weight) and tuning advice.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0291",
+  "status": "ok",
+  "question": "Differentiate between boosting and bagging.",
+  "answer": "Both are ensemble methods built from many base learners, but they train and combine them differently. Bagging (bootstrap aggregating) trains each model independently, in parallel, on a bootstrap sample of the data and averages (regression) or votes (classification). Its main effect is variance reduction, so it works best with low-bias, high-variance learners such as deep decision trees (random forest adds random feature subsets to decorrelate the trees); it is fairly robust to noisy labels and gives out-of-bag error estimates. Boosting trains models sequentially, each one focusing on what the ensemble so far gets wrong, either by reweighting misclassified examples (AdaBoost) or by fitting the negative gradient/residuals of the loss (gradient boosting), and combines them as a weighted sum. It mainly reduces bias, using weak learners such as shallow trees, but can also reduce variance. Trade-offs: boosting often reaches higher accuracy but can overfit, especially with noisy labels, so it needs a small learning rate, early stopping and limited depth; its rounds are inherently sequential, whereas bagging parallelizes trivially.",
+  "key_concepts": [
+   "bagging",
+   "boosting",
+   "bootstrap sampling",
+   "variance reduction",
+   "bias reduction",
+   "gradient boosting",
+   "random forest"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original oversimplified (boosting 'reduces bias' only, bagging 'parallel'); qualified: boosting mainly reduces bias but also variance, added mechanisms, learner types and overfitting trade-offs.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0305",
+  "status": "ok",
+  "question": "What are the different types of learning or training models in ML?",
+  "answer": "Machine-learning approaches are usually grouped by the kind of feedback available during training. Supervised learning learns from labelled input-target pairs to predict the target (classification, regression). Unsupervised learning finds structure in unlabelled data (clustering, dimensionality reduction, density estimation). Reinforcement learning is different: an agent interacts with an environment and learns a policy from reward signals, not from labelled targets, so it is not defined simply by the presence or absence of a target variable. Common in-between or related categories: semi-supervised learning (a few labels plus many unlabelled examples) and self-supervised learning (labels derived from the data itself, as in masked-language-model pre-training). Also distinguished are online versus batch learning (incremental versus all-at-once updates). Example: spam detection with labelled emails is supervised; customer segmentation with k-means is unsupervised; a game-playing agent learning from win/loss reward is reinforcement learning.",
+  "key_concepts": [
+   "supervised learning",
+   "unsupervised learning",
+   "reinforcement learning",
+   "semi-supervised learning",
+   "self-supervised learning",
+   "reward signal"
+  ],
+  "difficulty": "Easy",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original said types depend on presence/absence of target variables, which does not describe reinforcement learning (reward signal); fixed that, added semi- and self-supervised learning and examples.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0378",
+  "status": "ok",
+  "question": "What are some ways I can make my model more robust to outliers?",
+  "answer": "First investigate: decide whether outliers are errors (fix or remove), genuine rare-but-valid cases the model must handle (keep), or a different process (model separately). Then options: (1) Robust loss: Huber, MAE/quantile or Tukey-style losses instead of squared error, which squares large residuals and lets a few points dominate. (2) Robust models/estimators: tree-based models are insensitive to extreme feature values; RANSAC, Theil-Sen or Huber regression for linear models; median-based statistics. (3) Transform the target or features: log or Box-Cox/Yeo-Johnson for skewed variables, rank transforms. (4) Cap/winsorize at percentiles, and use robust scaling (median and IQR) instead of mean/std. (5) Remove only confirmed anomalies, or use outlier detection (IQR rule, isolation forest) with care. Learn thresholds, caps and scalers on training data only to avoid leakage, and evaluate with a metric that matches the business cost (e.g. MAE versus RMSE). Pitfall: deleting outliers can bias the model and hide the cases that matter most in production.",
+  "key_concepts": [
+   "robust loss functions",
+   "Huber loss",
+   "winsorizing",
+   "robust scaling",
+   "log transformation",
+   "outlier detection",
+   "RANSAC"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was a valid one-line list; added the investigate-first step, concrete methods, leakage and metric-alignment caveats.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0380",
+  "status": "ok",
+  "question": "What error metric would you use to evaluate how good a binary classifier is? What if the classes are imbalanced? What if there are more than two groups?",
+  "answer": "The metric should follow the cost of errors, not habit. Balanced binary data: accuracy is fine as a summary, ROC-AUC measures ranking quality independent of threshold, and log loss or Brier score assess probability quality. Imbalanced data: accuracy is misleading (predicting the majority class can score 99%), so use the confusion matrix with precision, recall and F1 (or F-beta if recall or precision matters more), and PR-AUC/average precision; ROC-AUC can look optimistic when negatives vastly outnumber positives because the false-positive rate stays small, whereas precision reacts to them. Also choose the decision threshold deliberately from the cost trade-off rather than defaulting to 0.5. More than two classes: compute per-class precision/recall, then macro-average (unweighted mean over classes, treats rare classes equally), weighted-average (by class support) or micro-average (pool all decisions; for single-label multiclass micro-F1 equals accuracy, so it is dominated by frequent classes); a multiclass confusion matrix and one-vs-rest AUC are also used. For imbalance you can add stratified splits and, if needed, class weights.",
+  "key_concepts": [
+   "accuracy",
+   "precision and recall",
+   "F1 score",
+   "PR-AUC",
+   "ROC-AUC",
+   "macro F1",
+   "micro F1",
+   "confusion matrix"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was a correct list; added reasoning for each case, ROC-AUC optimism under heavy imbalance, threshold choice, and that micro-F1 equals accuracy for single-label multiclass.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0381",
+  "status": "ok",
+  "question": "What are various ways to predict a binary response variable? Can you compare two of them and tell me when one would be more appropriate? What is the difference between these?",
+  "answer": "Common methods: logistic regression, naive Bayes, k-NN, decision trees, random forests, gradient-boosted trees, support vector machines and neural networks. Comparison of logistic regression versus a kernel SVM: logistic regression models P(y=1|x) as a sigmoid of a linear function of the features and is fit by maximizing likelihood (log loss). It outputs probabilities, its coefficients are interpretable as log-odds effects, training is convex and fast, and it is a strong baseline, but its boundary is linear in the given features unless you add interactions. An SVM maximizes the margin using hinge loss and depends only on the support vectors; with a non-linear kernel (e.g. RBF) it can fit curved boundaries, but it does not natively give probabilities (Platt scaling is needed), is harder to interpret, scales worse with many samples, and needs feature scaling and tuning of C and gamma. Note that a linear SVM is still a linear classifier, so the 'more complex boundary' advantage comes only from the kernel. Choose logistic regression when interpretability, calibrated probabilities or a quick baseline matter; the kernel SVM for moderate-sized data with clear non-linear structure; gradient boosting often wins on tabular data. The best choice is established empirically with cross-validation.",
+  "key_concepts": [
+   "binary classification",
+   "logistic regression",
+   "support vector machine",
+   "kernel trick",
+   "log-odds",
+   "probability calibration",
+   "gradient boosting"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original said 'SVM handles more complex boundaries', true only with a non-linear kernel; qualified that, expanded the comparison (loss, probabilities, interpretability, scaling) and when to choose each. Question is open-ended by nature.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0383",
+  "status": "ok",
+  "question": "Why might it be preferable to include fewer predictors over many?",
+  "answer": "Fewer well-chosen predictors usually give a model that generalizes better and is easier to use. Reasons: (1) Lower variance and less overfitting: each extra predictor adds parameters that can fit noise, especially when the number of predictors is large relative to the number of samples. (2) Interpretability: a smaller model is easier to explain and audit. (3) Multicollinearity: correlated predictors make coefficient estimates unstable with inflated standard errors, which harms inference more than raw predictive accuracy. (4) Cost and reliability: fewer features to collect, store, monitor and keep available in production, and less exposure to data drift or missingness. (5) Speed of training and inference, and less curse-of-dimensionality pressure on distance-based methods. Condition: this holds for predictors that are noisy or redundant; dropping genuinely informative ones increases bias, so it is a bias-variance trade-off. Regularization (lasso, ridge) or tree ensembles can handle many predictors, so the benefit is greatest for unregularized models and small samples. Select by cross-validation, not by looking at the test set.",
+  "key_concepts": [
+   "overfitting",
+   "bias-variance trade-off",
+   "multicollinearity",
+   "interpretability",
+   "feature selection",
+   "curse of dimensionality",
+   "lasso"
+  ],
+  "difficulty": "Easy",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was a correct list; added mechanism per reason, the condition (only for noisy/redundant predictors), the note that multicollinearity mainly hurts inference, and the role of regularization.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0394",
+  "status": "ok",
+  "question": "You want to run a regression to predict the probability of a flight delay, but there are flights with delays of up to 12 hours that are really messing up your model. How can you address this?",
+  "answer": "First note the mismatch: a probability of delay is a classification target, so the natural fix is to define a binary label (e.g. delayed by more than 15 minutes) and fit logistic regression or gradient boosting. Then the length of an extreme delay no longer matters, since a 12-hour delay is just a 1. If you actually need to predict delay minutes, the long tail is the issue: (1) investigate the extremes, since multi-hour delays and cancellations often come from different causes (weather, mechanical, crew) and may deserve a separate model or flag; (2) transform the target (log1p of positive delays, or a two-part model: probability of delay, then size given delay); (3) use a robust loss such as Huber or MAE, or quantile regression to predict the median or chosen quantiles; (4) cap or winsorize at a high percentile, using a threshold learned on training data; (5) use tree-based models, which are less affected by extreme targets. Do not simply delete the long delays if they occur in production, as the model would then be systematically over-optimistic. Evaluate with a metric that reflects the use case (e.g. log loss or Brier score for probabilities).",
+  "key_concepts": [
+   "flight delay prediction",
+   "logistic regression",
+   "robust loss",
+   "target transformation",
+   "quantile regression",
+   "winsorizing",
+   "two-part model"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was a list; added the key observation that probability of delay is a classification problem (so extreme durations become irrelevant), and explained each regression-side option with caveats about deleting data.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0413",
+  "status": "ok",
+  "question": "Difference between WHERE and HAVING?",
+  "answer": "WHERE filters individual rows before grouping and aggregation; HAVING filters groups after GROUP BY and aggregation. Logical order of evaluation: FROM/JOIN, WHERE, GROUP BY, aggregate functions, HAVING, SELECT, ORDER BY. Consequently WHERE cannot use aggregate functions such as SUM() or COUNT(*) (they do not exist yet), whereas HAVING can; conversely, a condition on a plain column that does not depend on aggregates is better placed in WHERE, because it discards rows early so fewer rows are grouped (optimizers may sometimes push such predicates down, but do not rely on it). Example: total paid amount per customer, counting only paid orders, keeping customers whose total exceeds 100. The status filter is row-level so it goes in WHERE; the total filter is group-level so it goes in HAVING. On the sample data, customer 1 has paid 60+70=130 (the refunded 500 is excluded by WHERE), customer 2 has 90 and is removed by HAVING, customer 3 has 200.\n\n```sql\nSELECT customer_id, SUM(amount) AS total_paid\nFROM orders\nWHERE status = 'paid'\nGROUP BY customer_id\nHAVING SUM(amount) > 100\nORDER BY customer_id;\n```",
+  "key_concepts": [
+   "WHERE clause",
+   "HAVING clause",
+   "GROUP BY",
+   "aggregate functions",
+   "order of evaluation",
+   "row-level vs group-level filter"
+  ],
+  "difficulty": "Easy",
+  "domain": "SQL",
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE orders(order_id INTEGER, customer_id INTEGER, status TEXT, amount REAL);\nINSERT INTO orders VALUES (1,1,'paid',60),(2,1,'paid',70),(3,1,'refunded',500),(4,2,'paid',80),(5,2,'paid',10),(6,3,'paid',200);",
+   "solution": "SELECT customer_id, SUM(amount) AS total_paid\nFROM orders\nWHERE status = 'paid'\nGROUP BY customer_id\nHAVING SUM(amount) > 100\nORDER BY customer_id;",
+   "test": "",
+   "expected": [
+    [
+     1,
+     130.0
+    ],
+    [
+     3,
+     200.0
+    ]
+   ]
+  },
+  "sources": [],
+  "change_notes": "Original correct; added evaluation order, why WHERE cannot use aggregates, performance guidance, and an executed SQLite example (result [(1,130.0),(3,200.0)]).",
+  "confidence": "high"
+ }
+]

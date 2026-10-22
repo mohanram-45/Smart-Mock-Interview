@@ -1,0 +1,1139 @@
+[
+ {
+  "plan_id": "B3-MLO-06-1",
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": null,
+  "added_sources": [],
+  "unsourced_claims": [
+   "Lock-file pinning hides what a fresh build would resolve (general packaging practice, no source)",
+   "Bake-vs-download trade-off for model weights (design judgement)"
+  ],
+  "code_patch": null,
+  "rubric_points": null,
+  "suggested_key_concepts": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "verdict": "pass",
+  "reasons": [
+   "Diagnosis (COPY . . before install invalidates install layer) is correct and matches Docker's own worked example; restructured Dockerfile is valid and consistent with the prose; extras are standard and sourced."
+  ],
+  "parts_answered": {
+   "why every edit reinstalls deps": true,
+   "how to restructure": true,
+   "what else to tighten before production": true
+  },
+  "evidence": [
+   {
+    "claim": "A changed layer invalidates all later layers",
+    "method": "doc",
+    "evidence": "docs.docker.com/build/cache/: 'If a layer changes, all other layers that come after it are also affected.'"
+   },
+   {
+    "claim": "Copy manifest, install, then copy source",
+    "method": "doc",
+    "evidence": "build/cache/optimize/ 'Order your layers': 'copy over the package management files... Then, install the dependencies. Finally, copy over the project source code, which is subject to frequent change.'"
+   },
+   {
+    "claim": "Digest pinning for supply-chain integrity; USER non-root; .dockerignore; multi-stage",
+    "method": "doc",
+    "evidence": "building/best-practices/: 'To fully secure your supply chain integrity, you can pin the image version to a specific digest'; 'If a service can run without privileges, use USER to change to a non-root user'; 'Exclude with .dockerignore'; 'Use multi-stage builds'."
+   },
+   {
+    "claim": "Weights layer before code layer avoids re-pushing weights on code change",
+    "method": "derivation",
+    "evidence": "Layer order follows the same invalidation rule; weights COPY precedes service/ COPY so a code-only edit leaves it cached."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Single mechanism (layer cache invalidation) plus a checklist of hardening items; short applied restructuring, no multi-step derivation.",
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanism, fix and hardening rationale incl. weights trade-off."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete Dockerfile plus a verification procedure; not a paraphrase of the detailed text."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "All 8 are discussed (layer caching, invalidation, COPY ordering, lock file, digest, dockerignore, non-root, multi-stage). 'multi-stage build' is only a one-line mention but acceptable.",
+  "sources_findings": [
+   {
+    "url": "https://docs.docker.com/build/cache/",
+    "status": "supported",
+    "evidence": "'If a layer changes, all other layers that come after it are also affected.'"
+   },
+   {
+    "url": "https://docs.docker.com/build/cache/optimize/",
+    "status": "supported",
+    "evidence": "'make expensive steps appear near the beginning... Steps that change often should appear near the end'; package.json/yarn.lock copy-then-install example."
+   },
+   {
+    "url": "https://docs.docker.com/build/building/best-practices/",
+    "status": "supported",
+    "evidence": "Digest pinning sentence, USER non-root sentence and .dockerignore section all present."
+   }
+  ],
+  "common_mistakes_note": "Good: mistakes are real and specific (cache flag instead of reordering; install before requirements COPY; digest vs tag).",
+  "interview_style_note_ok": true
+ },
+ {
+  "plan_id": "B3-MLO-06-2",
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": null,
+  "added_sources": [],
+  "unsourced_claims": [
+   "Forked workers may or may not share model pages via copy-on-write (hedged in the text, general OS behaviour)",
+   "A slow upward memory trend indicates a leak (general debugging heuristic)"
+  ],
+  "code_patch": null,
+  "rubric_points": null,
+  "suggested_key_concepts": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "verdict": "correct",
+  "reasons": [
+   "Mechanism and Kubernetes behaviour are correct and sourced.",
+   "Practical block contradicts its own sizing: the stated estimated peak (2.9 GiB) is 83% of the proposed 3.5 GiB limit, so the final acceptance check 'stays below roughly 80% of the limit' would fail by design.",
+   "The 4 data-loader worker processes named in the question are never added to the memory sum."
+  ],
+  "parts_answered": {
+   "why not locally": true,
+   "how to find real need": true,
+   "what to change": true,
+   "shared memory/dev/shm effect": true
+  },
+  "evidence": [
+   {
+    "claim": "Memory limits enforced by kernel OOM kills; CPU by throttling",
+    "method": "doc",
+    "evidence": "manage-resources-containers: '`memory` limits are enforced by the kernel with out of memory (OOM) kills'; '`cpu` limits are enforced by CPU throttling.'"
+   },
+   {
+    "claim": "OOMKilled means container tried to use more than its limit",
+    "method": "doc",
+    "evidence": "same page: 'The `OOMKilled` reason shows that the container tried to use more memory than its limit.'"
+   },
+   {
+    "claim": "tmpfs emptyDir counts against container memory limit",
+    "method": "doc",
+    "evidence": "volumes page: 'unlike disks, files you write count against the memory limit of the container that wrote them.'"
+   },
+   {
+    "claim": "2x1.4 + 2x0.4 = 3.6; +0.6 = 4.2 > 4",
+    "method": "executed",
+    "evidence": "arithmetic recomputed: 2.8+0.8=3.6, 3.6+0.6=4.2, 4.2+0.5=4.7."
+   },
+   {
+    "claim": "Option (a) 1.4+0.4+0.6+0.5 = 2.9; 3.5 limit gives ~20% margin",
+    "method": "executed",
+    "evidence": "2.9*1.2=3.48 so 3.5 ok; but 2.9/3.5 = 82.9% utilisation, above the '80%' acceptance threshold."
+   },
+   {
+    "claim": "Option (b) two workers limit 5.5",
+    "method": "derivation",
+    "evidence": "4.7*1.17=5.5; margin ~17%, roughly consistent with 'about 20%' though not identical."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "practical_answer",
+    "claim": "stays below roughly 80% of the limit",
+    "problem": "With the proposed 3.5 GiB limit the answer's own expected peak (2.9 GiB) is already about 83% of the limit, so this acceptance criterion contradicts the sizing and would flag a correctly sized pod as failing.",
+    "replacement": "stays below roughly 85% of the limit (the estimated 2.9 GiB peak is already about 83% of 3.5 GiB)"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Add per-process framework and interpreter overhead (suppose a measured 0.4 GiB each, 0.8 GiB)",
+    "problem": "The 4 data-loader worker processes stated in the question have their own interpreter/framework overhead and are not in the sum, so the total is optimistic.",
+    "replacement": "Add per-process framework and interpreter overhead (suppose a measured 0.4 GiB each for the two server workers, 0.8 GiB; the 4 data-loader workers add their own overhead, which the measurement should include)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Several interacting contributors (limit semantics, per-worker model copies, tmpfs accounting) but each is a known fact; arithmetic is simple.",
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Explanation, measurement method and ordered remedies."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked sizing and a pod-spec fragment; adds new numbers and config not in detailed (but fix the 80% check)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "All covered; 'memory request' is mentioned only briefly (set near steady state) - acceptable.",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+    "status": "supported",
+    "evidence": "OOM-kill and throttling sentences, OOMKilled sentence, whole-number extended-resource sentence all present on the rendered page. (Extended-resource and Pending claims listed in 'supports' are not used by this record.)"
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/storage/volumes/",
+    "status": "supported",
+    "evidence": "'files you write count against the memory limit of the container that wrote them.'"
+   }
+  ],
+  "common_mistakes_note": "Genuine and useful.",
+  "interview_style_note_ok": true
+ },
+ {
+  "plan_id": "B3-MLO-06-3",
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": null,
+  "added_sources": [],
+  "unsourced_claims": [
+   "CrashLoopBackOff back-off behaviour wording ('eventually backs off') - standard kubelet behaviour, not quoted"
+  ],
+  "code_patch": null,
+  "rubric_points": null,
+  "suggested_key_concepts": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "verdict": "correct",
+  "reasons": [
+   "Diagnosis (liveness kills before 60-150 s load) and probe roles are correct and well sourced.",
+   "Validation step in the practical block tests the wrong thing: with a 30x10 = 300 s startup budget, a 200 s load would still succeed, so the claimed restart would not occur.",
+   "The 'pods stay alive but unready' test depends on the HTTP server answering /health/live while weights load, an assumption the design never states."
+  ],
+  "parts_answered": {
+   "what is happening": true,
+   "probe design": true,
+   "what each endpoint checks": true,
+   "one way design could still go wrong": true
+  },
+  "evidence": [
+   {
+    "claim": "First check ~20 s, 3 failures at 10 s => killed ~40 s",
+    "method": "derivation",
+    "evidence": "checks at t=20,30,40; third failure at ~40 s (+ timeout); answer says 40-50 s, consistent."
+   },
+   {
+    "claim": "Startup probe holds off liveness/readiness until success; failure kills the container",
+    "method": "doc",
+    "evidence": "probes concept page: 'Kubernetes does not execute liveness or readiness probes until the startup probe succeeds'; 'If the startup probe fails, the kubelet kills the container'."
+   },
+   {
+    "claim": "Startup probe on same endpoint as liveness, high failureThreshold",
+    "method": "doc",
+    "evidence": "probes page: 'you should specify a startup probe that checks the same endpoint as the liveness probe... set its failureThreshold high enough to allow the container to start, without changing the default values of the liveness probe.'"
+   },
+   {
+    "claim": "Readiness probes run for whole lifecycle; unready pods get no traffic",
+    "method": "doc",
+    "evidence": "'Readiness probes run on the container during its whole lifecycle.' and 'the pod will be marked unready and will not receive traffic from any services.'"
+   },
+   {
+    "claim": "Startup budget = 30 x 10 = 300 s",
+    "method": "derivation",
+    "evidence": "failureThreshold x periodSeconds (+ initialDelaySeconds default 0)."
+   },
+   {
+    "claim": "200 s load would fail a 300 s startup budget",
+    "method": "derivation",
+    "evidence": "200 < 300, so the startup probe succeeds; the practical test statement is wrong. 350 s would exceed the budget."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "practical_answer",
+    "claim": "Then lengthen the simulated load to 200 s and confirm the startup probe fails and the pod is restarted, proving the budget is enforced.",
+    "problem": "The startup budget in the same block is about 300 s (30 x 10), so a 200 s load passes and no restart occurs; the test as written contradicts the configuration.",
+    "replacement": "Then lengthen the simulated load beyond the budget (for example 350 s) and confirm the startup probe fails and the pod is restarted, proving the budget is enforced; a 200 s load would still pass inside the 300 s budget."
+   },
+   {
+    "severity": "major",
+    "field": "practical_answer",
+    "claim": "Validation: kill the weight store's network in a test cluster and confirm pods stay alive but unready (no restarts), then restore it and confirm they become ready without a restart.",
+    "problem": "This outcome holds only if the server answers /health/live while weights load in the background. If loading blocks the server (the scenario that needs a startup probe on the liveness endpoint), the startup probe kills the pod after about 300 s. Also, pods that already finished loading do not become unready when the store goes away, because readiness here is local.",
+    "replacement": "Validation: start fresh pods in a test cluster with the weight store unreachable. If the HTTP server answers /health/live while weights load in the background, the pods stay alive but unready (no restarts) and become ready without a restart once the store returns; if loading blocks the server, the startup probe will kill them after about 300 s, so match the test to your real load path."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Applies three probe types and a timing calculation; no deep multi-step reasoning, but needs to know startup-probe semantics.",
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Diagnosis, design and failure modes."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "YAML probe block and validation plan (needs the fixes above)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is, with the two corrections)",
+  "key_concepts_findings": "All covered; 'Service endpoints' appears only as 'no traffic through Services' - acceptable.",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/concepts/workloads/pods/probes/",
+    "status": "supported",
+    "evidence": "Startup-probe, slow-start, 'Liveness probes do not wait for readiness probes to succeed' and failure-kills sentences all present."
+   },
+   {
+    "url": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/",
+    "status": "supported",
+    "evidence": "'the kubelet kills the container and restarts it'; 'will not receive traffic from any services'; 'Readiness probes run on the container during its whole lifecycle.'"
+   }
+  ],
+  "common_mistakes_note": "Good; the first listed mistake (large initialDelaySeconds) is a real trade-off.",
+  "interview_style_note_ok": true
+ },
+ {
+  "plan_id": "B3-MLO-06-4",
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": null,
+  "added_sources": [],
+  "unsourced_claims": [
+   "The old pod's GPU is freed only after its graceful termination completes, so real per-replacement time is slightly above 90 s (general behaviour, not stated)",
+   "Scheduler does not preempt running pods for a surge pod of equal priority (background)"
+  ],
+  "code_patch": null,
+  "rubric_points": null,
+  "suggested_key_concepts": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "verdict": "correct",
+  "reasons": [
+   "Deadlock analysis is correct (surge pod Pending for lack of a free GPU, maxUnavailable 0 forbids freeing one).",
+   "Arithmetic is right; one minor inconsistency: the practical block adds minReadySeconds: 30 but still quotes rollout/rollback time as 4 x 90 s."
+  ],
+  "parts_answered": {
+   "why it hangs": true,
+   "options": true,
+   "cost of each": true,
+   "uses 90 s load time": true
+  },
+  "evidence": [
+   {
+    "claim": "maxSurge and maxUnavailable cannot both be 0; defaults 25%",
+    "method": "doc",
+    "evidence": "deployment page: 'The value cannot be 0 if maxSurge is 0' / 'The value cannot be 0 if maxUnavailable is 0.'; 'The default value is 25%.'"
+   },
+   {
+    "claim": "Pending while request cannot be satisfied",
+    "method": "doc",
+    "evidence": "manage-resources-containers: 'The Pod remains in the PENDING state as long as the resource request cannot be satisfied.'"
+   },
+   {
+    "claim": "Old ReplicaSets retained for rollback, default 10",
+    "method": "doc",
+    "evidence": "deployment page: '.spec.revisionHistoryLimit ... By default, it is 10.'"
+   },
+   {
+    "claim": "Option 1 time >= 4 x 90 s = 360 s = 6 min; capacity 3/4",
+    "method": "derivation",
+    "evidence": "one pod at a time, each load 90 s; with minReadySeconds 30 it is >= 8 min (still consistent with 'at least')."
+   },
+   {
+    "claim": "3/3.4 = 88.2%",
+    "method": "executed",
+    "evidence": "3/3.4 = 0.882"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "with the expectation that rollback also takes about 4 x 90 s",
+    "problem": "The strategy block in the same answer sets minReadySeconds: 30, so each replacement takes about 120 s and the whole update or rollback about 8 minutes, not 6.",
+    "replacement": "with the expectation that rollback also takes about 4 x (90 + 30) s = 8 minutes with this minReadySeconds"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "One well-known rolling-update constraint interacting with scarce GPU capacity; requires comparing options, not deep derivation.",
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Cause, three options with costs, rollback caveats."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Capacity arithmetic and strategy YAML; distinct."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "All covered; 'revision history' and 'rollback' appear only in the final paragraph - acceptable.",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+    "status": "supported",
+    "evidence": "maxSurge/maxUnavailable definitions with 'cannot be 0' constraints, 25% defaults, MinReadySeconds, revisionHistoryLimit default 10."
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+    "status": "supported",
+    "evidence": "Pending sentence present; other listed support is unused here."
+   }
+  ],
+  "common_mistakes_note": "Genuine and useful.",
+  "interview_style_note_ok": true
+ },
+ {
+  "plan_id": "B3-MLO-06-5",
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": null,
+  "added_sources": [],
+  "unsourced_claims": [
+   "GPU time-slicing/partitioning exists via vendor mechanisms (hedged in text)",
+   "Scheduler places a pod on a single node so free GPUs do not pool across nodes (core scheduling semantics, not quoted)"
+  ],
+  "code_patch": null,
+  "rubric_points": null,
+  "suggested_key_concepts": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "verdict": "correct",
+  "reasons": [
+   "GPU resource rules are exactly as documented; per-node fragmentation explanation and taint/toleration layout are correct.",
+   "One sentence wrongly groups 'priorities' with non-core add-ons: pod priority and preemption are core scheduler features."
+  ],
+  "parts_answered": {
+   "GPU resource rules (0.5 and 1/2 invalid)": true,
+   "why 8-GPU job is Pending": true,
+   "how to organise scheduling": true
+  },
+  "evidence": [
+   {
+    "claim": "GPUs only in limits; limit alone = request; both must be equal; requests without limits not allowed",
+    "method": "doc",
+    "evidence": "scheduling-gpus: 'You can specify GPU limits without specifying requests, because Kubernetes will use the limit as the request value by default.'; 'You can specify GPU in both limits and requests but these two values must be equal.'; 'You cannot specify GPU requests without specifying limits.'"
+   },
+   {
+    "claim": "Extended resources whole numbers, not overcommitted",
+    "method": "doc",
+    "evidence": "manage-resources-containers: 'The API server restricts quantities of extended resources to whole numbers.' and 'Extended resources cannot be overcommitted, so request and limit must be equal if both are present'."
+   },
+   {
+    "claim": "Taints dedicate nodes; NoSchedule blocks pods without toleration",
+    "method": "doc",
+    "evidence": "taint-and-toleration page: 'Dedicated Nodes' use case; 'no pod will be able to schedule onto node1 unless it has a matching toleration.'"
+   },
+   {
+    "claim": "Node selectors/labels target GPU types",
+    "method": "doc",
+    "evidence": "scheduling-gpus: 'you can use Node Labels and Node Selectors to schedule pods to appropriate nodes.'"
+   },
+   {
+    "claim": "Concise answer length",
+    "method": "executed",
+    "evidence": "77 words (<= 80)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Priorities and queueing (a batch scheduler or job queue with gang scheduling) address fairness for multi-pod training jobs, but those are add-ons beyond the core scheduler.",
+    "problem": "Pod priority and preemption are built into the core scheduler; only queueing and gang scheduling are add-ons.",
+    "replacement": "Gang scheduling and job queueing (a batch scheduler or job-queue controller) address fairness and all-or-nothing placement for multi-pod training jobs and are add-ons beyond the core scheduler; pod priority and preemption are core features and can also let an important job displace lower-priority pods."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Known resource rules plus a fragmentation argument and a scheduling-design answer; moderate.",
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Genuinely shorter, interview-ready (77 words)."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Full rules, fragmentation reasoning, GPU-sharing hedge."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Pool layout and YAML not in detailed."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical (as is)",
+  "key_concepts_findings": "All covered.",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus/",
+    "status": "supported",
+    "evidence": "Limits-only, equal-if-both and node-selector sentences present (whole-number rule is on the resource-management page, not here)."
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+    "status": "supported",
+    "evidence": "Whole-number and no-overcommit sentences present."
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/",
+    "status": "supported",
+    "evidence": "Dedicated Nodes use case and NoSchedule sentence present."
+   }
+  ],
+  "common_mistakes_note": "Genuine and useful.",
+  "interview_style_note_ok": true
+ },
+ {
+  "plan_id": "B3-MLO-06-6",
+  "nearest_existing": {
+   "id": "smi-j0011",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "added_sources": [],
+  "unsourced_claims": [
+   "Idempotency-key, manifest and cache-key patterns are engineering practice (design judgement, no source)",
+   "Why register_model ran twice is not pinned to a specific mechanism (question leaves it open; answer treats it generically as duplicate invocation)"
+  ],
+  "code_patch": null,
+  "rubric_points": null,
+  "suggested_key_concepts": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "verdict": "correct",
+  "reasons": [
+   "Design (idempotency key, atomic publish with manifest, content/run-keyed outputs, checksum-verified references, hash-keyed cache, selective retries) is sound and answers every part.",
+   "Two overstated statements need hedging: OOM determinism, and per-attempt memory escalation; the 'rename' atomicity remark ignores object stores."
+  ],
+  "parts_answered": {
+   "properties each step needs": true,
+   "how to pass artifacts": true,
+   "where caching fits": true,
+   "where retries fit": true,
+   "explains both incidents": true
+  },
+  "evidence": [
+   {
+    "claim": "Jobs may start the same program twice; apps must handle restarts",
+    "method": "doc",
+    "evidence": "job page: 'the same program may sometimes be started twice.' and 'your application needs to handle the case when it is restarted in a new pod. In particular, it needs to handle temporary files, locks, incomplete output and the like caused by previous runs.'"
+   },
+   {
+    "claim": "OOM kill repeats with identical resources",
+    "method": "background_only",
+    "evidence": "Usually true for fixed workload but not guaranteed (node memory pressure, allocator timing); statement as 'deterministic' is overstated."
+   },
+   {
+    "claim": "Cache key = code digest + config + input artifact digests + data snapshot",
+    "method": "derivation",
+    "evidence": "Standard content-addressed memoisation; consistent with the practical replay."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "An OOM kill is deterministic for the same resources and input, so identical retries waste time",
+    "problem": "Overstated: OOM kills often repeat but can be intermittent (peak timing, co-tenant pressure).",
+    "replacement": "An OOM kill usually repeats for the same resources and input (though node memory pressure can make it intermittent), so identical retries often waste time"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "fail fast, or retry once with a larger memory request, and alert",
+    "problem": "Plain Kubernetes Jobs retry with the same pod template; changing resources per attempt needs orchestrator support.",
+    "replacement": "fail fast, or (if your orchestrator supports per-attempt resources) retry once with a larger memory request, and alert"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(rename or write a completion marker such as a manifest listing files and checksums)",
+    "problem": "Directory rename is atomic on many POSIX filesystems but not on object stores such as S3, where a completion marker is the reliable pattern.",
+    "replacement": "(an atomic rename where the filesystem guarantees it, or, on object stores without atomic directory rename, a completion marker such as a manifest listing files and checksums)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-part pipeline design with failure-mode reasoning (at-least-once, atomic commit, cache keys, retry classification).",
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Principles and rationale."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Replays both incidents with concrete ids and keys; not a paraphrase."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "All 8 discussed.",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/concepts/workloads/controllers/job/",
+    "status": "supported",
+    "evidence": "'the same program may sometimes be started twice'; backoffLimit present; handling restarts/incomplete output stated."
+   }
+  ],
+  "common_mistakes_note": "Genuine and useful.",
+  "interview_style_note_ok": true
+ },
+ {
+  "plan_id": "B3-MLO-07-1",
+  "nearest_existing": {
+   "id": "smi-i0009",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "added_sources": [],
+  "unsourced_claims": [
+   "Row-by-row replay of raw events through both paths as definitive test (engineering practice)"
+  ],
+  "code_patch": null,
+  "rubric_points": null,
+  "suggested_key_concepts": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "verdict": "correct",
+  "reasons": [
+   "Definitions are correct and the TFDV statement is accurately worded.",
+   "The how-to-tell heuristics ('immediately' vs 'gradually') are stated as universal; drift can be abrupt and skew can appear later (e.g. a code change in one path)."
+  ],
+  "parts_answered": {
+   "define skew": true,
+   "differ from drift": true,
+   "concrete example": true,
+   "how to tell which": true
+  },
+  "evidence": [
+   {
+    "claim": "TFDV: skew compares training vs serving; drift compares consecutive spans",
+    "method": "doc",
+    "evidence": "tfdv guide: 'Detect training-serving skew by comparing examples in training and serving data.'; 'Drift detection is supported between consecutive spans of data'."
+   },
+   {
+    "claim": "Concise answer length",
+    "method": "executed",
+    "evidence": "76 words; after edit about 78."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "concise_answer",
+    "claim": "Skew is a pipeline inconsistency present from the first request; drift develops later.",
+    "problem": "Stated as universal.",
+    "replacement": "Skew is a pipeline inconsistency, usually present from the first request; drift usually develops later."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(1) Skew shows up immediately after deployment:",
+    "problem": "Heuristic stated as universal; a later change to one feature path also causes skew.",
+    "replacement": "(1) Skew typically shows up immediately after deployment (or after a change to one of the paths):"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(2) Drift appears gradually:",
+    "problem": "Drift can be abrupt (seasonality, a product launch).",
+    "replacement": "(2) Drift typically appears over time (though it can also be abrupt):"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Concept distinction plus a diagnostic procedure; not a single-fact recall.",
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Shorter interview-ready answer (76 words)."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Adds diagnostic tests and fixes."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed (as is)",
+  "key_concepts_findings": "All 7 discussed.",
+  "sources_findings": [
+   {
+    "url": "https://www.tensorflow.org/tfx/guide/tfdv",
+    "status": "supported",
+    "evidence": "'Detect training-serving skew by comparing examples in training and serving data.'; 'Drift detection is supported between consecutive spans of data... L-infinity distance for categorical features'."
+   }
+  ],
+  "common_mistakes_note": "Genuine; second mistake ('skew is only about label or model changes') is slightly odd but acceptable.",
+  "interview_style_note_ok": true
+ },
+ {
+  "plan_id": "B3-MLO-07-2",
+  "nearest_existing": {
+   "id": "smi-i0002",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran solution+test from scratch on /home/claude/work/dep/v (3.13), v310, v311 (python -I): ok on all. No 3.11+ features; imports bisect, collections only. Fenced code in practical_answer is identical to code.solution. Extra edges listed in evidence all pass. Proposed test patch adds six assertions (inclusive TTL boundary 700 vs 701, ttl=0, empty events/rows) and passes on all three interpreters plus 3.13.",
+  "added_sources": [],
+  "unsourced_claims": [
+   "Online-store expiry mirroring (hedged in issues)"
+  ],
+  "code_patch": {
+   "solution": null,
+   "test": "rows = [\n    (\"u1\", 100, 2),\n    (\"u1\", 200, 5),\n    (\"u1\", 200, 6),   # same timestamp: later row wins\n    (\"u1\", 400, 9),\n    (\"u2\", 150, 1),\n]\nevents = [\n    (\"u1\", 99),    # before any feature row\n    (\"u1\", 100),   # exactly on the row\n    (\"u1\", 199),\n    (\"u1\", 250),\n    (\"u1\", 399),\n    (\"u1\", 500),   # newest row is 100 s old\n    (\"u1\", 800),   # newest row is 400 s old: expired\n    (\"u2\", 149),\n    (\"u2\", 150),\n    (\"u3\", 300),   # unknown entity\n]\ngot = point_in_time_join(events, rows, ttl=300)\nassert got == [None, 2, 2, 6, 6, 9, None, None, 1, None], got\n# the future row (ts=400) must never reach an event at ts<400\nassert 9 not in got[:5]\n# naive join leaks: every u1 event sees the value from t=400\nnaive = naive_latest_join(events, rows)\nassert naive == [9, 9, 9, 9, 9, 9, 9, 1, 1, None], naive\n# input order does not matter when there are no timestamp ties\nimport random\nrandom.seed(0)\nclean = [r for r in rows if r[2] != 5]\nshuffled = clean[:]\nrandom.shuffle(shuffled)\nassert point_in_time_join(events, clean, 300) == point_in_time_join(events, shuffled, 300)\n# extra edges: TTL boundary is inclusive, ttl=0 needs an exact match, empty inputs\nassert point_in_time_join([(\"u1\", 700)], rows, ttl=300) == [9]      # 700 - 400 == ttl\nassert point_in_time_join([(\"u1\", 701)], rows, ttl=300) == [None]   # one past the TTL\nassert point_in_time_join([(\"u1\", 200)], rows, ttl=0) == [6]\nassert point_in_time_join([(\"u1\", 201)], rows, ttl=0) == [None]\nassert point_in_time_join([], rows, 300) == []\nassert point_in_time_join([(\"u1\", 5)], [], 300) == [None]\nprint(\"ok\")\n"
+  },
+  "rubric_points": null,
+  "suggested_key_concepts": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "verdict": "correct",
+  "reasons": [
+   "Implementation is correct and passes on all three interpreters; fenced code in practical equals code.solution; stdlib only.",
+   "Test suite misses the inclusive TTL boundary (event_ts - ts == ttl) and ttl=0; a test-only patch adds them.",
+   "One sentence about online-store expiry is not backed by the cited Feast pages."
+  ],
+  "parts_answered": {
+   "explain what is wrong": true,
+   "implement": true,
+   "TTL semantics": true,
+   "tie treatment": true
+  },
+  "evidence": [
+   {
+    "claim": "Feast joins point-in-time correctly and scans backward up to TTL",
+    "method": "doc",
+    "evidence": "point-in-time-joins page: 'Feast will scan backward in time from the entity dataframe timestamp up to a maximum of the TTL time specified.'"
+   },
+   {
+    "claim": "Solution and tests pass",
+    "method": "executed",
+    "evidence": "python3.13, dep venv, v310, v311 all print ok."
+   },
+   {
+    "claim": "Extra edge cases",
+    "method": "executed",
+    "evidence": "TTL boundary (ts+300 included, +301 excluded), ttl=0 exact match, tie later-wins, empty events, empty rows, falsy value 0 preserved, unsorted floats, generator input, negative ttl, naive tie: all pass on v310/v311/3.13."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "mirroring what an online store with an expiry would return",
+    "problem": "Not supported by the cited Feast pages; online-store expiry behaviour varies by store/version.",
+    "replacement": "mirroring what a serving system that treats old values as expired would return"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short implementation using bisect with TTL and ties; the concept (leakage) is standard.",
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Leakage explanation and design/tie discussion."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Runnable code and worked check; code is not in detailed."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "All 7 discussed.",
+  "sources_findings": [
+   {
+    "url": "https://docs.feast.dev/getting-started/concepts/point-in-time-joins",
+    "status": "supported",
+    "evidence": "'Feast is able to join features... onto an entity dataframe in a point-in-time correct way... Feast will scan backward in time ... up to a maximum of the TTL time specified.'"
+   },
+   {
+    "url": "https://docs.feast.dev/getting-started/concepts/feature-view",
+    "status": "supported",
+    "evidence": "'(optional) a TTL, which limits how far back Feast will look when generating historical datasets'. Its on-demand sentence is not used by this record."
+   }
+  ],
+  "common_mistakes_note": "Genuine and useful.",
+  "interview_style_note_ok": true
+ },
+ {
+  "plan_id": "B3-MLO-07-3",
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": null,
+  "added_sources": [],
+  "unsourced_claims": [
+   "Offline = warehouse scans, online = key-value lookups (general architecture)",
+   "Adoption triggers (judgement)"
+  ],
+  "code_patch": null,
+  "rubric_points": null,
+  "suggested_key_concepts": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "verdict": "correct",
+  "reasons": [
+   "Sound, balanced 'not yet' recommendation with explicit triggers; sources support the Feast statements.",
+   "Small wording fixes: 'versioned' appears in the concise answer but is never covered; 'One system cannot cheaply do both well' is absolute."
+  ],
+  "parts_answered": {
+   "problems solved": true,
+   "why two stores": true,
+   "adopt here?": true,
+   "what would change answer": true
+  },
+  "evidence": [
+   {
+    "claim": "Feast joins features point-in-time correctly",
+    "method": "doc",
+    "evidence": "point-in-time-joins page sentence quoted."
+   },
+   {
+    "claim": "Feast ingests values into an online store for real-time low-latency serving",
+    "method": "doc",
+    "evidence": "architecture overview: 'Feast uses a Push Model to ingest data from different sources and store feature values in the online store. This allows Feast to serve features in real-time with low latency.'"
+   },
+   {
+    "claim": "Concise length",
+    "method": "executed",
+    "evidence": "75 words"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "concise_answer",
+    "claim": "shared, versioned feature definitions",
+    "problem": "'Versioned' is not discussed anywhere in the detailed answer.",
+    "replacement": "shared feature definitions"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "One system cannot cheaply do both well.",
+    "problem": "Absolute; some systems serve both patterns acceptably at modest scale.",
+    "replacement": "A single store rarely does both well at reasonable cost."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Trade-off judgement with explanation of architecture; no computation.",
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Shorter (75 words) with the recommendation."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Reasoning and triggers."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed (as is)",
+  "key_concepts_findings": "All covered; materialization is covered.",
+  "sources_findings": [
+   {
+    "url": "https://docs.feast.dev/getting-started/concepts/point-in-time-joins",
+    "status": "supported",
+    "evidence": "See above."
+   },
+   {
+    "url": "https://docs.feast.dev/getting-started/architecture/overview",
+    "status": "supported",
+    "evidence": "Push-model / online store / real-time low latency sentence present."
+   }
+  ],
+  "common_mistakes_note": "Genuine.",
+  "interview_style_note_ok": true
+ },
+ {
+  "plan_id": "B3-MLO-07-4",
+  "nearest_existing": {
+   "id": "smi-i0009",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "added_sources": [],
+  "unsourced_claims": [
+   "Trade-offs of DSL, parity tests and log-and-wait approaches (design judgement)",
+   "Parity tolerances (1e-6) are explicitly hypothetical"
+  ],
+  "code_patch": null,
+  "rubric_points": [
+   {
+    "decision": "Compute once and publish to both stores (single pipeline writes offline history and online latest values)",
+    "tradeoff": "No second implementation; but cannot cover request-time inputs and freshness is bounded by pipeline latency."
+   },
+   {
+    "decision": "Share one transformation function/library executed in both paths (e.g. on-demand feature views or a pinned shared package)",
+    "tradeoff": "One definition for request-time features; requires same language/runtime/versions and adds per-request latency."
+   },
+   {
+    "decision": "Declarative spec compiled to SQL and service code",
+    "tradeoff": "Language-independent but a new DSL and generator to maintain, limited expressiveness."
+   },
+   {
+    "decision": "Keep two implementations with enforced parity tests",
+    "tradeoff": "Cheapest migration but parity depends on test coverage and recurring cost."
+   },
+   {
+    "decision": "Log served features and train on logs",
+    "tradeoff": "Eliminates skew for logged features but needs history first and can bake in live bugs."
+   },
+   {
+    "decision": "Pin explicit semantics (window definition/timezone, rounding, null/unknown defaults, knowledge time)",
+    "tradeoff": "Small upfront spec effort removes the silent-difference sources found in the audits."
+   },
+   {
+    "decision": "Replay-based parity test on frozen raw inputs, run before (baseline) and in CI after",
+    "tradeoff": "Needs fixtures and compute; large sample nightly, small edge-case fixture as gate."
+   }
+  ],
+  "suggested_key_concepts": [
+   "single source of truth",
+   "on-demand transformation",
+   "parity test",
+   "shared library",
+   "window semantics",
+   "default handling",
+   "feature logging",
+   "replay of raw events"
+  ],
+  "suggested_type": null,
+  "type_ok": true,
+  "verdict": "correct",
+  "reasons": [
+   "Type 'design' is right; five approaches with honest trade-offs, parity-proof method present.",
+   "Practical DST example does not specify direction: a 720-hour window is longer than 30 local calendar days across a spring-forward change (719 h) and shorter across a fall-back (721 h); the stated outcome (code gives 11, SQL 12) holds only for the clock-going-back case.",
+   "'materialization' key concept is not discussed; Feast on-demand views are documented as alpha."
+  ],
+  "parts_answered": {
+   "single transformation definition": true,
+   ">=3 approaches with trade-offs": true,
+   "parity proof before and after": true
+  },
+  "evidence": [
+   {
+    "claim": "Feast on-demand transformations run in both retrieval paths",
+    "method": "doc",
+    "evidence": "feature-view page: 'Users define python transformation logic which is executed in both the historical retrieval and online retrieval paths.' Section is labelled [Alpha]."
+   },
+   {
+    "claim": "30 calendar days vs 720 hours across DST",
+    "method": "derivation",
+    "evidence": "Spring-forward day has 23 h => 30 local days = 719 h (720 h window starts 1 h earlier, would count MORE); fall-back day has 25 h => 721 h (720 h window starts 1 h later, would count LESS, matching 12 vs 11). UTC calendar days = exactly 720 h so the stated fix is consistent."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "when a daylight-saving change shifts the window start by an hour and an order falls in that hour",
+    "problem": "Direction of the shift matters; as written it is ambiguous and for spring-forward the discrepancy goes the other way.",
+    "replacement": "when a clock change adds an hour (a 25-hour local day), so the 720-hour window starts an hour later than the calendar window and misses an order that falls in that hour"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Feast documents on-demand transformations as Python logic executed in both the historical retrieval and online retrieval paths",
+    "problem": "The Feast page labels on-demand feature views Alpha/Beta, so this may change.",
+    "replacement": "Feast documents (as an alpha-stage feature at the time of checking) on-demand transformations as Python logic executed in both the historical retrieval and online retrieval paths"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open-ended design with comparison of at least three architectures and a verification plan.",
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Approaches, semantics, parity method."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete procedure, thresholds, worked bug; adds new content (watch the DST wording)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "'materialization' is never explained (detailed only says push latest values to the online store); 'feature logging' is covered by log-and-wait; 'single source of truth' implicit.",
+  "sources_findings": [
+   {
+    "url": "https://docs.feast.dev/getting-started/concepts/feature-view",
+    "status": "supported",
+    "evidence": "On-demand sentence quoted above (labelled Alpha); the TTL sentence in 'supports' is not used by this record."
+   }
+  ],
+  "common_mistakes_note": "Genuine and useful.",
+  "interview_style_note_ok": true
+ },
+ {
+  "plan_id": "B3-MLO-07-5",
+  "nearest_existing": {
+   "id": "smi-i0009",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "added_sources": [],
+  "unsourced_claims": [
+   "Bitemporal (event time + knowledge time) reconstruction and delay-distribution simulation are engineering practice with no cited source"
+  ],
+  "code_patch": null,
+  "rubric_points": null,
+  "suggested_key_concepts": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "verdict": "correct",
+  "reasons": [
+   "Mechanism (backfill over current table sees late-arriving and not-yet-deleted rows that the online path never saw) is right; repair via event time plus knowledge time, logging and audit is sound.",
+   "Numbers are consistent (1-0.97^4 = 11.5%; 88.5% match) but the expected-match figure ignores cancelled-then-deleted orders, which create mismatches in the opposite direction.",
+   "The cited Feast page covers event-time as-of joins only, not knowledge time."
+  ],
+  "parts_answered": {
+   "mechanism": true,
+   "repair training data": true,
+   "repair process": true
+  },
+  "evidence": [
+   {
+    "claim": "1-0.97^4",
+    "method": "executed",
+    "evidence": "0.97^4=0.8853; 1-0.8853=0.1147 (about 11.5%); naive match about 88.5%, consistent with 88 to 89%."
+   },
+   {
+    "claim": "Late orders (1-3 days) are never visible to a transaction scored within 24 h of the order",
+    "method": "derivation",
+    "evidence": "delay >= 1 day > window length, so every late order in the window is missing online."
+   },
+   {
+    "claim": "Cancelled-then-deleted orders raise online counts vs backfill",
+    "method": "derivation",
+    "evidence": "Online saw the order before cancellation; backfilled table no longer has it, so those cases differ in the opposite direction from late arrivals."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "(expected near 88 to 89% under these assumptions)",
+    "problem": "The assumption set counts only late arrivals; cancelled-then-deleted orders add mismatches in the opposite direction, so the real match rate would be somewhat lower.",
+    "replacement": "(expected near 88 to 89% if only late arrivals mattered; cancelled-then-deleted orders add mismatches in the opposite direction, so expect somewhat lower)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Requires recognising a bitemporal availability problem and designing a reconstruction and audit.",
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanism and repair."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked example, probability estimate, audit procedure."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "'feature TTL' is covered only by the final freshness paragraph; weak but present.",
+  "sources_findings": [
+   {
+    "url": "https://docs.feast.dev/getting-started/concepts/point-in-time-joins",
+    "status": "partially",
+    "evidence": "Page supports event-time point-in-time joins with TTL; it does not discuss knowledge/ingestion time or late-arriving data, which is the record's central point (uncited in the text)."
+   }
+  ],
+  "common_mistakes_note": "Genuine and useful.",
+  "interview_style_note_ok": true
+ },
+ {
+  "plan_id": "B3-MLO-07-6",
+  "nearest_existing": {
+   "id": "smi-i0009",
+   "same_intent": false
+  },
+  "code_findings": "Ran on 3.13 (dep venv), v310, v311 with -I: all print 'ok'. No 3.11+ features, only collections.Counter. Fenced block in practical_answer identical to code.solution. Edge cases (see evidence) pass. Minor note: the 'sample-size noise' test uses a constructed 58/31/11 sample rather than a random draw, which the text already describes accurately.",
+  "added_sources": [],
+  "unsourced_claims": [
+   "Default thresholds (0.10, 1%, 2 pp) are explicitly starting points, not sourced"
+  ],
+  "code_patch": null,
+  "rubric_points": null,
+  "suggested_key_concepts": null,
+  "suggested_type": null,
+  "type_ok": true,
+  "verdict": "pass",
+  "reasons": [
+   "Code is correct, stdlib only, passes on all three interpreters; fenced code equals code.solution; every number in the prose recomputes (240/960=0.25, GB 0.60->0.375, 58/31/11 gaps 0.02/0.01/0.01).",
+   "Statistic interpretations and limits are accurate and appropriately hedged."
+  ],
+  "parts_answered": {
+   "implement with null rates, L-inf, unseen share, violations": true,
+   "what each statistic tells": true,
+   "pipeline mistake revealed": true,
+   "limits": true
+  },
+  "evidence": [
+   {
+    "claim": "TFDV expresses categorical drift via L-infinity and detects training-serving skew",
+    "method": "doc",
+    "evidence": "tfdv guide: 'We express drift in terms of L-infinity distance for categorical features'; skew detection compares training and serving data."
+   },
+   {
+    "claim": "Solution+test pass",
+    "method": "executed",
+    "evidence": "python3.13, dep venv, v310, v311: 'ok 0.020000000000000018'"
+   },
+   {
+    "claim": "Test arithmetic",
+    "method": "executed",
+    "evidence": "non-null served = 960; unseen 240/960=0.25; gaps GB .225, gb .25, US .01875, DE .00625; null 0.04 > 0.02."
+   },
+   {
+    "claim": "Extra edges",
+    "method": "executed",
+    "evidence": "identical lists; train-only category (gap 0.5, tie broken to 'a'); fully disjoint samples (unseen 1.0); nulls only in train; null gap exactly at threshold not flagged; mixed int/str categories; empty-string category; all pass. Note 0.9-0.8 float gives 0.0999..., so an exactly-at-threshold L-inf gap of 0.10 may not fire due to float rounding (benign)."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short implementation with a few statistics and thresholds; interpretation requires some judgement.",
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Explains meaning, design choices and limits."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Runnable code plus threshold workflow; code not duplicated in detailed."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "All 7 discussed.",
+  "sources_findings": [
+   {
+    "url": "https://www.tensorflow.org/tfx/guide/tfdv",
+    "status": "supported",
+    "evidence": "'Drift detection is supported between consecutive spans... We express drift in terms of L-infinity distance for categorical features'; skew detection by comparing training and serving examples."
+   }
+  ],
+  "common_mistakes_note": "Genuine and useful.",
+  "interview_style_note_ok": true
+ }
+]

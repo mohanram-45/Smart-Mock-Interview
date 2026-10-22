@@ -1,0 +1,845 @@
+[
+ {
+  "id": "smi-0012",
+  "status": "ok",
+  "question": "Your linear regression didn’t run and communicates that there are an infinite number of best estimates for the regression coefficients. What could be wrong?",
+  "answer": "The design matrix is rank-deficient, so X'X is singular and the least-squares normal equations have infinitely many solutions. The usual causes are perfect multicollinearity (one predictor is an exact linear combination of others, for example a duplicated column, a unit-converted copy, or a set of one-hot dummies for every category alongside an intercept, the dummy variable trap) and having more parameters than observations (p > n, counting the intercept), which forces the columns to be linearly dependent. Note that p > n is a sufficient cause but not the only one; perfect correlation between just two predictors is enough. Fitted values are still unique, only the individual coefficients are not identifiable.\nFixes: drop or merge redundant columns, drop one dummy level, collect more observations, reduce dimensionality (PCA), or add regularisation. Ridge regression makes the problem strictly convex and gives a unique solution even when p > n; lasso also works but may select a non-unique subset when predictors are exactly collinear.",
+  "key_concepts": [
+   "perfect multicollinearity",
+   "singular X'X matrix",
+   "rank-deficient design matrix",
+   "p > n",
+   "dummy variable trap",
+   "ridge regression"
+  ],
+  "difficulty": "Medium",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original named only p > n and a vague correlation statement. Added the rank/singularity mechanism, dummy variable trap, the point that p > n is sufficient but not necessary, and fixes.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0013",
+  "status": "ok",
+  "question": "You run your regression on different subsets of your data, and find that in each subset, the beta value for a certain variable varies wildly. What could be the issue here?",
+  "answer": "Several things can make a coefficient swing between subsets, and heterogeneity is only one of them. Check these in order: (1) high estimation variance: small subsets give large standard errors, so wild betas may just be noise (compare confidence intervals across subsets, or bootstrap); (2) multicollinearity: if the variable is correlated with others, its coefficient is unstable even though predictions are not (check VIF); (3) outliers or high-leverage points dominating some subsets; (4) true heterogeneity: the relationship really differs across segments, or an interaction or non-linear effect is missing from the model.\nIf heterogeneity is real, add interaction terms with the segment variable, fit a hierarchical/mixed-effects model, or fit separate models per segment (segments should be defined sensibly, for example on business or time variables, not by clustering on the outcome). Tree-based models handle interactions and segment-specific effects automatically, at the cost of less interpretable per-variable coefficients. A Chow test can formally test whether coefficients differ between two groups.",
+  "key_concepts": [
+   "heterogeneity",
+   "small-sample variance",
+   "multicollinearity",
+   "interaction terms",
+   "outliers and leverage",
+   "tree-based models"
+  ],
+  "difficulty": "Medium",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original only gave heterogeneity. Added the more common statistical causes (variance, collinearity, outliers), diagnostics and remedies, and a caution about clustering.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0016",
+  "status": "ok",
+  "question": "How could you use GPS data from a car to determine the quality of a driver?",
+  "answer": "Start by defining what 'quality' means (usually safety, sometimes efficiency) and then derive features from the GPS trace. Clean it first: GPS is noisy, so smooth positions and map-match to the road network. Speed and acceleration are derived from successive fixes, so sampling rate matters. Features: speeding relative to the posted limit (needs road-segment data), harsh braking and harsh acceleration events (deceleration or acceleration above calibrated thresholds), cornering speed, speed variance, time of day and road type, and mileage. Normalise by exposure (events per 100 km, not raw counts), otherwise heavy drivers look worse.\nCombine features into a score. A hand-weighted score is easy to explain, but a better approach is supervised: train a model on features to predict outcomes such as accident or insurance-claim history, and validate on held-out drivers. Route efficiency is a separate dimension and not a safety signal.\nCaveats: GPS cannot see phone use or fatigue, context such as traffic or weather confounds braking, and there are privacy and fairness concerns.",
+  "key_concepts": [
+   "telematics features",
+   "harsh braking",
+   "speeding",
+   "map matching",
+   "exposure normalisation",
+   "validation against claims"
+  ],
+  "difficulty": "Medium",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was a short list of behaviours. Added data cleaning, exposure normalisation, a supervised validation route, and caveats.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0017",
+  "status": "ok",
+  "question": "Given accelerometer, altitude, and fuel usage data from a car, how would you determine the optimum acceleration pattern to drive over hills?",
+  "answer": "Split it into a model and an optimiser. Model: estimate the road grade from altitude against distance (smooth it, as altitude is noisy) and estimate fuel rate as a function of speed, acceleration and grade. A physics-based form is a good prior: required power = rolling resistance + aerodynamic drag + grade force (m g sin θ) + inertial term (m a) times speed, and fuel flow rises with power and depends on engine efficiency. Fit the unknown parameters, or a flexible model such as gradient boosting, to the logged data. The accelerometer measures a mix of true acceleration and gravity along the slope, so derive acceleration from speed or correct for the tilt.\nOptimiser: choose a speed profile v(s) along the route that minimises total fuel subject to speed limits, acceleration limits and a bound on total trip time (without the time constraint the answer is trivially 'drive slowly'). Solve with dynamic programming over discretised distance and speed, or optimal control. Typical result under such models: let speed drop on climbs and recover it on descents rather than holding a constant speed, but this should be checked against the fitted model.\nValidate with held-out trips or controlled test drives.",
+  "key_concepts": [
+   "fuel consumption model",
+   "road grade from altitude",
+   "vehicle power equation",
+   "dynamic programming",
+   "constrained optimisation",
+   "sensor noise"
+  ],
+  "difficulty": "Hard",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was generic. Added a concrete two-stage approach (fuel model plus constrained optimisation), physics terms, sensor handling and validation.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0019",
+  "status": "ok",
+  "question": "How would quantify the influence of a Twitter user?",
+  "answer": "Build a directed graph in which an edge goes from a follower to the account they follow, then run PageRank: a user's score is high if they are followed by many users who themselves have high scores. Iteratively, rank(i) = (1-d)/N + d * sum over followers j of rank(j)/outdegree(j), with damping factor d (commonly 0.85) and special handling of dangling nodes; it converges to the stationary distribution of a random walk and is the principal-eigenvector style of centrality.\nPlain follower count is easy to inflate with bots and says nothing about attention, so improve it with engagement-weighted edges (retweets, replies, mentions rather than just follows), retweet-cascade size, and bot filtering. Topic-sensitive PageRank (restarting the walk in a topic-specific seed set) gives influence per topic. Alternatives: in-degree, HITS (hubs and authorities).\nFirst define 'influence' (reach, engagement, or ability to change behaviour); validate the metric against an outcome such as downstream retweet reach.",
+  "key_concepts": [
+   "PageRank",
+   "follower graph",
+   "eigenvector centrality",
+   "damping factor",
+   "engagement-weighted edges",
+   "topic-sensitive influence"
+  ],
+  "difficulty": "Medium",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was a one-line analogy. Added the formula, convergence interpretation, weaknesses of follower graphs, engagement weighting and validation.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0020",
+  "status": "ok",
+  "question": "Given location data of golf balls in games, how would construct a model that can advise golfers where to aim?",
+  "answer": "Frame it as choosing an aim point that minimises expected strokes to finish the hole. Two components: (1) A value function E[strokes | ball location and lie], estimated from historical shots (average strokes remaining from each distance/lie, the basis of strokes-gained metrics, or fitted by regression or dynamic programming). Hazards such as water and bunkers enter naturally as locations with a higher expected-strokes value (penalty strokes). (2) A dispersion model: for a golfer and club, the distribution of landing positions relative to the aim point, often a bivariate Gaussian with distance and lateral spread (fitted per golfer, possibly shrunk toward a population mean when data are sparse).\nFor each candidate aim point a, compute E[strokes | a] = integral of P(land at x | a, golfer) * value(x) dx, by grid integration or Monte Carlo sampling, and recommend the argmin. The best target is often not the pin: for a golfer with wide dispersion, aiming away from a hazard lowers expected strokes.\nCaveats: the intended aim is usually not recorded (it must be assumed or inferred), GPS error, wind and lie effects, and selection bias because golfers choose shots based on situation.",
+  "key_concepts": [
+   "shot dispersion model",
+   "expected strokes",
+   "strokes gained",
+   "Monte Carlo simulation",
+   "hazard penalties"
+  ],
+  "difficulty": "Hard",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was a vague outline. Made it concrete: value function, dispersion model, expectation over aim points, and data caveats.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0022",
+  "status": "ok",
+  "question": "Given data on congressional bills and which congressional representatives co-sponsored the bills, how would you determine which other representatives are most similar to yours in voting behavior? How would you evaluate who is the most liberal? Most republican? Most bipartisan?",
+  "answer": "Build a representatives x bills matrix (1 if the representative sponsored or co-sponsored, or voted yes; 0 otherwise; or use +1/-1/0 for yes/no/missing if you have roll-call votes). Missing is not the same as opposition, so treat absences carefully.\nSimilarity to your representative: compute cosine or Jaccard similarity between the row vectors and rank the others; the nearest neighbours are the most similar. This is neighbourhood-based collaborative filtering.\nIdeology: reduce the matrix with SVD/PCA (or a proper ideal-point model such as DW-NOMINATE used in political science) and read the first dimension, which in US data generally separates the parties; the extreme ends are the most liberal and most conservative. Taking the representative closest to a party's mean vector, as is sometimes suggested, finds the most typical member of that party, not the most extreme.\nBipartisan: define it explicitly, for example the share of a representative's co-sponsorships that are bills led by the other party, or the fraction of co-sponsors from the other party, or positions near the middle of the ideology axis. Check robustness to bill count and committee roles.",
+  "key_concepts": [
+   "co-sponsorship matrix",
+   "cosine similarity",
+   "nearest neighbours",
+   "dimensionality reduction",
+   "ideal point estimation",
+   "bipartisanship score"
+  ],
+  "difficulty": "Hard",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original conflated collaborative filtering with the ideology question and its 'closest to mean vector' method finds the typical, not extreme, member. Rewrote with similarity, dimensionality reduction and an explicit bipartisan metric.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0023",
+  "status": "ok",
+  "question": "How would you come up with an algorithm to detect plagiarism in online content?",
+  "answer": "Pipeline: normalise text (lowercase, strip punctuation and markup), split into overlapping word k-grams (shingles), and hash them. Compare documents by Jaccard similarity of their shingle sets, or by containment (what fraction of the suspect text appears in the source). Comparing all pairs does not scale, so use fingerprinting: winnowing (as in MOSS) keeps a representative subset of hashes with a guarantee of detecting matches above a length threshold, and MinHash with locality-sensitive hashing finds candidate near-duplicates without pairwise comparison.\nA plain bag of words discards order and flags unrelated texts that share vocabulary, so shingles preserve local order and are better for copied passages. For reworded text (paraphrase) add semantic similarity such as TF-IDF cosine or sentence embeddings, which are more costly and give more false positives.\nThen align the matching regions, apply a tuned threshold, and exclude properly quoted or cited material and boilerplate; flagged cases need human review. Evaluate with precision and recall on labelled pairs.",
+  "key_concepts": [
+   "text normalisation",
+   "shingling",
+   "winnowing fingerprints",
+   "MinHash and LSH",
+   "Jaccard similarity",
+   "paraphrase detection with embeddings"
+  ],
+  "difficulty": "Medium",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was a single sentence. Added shingling, scalable fingerprinting (winnowing, MinHash/LSH), why bag of words is weak, paraphrase handling and evaluation.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0024",
+  "status": "ok",
+  "question": "You have data on all purchases of customers at a grocery store. Describe to me how you would program an algorithm that would cluster the customers into groups. How would you determine the appropriate number of clusters to include?",
+  "answer": "Aggregate transactions into one feature vector per customer: for example recency, frequency and monetary value, plus spend share per product category. Scale features (k-means uses Euclidean distance, so large-valued features dominate), and consider log-transforming skewed spend. Run k-means (with k-means++ initialisation and several restarts, since it finds local optima) for a range of k.\nChoosing k: SSE (inertia) always decreases as k grows, so look for the elbow where the improvement flattens; that is subjective, so confirm with the silhouette score (higher is better), the gap statistic, or stability across resamples. Finally check that the clusters are interpretable and actionable for the business, which often decides between neighbouring k values.\nLimitations: k-means assumes roughly spherical, similar-sized clusters and is sensitive to outliers. For very sparse, high-dimensional basket data, reduce dimensions first (SVD/PCA), or use hierarchical clustering or a Gaussian mixture as alternatives.",
+  "key_concepts": [
+   "k-means",
+   "customer features",
+   "feature scaling",
+   "elbow method",
+   "silhouette score",
+   "k-means++ initialisation"
+  ],
+  "difficulty": "Medium",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was one line. Added feature construction, scaling, initialisation, additional k-selection criteria and limitations.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0025",
+  "status": "ok",
+  "question": "Let's say you're building the recommended music engine at Spotify to recommend people music based on past listening history. How would you approach this problem?",
+  "answer": "Define the goal and metric first (for example listening time or retention, not just clicks). Data is mostly implicit feedback (plays, skips, saves, completions), which is noisy: a play is not a like, so weight signals by confidence.\nArchitecture: a two-stage system. Candidate generation narrows millions of tracks to hundreds, using collaborative filtering (matrix factorisation or embeddings learned from user-item interactions, item-to-item similarity) plus content-based retrieval from audio features, metadata and text. Content features also handle cold start, where new tracks or users have no interaction history. A ranking model (for example gradient boosted trees or a neural network) then scores candidates with user, item and context features (time, device) to predict something like the probability of a non-skipped listen. A re-ranking step enforces diversity, freshness and business rules.\nEvaluate offline with ranking metrics (recall@k, NDCG) using time-based splits, then online with A/B tests. Watch for popularity bias and feedback loops that narrow exposure.",
+  "key_concepts": [
+   "implicit feedback",
+   "matrix factorisation",
+   "content-based filtering",
+   "cold start",
+   "candidate generation and ranking",
+   "A/B testing"
+  ],
+  "difficulty": "Hard",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original named hybrid recommenders only. Added implicit-feedback handling, two-stage architecture, cold start, evaluation and bias issues.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0035",
+  "status": "ok",
+  "question": "What are the disadvantages of deep learning?",
+  "answer": "Main disadvantages: (1) Data hungry: deep nets usually need large labelled datasets; on small data they tend to overfit, although transfer learning, data augmentation and regularisation can reduce the problem. (2) Computationally expensive: training large models can take hours to days or longer on GPUs/TPUs depending on model size, data and hardware, which also costs money and energy. (3) Hard to interpret: they are largely black boxes, which is a problem in regulated or high-stakes settings. (4) Many hyperparameters and design choices (architecture, learning rate, regularisation) with costly tuning and sensitivity to initialisation. (5) Can be brittle: sensitive to distribution shift and adversarial examples, and may learn spurious correlations.\nFor small tabular datasets, simpler models such as gradient boosted trees or linear models are often as good or better and far cheaper.",
+  "key_concepts": [
+   "data hunger",
+   "compute cost",
+   "overfitting on small data",
+   "interpretability",
+   "transfer learning",
+   "hyperparameter tuning"
+  ],
+  "difficulty": "Easy",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original said models 'fail' on small data and 'take longer to execute'; clarified that this is mostly training cost and overfitting, with mitigations, and added interpretability, tuning and brittleness.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0073",
+  "status": "ok",
+  "question": "What are some of the most used applications of Deep Learning?",
+  "answer": "Deep learning is applied wherever there are large amounts of data and complex patterns. Common areas, with typical architectures: computer vision (image classification, object detection, segmentation; convolutional networks and vision transformers); natural language processing (machine translation, sentiment analysis, question answering, text generation, summarisation; mostly transformers today, formerly RNN/LSTM); speech recognition and synthesis; recommender systems (embedding-based models); generative modelling (images, audio, text); medical image analysis; autonomous-driving perception; anomaly and fraud detection; and reinforcement learning for games and control.\nSentiment analysis, object detection and image recognition from the original list are specific tasks inside NLP and computer vision, not separate fields. Which ones are 'most used' depends on the industry, so it is better to state the examples than rank them.",
+  "key_concepts": [
+   "computer vision",
+   "convolutional neural networks",
+   "natural language processing",
+   "transformers",
+   "speech recognition",
+   "recommender systems"
+  ],
+  "difficulty": "Easy",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was an unstructured list with overlapping items and an unsupported 'most used' claim. Grouped by field, named typical architectures.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0083",
+  "status": "ok",
+  "question": "What is data normalization in Deep Learning?",
+  "answer": "Data normalisation is a preprocessing step that rescales input features to a common scale. Two common forms: min-max scaling to a range such as [0, 1], x' = (x - min)/(max - min), and standardisation (z-score) to zero mean and unit variance, x' = (x - mu)/sigma. For images, dividing pixel values by 255 is typical.\nWhy it helps: if features have very different scales, the loss surface is elongated and gradient descent with one learning rate zig-zags or needs a small step size, so training is slower or unstable. Inputs with huge magnitude can also saturate sigmoid or tanh units and make weight initialisation assumptions invalid.\nPitfall: compute mu, sigma, min and max on the training set only and reuse them for validation and test data and at inference, otherwise you leak information. This differs from batch or layer normalisation, which normalise activations inside the network during training.",
+  "key_concepts": [
+   "min-max scaling",
+   "standardisation",
+   "training-set statistics",
+   "data leakage",
+   "gradient descent convergence",
+   "batch normalisation"
+  ],
+  "difficulty": "Easy",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was correct but thin. Added formulas, why scale matters for gradient descent, the leakage pitfall, and distinction from batch normalisation.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0113",
+  "status": "ok",
+  "question": "What are the steps involved in the working of an LSTM network?",
+  "answer": "An LSTM keeps a cell state c_t that acts as long-term memory, regulated by three gates (sigmoid outputs between 0 and 1). At each time step, with previous hidden state h_{t-1} and input x_t:\n1. Forget gate: f_t = sigmoid(W_f [h_{t-1}, x_t] + b_f) decides how much of the old cell state to keep.\n2. Input gate and candidate: i_t = sigmoid(W_i [h_{t-1}, x_t] + b_i) and c~_t = tanh(W_c [h_{t-1}, x_t] + b_c) decide what new information to write. The cell state is updated as c_t = f_t * c_{t-1} + i_t * c~_t (element-wise).\n3. Output gate: o_t = sigmoid(W_o [h_{t-1}, x_t] + b_o), and the new hidden state (the output) is h_t = o_t * tanh(c_t).\nBecause the cell state is updated additively and gated, gradients can flow across many steps with less shrinkage than in a plain RNN, which mitigates (but does not eliminate) vanishing gradients and lets the network learn longer dependencies.",
+  "key_concepts": [
+   "forget gate",
+   "input gate",
+   "cell state",
+   "output gate",
+   "hidden state",
+   "vanishing gradient"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original described the three stages informally. Added the gate equations and why the additive cell update helps gradients.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0124",
+  "status": "ok",
+  "question": "What are the advantages of using Batchnorm?",
+  "answer": "Batch normalisation normalises each feature of a layer's input over the mini-batch (subtract the batch mean, divide by the batch standard deviation) and then applies a learnable scale gamma and shift beta so the layer can still represent any needed distribution. Advantages: (1) faster, more stable training, allowing larger learning rates; (2) less sensitivity to weight initialisation; (3) a mild regularising effect, because each sample's normalisation depends on the other samples in its batch, which adds noise, so it can reduce the need for dropout; (4) helps keep activations away from saturation in sigmoid or tanh units. Why it works is debated: the original 'reduced internal covariate shift' explanation has been challenged in favour of a smoother optimisation landscape.\nCaveats: it depends on batch size (very small batches give noisy statistics), training and inference differ (inference uses running averages of mean and variance), and it fits recurrent networks and variable-length sequences poorly, where layer normalisation is usually used.",
+  "key_concepts": [
+   "batch normalisation",
+   "learnable scale and shift",
+   "higher learning rates",
+   "regularising effect",
+   "running statistics",
+   "layer normalisation"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original two short claims. Added mechanism, learnable gamma/beta, other benefits, the caveat on the explanation, and limitations (batch size, train/inference mismatch).",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0128",
+  "status": "ok",
+  "question": "How to solve the exploding gradient problem?",
+  "answer": "Gradient clipping is the standard fix. The original describes clipping by value (clamp each component to [-M, M]), which works but can change the gradient's direction. Clipping by norm is more common: if ||g|| > M, rescale g to g * M/||g||, which caps the step size and preserves direction. Example:\n```python\nimport numpy as np\n\ndef clip_by_norm(g, max_norm):\n    \"\"\"Rescale gradient g so its L2 norm is at most max_norm (direction preserved).\"\"\"\n    norm = np.linalg.norm(g)\n    return g if norm <= max_norm else g * (max_norm / norm)\n\ndef clip_by_value(g, m):\n    \"\"\"Clamp every component to [-m, m].\"\"\"\n    return np.clip(g, -m, m)\n```\nClipping treats the symptom. Causes in deep or recurrent networks are repeated multiplication by weights with large norm. Other remedies: careful initialisation (Xavier/He), lower learning rate, gated architectures (LSTM, GRU), residual connections, normalisation layers, weight regularisation, and truncated backpropagation through time for RNNs. M is a hyperparameter; choose it by monitoring typical gradient norms during training.",
+  "key_concepts": [
+   "exploding gradients",
+   "gradient clipping by norm",
+   "clipping by value",
+   "weight initialisation",
+   "LSTM and GRU",
+   "truncated backpropagation through time"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\ndef clip_by_norm(g, max_norm):\n    \"\"\"Rescale gradient g so its L2 norm is at most max_norm (direction preserved).\"\"\"\n    norm = np.linalg.norm(g)\n    return g if norm <= max_norm else g * (max_norm / norm)\n\ndef clip_by_value(g, m):\n    \"\"\"Clamp every component to [-m, m].\"\"\"\n    return np.clip(g, -m, m)",
+   "test": "import numpy as np\ng = np.array([30.0, 40.0])\nc = clip_by_norm(g, 5.0)\nassert np.isclose(np.linalg.norm(c), 5.0)\nassert np.allclose(c / np.linalg.norm(c), g / np.linalg.norm(g))\nassert np.allclose(clip_by_norm(np.array([1.0, 2.0]), 5.0), [1.0, 2.0])\nassert np.allclose(clip_by_value(np.array([-9.0, 0.5, 9.0]), 1.0), [-1.0, 0.5, 1.0])",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "Original was correct for clipping by value. Added clipping by norm with tested code, the cause, and other remedies.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0134",
+  "status": "ok",
+  "question": "What is supervised learning?",
+  "answer": "Supervised learning learns a function f that maps inputs X to outputs y from labelled examples (x_i, y_i). The training algorithm adjusts parameters to minimise a loss between predictions f(x_i) and the known labels y_i, and the goal is generalisation: good predictions on new, unseen inputs, which is estimated on held-out data.\nTwo main problem types: classification, where y is a discrete category (spam vs not spam, digit recognition), and regression, where y is a continuous value (house price, demand). Examples of algorithms: linear and logistic regression, decision trees, SVMs, neural networks.\nThe 'supervision' comes from the labels, which are often the costly part (human annotation) and may be noisy. It contrasts with unsupervised learning, where no target variable is given.",
+  "key_concepts": [
+   "labelled training data",
+   "classification",
+   "regression",
+   "loss minimisation",
+   "generalisation",
+   "train/test split"
+  ],
+  "difficulty": "Easy",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was only half a definition. Added the learning objective, generalisation, the two problem types and the label-cost caveat.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0144",
+  "status": "ok",
+  "question": "Examples of SVM Kernels?",
+  "answer": "A kernel K(x, z) computes an inner product in an implicit feature space, so an SVM can fit non-linear boundaries without computing the mapping (the kernel trick). Common kernels:\n- Linear: K = x . z. Good for high-dimensional, sparse data such as text, and fast.\n- Polynomial: K = (gamma x . z + r)^d. Models feature interactions up to degree d.\n- Gaussian radial basis function (RBF): K = exp(-gamma ||x - z||^2). The usual default for non-linear problems; corresponds to an infinite-dimensional feature space. Large gamma gives very local, wiggly boundaries (overfitting risk), small gamma gives smoother ones.\n- Sigmoid: K = tanh(gamma x . z + r). It resembles a neural-network activation but is not a valid positive semi-definite kernel for all parameter values, so it is used less.\nFeatures should be scaled before using RBF or polynomial kernels. Tune C and the kernel parameters by cross-validation.",
+  "key_concepts": [
+   "kernel trick",
+   "linear kernel",
+   "polynomial kernel",
+   "RBF kernel",
+   "sigmoid kernel",
+   "kernel hyperparameters"
+  ],
+  "difficulty": "Easy",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original omitted the linear kernel and gave no formulas or guidance. Added the kernel trick, formulas, when to use each, and caveats.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0150",
+  "status": "ok",
+  "question": "Types of Boosting Algorithms?",
+  "answer": "Boosting builds a strong model by adding weak learners sequentially, each correcting its predecessors, mainly reducing bias. Main variants:\n- AdaBoost: after each round, increases the weights of misclassified samples so the next weak learner (often a decision stump) focuses on them; the final prediction is a weighted vote of the learners.\n- Gradient boosting (gradient boosted trees): each new tree is fitted to the negative gradient of the loss with respect to the current predictions (for squared error these are the residuals) and added with a learning rate (shrinkage). It works with any differentiable loss.\n- XGBoost, LightGBM and CatBoost are optimised implementations of gradient boosting rather than different families: XGBoost adds explicit regularisation and uses second-order gradient information, LightGBM uses histogram-based, leaf-wise growth for speed, and CatBoost handles categorical features specially.\nBoosting can overfit if there are too many rounds, so use a small learning rate, early stopping, shallow trees and subsampling. This contrasts with bagging, which trains models independently and reduces variance.",
+  "key_concepts": [
+   "AdaBoost",
+   "gradient boosting",
+   "sample reweighting",
+   "weak learners",
+   "XGBoost",
+   "LightGBM and CatBoost"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was a bare list that presented XGBoost as a separate algorithm. Explained each approach and clarified implementations.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0152",
+  "status": "ok",
+  "question": "Explain how a ROC curve works?",
+  "answer": "A ROC curve plots the true positive rate, TPR = TP/(TP+FN) (sensitivity/recall), against the false positive rate, FPR = FP/(FP+TN) (fall-out), as the classification threshold on the model's score is swept from high to low. Each point is one threshold: a strict threshold gives low TPR and low FPR; a lenient threshold gives high TPR and high FPR. A random classifier follows the diagonal; a perfect one reaches the top-left corner.\nAUC, the area under the curve, equals the probability that a randomly chosen positive is scored higher than a randomly chosen negative, so it measures ranking quality independent of any single threshold and is unchanged by monotonic transformations of the scores (it says nothing about calibration). You still must pick an operating point by weighing the costs of false positives and false negatives.\nCaveat: with a rare positive class, FPR can look small because the negatives are numerous, so ROC/AUC can appear optimistic; a precision-recall curve is then more informative.",
+  "key_concepts": [
+   "ROC curve",
+   "true positive rate",
+   "false positive rate",
+   "decision threshold",
+   "AUC",
+   "precision-recall curve"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was correct but lacked axes definitions, AUC meaning, threshold intuition and the imbalance caveat. Added them.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0153",
+  "status": "ok",
+  "question": "What is unsupervised Learning?",
+  "answer": "Unsupervised learning finds structure in data that has inputs X but no target labels. Main tasks: clustering (k-means, hierarchical, Gaussian mixtures) to group similar samples; dimensionality reduction (PCA, t-SNE, autoencoders) to compress or visualise data; density estimation and anomaly detection; and association rule mining (market-basket analysis).\nBecause there is no ground truth, evaluation is harder: use internal measures (silhouette score, reconstruction error), stability checks, or judge usefulness in a downstream task and by domain experts. Results depend strongly on preprocessing and the distance or similarity measure chosen.\nNot to be confused with self-supervised learning, where labels are generated from the data itself (for example predicting masked words), or semi-supervised learning, which mixes a few labels with many unlabelled samples.",
+  "key_concepts": [
+   "unlabelled data",
+   "clustering",
+   "dimensionality reduction",
+   "anomaly detection",
+   "evaluation without labels"
+  ],
+  "difficulty": "Easy",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was only the definition. Added main task families, evaluation difficulty and distinctions from self- and semi-supervised learning.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0159",
+  "status": "ok",
+  "question": "Hierarchical Clustering?",
+  "answer": "Hierarchical clustering builds a nested tree of clusters instead of a single flat partition. The common agglomerative (bottom-up) version starts with each point as its own cluster and repeatedly merges the two closest clusters until one remains; the divisive (top-down) version starts with everything in one cluster and splits recursively. The result is shown as a dendrogram, and cutting it at a chosen height gives a flat clustering, so the number of clusters need not be fixed in advance.\nHow 'closest' is defined is the linkage: single (minimum pairwise distance; can chain clusters into long strands), complete (maximum distance; compact clusters), average, or Ward (merge that least increases within-cluster variance; tends toward equal-sized, spherical clusters). The distance metric also matters.\nLimitations: merges are greedy and cannot be undone, memory and time scale at least quadratically with the number of points, so it is impractical for very large datasets, and results are sensitive to outliers and the linkage choice.",
+  "key_concepts": [
+   "agglomerative clustering",
+   "divisive clustering",
+   "linkage criteria",
+   "dendrogram",
+   "Ward linkage",
+   "computational cost"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original defined it loosely as 'connectivity model'. Added agglomerative vs divisive procedure, linkage criteria, dendrogram cutting and limitations.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0172",
+  "status": "ok",
+  "question": "What is A/B testing?",
+  "answer": "An A/B test is a randomised controlled experiment: users are randomly assigned to a control (A, the current version) or a treatment (B, the change), and a pre-defined metric is compared between groups. Randomisation is what lets the difference be attributed to the change rather than to confounders.\nProcess: define the hypothesis and primary metric; choose the randomisation unit (usually user); do a power analysis to set the sample size from the baseline rate, the minimum detectable effect, significance level (commonly 0.05) and power (commonly 0.8); run for the planned duration; then test the difference, for example with a two-proportion z-test for conversion rates or a t-test for means, and report the effect size with a confidence interval.\nPitfalls: stopping early when results look significant (peeking inflates false positives unless you use sequential methods), testing many metrics or variants without correction, sample ratio mismatch (group sizes deviating from the intended split signals a bug), novelty effects, and interference between users. Statistical significance is not practical significance: check the effect is large enough to matter.",
+  "key_concepts": [
+   "randomised controlled experiment",
+   "hypothesis test",
+   "sample size and power",
+   "statistical significance vs practical significance",
+   "peeking",
+   "sample ratio mismatch"
+  ],
+  "difficulty": "Easy",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was a short definition. Added randomisation, design steps (power analysis), tests, pitfalls and significance vs practical importance.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0183",
+  "status": "ok",
+  "question": "How do we select the depth of the trees in random forest?",
+  "answer": "Treat depth as a hyperparameter and tune it with cross-validation or out-of-bag (OOB) error rather than a fixed rule. Depth is controlled indirectly or directly via: maximum depth, maximum number of leaf nodes, minimum samples required to split a node, minimum samples per leaf, and minimum impurity decrease required for a split (the stopping rules listed in the original).\nContext: random forests differ from single trees. Individual trees are usually grown deep or fully (the scikit-learn default has no depth limit) because deep trees have low bias and averaging many decorrelated trees reduces the variance. So heavy depth limits are often unnecessary; restricting depth or enforcing a larger minimum leaf size helps mainly with noisy data (smoother predictions, less overfitting), memory and prediction speed.\nPractical recipe: set up a small grid or random search over max_depth, min_samples_leaf (and max_features), score by OOB or k-fold CV, and pick the simplest setting near the best score.",
+  "key_concepts": [
+   "max_depth",
+   "min_samples_leaf",
+   "out-of-bag error",
+   "cross-validation",
+   "bias-variance trade-off",
+   "fully grown trees"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original listed stopping rules with no guidance. Added the hyperparameter names, tuning method, and the reason deep trees are normal in forests.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0193",
+  "status": "ok",
+  "question": "What is Pseudo Labeling?",
+  "answer": "Pseudo-labeling is a semi-supervised technique: train a model on the labelled data, predict labels for unlabelled data, keep the predictions it is confident about (probability above a threshold) as 'pseudo-labels', add them to the training set and retrain, optionally iterating. The model sees more inputs, which can help it learn the input distribution and decision boundaries in regions with few labels, and works best when labels are scarce and unlabelled data is plentiful and comes from a similar distribution.\nRisks: confirmation bias, since wrong pseudo-labels reinforce the model's own mistakes; poorly calibrated confidence makes thresholds unreliable; class imbalance can be amplified. Mitigations: high thresholds, keeping a clean labelled validation set (never pseudo-label it), soft labels or weighting pseudo-labelled examples less, and re-checking performance after each round.\nUsing unlabelled test inputs (as in some competitions) is only legitimate if the test labels are never used; in production the unlabelled data is typically new incoming data. It is not guaranteed to help.",
+  "key_concepts": [
+   "semi-supervised learning",
+   "confidence threshold",
+   "unlabelled data",
+   "confirmation bias",
+   "iterative retraining",
+   "calibration"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original referred specifically to test data and was thin. Generalised to unlabelled data, added procedure, risks and mitigations.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0194",
+  "status": "ok",
+  "question": "What is Knowledge Distillation?",
+  "answer": "Knowledge distillation trains a small 'student' model to imitate a larger 'teacher' (or ensemble), producing a compact model for cheaper inference. The student is trained on the teacher's soft targets, the output probabilities softmax(z/T) computed with a temperature T > 1 that flattens the distribution, so they reveal how the teacher ranks the wrong classes (for example, that a cat is more like a dog than a car), sometimes called dark knowledge. A typical loss combines distillation and the hard-label loss: L = alpha * CE(y, student) + (1 - alpha) * T^2 * KL(teacher_T || student_T) (Hinton et al., 2015).\nApplications include compressing language models (DistilBERT is a distilled BERT), vision models for mobile devices and edge hardware, and ensemble-to-single-model compression. The student is usually somewhat worse than the teacher but better than the same architecture trained only on hard labels; how close it gets depends on the task and the student's capacity.",
+  "key_concepts": [
+   "teacher-student",
+   "soft targets",
+   "temperature",
+   "KL divergence",
+   "dark knowledge",
+   "model compression"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original claimed no significant accuracy loss and gave no mechanism. Added soft targets, temperature, loss formula and an honest statement of the accuracy trade-off.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0222",
+  "status": "ok",
+  "question": "When should ridge regression be preferred over lasso?",
+  "answer": "Prefer ridge (L2 penalty) when you believe many predictors each contribute a little, so you do not want to discard any: ridge shrinks coefficients toward zero but never exactly to zero. It is particularly better with highly correlated predictors: lasso tends to pick one of a correlated group arbitrarily and the choice is unstable across samples, whereas ridge spreads weight across them. Lasso can also select at most n variables when p > n. Ridge also has a closed-form solution and a smooth objective, which makes it easy to fit, and it usually predicts better than lasso when the true coefficients are dense.\nChoose lasso (L1) when you expect a sparse truth and need automatic feature selection and an interpretable model. Elastic net combines both penalties and is a good default when predictors are correlated and you still want some sparsity.\nStandardise predictors first, since the penalties depend on feature scale, and choose the penalty strength by cross-validation.",
+  "key_concepts": [
+   "ridge regression",
+   "lasso",
+   "L2 vs L1 penalty",
+   "correlated predictors",
+   "sparsity",
+   "elastic net"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original gave only the keep-all-predictors reason. Added correlated-predictor behaviour, p > n limit, when lasso wins, elastic net, and practical notes.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0223",
+  "status": "ok",
+  "question": "Which algorithms can be used for important variable selection?",
+  "answer": "There are three families. Filter methods score features independently of a model: correlation or mutual information with the target, chi-square test, ANOVA F-test, variance threshold. Wrapper methods search subsets by fitting a model repeatedly: forward/backward stepwise selection and recursive feature elimination (RFE). Embedded methods select during training: lasso (L1) shrinks coefficients to zero, and tree ensembles such as random forest or XGBoost give feature importances.\nCaution with importance charts: impurity-based (Gini) importance in random forests is biased toward continuous and high-cardinality features and splits credit among correlated features; permutation importance on held-out data is more reliable. Do selection inside cross-validation (not on the full dataset first), or you will leak information and overestimate performance.\nPractical combo: remove constant and near-duplicate features, rank with a tree model plus permutation importance, then confirm by CV that dropping the lowest-ranked features does not hurt.",
+  "key_concepts": [
+   "filter methods",
+   "wrapper methods",
+   "embedded methods",
+   "permutation importance",
+   "impurity importance bias",
+   "recursive feature elimination"
+  ],
+  "difficulty": "Easy",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original listed two tools. Added the three method families and the importance bias and leakage pitfalls.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0225",
+  "status": "ok",
+  "question": "What ensemble technique is used by gradient boosting trees?",
+  "answer": "Gradient boosting machines (GBM) use boosting: trees are added sequentially, each one trained to correct the errors of the current ensemble. Concretely, at each step the new tree is fitted to the negative gradient of the loss with respect to the current predictions (the pseudo-residuals; plain residuals for squared error), and its output is added to the model scaled by a learning rate: F_m = F_{m-1} + eta * h_m. The result is a stage-wise additive model of shallow trees.\nContrast with bagging (random forest), where deep trees are trained independently in parallel on bootstrap samples and averaged to reduce variance; boosting mainly reduces bias and can overfit if run too long. Control it with a small learning rate, number of trees (with early stopping on a validation set), tree depth and row/column subsampling.",
+  "key_concepts": [
+   "boosting",
+   "gradient boosting",
+   "pseudo-residuals",
+   "learning rate shrinkage",
+   "additive model",
+   "early stopping"
+  ],
+  "difficulty": "Easy",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was one sentence. Added the mechanism (fit to negative gradient), contrast with bagging, and regularisation controls.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0267",
+  "status": "ok",
+  "question": "How do you handle outliers in the data?",
+  "answer": "First investigate: is the outlier a data error (typo, sensor fault, wrong unit) or a genuine extreme value? The treatment depends on that, and sometimes the outliers are the signal (fraud, failures).\nDetect: boxplots and scatter plots for a visual check; the IQR rule (flag values below Q1 - 1.5*IQR or above Q3 + 1.5*IQR); z-scores (commonly |z| > 3), noting that mean and standard deviation are themselves distorted by outliers, so a median/MAD-based modified z-score is more robust; and multivariate methods such as isolation forest or Mahalanobis distance for outliers that are unusual only in combination.\nHandle: correct errors where possible; remove only with justification; cap (winsorise) at percentile or IQR bounds; apply a transformation such as log for skewed data; or use robust methods (median, Huber loss, tree-based models) that tolerate them. Always apply caps fitted on training data only, and record what was changed.\nExample:\n```python\nimport pandas as pd\n\ndef iqr_outliers(s, k=1.5):\n    q1, q3 = s.quantile(0.25), s.quantile(0.75)\n    iqr = q3 - q1\n    return (s < q1 - k * iqr) | (s > q3 + k * iqr)\n\ndef winsorize_iqr(s, k=1.5):\n    q1, q3 = s.quantile(0.25), s.quantile(0.75)\n    iqr = q3 - q1\n    return s.clip(lower=q1 - k * iqr, upper=q3 + k * iqr)\n```",
+  "key_concepts": [
+   "IQR rule",
+   "z-score",
+   "winsorising",
+   "robust statistics",
+   "error versus genuine outlier",
+   "isolation forest"
+  ],
+  "difficulty": "Medium",
+  "domain": "Data Analysis",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import pandas as pd\n\ndef iqr_outliers(s, k=1.5):\n    q1, q3 = s.quantile(0.25), s.quantile(0.75)\n    iqr = q3 - q1\n    return (s < q1 - k * iqr) | (s > q3 + k * iqr)\n\ndef winsorize_iqr(s, k=1.5):\n    q1, q3 = s.quantile(0.25), s.quantile(0.75)\n    iqr = q3 - q1\n    return s.clip(lower=q1 - k * iqr, upper=q3 + k * iqr)",
+   "test": "import pandas as pd\ns = pd.Series([10, 11, 12, 12, 13, 14, 15, 100])\nmask = iqr_outliers(s)\nassert mask.tolist() == [False]*7 + [True]\nw = winsorize_iqr(s)\nassert w.iloc[-1] < 100 and w.iloc[0] == 10",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "Original was a list of terms. Added decision logic (error vs real), robust variants of detection, handling options and a tested IQR example.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0280",
+  "status": "ok",
+  "question": "What performance metrics are used for linear regression?",
+  "answer": "Common metrics: MSE (mean of squared errors; penalises large errors, in squared units), RMSE (its square root, in the target's units), MAE (mean absolute error; less sensitive to outliers, easy to interpret), R-squared (fraction of variance in y explained, 1 - SSE/SST) and adjusted R-squared (R-squared penalised for the number of predictors, so it does not rise automatically when useless variables are added). MAPE is sometimes used for relative error but breaks when targets are near zero.\nUse them on held-out data (or via cross-validation): training R-squared always increases with more predictors and can overstate quality, while test R-squared can even be negative. For comparing models with different numbers of parameters, AIC or BIC are also used. Metrics should be complemented by residual plots to check linearity and constant variance.",
+  "key_concepts": [
+   "MSE and RMSE",
+   "MAE",
+   "R-squared",
+   "adjusted R-squared",
+   "held-out evaluation",
+   "residual analysis"
+  ],
+  "difficulty": "Easy",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was a bare list. Added definitions, outlier sensitivity, why adjusted R2 exists and the held-out caveat.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0283",
+  "status": "ok",
+  "question": "How do you deal with multicollinearity?",
+  "answer": "Multicollinearity means predictors are strongly linearly related. It inflates the variance of coefficient estimates (large standard errors, unstable or sign-flipping coefficients) but does not bias them, and does not necessarily hurt prediction, so it matters mostly when you need to interpret coefficients.\nDetect: correlation matrix, variance inflation factor (VIF; values above roughly 5 to 10 are a common warning rule of thumb), or a high condition number of the design matrix.\nRemedies: drop or combine redundant variables (or pick one from each correlated group using domain knowledge); use PCA to build uncorrelated components (principal component regression) or partial least squares, which make components relevant to the target, at the cost of interpretability; use ridge regression (or elastic net), which stabilises estimates; centre variables when the collinearity comes from polynomial or interaction terms; or collect more data/more variation. If the goal is only prediction, you can often leave it alone, ideally with regularisation.",
+  "key_concepts": [
+   "multicollinearity",
+   "variance inflation factor",
+   "ridge regression",
+   "principal component regression",
+   "partial least squares",
+   "condition number"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original listed three fixes only. Added what multicollinearity does (variance not bias), detection (VIF), ridge, centring, and when to ignore it.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0284",
+  "status": "ok",
+  "question": "What is heteroscedasticity?",
+  "answer": "Heteroscedasticity means the variance of the regression errors is not constant across observations (for example, it grows with the fitted value or a predictor), violating the homoscedasticity assumption. Typical example: spending variability increases with income.\nConsequences for OLS: coefficient estimates remain unbiased and consistent, but the usual standard errors are wrong, so t-tests, p-values and confidence intervals are unreliable, and OLS is no longer the most efficient estimator.\nDetect: a residuals-vs-fitted plot showing a funnel shape, or formal tests such as Breusch-Pagan and White.\nFix: use heteroscedasticity-robust (White/HC) standard errors; transform the target (log is common when variance scales with the mean); weighted least squares or GLS when the variance structure is known or modelled; or change the model family (for example a GLM).",
+  "key_concepts": [
+   "heteroscedasticity",
+   "homoscedasticity",
+   "residual plot",
+   "Breusch-Pagan test",
+   "robust standard errors",
+   "weighted least squares"
+  ],
+  "difficulty": "Easy",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was a single-line definition. Added example, consequences (unbiased estimates but invalid inference), detection and fixes.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0318",
+  "status": "ok",
+  "question": "Explain the handling of missing or corrupted values in a dataset.",
+  "answer": "First diagnose: how much is missing, and why? Missing completely at random, at random (depends on other observed variables) or not at random (depends on the missing value itself) matters, because dropping or imputing can bias results when missingness is informative. Corrupted values (wrong types, impossible values such as age -4, bad encodings) are found with validation rules (type, range, allowed categories, duplicates).\nOptions: drop rows or columns (dropna) when little is lost or a column is mostly empty; impute with a constant, mean (symmetric data), median (skewed data) or mode (categorical) using fillna; model-based imputation (kNN, regression, iterative imputation) for better accuracy; for time series, forward fill or interpolation. Add a missing-value indicator column when missingness may be informative. Convert corrupted entries to NaN first (pd.to_numeric with errors='coerce'), then treat them as missing.\nFit imputation statistics on the training set only to avoid leakage. Example:\n```python\nimport numpy as np\nimport pandas as pd\n\ndef clean(df):\n    df = df.copy()\n    df[\"age\"] = pd.to_numeric(df[\"age\"], errors=\"coerce\")      # corrupted text -> NaN\n    df.loc[(df[\"age\"] < 0) | (df[\"age\"] > 120), \"age\"] = np.nan  # impossible values -> NaN\n    df[\"age_missing\"] = df[\"age\"].isnull()                      # keep a missingness flag\n    df[\"age\"] = df[\"age\"].fillna(df[\"age\"].median())            # median imputation\n    return df.dropna(subset=[\"id\"])                             # drop rows with no key\n```",
+  "key_concepts": [
+   "missing data mechanisms",
+   "imputation",
+   "pandas dropna and fillna",
+   "type coercion",
+   "missingness indicator",
+   "data leakage"
+  ],
+  "difficulty": "Medium",
+  "domain": "Data Analysis",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\nimport pandas as pd\n\ndef clean(df):\n    df = df.copy()\n    df[\"age\"] = pd.to_numeric(df[\"age\"], errors=\"coerce\")      # corrupted text -> NaN\n    df.loc[(df[\"age\"] < 0) | (df[\"age\"] > 120), \"age\"] = np.nan  # impossible values -> NaN\n    df[\"age_missing\"] = df[\"age\"].isnull()                      # keep a missingness flag\n    df[\"age\"] = df[\"age\"].fillna(df[\"age\"].median())            # median imputation\n    return df.dropna(subset=[\"id\"])                             # drop rows with no key",
+   "test": "import numpy as np, pandas as pd\ndf = pd.DataFrame({\"id\": [1, 2, 3, None, 5], \"age\": [30, \"abc\", -4, 40, 50]})\nout = clean(df)\nassert len(out) == 4\nassert out[\"age\"].isnull().sum() == 0\nassert out[\"age_missing\"].sum() == 2\nassert out.loc[out[\"id\"] == 2, \"age\"].iloc[0] == 40.0",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "Original named pandas functions only. Added missingness mechanisms, handling choices, corrupted-value validation, leakage caution and a tested pandas example.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0336",
+  "status": "ok",
+  "question": "How Do You Design an Email Spam Filter in Machine Learning?",
+  "answer": "Frame it as binary text classification (spam vs ham) with unequal costs: wrongly sending a real email to spam is usually worse than letting some spam through, so the target is high precision at an acceptable recall.\nSteps: collect labelled emails (user reports, trusted ham) and a time-ordered split for validation; clean and tokenise the text, handling HTML, URLs and headers; build features (bag of words or TF-IDF n-grams, sender/domain reputation, header and link features, message structure); train a baseline such as multinomial Naive Bayes, then stronger models like logistic regression or gradient boosted trees; handle class imbalance (class weights, resampling); and evaluate on unseen, later data with precision, recall, F1 and PR-AUC, not accuracy alone, which is misleading when classes are imbalanced. Choose a decision threshold from the precision target.\nDeployment: spammers adapt, so monitor for drift, retrain regularly, keep a feedback loop from user reports, and combine with rules and blocklists.",
+  "key_concepts": [
+   "binary text classification",
+   "Naive Bayes",
+   "TF-IDF features",
+   "precision and recall",
+   "class imbalance",
+   "concept drift"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was a generic data-science checklist with an accuracy-only evaluation. Added cost asymmetry, features, imbalance, proper metrics, time-based split and drift.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0338",
+  "status": "ok",
+  "question": "What is the process of carrying out a linear regression?",
+  "answer": "Steps: (1) Frame the problem and explore the data: scatter plots, correlations (the strength and direction of the linear relationships), outliers and missing values. (2) Prepare features: encode categoricals (drop one dummy level), transform skewed variables if needed, split into train and test sets. (3) Estimate the model by ordinary least squares, choosing coefficients that minimise the sum of squared residuals, with the solution beta = (X'X)^-1 X'y (or via numerical solvers). (4) Check assumptions through residual diagnostics: linearity, independent errors, constant variance (homoscedasticity), approximately normal residuals if you need inference, and no severe multicollinearity. (5) Evaluate: R-squared, RMSE/MAE on held-out data, and coefficient significance and confidence intervals. (6) Iterate: add transformations or interaction terms, remove or investigate influential points, or regularise (ridge/lasso), then interpret the coefficients as the expected change in y for one unit change in a predictor holding the others fixed.",
+  "key_concepts": [
+   "exploratory analysis",
+   "ordinary least squares",
+   "normal equation",
+   "regression assumptions",
+   "residual diagnostics",
+   "held-out evaluation"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original named three stages loosely. Made the steps concrete with OLS estimation, assumptions, diagnostics and evaluation.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0369",
+  "status": "ok",
+  "question": "What is Bag of Words?",
+  "answer": "Bag of Words represents a document as a vector over a fixed vocabulary, where each entry is the count (or a binary presence flag, or a TF-IDF weight) of a word in that document. Stacking the vectors gives a document-term matrix, which is sparse because most documents contain few vocabulary words. Grammar and word order are discarded, hence 'bag'. It is a simple, strong baseline for text classification with models such as Naive Bayes or logistic regression.\nWeaknesses: no word order or context ('not good' and 'good' share a word; 'dog bites man' equals 'man bites dog'), no semantic similarity between words (car vs automobile), very high dimensionality and sparsity, and vocabulary that is fixed at training time (unseen words are ignored). Remedies: n-grams, TF-IDF to down-weight common words, stop-word removal, hashing, or dense embeddings.\nExample:\n```python\nfrom sklearn.feature_extraction.text import CountVectorizer\n\ndocs = [\"the cat sat\", \"the cat saw the cat\"]\nvec = CountVectorizer()\nX = vec.fit_transform(docs).toarray()\nvocab = list(vec.get_feature_names_out())\nprint(vocab)\nprint(X.tolist())\n```\nOutput: [[1, 1, 0, 1], [2, 0, 1, 2]] for the vocabulary ['cat', 'sat', 'saw', 'the'].",
+  "key_concepts": [
+   "bag of words",
+   "count vectorisation",
+   "TF-IDF",
+   "sparse vectors",
+   "n-grams",
+   "loss of word order"
+  ],
+  "difficulty": "Medium",
+  "domain": "NLP",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "from sklearn.feature_extraction.text import CountVectorizer\n\ndocs = [\"the cat sat\", \"the cat saw the cat\"]\nvec = CountVectorizer()\nX = vec.fit_transform(docs).toarray()\nvocab = list(vec.get_feature_names_out())\nprint(vocab)\nprint(X.tolist())",
+   "test": "assert vocab == [\"cat\", \"sat\", \"saw\", \"the\"]\nassert X.tolist() == [[1, 1, 0, 1], [2, 0, 1, 2]]",
+   "expected": [
+    [
+     "cat",
+     "sat",
+     "saw",
+     "the"
+    ],
+    [
+     [
+      1,
+      1,
+      0,
+      1
+     ],
+     [
+      2,
+      0,
+      1,
+      2
+     ]
+    ]
+   ]
+  },
+  "sources": [],
+  "change_notes": "Original was a short definition. Added construction, variants, weaknesses, remedies and a tested scikit-learn example.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0377",
+  "status": "ok",
+  "question": "What could be some issues if the distribution of the test data is significantly different than the distribution of the training data?",
+  "answer": "This is dataset shift: the joint distribution of inputs and labels differs between training and deployment, so performance measured on validation data no longer predicts real performance. The main types: covariate shift (P(x) changes while P(y|x) stays the same), prior or label shift (P(y) changes), and concept drift (P(y|x) changes, so the relationship itself changed).\nConsequences: accuracy drops, probabilities become miscalibrated, the model must extrapolate into regions it never saw (where it can be confidently wrong), thresholds and decision costs are off, and the offline validation score is over-optimistic.\nDetect: compare feature distributions (KS test, population stability index), train a classifier to distinguish train from test inputs (adversarial validation; high AUC means a shift), and monitor live performance or label rates.\nMitigate: retrain on recent or representative data, use time-based validation, importance-weight training samples under covariate shift, apply domain adaptation, favour stable features, and set up monitoring with retraining triggers.",
+  "key_concepts": [
+   "dataset shift",
+   "covariate shift",
+   "label shift",
+   "concept drift",
+   "adversarial validation",
+   "importance weighting"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original named the issue only. Added types of shift, consequences, detection and mitigation.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0379",
+  "status": "ok",
+  "question": "What are some differences you would expect in a model that minimises squared error versus a model that minimises absolute error? In which cases would each error metric be appropriate?",
+  "answer": "Minimising squared error (L2) makes the model estimate the conditional mean; minimising absolute error (L1) estimates the conditional median. Differences: squared error penalises large errors quadratically, so the fit is pulled toward outliers and heavy-tailed noise; absolute error grows linearly and is more robust. Squared error is smooth and differentiable, and has a closed-form solution for linear models (OLS) and a unique minimum; absolute error has a kink at zero (needs linear programming or subgradient methods), gradients of constant size, and its minimiser may not be unique.\nUse squared error when large errors are disproportionately costly, noise is roughly Gaussian, and you want the mean (for example when predictions will be summed or averaged). Use absolute error when there are outliers that are not meaningful, noise is heavy-tailed or the target is skewed and you want a typical, median-type prediction in the target's own units. Huber loss is a compromise: quadratic near zero and linear for large errors.",
+  "key_concepts": [
+   "squared error",
+   "absolute error",
+   "conditional mean vs median",
+   "outlier sensitivity",
+   "Huber loss",
+   "differentiability"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original two sentences. Added mean-vs-median result, optimisation properties, and when each is appropriate, plus Huber loss.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0384",
+  "status": "ok",
+  "question": "Given training data on tweets and their retweets, how would you predict the number of retweets of a given tweet after seven days after only observing two days worth of data?",
+  "answer": "Treat it as supervised regression on historical tweets with at least seven days of history. Target: the retweet count at day 7 (or its log, log(1 + count), since counts are heavy-tailed). Features must use only information available at two days: cumulative retweets at several checkpoints (for example 1, 6, 12, 24, 48 hours) and their growth rate, tweet features (text, media, links, hashtags), author features (followers, past retweet performance), and posting time (hour, weekday). Strong baseline: predict the day-7 count as the day-2 count times a typical growth ratio learned from the data; this works because most retweets happen early. Then use gradient boosted trees or a regularised linear model on the log scale, or a self-exciting point-process (Hawkes) model that fits the retweet arrival process and extrapolates it.\nEvaluate on later tweets than training tweets (time-based split) using error metrics suited to counts, such as RMSE on the log scale, and calibrate prediction intervals, since viral outliers dominate. Avoid leakage by never using features that occur after day 2. Retrain periodically as platform behaviour changes.",
+  "key_concepts": [
+   "early-growth features",
+   "log-transformed target",
+   "time-based validation",
+   "data leakage",
+   "Hawkes process",
+   "prediction intervals"
+  ],
+  "difficulty": "Hard",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was a one-line restatement. Added target transform, early-growth features, a baseline, model options (including Hawkes), leakage control and evaluation.",
+  "confidence": "medium"
+ }
+]

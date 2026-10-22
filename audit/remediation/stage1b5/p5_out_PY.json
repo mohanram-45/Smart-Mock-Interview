@@ -1,0 +1,327 @@
+[
+ {
+  "id": "smi-i0022",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Joining with an absolute component discards the prefix; PurePosixPath('a')/'/b' is /b",
+    "method": "executed",
+    "evidence": "3.13/3.11/3.10: PurePosixPath('a')/'/b' -> /b; os.path.join('a','/b') -> /b"
+   },
+   {
+    "claim": "'b.tar.gz' suffix '.gz', stem 'b.tar', suffixes ['.tar','.gz']; .bashrc suffix empty",
+    "method": "executed",
+    "evidence": "identical on 3.10, 3.11, 3.13"
+   },
+   {
+    "claim": "PurePosixPath('a\\\\b').parts is a single part; WindowsPath accepts both separators and is case-insensitive",
+    "method": "executed",
+    "evidence": "PurePosixPath('a\\\\b').parts == ('a\\\\b',); PureWindowsPath('a/b\\\\c').parts == ('a','b','c'); PureWindowsPath('A')==PureWindowsPath('a') True"
+   },
+   {
+    "claim": "/home/u/data.csv is not absolute on Windows",
+    "method": "executed",
+    "evidence": "PureWindowsPath('/home/u/data.csv').is_absolute() -> False"
+   },
+   {
+    "claim": "relpath-with-'..' has no exact Path equivalent",
+    "method": "executed",
+    "evidence": "3.10/3.11 relative_to signature has no walk_up and raises ValueError for /a/b vs /a/c; 3.12 and 3.13 signatures have walk_up=False and relative_to('/a/c', walk_up=True) gives ../b. So the claim is only true before 3.12."
+   },
+   {
+    "claim": "Originally flagged direction-of-failure fix is present and correct",
+    "method": "executed",
+    "evidence": "Text now covers Linux->Windows (absolute path, hard-coded locations, case); consistent with the question."
+   },
+   {
+    "claim": "expandvars/commonpath have no Path equivalent; most stdlib accepts PathLike",
+    "method": "background_only",
+    "evidence": "PurePath has no expandvars/commonpath methods (not exhaustively checked); os.PathLike acceptance from background knowledge."
+   },
+   {
+    "claim": "sources",
+    "method": "background_only",
+    "evidence": "sources list is empty, so there were no URLs to open. WebFetch was refused (permission request unanswered), so no online doc was opened; doc-type claims were checked against the local CPython language-reference text (pydoc_data) or executed."
+   }
+  ],
+  "remaining_limitations": [
+   "sources empty; doc statements not checked against online pathlib docs",
+   "WindowsPath-on-Linux behaviour verified only via Pure* classes"
+  ],
+  "fixes": [
+   {
+    "severity": "major",
+    "claim": "os.path remains fine for quick string work, but os.path remains fine for quick string work, and a few helpers (expandvars, relpath with '..', commonpath) have no exact Path equivalent, but nothing forces you to keep it for new code..",
+    "problem": "The first-pass fix was applied badly: the clause is duplicated, there is a stray double full stop and the sentence is ungrammatical ('but ... , and ..., but ...'). Also relpath-with-'..' is covered by Path.relative_to(walk_up=True) from 3.12 (verified on 3.12/3.13, absent on 3.10/3.11), so the unqualified claim is only true before 3.12.",
+    "replacement": "os.path remains fine for quick string work, and a few helpers (expandvars, commonpath, and relpath when the result needs '..': Path.relative_to only gained walk_up=True in 3.12) have no exact Path equivalent, but nothing forces you to keep os.path for new code."
+   }
+  ],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "n/a",
+   "py3.11": "n/a",
+   "py3.10": "n/a"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-i0025",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "import orders with from-imports on both sides fails with the quoted ImportError",
+    "method": "executed",
+    "evidence": "3.13, 3.11, 3.10 all print: cannot import name 'latest_order' from partially initialized module 'orders' (most likely due to a circular import) (path). 'import customers' as entry names customers/get_customer."
+   },
+   {
+    "claim": "Fix 2 on both sides works for both entry points",
+    "method": "executed",
+    "evidence": "both modules 'import x': import orders ok, import customers ok on all three interpreters"
+   },
+   {
+    "claim": "Changing only one side works only when the changed module is loaded second",
+    "method": "executed",
+    "evidence": "only orders changed to 'import customers': import orders FAILS, import customers ok. Only customers changed: import orders ok, import customers FAILS. Matches the text."
+   },
+   {
+    "claim": "Plain 'import orders' inside the second module succeeds on partially initialised module",
+    "method": "executed",
+    "evidence": "case d/c2 above"
+   },
+   {
+    "claim": "Mechanism: module registered in sys.modules before body executes; partially initialised",
+    "method": "derivation",
+    "evidence": "consistent with the observed message and behaviours; import system semantics (background_only for the doc wording)"
+   },
+   {
+    "claim": "TYPE_CHECKING / local import / sys.modules debugging advice",
+    "method": "background_only",
+    "evidence": "standard practice, not executed"
+   },
+   {
+    "claim": "sources",
+    "method": "background_only",
+    "evidence": "sources list is empty, so there were no URLs to open. WebFetch was refused (permission request unanswered), so no online doc was opened; doc-type claims were checked against the local CPython language-reference text (pydoc_data) or executed."
+   }
+  ],
+  "remaining_limitations": [
+   "The question quotes the 'partially initialized' wording, which varies by Python version/path (earlier reviewer saw a different message on one 3.13 build); here 3.13.16 printed the same text, so no change needed",
+   "sources empty"
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "n/a",
+   "py3.11": "n/a",
+   "py3.10": "n/a"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-i0026",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "python shop/cli.py: __name__ '__main__', __package__ None, sys.path[0] = shop/ dir; relative import fails with the quoted error",
+    "method": "executed",
+    "evidence": "3.13/3.11/3.10: output '__main__ None .../shop' then ImportError: attempted relative import with no known parent package"
+   },
+   {
+    "claim": "python -m shop.cli: __name__ '__main__', __package__ 'shop', sys.path[0] is the cwd, import works; must be run from folder containing shop/",
+    "method": "executed",
+    "evidence": "printed '__main__ shop <cwd>' and 'ok shop.db'; running from inside shop/ gives ModuleNotFoundError: No module named 'shop'"
+   },
+   {
+    "claim": "shop/__main__.py makes python -m shop work",
+    "method": "executed",
+    "evidence": "printed 'main pkg __main__ shop'"
+   },
+   {
+    "claim": "Directory without __init__.py imports as namespace package (no __file__)",
+    "method": "executed",
+    "evidence": "ns.__path__ is _NamespacePath, ns.__file__ None on all three"
+   },
+   {
+    "claim": "sources",
+    "method": "background_only",
+    "evidence": "sources list is empty, so there were no URLs to open. WebFetch was refused (permission request unanswered), so no online doc was opened; doc-type claims were checked against the local CPython language-reference text (pydoc_data) or executed."
+   }
+  ],
+  "remaining_limitations": [
+   "sources empty"
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "n/a",
+   "py3.11": "n/a",
+   "py3.10": "n/a"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-i0027",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "pip freeze records versions but no hashes",
+    "method": "executed",
+    "evidence": "pip 24.0 'pip freeze --help' has no hash option (0 mentions of 'hash')"
+   },
+   {
+    "claim": "Externally managed system Python (PEP 668)",
+    "method": "executed",
+    "evidence": "/usr/lib/python3.12/EXTERNALLY-MANAGED exists in the sandbox; the 'pip refuses to install' behaviour and the PEP are background_only"
+   },
+   {
+    "claim": "[project] keys name, version, requires-python, dependencies, optional-dependencies, [project.scripts]; [build-system] with hatchling/setuptools/flit-core",
+    "method": "executed",
+    "evidence": "tomllib parsed a sample with these tables (structure only); field list vs PyPA spec is background_only because packaging.python.org could not be opened"
+   },
+   {
+    "claim": "Library: abstract ranges; application: lock file with hashes via pip-compile/uv/poetry",
+    "method": "background_only",
+    "evidence": "standard practice; pip-compile --generate-hashes, uv and poetry hash support from background knowledge"
+   },
+   {
+    "claim": "Originally flagged: first-person process note removed, freeze/hash claim corrected",
+    "method": "executed",
+    "evidence": "text contains neither; consistent"
+   },
+   {
+    "claim": "sources",
+    "method": "background_only",
+    "evidence": "sources list is empty, so there were no URLs to open. WebFetch was refused (permission request unanswered), so no online doc was opened; doc-type claims were checked against the local CPython language-reference text (pydoc_data) or executed."
+   }
+  ],
+  "remaining_limitations": [
+   "Could not open packaging.python.org or PEP 668 (WebFetch refused); spec and lock-tool claims rest on background knowledge",
+   "sources empty; consider adding the PyPA pyproject.toml spec and PEP 668 URLs once checkable",
+   "[build-system] is only needed for the library/installable project, a pure application may omit it (minor, not an error)"
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "n/a",
+   "py3.11": "n/a",
+   "py3.10": "n/a"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-i0028",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Outputs/returns for f('ok'), f('raise'), f('return') and swallow()",
+    "method": "executed",
+    "evidence": "tests pass on 3.13.16, 3.11.17, 3.10.20; the question code matches the recorded solution semantics"
+   },
+   {
+    "claim": "Fenced block in answer identical to solution",
+    "method": "executed",
+    "evidence": "string comparison True; swallow returns 'done' in code, answer and question"
+   },
+   {
+    "claim": "else runs only if no exception and no return/break/continue; exceptions in else not handled by preceding except",
+    "method": "doc",
+    "evidence": "CPython language reference (pydoc_data topic 'try'): 'The optional else clause is executed if the control flow leaves the try suite, no exception was raised, and no return, continue, or break statement was executed. Exceptions in the else clause are not handled by the preceding except clauses.'"
+   },
+   {
+    "claim": "return/break/continue in finally discards the saved exception and overrides return value",
+    "method": "doc",
+    "evidence": "same topic: 'the saved exception is discarded' and example foo() -> 'finally'"
+   },
+   {
+    "claim": "Bare except catches KeyboardInterrupt/SystemExit (BaseException)",
+    "method": "background_only",
+    "evidence": "exception hierarchy from background knowledge, not run"
+   },
+   {
+    "claim": "Python 3.14 emits SyntaxWarning for return in finally (PEP 765)",
+    "method": "background_only",
+    "evidence": "no 3.14 available and PEP page could not be opened"
+   },
+   {
+    "claim": "sources",
+    "method": "background_only",
+    "evidence": "sources list is empty, so there were no URLs to open. WebFetch was refused (permission request unanswered), so no online doc was opened; doc-type claims were checked against the local CPython language-reference text (pydoc_data) or executed."
+   }
+  ],
+  "remaining_limitations": [
+   "3.14 SyntaxWarning not verified"
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "and Python 3.14 emits a SyntaxWarning for it.",
+    "problem": "Version-specific statement that could not be verified (no 3.14, PEP page not openable); should be attributed/hedged.",
+    "replacement": "and, per PEP 765, recent Python versions (3.14 onward) emit a SyntaxWarning for it."
+   }
+  ],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-i0029",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Code and test pass; fenced block identical to solution",
+    "method": "executed",
+    "evidence": "3.13.16, 3.11.17, 3.10.20 all ok; block comparison True"
+   },
+   {
+    "claim": "raise from exc sets __cause__ and __suppress_context__ True; implicit raise sets __context__ only; from None sets __cause__ None, __suppress_context__ True, __context__ kept; traceback wordings",
+    "method": "doc",
+    "evidence": "CPython language reference (pydoc_data topic 'raise') shows 'direct cause' and 'During handling...' wordings, 'from None' suppression and the 3.3 __suppress_context__ note; attribute values also asserted by the recorded test"
+   },
+   {
+    "claim": "Edge cases",
+    "method": "executed",
+    "evidence": "parse_port: ''->ConfigValueError(cause ValueError); '0','65536','-1' -> out of range; ' 80 ' -> 80 and '1_000' -> 1000 (int semantics, not claimed otherwise); read_port on a directory -> ConfigFileError caused by IsADirectoryError; read_port on a file with invalid UTF-8 bytes -> raw UnicodeDecodeError, NOT a ConfigError"
+   },
+   {
+    "claim": "sources",
+    "method": "background_only",
+    "evidence": "sources list is empty, so there were no URLs to open. WebFetch was refused (permission request unanswered), so no online doc was opened; doc-type claims were checked against the local CPython language-reference text (pydoc_data) or executed."
+   }
+  ],
+  "remaining_limitations": [
+   "UnicodeDecodeError from a non-UTF-8 file escapes the hierarchy; the docstring says 'missing or unreadable', so the caveat sentence should list it",
+   "Lenient int() parsing accepts ' 80 ' and '1_000'"
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "(for example a TypeError from passing None)",
+    "problem": "The closing paragraph says a single except ConfigError catches everything raised on purpose, but read_port on a file that is not valid UTF-8 raises UnicodeDecodeError (a ValueError subclass, not an OSError), which escapes the hierarchy; verified by running.",
+    "replacement": "(for example a TypeError from passing None, or a UnicodeDecodeError from a file that is not valid UTF-8)"
+   }
+  ],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ }
+]

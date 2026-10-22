@@ -1,0 +1,106 @@
+[
+ [
+  "B1-GEN-01-1",
+  "concise_answer",
+  "(FAISS's guide recommends it)",
+  "(FAISS's guide: best when RAM is plentiful)",
+  "final_recheck",
+  "minor"
+ ],
+ [
+  "B1-GEN-01-1",
+  "practical_answer",
+  "so values around 30k-100k are typical starting points to try, then tuned.",
+  "so about 30k-100k is the 4-16 x sqrt(N) starting range, while FAISS's guide goes up to 262,144 (with an HNSW coarse quantiser) for 10M-100M vectors; tune from there.",
+  "final_recheck",
+  "minor"
+ ],
+ [
+  "B1-GEN-01-7",
+  "answer",
+  "If PQ is used, its codebooks must be retrained and vectors re-encoded too, otherwise quantisation error stays high.",
+  "If PQ is used, the vectors must be re-encoded against the new centroids and the codebooks should be retrained on the new residuals, otherwise quantisation error stays high.",
+  "final_recheck",
+  "minor"
+ ],
+ [
+  "B1-GEN-01-7",
+  "answer",
+  "which means a full re-add.",
+  "which means a full re-add; then re-sweep nprobe against exact search, because nprobe = 16 will not behave the same on the new layout.",
+  "final_recheck",
+  "minor"
+ ],
+ [
+  "B1-GEN-01-7",
+  "answer",
+  "This is data drift for the clustering and is not a bug in the search code.",
+  "This most likely reflects drift relative to the trained clustering rather than a bug in the search code, which the diagnosis below confirms or rules out.",
+  "final_recheck",
+  "minor"
+ ],
+ [
+  "B1-GEN-02-4",
+  "detailed_answer",
+  "a chunk by (document ID, chunk position or section path, content hash)",
+  "a chunk by (document ID, content hash of the normalised chunk text), adding a section path only if identical chunks in one page must stay separate",
+  "final_recheck",
+  "minor"
+ ],
+ [
+  "B1-GEN-03-6",
+  "answer",
+  "(not shown by the RAG-Fusion abstract; measure it)",
+  "(a hypothesis to test, not a given)",
+  "final_recheck",
+  "minor"
+ ],
+ [
+  "B1-GEN-03-6",
+  "answer",
+  "it is weak for exact identifiers",
+  "it tends to be weak for exact identifiers",
+  "final_recheck",
+  "minor"
+ ],
+ [
+  "B1-GEN-05-4",
+  "detailed_answer",
+  "(position bias and/or plain instability; check whether flips favour the first slot): for nearly a third of pairs the verdict changed when only the order changed; re-running the same order (to measure plain sampling noise) separates position bias from randomness.",
+  "(position bias and/or plain instability): for nearly a third of pairs the verdict changed when only the order changed. Check whether flips favour the first slot, and re-run the same order to measure plain sampling noise, which separates position bias from randomness.",
+  "final_recheck",
+  "minor"
+ ],
+ [
+  "B1-GEN-06-6",
+  "detailed_answer",
+  "so consistent mid-high placement competes with one strong placement",
+  "so the two are nearly tied: RRF rewards a top rank only slightly more than consistent agreement",
+  "final_recheck",
+  "minor"
+ ],
+ [
+  "B1-GEN-06-6",
+  "detailed_answer",
+  "cosine similarities lie in [-1, 1] and cluster in a narrow band",
+  "cosine similarities lie in [-1, 1] and often cluster in a narrow band",
+  "final_recheck",
+  "minor"
+ ],
+ [
+  "B1-GEN-06-6",
+  "detailed_answer",
+  "local statistics approximate the global ones and the problem is small",
+  "local statistics approximate the global ones for common terms and the problem is usually small (very rare terms stay noisy even then)",
+  "final_recheck",
+  "minor"
+ ],
+ [
+  "B1-GEN-06-6",
+  "concise_answer",
+  "combine them with rank-based fusion such as reciprocal rank fusion or normalised scores",
+  "combine them with reciprocal rank fusion or tuned, per-list normalised scores",
+  "final_recheck",
+  "minor"
+ ]
+]

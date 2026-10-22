@@ -1,0 +1,239 @@
+[
+ {
+  "id": "P3-DA-01",
+  "domain": "Data Analysis",
+  "question_type": "scenario",
+  "question": "You are handed a 2.4M-row customer table (one export, no documentation) and asked to 'see what is in there' before anyone builds a churn analysis. What do you check, in what order, and what do you write down?",
+  "answer": "Start by establishing what one row is and whether the data can be trusted, before looking at any distribution.\n\n1. Shape and grain: row count, column count, and what a row represents (customer, customer-snapshot, customer-month). Check that the stated key is unique: count rows versus distinct key values. If customer_id repeats, find out why (history rows, merges, duplicate loads).\n2. Types: confirm dtypes match meaning (dates stored as strings, IDs read as floats, numeric codes that are really categories, sentinel values like 0, -1, 9999 or 'N/A' standing in for missing).\n3. Missingness: per-column null rate, then patterns: is it concentrated in certain signup periods, channels or regions? Columns that are null together often come from one source system.\n4. Duplicates: exact duplicate rows and near-duplicates (same person, different ID, differently spelled email).\n5. Distributions: for numeric columns look at min, max, quantiles and histograms, not only the mean; for categoricals look at cardinality, rare levels and inconsistent spellings. Flag impossible values (negative ages, future signup dates) and judge outliers as error versus genuine tail.\n6. Dates: min and max of each date column, gaps, logical ordering (signup before first order), and time zone.\n7. Joins: check that keys match other tables, and measure match rate, orphan rows and fan-out (a one-to-many join silently multiplying rows).\n8. Business sanity: reconcile a few totals against a known figure, such as active customers in a finance report.\n\nDocument the grain, the key, the data dictionary as you understand it, each anomaly with its count and how you treated it, assumptions, open questions for the data owner, and the extract date. That makes the analysis reproducible and the questions go to someone who can answer them.",
+  "key_concepts": [
+   "grain of a table",
+   "key uniqueness",
+   "sentinel values",
+   "missingness patterns",
+   "join fan-out",
+   "outlier vs error",
+   "data dictionary"
+  ],
+  "common_mistakes": [
+   "Jumping to summary statistics or modelling without confirming the row grain and key uniqueness",
+   "Treating sentinel values such as 9999 or 0 as real numbers",
+   "Dropping outliers or nulls silently without recording it"
+  ],
+  "interview_style_note": "Orders the checks from trust in the data (grain, keys, types) to distributions, verifies joins, and documents assumptions and open questions rather than just running describe().",
+  "sources": [],
+  "code": null
+ },
+ {
+  "id": "P3-DA-02",
+  "domain": "Data Analysis",
+  "question_type": "concept",
+  "question": "Average order value on your shop is 84 but most customers seem to spend far less, and the median is 41. A manager asks which number to put on the dashboard. What do you tell them?",
+  "answer": "Report the median as the 'typical order' and show the mean alongside it, because the two answer different questions and the gap tells you the data is right-skewed.\n\nOrder values are bounded at zero but have a long upper tail (a few very large baskets). The mean is pulled up by that tail, so a mean of 84 against a median of 41 says half of orders are under 41 while a minority of big orders lifts the average. The mean is still the right number when you care about totals: revenue equals the mean times the number of orders, so forecasting revenue or comparing revenue per order across periods needs the mean. The median is robust to extreme values and describes the typical customer, but it ignores how big the tail is and cannot be summed.\n\nThe mode is rarely useful for continuous values like order value; it is mostly meaningful for discrete or categorical data (most common basket size, most common product), or after binning.\n\nFor a business audience I would show: the median, the mean, and a sentence saying why they differ, plus a couple of percentiles (for example P25, P75, P90) or a histogram. If decisions are about revenue concentration, add the share of revenue from the top 10 percent of orders. Also check that the median is not distorted by a cluster of tiny orders such as free samples, and be explicit about whether refunds and shipping are included.\n\nPitfall: the mean of a skewed variable moves a lot with a few large orders, so a month-over-month change in the mean can be noise from one bulk buyer.",
+  "key_concepts": [
+   "right-skewed distribution",
+   "mean vs median",
+   "robustness to outliers",
+   "percentiles",
+   "revenue = mean x orders"
+  ],
+  "common_mistakes": [
+   "Saying the mean is always wrong for skewed data",
+   "Reporting only the mean and calling it typical",
+   "Suggesting the mode for continuous order values"
+  ],
+  "interview_style_note": "Chooses the statistic by the question being asked, explains the skew, and proposes a short honest reporting set rather than a single number.",
+  "sources": [],
+  "code": null
+ },
+ {
+  "id": "P3-DA-03",
+  "domain": "Data Analysis",
+  "question_type": "concept",
+  "question": "A customer survey has 30 percent of income answers missing. Explain how you would decide whether the missingness is MCAR, MAR or MNAR using business examples, what happens if you just drop those rows versus impute, and what you can actually test.",
+  "answer": "MCAR (missing completely at random): the chance a value is missing is unrelated to anything, observed or not. Example: a survey tool bug that randomly loses 5 percent of responses. MAR (missing at random): missingness depends on observed variables but not on the missing value itself once those are accounted for. Example: younger respondents skip the income question more often, and age is recorded. MNAR (missing not at random): missingness depends on the unobserved value itself. Example: very high earners decline to state income.\n\nConsequences. Dropping rows (complete-case analysis) is unbiased under MCAR, only losing power, but can be biased under MAR and MNAR because the remaining sample is not representative; with 30 percent missing you may also lose much data when several columns have gaps. Imputation helps under MAR if the imputation model uses the variables that drive missingness (multiple imputation is preferred to a single mean fill, which shrinks variance and distorts relationships). Under MNAR no standard imputation fixes the bias, because the information is not in the observed data; you need sensitivity analysis or outside data.\n\nWhat you can test: compare observed variables between rows with and without income (t-tests, or a logistic regression predicting a missing indicator). Differences rule out MCAR. Little's test targets MCAR specifically. You cannot test MAR versus MNAR from the data alone, since that needs the missing values; it rests on domain argument, ideally supported by follow-up data collection on a sample of non-responders.\n\nPractical step: add a missing indicator, report results under a few assumptions, and say how far conclusions move.",
+  "key_concepts": [
+   "MCAR",
+   "MAR",
+   "MNAR",
+   "complete-case analysis",
+   "multiple imputation",
+   "missing-indicator",
+   "sensitivity analysis"
+  ],
+  "common_mistakes": [
+   "Claiming a statistical test can prove data is MAR rather than MNAR",
+   "Saying mean imputation is harmless because it keeps the mean",
+   "Assuming dropping rows is always unbiased"
+  ],
+  "interview_style_note": "Gives correct definitions with business examples, states that MAR vs MNAR is untestable from observed data, and links each mechanism to the consequence of dropping versus imputing.",
+  "sources": [],
+  "code": null
+ },
+ {
+  "id": "P3-DA-04",
+  "domain": "Data Analysis",
+  "question_type": "design",
+  "question": "Product wants to test a redesigned checkout button on a site with about 40,000 eligible visitors per day and a 4.0 percent checkout conversion. Design the experiment: primary and guardrail metrics, randomisation unit, sample size and duration, novelty effects, and the stopping rule.",
+  "answer": "Primary metric: checkout conversion, defined precisely as users with at least one completed order divided by users exposed, over a fixed window after first exposure. Guardrails: revenue per user and average order value, payment failures, page load time, refund/cancel rate, and error rate; the test should not ship if a guardrail degrades beyond a pre-agreed margin even when conversion rises.\n\nRandomisation unit: the user (stable cookie or account id), not the page view, so each person always sees one version and the analysis unit matches the randomisation unit. If many users share devices or switch between logged-out and logged-in, consider the logged-in id where available. Check sample ratio mismatch (an observed split deviating from 50/50) before reading results; it signals an assignment or logging bug.\n\nSample size: to detect a 5 percent relative lift (4.0 to 4.2 percent) at two-sided alpha 0.05 and 80 percent power, the standard two-proportion formula gives roughly 150,000 users per arm (illustrative, computed). A 10 percent relative lift needs about 38,000 to 39,000 per arm. The minimum detectable effect should be set by what is worth shipping, not by what is convenient.\n\nDuration: at 40,000 visitors a day (about 20,000 per arm) 150,000 per arm takes roughly 8 days, so run two full weeks to cover complete weekly cycles, since weekday and weekend behaviour differ. Note that repeat visitors mean unique users accumulate more slowly than visits.\n\nNovelty effect: a new button may get extra clicks simply for being new, or lose in the short run through change aversion. Look at the effect by day and by new versus returning users, and run long enough to see it settle.\n\nStopping rule: fix sample size, duration and the analysis in advance (pre-registration). Do not stop when p first dips below 0.05; repeated peeking inflates false positives unless you use a sequential method designed for it.",
+  "key_concepts": [
+   "primary metric",
+   "guardrail metrics",
+   "randomisation unit",
+   "sample size calculation",
+   "sample ratio mismatch",
+   "novelty effect",
+   "peeking",
+   "weekly seasonality"
+  ],
+  "common_mistakes": [
+   "Stopping the test as soon as the p-value crosses 0.05",
+   "Randomising by page view or session while analysing by user",
+   "Choosing sample size without a minimum effect that matters, or ending mid-week"
+  ],
+  "interview_style_note": "Covers the full design: metric hierarchy, unit of randomisation, a power calculation tied to a minimum detectable effect, weekly cycles, novelty, and a pre-committed stopping rule.",
+  "sources": [],
+  "code": null
+ },
+ {
+  "id": "P3-DA-05",
+  "domain": "Data Analysis",
+  "question_type": "concept",
+  "question": "A teammate says 'the 95 percent confidence interval for the mean delivery time is 31 to 35 minutes, so there is a 95 percent chance the true mean is between 31 and 35.' Is that right? What does the interval mean and what makes it wider or narrower?",
+  "answer": "Strictly, no. In the frequentist framework the true mean is a fixed (unknown) number, so after you compute the interval it either contains it or it does not. The 95 percent describes the procedure: if you repeated the sampling and interval construction many times under the same conditions, about 95 percent of the intervals produced would contain the true mean. This particular interval 31 to 35 is one draw from that process.\n\nCommon misreadings to avoid: that 95 percent of individual deliveries fall between 31 and 35 (the interval is about the mean, not individual values, which spread much more); that a repeat sample's mean has a 95 percent chance of landing inside it; and that values inside the interval are all equally plausible. In practice, many people use the shorthand 'we are 95 percent confident', which is acceptable if you understand it as a statement about the method. A Bayesian credible interval does support the 'probability the parameter lies in this range' wording, but it needs a prior and is a different object.\n\nWidth: for a mean it is about 2 x critical value x standard error, and the standard error is s divided by the square root of n. So the interval narrows as sample size grows (to halve the width you need roughly four times the data), widens with more variability in the data, and widens with a higher confidence level (99 percent is wider than 95 percent). The formula assumes the usual conditions, such as independent observations and a mean that is approximately normal (via a large enough sample or a roughly normal population).",
+  "key_concepts": [
+   "confidence interval",
+   "coverage of a procedure",
+   "standard error",
+   "sample size effect on width",
+   "confidence level",
+   "credible interval vs confidence interval"
+  ],
+  "common_mistakes": [
+   "Saying there is a 95 percent probability the true mean is inside this specific interval",
+   "Reading the interval as the range containing 95 percent of observations",
+   "Thinking doubling the sample size halves the width"
+  ],
+  "interview_style_note": "States that 95 percent refers to long-run coverage of the procedure, rejects the 'probability the parameter is in this interval' reading, and names the drivers of width.",
+  "sources": [],
+  "code": null
+ },
+ {
+  "id": "P3-DA-06",
+  "domain": "Data Analysis",
+  "question_type": "scenario",
+  "question": "An A/B test reports that the variant lifts conversion by +2.0 percent relative, with a 95 percent CI of [-0.5, +4.5] percent relative, and baseline conversion is 5 percent. The PM asks whether to ship. What do you conclude and recommend, and what extra information would change your decision?",
+  "answer": "Conclusion: the result is not statistically significant at the 5 percent level, because the interval includes zero. That is not evidence of 'no effect'. The data are compatible with a small harm (-0.5 percent relative) and with a meaningful gain (+4.5 percent relative). The estimate is inconclusive rather than negative.\n\nTranslate to absolute terms using the 5 percent baseline (illustrative): the point estimate is +0.10 percentage points (5.00 to 5.10 percent), and the interval runs from about -0.025 to +0.225 percentage points. Then ask what matters practically. If a 0.1 pp gain would be worth, say, a few hundred thousand a year at your traffic, a plausible lift of up to +4.5 percent may well be valuable, and the downside is small. If the cost of shipping is high or a minimum useful lift was pre-set at, for example, +5 percent relative, the upper end of the interval does not reach it and the test cannot support shipping.\n\nRecommendation depends on the decision rule agreed before the test. Options: extend the test (only if the plan allowed it or by using a valid sequential design; otherwise a second confirmatory test with a larger sample), or ship if the change is cheap, reversible and guardrails are healthy, accepting the uncertainty. Do not call it a win, and do not stop the test early solely because it is close.\n\nExtra data: pre-specified MDE and power (was this test sized to detect a lift this small?), guardrail metrics such as revenue per user and refund rate, sample ratio check, consistency across days and segments (treated as exploratory, not as a hunt for significance), results from similar earlier tests, and the implementation and maintenance cost.",
+  "key_concepts": [
+   "confidence interval including zero",
+   "statistical vs practical significance",
+   "relative vs absolute lift",
+   "minimum detectable effect",
+   "guardrail metrics",
+   "inconclusive result",
+   "pre-specified decision rule"
+  ],
+  "common_mistakes": [
+   "Concluding the variant has no effect because p is above 0.05",
+   "Declaring a win because the point estimate is positive",
+   "Slicing into segments until something is significant"
+  ],
+  "interview_style_note": "Does not equate non-significance with no effect, converts to absolute terms, ties the decision to a pre-set practical threshold and cost, and lists concrete follow-up data.",
+  "sources": [],
+  "code": null
+ },
+ {
+  "id": "P3-DA-07",
+  "domain": "Data Analysis",
+  "question_type": "scenario",
+  "question": "You are testing a new ride-matching algorithm in a two-sided marketplace (riders and drivers share the same supply). A colleague proposes randomising riders 50/50 and comparing outcomes. Why might that give a biased estimate, and what alternatives would you consider?",
+  "answer": "The problem is interference (a violation of SUTVA, the assumption that one unit's outcome does not depend on others' treatment assignments). Treated and control riders compete for the same drivers. If the new algorithm gets treated riders matched faster, it may take drivers from control riders, who then wait longer. The control group is therefore made worse, so the measured treated-minus-control gap overstates the benefit of rolling the algorithm out to everyone (it can also understate it if the effects run in the opposite direction, for example if the algorithm makes better use of supply). The direction depends on the mechanism; what is wrong is that the experiment measures a relative effect under mixed exposure rather than the effect of the policy at 100 percent.\n\nAlternatives:\n- Cluster or geo randomisation: assign whole cities or zones to a version, so most interactions happen within a group. It reduces spillover but has few independent units, so variance is high, needs matched pairs or synthetic control, and boundary effects remain (drivers crossing zones).\n- Time-based switchback: alternate the whole market between versions in time blocks (for example every 30 minutes or by day), randomising the sequence. It has more units and no cross-contamination at a given moment, but carryover between blocks can bias it, and block length must exceed the system's memory; strong time-of-day effects need to be balanced.\n- Two-sided or hybrid designs, and modelling the interference, which depend on assumptions.\n\nTrade-off: user-level randomisation is simple and has high power but possibly biased; cluster and switchback designs reduce bias but cost power and complexity. Pick by how strong the spillover is, and where possible check by running a small cluster experiment to compare against the user-level estimate.",
+  "key_concepts": [
+   "interference",
+   "SUTVA",
+   "spillover effects",
+   "cluster randomisation",
+   "switchback experiment",
+   "geo experiment",
+   "carryover effect"
+  ],
+  "common_mistakes": [
+   "Assuming user-level randomisation is always valid because it is random",
+   "Asserting the bias is always upward",
+   "Proposing switchback without noting carryover or choosing block length"
+  ],
+  "interview_style_note": "Names interference and explains the mechanism through shared supply, avoids claiming a fixed bias direction, and weighs cluster, geo and switchback designs by bias versus power.",
+  "sources": [],
+  "code": null
+ },
+ {
+  "id": "P3-DA-08",
+  "domain": "Data Analysis",
+  "question_type": "scenario",
+  "question": "An analyst computes average customer tenure and satisfaction using only customers who are active today, and reports 'average tenure is 4.1 years and satisfaction is 8.2 out of 10'. What is wrong, which way is the bias, how would you detect it, and how would you fix or reframe the analysis?",
+  "answer": "This is survivorship (selection) bias: the sample contains only customers who stayed, so those who left, often because they were unhappy or poorly matched, are missing.\n\nDirection: satisfaction is typically overstated, since dissatisfied customers are more likely to have churned. Average tenure of current customers is also not what it appears: it describes how long today's survivors have been around, which is a different quantity from how long a newly acquired customer stays. Long-tenured customers are over-represented among survivors, while customers who left early are absent, so treating it as expected customer lifetime is misleading. The direction relative to true lifetime depends on cohort ages and the churn pattern, so do not assume it is simply over- or understated.\n\nDetection: compare the full signup cohort against the survivors. Compute retention by signup cohort; check how the share of customers surviving varies with early satisfaction or behaviour; find out whether churned customers had lower scores in any earlier survey.\n\nFixes: include churned customers (use all customers ever acquired), analyse by cohort, and use survival analysis (Kaplan-Meier, hazard models) which handles customers still active as censored rather than ignoring them. Reframe the question: 'median time to churn for a new customer' and 'satisfaction among those at 1, 6 and 24 months including people who left', with exit surveys for churners where possible. State limitations where churner data cannot be recovered.",
+  "key_concepts": [
+   "survivorship bias",
+   "selection bias",
+   "right-censoring",
+   "survival analysis",
+   "Kaplan-Meier",
+   "cohort analysis",
+   "churned customers"
+  ],
+  "common_mistakes": [
+   "Claiming tenure is simply overstated without noting censoring and cohort age",
+   "Fixing it by weighting survivors instead of recovering churned data",
+   "Ignoring that satisfaction scores of churned users may be unavailable"
+  ],
+  "interview_style_note": "Identifies survivorship bias, gives the likely direction for satisfaction while being careful about tenure, and proposes cohort and survival-analysis fixes.",
+  "sources": [],
+  "code": null
+ },
+ {
+  "id": "P3-DA-09",
+  "domain": "Data Analysis",
+  "question_type": "scenario",
+  "question": "Monthly active users on the dashboard drop 12 percent the week after an app release that also changed how 'active' is logged. Leadership is alarmed. How do you work out whether it is a real decline or a measurement artefact, reconcile the numbers, and explain it to stakeholders?",
+  "answer": "Treat it as a data-quality investigation first, and do not give a verdict until you have separated real behaviour change from measurement change.\n\n1. Pin down definitions: get the old and new definitions of 'active' (event type, threshold, session timeout, identity key such as device versus account) and the exact release timestamp and rollout percentage by platform and app version.\n2. Look at the shape of the break: a step change at the release timestamp, concentrated in the new app version, points to logging. A gradual decline that is similar across versions suggests behaviour. Compare by platform, version, country and user cohort.\n3. Triangulate with independent signals not touched by the change: server-side requests, logins, orders, revenue, support tickets, push-notification opens. If orders are flat while 'active' dropped, the instrumentation is the suspect.\n4. Reconcile directly: for a window with both versions, compute the metric under the old and under the new definition (backfill the new definition historically if the raw events exist, or run both in parallel for a period). The difference is the definition effect; any remainder is real change. Check for duplicate or lost events, changed event names, SDK or consent changes (a consent prompt can reduce tracked users).\n5. Communicate: state what is known, what is not, and when you will know. Annotate the dashboard with the release date, keep a continuous series on one definition, version-control metric definitions, and avoid comparing across the break. Give leadership a range with the assumptions (for example, 'x of the 12 points is explained by the definition change; y remains under investigation').\n\nPitfall: quoting the 12 percent as a trend without a like-for-like series, or explaining the drop away before testing it.",
+  "key_concepts": [
+   "metric definition change",
+   "instrumentation bug",
+   "step change vs trend",
+   "triangulation with independent metrics",
+   "backfilling a metric",
+   "dashboard annotation",
+   "parallel run"
+  ],
+  "common_mistakes": [
+   "Reporting the drop as real churn without checking the logging change",
+   "Dismissing the drop as an artefact without evidence",
+   "Comparing old and new definitions across the break on one chart without annotation"
+  ],
+  "interview_style_note": "Separates measurement from behaviour with a structured diagnostic (definition, break shape, independent signals, like-for-like recomputation) and communicates uncertainty.",
+  "sources": [],
+  "code": null
+ },
+ {
+  "id": "P3-DA-10",
+  "domain": "Data Analysis",
+  "question_type": "concept",
+  "question": "Conversion rose from 2.0 percent to 2.5 percent after a redesign. One slide says 'up 0.5 percent', another says 'up 25 percent'. Which is right, how would you write it, and why does the base rate matter? Include the same absolute change on a 20 percent baseline.",
+  "answer": "Both can be right, but they measure different things, and 'up 0.5 percent' is the misleading wording. Conversion went from 2.0 to 2.5 percent, an absolute change of 0.5 percentage points (pp). The relative change is 0.5 / 2.0 = 25 percent. Percentage points describe the difference between two percentages; percent describes a ratio change. Saying 'up 0.5 percent' would mean a rise from 2.0 to 2.01 percent, which is wrong.\n\nBase rate matters because the same absolute change means very different relative changes. On a 20 percent baseline, a rise of 0.5 pp (to 20.5 percent) is only a 2.5 percent relative change. A 25 percent relative lift on 2 percent baseline is small in absolute terms; the same 25 percent on a 20 percent baseline would be 5 pp, ten times more extra conversions per visitor.\n\nRelative numbers also make declines asymmetric: dropping from 50 to 25 percent is -25 pp and -50 percent relative, but recovering needs +25 pp and +100 percent.\n\nReport both together: 'conversion rose from 2.0 to 2.5 percent (+0.5 pp, +25 percent relative)', add the confidence interval, and translate to business impact such as extra orders per 100,000 visitors (here 500 extra). That prevents a large-looking relative figure from hiding a tiny absolute one, and prevents a small absolute figure from hiding a large relative gain on a low base.",
+  "key_concepts": [
+   "percentage points",
+   "relative change",
+   "absolute change",
+   "base rate",
+   "asymmetry of percent changes",
+   "reporting effect sizes"
+  ],
+  "common_mistakes": [
+   "Writing 'up 0.5 percent' for a 0.5 percentage point change",
+   "Quoting only the relative lift without the baseline",
+   "Treating -50 percent followed by +50 percent as returning to the start"
+  ],
+  "interview_style_note": "Distinguishes pp from percent with correct arithmetic, shows the base-rate effect with numbers, and reports absolute and relative effects together with business meaning.",
+  "sources": [],
+  "code": null
+ }
+]

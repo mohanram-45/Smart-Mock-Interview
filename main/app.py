@@ -19,6 +19,11 @@ from model_registry import list_models, is_valid_model, DEFAULT_MODEL, MODEL_CHO
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from report_delivery.routes import delivery_blueprint
+from question_provider import QuestionSourceUnavailable
+from src.retrieval.flask_api import init_retrieval, make_provider, question_meta, resolve_source
+from src.demo.routes import init_demo
+from src.mlops.obs import init_observability
+from src.mlops.metrics import inc as _metric
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,6 +45,9 @@ CORS(app, resources={
 
 sessions = {}
 report_jobs = {}
+init_retrieval(app, sessions)   # /api/retrieval/* (404 unless curated mode is enabled)
+init_observability(app)         # /healthz /readyz /metrics + privacy-safe request metrics and JSON access log (never logs bodies or answers)
+init_demo(app)                  # /demo/*  Stage 4A end-to-end demonstration (separate sessions; legacy /api/* routes and scoring untouched)
 
 
 def _generate_report_job(session_id, session):
@@ -132,14 +140,26 @@ def start_interview():
         if not is_valid_model(model_choice):
             return jsonify({"error": f"Invalid model: {model_choice}"}), 400
 
-        session_id = f"session_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
-
         try:
-            session = AdaptiveInterviewSession(session_id, role, custom_domains, model_choice=model_choice)
+            question_source = resolve_source(data.get('question_source'))
         except ValueError as e:
             return jsonify({"error": str(e)}), 400
 
-        if not session.load_questions():
+        session_id = f"session_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+
+        try:
+            session = AdaptiveInterviewSession(session_id, role, custom_domains, model_choice=model_choice,
+                                               question_provider=make_provider(question_source))
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+
+        try:
+            loaded = session.load_questions()
+        except QuestionSourceUnavailable as e:
+            _metric("smart_retrieval_failures_total", kind="source_unavailable", surface="legacy")
+            return jsonify({"error": str(e), "question_source": question_source}), 503
+
+        if not loaded:
             return jsonify({"error": "Failed to load questions for selected domains"}), 400
 
         first_question = session.start_round("Easy")
@@ -147,6 +167,7 @@ def start_interview():
             return jsonify({"error": "No questions available for Easy round"}), 400
 
         sessions[session_id] = session
+        _metric("smart_interviews_started_total", surface="legacy")
 
         response = {
             "session_id": session_id,
@@ -162,9 +183,12 @@ def start_interview():
                 "question_id": first_question.get("id"),
                 "question": first_question.get("question"),
                 "question_number": 1,
-                "total_in_round": len(session.round_questions["Easy"])
+                "total_in_round": len(session.round_questions["Easy"]),
+                **question_meta(session, first_question)
             }
         }
+        if question_source != "legacy":
+            response["question_source"] = question_source
 
         logger.info(f"Started interview session {session_id} for role {role}")
         return jsonify(response), 200
@@ -192,7 +216,8 @@ def get_current_question():
         "question": question.get("question"),
         "question_number": session.current_question_index + 1,
         "total_in_round": len(session.round_questions[session.current_round_name]),
-        "current_round": session.current_round_name
+        "current_round": session.current_round_name,
+        **question_meta(session, question)
     }), 200
 
 
@@ -228,6 +253,7 @@ def submit_answer():
 
         session = sessions[session_id]
         result = session.submit_answer(user_answer)
+        _metric("smart_answers_submitted_total", surface="legacy")
 
         if "error" in result:
             return jsonify(result), 400
@@ -245,6 +271,7 @@ def submit_answer():
         return jsonify(result), 200
 
     except Exception as e:
+        _metric("smart_scorer_failures_total", scorer="legacy_api", stage="submit_error")
         logger.error(f"Error submitting answer: {e}")
         return jsonify({"error": str(e)}), 500
 
@@ -287,7 +314,8 @@ def check_round_completion():
                     "question_id": next_q.get("id"),
                     "question": next_q.get("question"),
                     "question_number": session.current_question_index + 1,
-                    "total_in_round": len(session.round_questions[session.current_round_name])
+                    "total_in_round": len(session.round_questions[session.current_round_name]),
+                    **question_meta(session, next_q)
                 }
 
         elif completion.get("action") == "next_round":
@@ -299,7 +327,8 @@ def check_round_completion():
                     "question_id": next_q.get("id"),
                     "question": next_q.get("question"),
                     "question_number": 1,
-                    "total_in_round": len(session.round_questions[next_round])
+                    "total_in_round": len(session.round_questions[next_round]),
+                    **question_meta(session, next_q)
                 }
 
         return jsonify(completion), 200
@@ -329,7 +358,8 @@ def next_question():
         "question": next_q.get("question"),
         "question_number": session.current_question_index + 1,
         "total_in_round": len(session.round_questions[session.current_round_name]),
-        "current_round": session.current_round_name
+        "current_round": session.current_round_name,
+        **question_meta(session, next_q)
     }), 200
 
 
@@ -367,7 +397,8 @@ def repeat_question():
 
     return jsonify({
         "question_id": question.get("id"),
-        "question": question.get("question")
+        "question": question.get("question"),
+        **question_meta(session, question)
     }), 200
 
 
@@ -398,6 +429,7 @@ def end_interview():
             return jsonify({"error": "Invalid session"}), 400
 
         session = sessions.pop(session_id)
+        _metric("smart_interviews_completed_total", surface="legacy")
         report_jobs[session_id] = {"status": "processing"}
         worker = threading.Thread(
             target=_generate_report_job,
@@ -503,12 +535,19 @@ def internal_error(error):
 # ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
+    import os
+    # Local-first defaults: bind to this machine only and keep Werkzeug's interactive debugger OFF (it executes code in the browser and the interview pages hold
+    # candidate answers). Both are one environment variable away from the old behaviour:  set SMART_HOST=0.0.0.0   set SMART_DEBUG=1
+    host = os.environ.get("SMART_HOST", "127.0.0.1")
+    port = int(os.environ.get("SMART_PORT", "5000"))
+    debug = os.environ.get("SMART_DEBUG", "").strip().lower() in ("1", "true", "yes", "on")
     logger.info("Starting SMART Mock Interview - Adaptive System")
+    logger.info("Open the interview demo at  http://%s:%s/demo/", "127.0.0.1" if host in ("0.0.0.0", "::") else host, port)
     # reloader disabled: it watches every imported module including
     # transformers, which restarts the server mid-request on first BERT load
     app.run(
-        host='0.0.0.0',
-        port=5000,
-        debug=True,
+        host=host,
+        port=port,
+        debug=debug,
         use_reloader=False
     )

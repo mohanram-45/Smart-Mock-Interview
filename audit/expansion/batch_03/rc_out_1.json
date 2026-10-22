@@ -1,0 +1,802 @@
+[
+ {
+  "plan_id": "B3-MLO-02-4",
+  "verdict": "correct",
+  "reasons": [
+   "Applied corrections (NaN/inf fail-closed, eps at exact thresholds, baseline-n slice rule) are correct, consistent and tested on 3.10/3.11/3.13; fenced code equals code.solution.",
+   "Two minor residual points: question wording attaches the min_slice_n qualifier ambiguously to the missing-slice rule, and the limitation list omits that slice regressions are judged on point estimates."
+  ],
+  "parts_answered": {
+   "implement gate with all decision rules": true,
+   "overall gain >= min_improvement AND lower bound > 0 with independent SEs": true,
+   "reject large-slice regression or missing slice": true,
+   "needs_review for small-slice-only regression": true,
+   "return {'decision','reasons'}": true,
+   "discuss what the rule does not protect against": true
+  },
+  "evidence": [
+   {
+    "claim": "Fenced code in practical_answer is identical to code.solution",
+    "method": "executed",
+    "evidence": "string compare of fenced block vs solution: equal"
+   },
+   {
+    "claim": "code.test passes",
+    "method": "executed",
+    "evidence": "prints ok on Python 3.13.16 (dep venv), 3.10.20, 3.11.17"
+   },
+   {
+    "claim": "Extra edge cases: n exactly 200 -> reject, 199 -> needs_review; large+small regress -> reject with 2 reasons; inf overall, NaN se, NaN baseline, -inf slice -> reject; missing small slice -> reject; extra candidate slice ignored; no 'slices' key -> promote; min_improvement=0 with se=0 and diff=0 -> reject ('not distinguishable'), diff 0.0001 -> promote",
+    "method": "executed",
+    "evidence": "all asserted/printed as expected on all three interpreters"
+   },
+   {
+    "claim": "0.910 vs 0.900, se 0.002 each: lower bound about 0.0045",
+    "method": "derivation",
+    "evidence": "se_diff=sqrt(2)*0.002=0.002828; 1.96*0.002828=0.00554; 0.01-0.00554=0.00446"
+   },
+   {
+    "claim": "0.905 with se 0.02: lower bound about -0.034",
+    "method": "derivation",
+    "evidence": "se_diff=sqrt(0.02^2+0.002^2)=0.02010; diff 0.005-1.96*0.0201=-0.0344"
+   },
+   {
+    "claim": "Positively correlated errors on shared examples make the true SE of the difference smaller, so independent-SE gate is conservative",
+    "method": "derivation",
+    "evidence": "Var(A-B)=Va+Vb-2Cov; Cov>0 -> smaller"
+   },
+   {
+    "claim": "'Offline and online metrics correlate' is its own ML Test Score test",
+    "method": "paper",
+    "evidence": "WebFetch of the PDF lists Model Tests item 2 'Offline and online metrics correlate.'"
+   },
+   {
+    "claim": "A 200-example slice at 0.85 has SE about 0.025",
+    "method": "derivation",
+    "evidence": "sqrt(0.85*0.15/200)=0.0252"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "question",
+    "claim": "regresses by more than slice_tolerance or is missing from the candidate",
+    "problem": "Ambiguous: the qualifier 'with at least min_slice_n examples' can be read as also restricting the missing-slice rule; the code and answer reject a missing slice of any size.",
+    "replacement": "regresses by more than slice_tolerance, or if any baseline slice of any size is missing from the candidate"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "label leakage in the holdout",
+    "problem": "Limitation list omits that slice regressions are judged on point estimates; at the default min_slice_n=200 the slice SE (about 0.025 at 0.85) exceeds the 0.01 tolerance, so the slice rule is noisy.",
+    "replacement": "slice regressions judged on point estimates (a 200-example slice at accuracy 0.85 has a standard error near 0.025, over twice the 0.01 tolerance, so the slice rule is noisy at the default minimum size); label leakage in the holdout"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Several interacting rules and float/NaN edge cases, but standard control flow and a single formula; discussion part is recall plus judgement.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Design rationale and limitations; no code."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Reference implementation plus worked numbers matching the tests; numbers consistent with detailed (0.0015 / 0.005 with se 0.02)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (unchanged)",
+  "key_concepts_findings": "All 7 are discussed in the answer (multiple comparisons in limitations; fail closed in NaN/missing bullet). None weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0020",
+   "same_intent": false
+  },
+  "code_findings": "Re-run from scratch on 3.13/3.10/3.11: ok. 12 extra edge cases of my own all behave as specified. stdlib only (math), no 3.11+ features. eps=1e-12 correctly lets a drop of exactly slice_tolerance (0.85-0.84) and a gain of exactly min_improvement pass. Unused c_n variable is harmless.",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Opened via WebFetch: Model Tests lists 'Offline and online metrics correlate', 'The impact of model staleness is known', 'A simpler model is not better', 'Model quality is sufficient on important data slices'; Infrastructure lists 'Training is reproducible', 'The ML pipeline is Integration tested', 'Model quality is validated before serving', 'Models are canaried before serving', 'Serving models can be rolled back'; Data/Monitoring list 'Feature expectations are captured in a schema', 'Data invariants hold for inputs', 'Training and serving are not skewed'. All 12 named tests present (the page capitalises 'Integration')."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Gate design choices (thresholds, three outcomes, paired bootstrap) are derivation/engineering judgement, not documented behaviour."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-02-5",
+  "verdict": "correct",
+  "reasons": [
+   "Relabelling the toy numbers as hypothetical is correct and they are internally consistent (14% = about 1 in 7; tail percentages match mean 0.762, sd 0.0135 on a 100-row set).",
+   "Residual: past-tense narration still reads as a measurement, the 'stricter bound' advice is ambiguous (3 sd below the mean already equals the worst seed), and 'worse than having none' is stated as fact."
+  ],
+  "parts_answered": {
+   "diagnose flakiness": true,
+   "redesign the check": true,
+   "what a PR test can establish": true,
+   "what it cannot establish": true
+  },
+  "evidence": [
+   {
+    "claim": "Hypothetical numbers consistent: P(acc<=0.74) with mean .762 sd .0135 is about 10-19% (continuity-corrected 10%, uncorrected 19%), reported 14%",
+    "method": "derivation",
+    "evidence": "normal approx on discrete 0.01 grid; 0.745 -> z=-1.26 (10%), 0.75 -> z=-0.89 (19%)"
+   },
+   {
+    "claim": "P(<=0.73) about 2% and P(<=0.72) about 0.5%, min 0.72 and none below 0.72",
+    "method": "derivation",
+    "evidence": "z(0.735)=-2.0 -> 2.3%; z(0.725)=-2.74 -> 0.3%; consistent with min 0.72 in 200 draws"
+   },
+   {
+    "claim": "3 sd below mean = 0.7215, above the stated minimum 0.72",
+    "method": "derivation",
+    "evidence": "0.762-3*0.0135=0.7215"
+   },
+   {
+    "claim": "ML Test Score lists 'Training is reproducible' and 'The ML pipeline is Integration tested' under ML Infrastructure tests",
+    "method": "paper",
+    "evidence": "WebFetch of PDF: ML Infrastructure Tests items 1 and 3"
+   },
+   {
+    "claim": "Rules of ML Rule 5: test the infrastructure independently from the machine learning",
+    "method": "doc",
+    "evidence": "WebFetch: 'Rule #5: Test the infrastructure independently from the machine learning'; body: check feature columns populated; model in training environment gives same score as serving"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "So 0.75 sits within one standard deviation of the mean and fails often, while a floor of 0.70 was never reached in 200 seeds.",
+    "problem": "Past tense reads as a real measurement although the block is declared hypothetical.",
+    "replacement": "In this illustration 0.75 sits within one standard deviation of the mean and fails often, while a floor of 0.70 is never reached in 200 seeds."
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "If a stricter bound is wanted, set it from a larger multiple of the measured standard deviation below the mean, and re-measure when the fixture or the model changes.",
+    "problem": "Ambiguous; with these numbers 3 sd below the mean (about 0.72) already equals the worst of 200 seeds, so a 'stricter' bound will flake.",
+    "replacement": "If a stricter bound is wanted, note that 3 standard deviations below the mean (about 0.72 here) already equals the worst of 200 seeds, so collect more seeds or enlarge the validation set first, and re-measure when the fixture or the model changes."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "which is worse than having none",
+    "problem": "Opinion stated as fact.",
+    "replacement": "which is arguably worse than having none"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Diagnosis is straightforward (noise vs threshold); the redesign needs judgement about what a PR test can claim.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Diagnosis, capability boundary, redesign."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked spread numbers and a concrete floor; not a paraphrase. Numbers are consistent with the 'one in seven' premise."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (unchanged)",
+  "key_concepts_findings": "All discussed; 'quarantining flaky tests' appears only as step (4) but is present.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0005",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Infrastructure tests 'Training is reproducible' and 'The ML pipeline is Integration tested' present; the 12-test list in `supports` is accurate."
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule #5 'Test the infrastructure independently from the machine learning'; Rule #8 'Know the freshness requirements of your system'; Rule #9 'Detect problems before exporting models: Do sanity checks right before you export the model'; Rule #29 about saving the set of features used at serving time. Rules 8/9/29 are not used in the answer (padding but accurate)."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Overfit-a-tiny-batch and loss-decrease property tests are standard practice; no authoritative page opened for them."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-02-7",
+  "verdict": "pass",
+  "reasons": [
+   "Rewritten fault 5 is correct and no longer overlaps fault 4; cache-key definition and worked example are consistent. Only addition: an Airflow source for the idempotency/retry claims."
+  ],
+  "parts_answered": {
+   "list design faults": true,
+   "fix for each": true,
+   "how cache key is formed": true,
+   "duplicates after retry": true,
+   "duplicate model version tag": true,
+   "backfill divergence": true
+  },
+  "evidence": [
+   {
+    "claim": "Retried tasks must give the same outcome; INSERT on re-run can duplicate rows; use UPSERT",
+    "method": "doc",
+    "evidence": "Airflow best practices: 'the tasks should produce the same outcome on every re-run'; 'Do not use INSERT during a task re-run, an INSERT statement might lead to duplicate rows in your database.'"
+   },
+   {
+    "claim": "Changing window_days changes build_features key and (via input content hashes) all downstream keys; changing only the seed changes only train+later keys",
+    "method": "derivation",
+    "evidence": "downstream keys include content hashes of upstream outputs"
+   },
+   {
+    "claim": "Identical keys with different outputs imply an undeclared input or nondeterminism",
+    "method": "derivation",
+    "evidence": "by definition of the key if it covers all declared inputs"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Several coupled symptoms to map onto pipeline properties plus a correct content-addressed cache key design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Fault-by-fault fixes and cache-key principle."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked key tuple, invalidation behaviour, backfill diff procedure, idempotency acceptance test."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (unchanged)",
+  "key_concepts_findings": "All 8 discussed. Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0008",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "Apache Airflow Best Practices (idempotent tasks, UPSERT on re-run)",
+    "url": "https://airflow.apache.org/docs/apache-airflow/stable/best-practices.html",
+    "supports": "Tasks that can be retried should produce the same outcome on every re-run, and inserting on a re-run can create duplicate rows (use upsert/overwrite).",
+    "quote": "Airflow can retry a task if it fails. Thus, the tasks should produce the same outcome on every re-run.",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Cache-key composition (step name, code hash, params, input content hashes) is design reasoning, not a documented orchestrator default.",
+   "'duplicated rows for 3 days' (why 3 days) is not explained; harmless."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-03-1",
+  "verdict": "pass",
+  "reasons": [
+   "Both corrections are accurate hedges: the MLflow page documents the incrementing version number, aliases as mutable references, run lineage and tags; it only mentions auditability briefly and RBAC for managed backends."
+  ],
+  "parts_answered": {
+   "what a registry adds beyond a folder": true,
+   "when the folder is enough": true
+  },
+  "evidence": [
+   {
+    "claim": "Each new registration under the same name increments the version number",
+    "method": "doc",
+    "evidence": "MLflow registry page: 'Each new model registered to the same model name increments the version number.'"
+   },
+   {
+    "claim": "Aliases are mutable named references",
+    "method": "doc",
+    "evidence": "'Model aliases allow you to assign a mutable, named reference to a particular version of a registered model.'"
+   },
+   {
+    "claim": "Lineage to the producing run",
+    "method": "doc",
+    "evidence": "'provides lineage (i.e., which MLflow experiment and run produced the model)'"
+   },
+   {
+    "claim": "Tags and annotations on versions",
+    "method": "doc",
+    "evidence": "'Tags are key-value pairs that you associate with registered models and model versions'"
+   },
+   {
+    "claim": "Access control/approvals",
+    "method": "doc",
+    "evidence": "Page mentions role-based access controls only for Databricks/managed backends; answer says 'typically adds', acceptable"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Easy",
+  "difficulty_rationale": "Conceptual contrast with clear checklist; the 'when is a folder enough' part adds mild judgement (Easy-Medium).",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer, about 260 words; no duplication."
+   }
+  ],
+  "suggested_answer_set": "single answer (unchanged)",
+  "key_concepts_findings": "All 7 discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0209",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/ml/model-registry/",
+    "status": "supported",
+    "evidence": "Versioning increments, lineage to run, tags/annotations, aliases mutable: all quoted on the opened page. Immutability of versions is not stated and the answer now says so."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Governance/approval workflow is described generically ('typically adds'); fine."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-03-3",
+  "verdict": "correct",
+  "reasons": [
+   "Reviewer's major correction (0.8% is probably not rounding alone) is right and I reproduced it empirically; the practical-answer caveat about 1e-4 margins is consistent.",
+   "Residual minor: the skl2onnx page is cited one-sidedly; the same page shows float casting causing large discrepancies in a regression-tree example."
+  ],
+  "parts_answered": {
+   "what ONNX fixes": true,
+   "what can still differ": true,
+   "how to test export": true,
+   "does ONNX guarantee identical behaviour (no)": true
+  },
+  "evidence": [
+   {
+    "claim": "Experiment: sklearn StandardScaler+GradientBoostingClassifier(300 trees, depth 4) on 20k test rows converted with skl2onnx (float32 input), run in onnxruntime",
+    "method": "executed",
+    "evidence": "label flips 0.0 of 20,000 rows; max |p_orig-p_onnx| = 3.2e-07 (skl2onnx/onnxruntime in a 3.13 venv). Supports 'float32 rounding alone usually flips far fewer than 0.8%'."
+   },
+   {
+    "claim": "skl2onnx: 'In most cases, float and double comparison gives the same result.' but also 'the probability that both comparisons give different results is not null' and 'The discrepencies are significant' (regression example, max abs error about 150.75 until the normalizer kept double)",
+    "method": "doc",
+    "evidence": "WebFetch of the sklearn-onnx float/double page"
+   },
+   {
+    "claim": "scikit-learn guide: ONNX runtime does not require Python; not all estimators supported; custom converters are hard; arbitrary computation can be represented so sandbox",
+    "method": "doc",
+    "evidence": "WebFetch of model_persistence page, sections 11.1/11.2/11.5"
+   },
+   {
+    "claim": "ONNX IR: model must name operator sets; implementation must support all operators or reject the model; non-default sets must specify a domain",
+    "method": "doc",
+    "evidence": "WebFetch of IR.md: 'An implementation must support all operators in the set or reject the model.'; 'Operator sets other than the default operator set MUST specify a domain.'"
+   },
+   {
+    "claim": "Tolerances and 1,600 flips = 0.8% of 200,000",
+    "method": "derivation",
+    "evidence": "200000*0.008=1600"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "the skl2onnx documentation says float and double comparisons give the same result in most cases)",
+    "problem": "One-sided citation: the same page warns that the probability of differing results is not null and shows large discrepancies for a regression tree when inputs are cast to float.",
+    "replacement": "the skl2onnx documentation says float and double comparisons give the same result in most cases, though the same page shows a regression example where casting to float produced large errors, so this is an expectation, not a guarantee)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Needs knowledge of ONNX scope and a sensible parity-testing plan; numerics reasoning is moderate.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Concepts and failure modes."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Stepwise parity procedure with numbers; consistent with the corrected detailed text (1,600 flips unlikely to be ties)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (unchanged)",
+  "key_concepts_findings": "All 7 are discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0003",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://github.com/onnx/onnx/blob/main/docs/IR.md",
+    "status": "supported",
+    "evidence": "'ONNX specifies the portable, serialized format of a computation graph.' 'Each model MUST explicitly name the operator sets...' 'An implementation must support all operators in the set or reject the model.' 'Operator sets other than the default operator set MUST specify a domain.'"
+   },
+   {
+    "url": "https://scikit-learn.org/stable/model_persistence.html",
+    "status": "supported",
+    "evidence": "ONNX runtime does not require python; 'not all scikit-learn models are supported'; 'arbitrary computations can be represented using the ONNX format ... sandboxed environment'; pickle security; InconsistentVersionWarning all quoted."
+   },
+   {
+    "url": "https://onnx.ai/sklearn-onnx/auto_tutorial/plot_ebegin_float_double.html",
+    "status": "supported",
+    "evidence": "'In most cases, float and double comparison gives the same result.' Also 'the probability that both comparisons give different results is not null' and 'The discrepencies are significant' (regression example). The quote supports the sentence but the one-sided use is flagged."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'A runtime that is too old fails loudly' is consistent with the IR reject rule but is runtime-specific; acceptable.",
+   "Specific tolerances (1e-4, 1e-6, 99.9%) are labelled hypothetical/judgement."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-03-4",
+  "verdict": "correct",
+  "reasons": [
+   "Applied inference-wording fix is correct (verified on MLflow 3.17: pandas int64 and Python ints infer long; whole-number floats stay double).",
+   "New major found: 'Missing columns, extra columns' is listed as something the signature check catches, but MLflow's schema enforcement ignores extra columns with a warning."
+  ],
+  "parts_answered": {
+   "string '34' for double": true,
+   "3.7 for long": true,
+   "hours vs days": true,
+   "what a signature can catch": true,
+   "what it cannot": true,
+   "what to add around it": true
+  },
+  "evidence": [
+   {
+    "claim": "MLflow 3.17 _enforce_schema: str '34' -> double raises 'Can not safely convert str to float64'",
+    "method": "executed",
+    "evidence": "venv run of mlflow-skinny 3.17.0"
+   },
+   {
+    "claim": "3.7 (and even 3.0 float) -> long raises 'Can not safely convert float64 to int64'; reject, not truncate",
+    "method": "executed",
+    "evidence": "same run"
+   },
+   {
+    "claim": "hours-instead-of-days with correct dtype passes unchanged; out-of-range values with right dtype pass",
+    "method": "executed",
+    "evidence": "same run (days_active=72 OK)"
+   },
+   {
+    "claim": "Missing column raises 'Model is missing inputs'; extra column only logs a warning 'These inputs will be ignored.' and passes",
+    "method": "executed",
+    "evidence": "same run; also source docstring 'Any extra columns are ignored.' (mlflow/models/utils.py l.1146)"
+   },
+   {
+    "claim": "infer_signature on pandas int64 column or python int -> long; float column -> double",
+    "method": "executed",
+    "evidence": "infer_signature output: age long when ints given"
+   },
+   {
+    "claim": "Signature can be inferred from input_example",
+    "method": "doc",
+    "evidence": "MLflow signatures page: 'MLflow automatically generates model signatures when you provide an input_example during model logging.'"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "answer",
+    "claim": "- Missing columns, extra columns, wrong shapes.",
+    "problem": "For the MLflow signatures the answer is built around, extra columns are not rejected: _enforce_schema ignores them with a warning, so listing them as caught is wrong without a qualifier.",
+    "replacement": "- Missing columns and wrong shapes. Extra columns are a policy choice: MLflow's schema enforcement ignores them with a warning, so reject them explicitly if you want strictness."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Application of schema-vs-semantic validation to three concrete cases plus a layered mitigation plan.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer about 300 words."
+   }
+  ],
+  "suggested_answer_set": "single answer (unchanged)",
+  "key_concepts_findings": "All 6 discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0012",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/ml/model/signatures/",
+    "status": "partially",
+    "evidence": "Page states automatic generation from input_example and shows long/double ColSpecs, but does not describe integer inference, type enforcement rules or extra-column behaviour. The sentence in `supports` (inferred from input_example; helps validate requests) is supported; the integer-inference claim in the answer rests on the executed run, not this page."
+   },
+   {
+    "url": "https://raw.githubusercontent.com/mlflow/mlflow/master/mlflow/models/utils.py",
+    "status": "supported",
+    "evidence": "Opened: '# NB: conversion between incompatible types (e.g. floats -> ints or double -> float) are not allowed.' and error text 'Can not safely convert {values.dtype} to {numpy_type}.' Source code of the project (type 'secondary' is reasonable)."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "MLflow source: _enforce_schema (mlflow/models/utils.py)",
+    "url": "https://raw.githubusercontent.com/mlflow/mlflow/master/mlflow/models/utils.py",
+    "supports": "MLflow schema enforcement ignores extra input columns (with a warning) and rejects missing inputs.",
+    "quote": "Any extra columns are ignored.",
+    "type": "secondary"
+   }
+  ],
+  "unsourced_claims": [
+   "Constraint checks, unit naming conventions, per-client logging are engineering practice, not documented MLflow behaviour."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-03-5",
+  "verdict": "correct",
+  "reasons": [
+   "Both applied corrections are accurate hedges, but they now conflict with the unhedged concise_answer ('atomic in the registry') and the interview note.",
+   "Practical scenario mixes v41 (record shown) with v39 (audit lookup) without saying so."
+  ],
+  "parts_answered": {
+   "what each version must record": true,
+   "how model is packaged": true,
+   "promotion with aliases": true,
+   "rollback with aliases": true,
+   "what is/is not atomic": true,
+   "14-month reproduction path": true
+  },
+  "evidence": [
+   {
+    "claim": "MLflow links each version to the producing run; aliases are mutable named references",
+    "method": "doc",
+    "evidence": "MLflow registry page quotes: 'Each registered model version is linked to the MLflow run, logged model or notebook that produced it'; 'mutable, named reference to a particular version'"
+   },
+   {
+    "claim": "Pulling by digest pins an exact image",
+    "method": "doc",
+    "evidence": "Docker docs: 'When pulling an image by digest, you specify exactly which version of an image to pull.' (page does not itself say tags are mutable)"
+   },
+   {
+    "claim": "pip hash-checking mode protects against tampering/network issues",
+    "method": "doc",
+    "evidence": "pip secure-installs: 'This mode uses local hashes, embedded in a requirements.txt file, to protect against remote tampering and network issues.'"
+   },
+   {
+    "claim": "concise_answer length",
+    "method": "executed",
+    "evidence": "66 words (<=80)"
+   },
+   {
+    "claim": "Alias update atomicity is registry-implementation dependent",
+    "method": "background_only",
+    "evidence": "MLflow page does not state it; the corrected detailed text hedges, concise does not"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "concise_answer",
+    "claim": "Promotion moves an alias: atomic in the registry, but replicas change only when redeployed.",
+    "problem": "Unhedged 'atomic' now contradicts the corrected detailed answer, which says the page does not state atomicity.",
+    "replacement": "Promotion moves an alias: one registry write (atomic in typical database-backed registries), but replicas change only when redeployed."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(atomic in typical database-backed registries, though the cited page does not state it)",
+    "problem": "'the cited page' is meaningless to a reader of the answer.",
+    "replacement": "(atomic in typical database-backed registries; MLflow's documentation does not state this)"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "take model v39 and its image digest.",
+    "problem": "The record shown above is for v41; the audit lookup silently switches to v39.",
+    "replacement": "take the model version it names (v39 in this scenario) and its image digest."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-part design: provenance, environment pinning, equivalence definition, alias semantics and retention interplay.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Immutable versions with content digest of artifact",
+    "tradeoff": "Guarantees 'v39' is one artifact vs storage cost and need for retention policy"
+   },
+   {
+    "decision": "Record lineage: commit, data snapshot id, config, seeds, feature-definition version",
+    "tradeoff": "Enables rebuild/audit vs discipline to log it at training time"
+   },
+   {
+    "decision": "Package or version preprocessing with the model",
+    "tradeoff": "Behavioural equivalence vs coupling model releases to feature code"
+   },
+   {
+    "decision": "Lockfile with hashes plus base image by digest, retain images (or rebuild path)",
+    "tradeoff": "Reproducible environment vs registry storage and cleanup-job risk"
+   },
+   {
+    "decision": "Promote by moving an alias; record resolved version+image digest in the deployment record",
+    "tradeoff": "Atomic registry pointer vs replicas only change on redeploy/re-resolve"
+   },
+   {
+    "decision": "Define equivalence as agreement within tolerance on a replay set; rehearse rollback",
+    "tradeoff": "Realistic across hardware vs bit-exactness"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "66-word interview-ready summary; needs the atomic hedge."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Rationale and trade-offs."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Audit replay walkthrough with concrete numbers; adds a rollback drill."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical (unchanged)",
+  "key_concepts_findings": "All 7 discussed. rubric_points (6) cover the main decisions with trade-offs; adequate.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0016",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/ml/model-registry/",
+    "status": "supported",
+    "evidence": "Lineage to run and mutable aliases quoted; page says nothing about immutability of versions or atomicity of alias updates, which the answer correctly now hedges."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "docker image pull: pull an image by digest",
+    "url": "https://docs.docker.com/reference/cli/docker/image/pull/",
+    "supports": "Pulling by digest specifies exactly which image version is used, supporting 'base image referenced by digest'.",
+    "quote": "When pulling an image by digest, you specify exactly which version of an image to pull.",
+    "type": "official_doc"
+   },
+   {
+    "title": "pip secure installs: hash-checking mode",
+    "url": "https://pip.pypa.io/en/stable/topics/secure-installs/",
+    "supports": "A dependency lockfile with hashes lets pip verify downloaded packages.",
+    "quote": "This mode uses local hashes, embedded in a requirements.txt file, to protect against remote tampering and network issues.",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "'tags are mutable' is not stated on the Docker page I opened; widely known but unsourced.",
+   "Replay tolerance (99.9% within 1e-6) is hypothetical."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-04-1",
+  "verdict": "correct",
+  "reasons": [
+   "Added cost sentence for (c) is correct and completes the four-criteria coverage. One hedge: backpressure is not always available for sensors."
+  ],
+  "parts_answered": {
+   "(a) choice+latency/freshness/cost/failure": true,
+   "(b) choice+criteria": true,
+   "(c) choice+criteria (cost now added)": true,
+   "where hybrid beats pure": true
+  },
+  "evidence": [
+   {
+    "claim": "100 ms budget leaves only a few tens of ms for the model after network, feature lookup and overhead",
+    "method": "background_only",
+    "evidence": "engineering judgement, labelled 'for example'"
+   },
+   {
+    "claim": "At-least-once delivery implies duplicates, so alerts need dedup/idempotency",
+    "method": "derivation",
+    "evidence": "redelivery after failure/checkpoint restore"
+   },
+   {
+    "claim": "Weekly 3M-page job idempotent via overwrite-by-partition/upsert",
+    "method": "derivation",
+    "evidence": "reruns replace, not append (cf. Airflow guidance on UPSERT)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "Apply backpressure rather than dropping data silently.",
+    "problem": "Sensors usually cannot be slowed; stated as the only option.",
+    "replacement": "Prefer backpressure or a durable buffer to silent drops (sensors often cannot be slowed, so if load must be shed, do it deliberately and count it)."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Standard serving-pattern mapping across three cases; hybrid insight is common but requires synthesis.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "(a) Scheduled batch with partitioned, retried, idempotent writes",
+    "tradeoff": "Cheapest and simplest; week-old freshness acceptable, failure leaves last output in place"
+   },
+   {
+    "decision": "(b) Online endpoint with latency budget and precomputed slow features in a key-value store",
+    "tradeoff": "Meets 100 ms but pays for peak capacity and feature-store complexity"
+   },
+   {
+    "decision": "(b) Streaming job maintaining 10-minute aggregates into the store",
+    "tradeoff": "Freshness vs operating a streaming pipeline and training/serving skew risk"
+   },
+   {
+    "decision": "(b) Pre-agreed fallback decision on timeout",
+    "tradeoff": "Checkout availability vs fraud risk during degraded scoring"
+   },
+   {
+    "decision": "(c) Stateful stream processor with windows, event time, checkpointing, dedup of alerts",
+    "tradeoff": "Seconds-level alerts vs complexity of late/out-of-order data and at-least-once delivery"
+   },
+   {
+    "decision": "Hybrid: batch heavy features/embeddings + light online model; or lookup of precomputed predictions",
+    "tradeoff": "Removes inference from the request path vs staleness"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer about 320 words; rubric_points (6) are acceptable and cover each case's key decision plus trade-off."
+   }
+  ],
+  "suggested_answer_set": "single answer (unchanged)",
+  "key_concepts_findings": "All 7 discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0036",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Serving-mode choices, 100 ms budget split, hybrid patterns and streaming concerns (event time, checkpointing, at-least-once) are design judgement/background; no official page opened. An optional source would be the Flink or Beam docs on event time and checkpointing."
+  ],
+  "code_patch": null
+ }
+]

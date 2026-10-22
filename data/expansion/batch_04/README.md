@@ -1,0 +1,3 @@
+# Stage 1D - Batch 4 (MLOps & Model Deployment part B, 40 records) - STAGED
+Ids `smi-m0001..smi-m0040`. Not merged into any curated version; v1-v5 and Batches 1-3 untouched. Layout as batch 3, plus `configs.json` (SQL examples; no YAML/Dockerfile in this batch). Verification: AI-generated, blind AI review, AI recheck of every corrected record, final recheck of the 18 records changed or previously major, code and SQL executed on Python 3.10/3.11/3.13, source pages opened by AI agents and (13 records) by the lead. No human review. 13-4 quarantined as an intent duplicate (see quarantine.csv).
+Validate: `python -B audit/expansion/validate_batch.py data/expansion/batch_04`; configs: `python audit/expansion/config_check.py data/expansion/batch_04`

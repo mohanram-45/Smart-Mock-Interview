@@ -1,0 +1,1686 @@
+[
+ {
+  "plan_id": "B1-GEN-01-1",
+  "verdict": "pass",
+  "reasons": [
+   "Applied correction (stale-centroid clause) is correct and consistent with the drift advice in practical. Minor omission only: sharded HNSW implies query fan-out to all shards; not wrong, so left as is."
+  ],
+  "parts_answered": {
+   "all_question_parts_covered": true
+  },
+  "evidence": [
+   {
+    "claim": "50M x 768 x 4 B = 153.6 GB; PQ 96 B x 50M = 4.8 GB (32x vs 3072 B); HNSW M=32: 64 links x 4 B = 256 B -> 12.8 GB; 166.4 GB -> 3 nodes; 1M/day = 11.6/s; sqrt(50M)=7071, 30k-100k = 4.2x-14x",
+    "method": "executed",
+    "evidence": "python arithmetic, all match"
+   },
+   {
+    "claim": "HNSW best latency at high recall; IVF-PQ recall ceiling fixed by re-ranking; centroids go stale; tombstone deletes implementation-dependent",
+    "method": "background_only",
+    "evidence": "standard ANN literature/FAISS practice, hedged in text"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-constraint design: sizing arithmetic, four index families, update/delete behaviour, selection procedure.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Do the memory arithmetic first (153.6 GB raw vs 64 GB/node)",
+    "tradeoff": "Rules out any full-vector in-RAM index on one node before debating recall; forces sharding, compression or disk"
+   },
+   {
+    "decision": "Compress with PQ (about 96 B/vector) and keep full vectors on NVMe for re-ranking",
+    "tradeoff": "Memory 32x smaller and fits one node, paid for with extra I/O and re-rank latency, and a recall ceiling without re-ranking"
+   },
+   {
+    "decision": "Set re-rank depth (top 100-200 by PQ distance) as a tunable",
+    "tradeoff": "Deeper re-rank raises recall@10 toward 0.95 but adds random reads against the 50 ms p95 budget"
+   },
+   {
+    "decision": "Alternative: HNSW sharded across >=3 nodes (or on compressed vectors)",
+    "tradeoff": "Best latency/recall per query and incremental inserts, but about 166 GB RAM, slow build and tombstone churn"
+   },
+   {
+    "decision": "Plan for 1M inserts/day and few deletes: IVF assigns to centroids cheaply; tombstones plus periodic rebuild",
+    "tradeoff": "Cheap updates vs centroid drift and graph degradation over time; needs a retrain/rebuild schedule"
+   },
+   {
+    "decision": "Choose by measured recall-vs-p95 curves on a 2-5M sample with held-out queries and exact ground truth",
+    "tradeoff": "Costs an experiment up front but avoids picking by reputation; re-check after a month of ingestion"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Genuinely shorter (77 words), consistent with detailed (153.6 GB, 32x)."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanism and trade-offs per family."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked sizing and selection procedure; numbers consistent with concise and detailed."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "All concepts are discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0009",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-01-2",
+  "verdict": "pass",
+  "reasons": [
+   "Applied signature reorder (seed before iters) now matches the question's ToyIVF(base, nlist, seed) and the test call; the tie caveat is correct. Code edge cases on all 3 interpreters: nlist=1 -> 1.0; k>n pads with -1; duplicate base rows and float32 input -> 1.0 at full probe; nprobe>nlist OK. Stdlib+numpy only, no 3.11+ features."
+  ],
+  "parts_answered": {
+   "all_question_parts_covered": true
+  },
+  "evidence": [
+   {
+    "claim": "recall list 0.665, 0.8775, 0.9625, 0.995, 1.0",
+    "method": "executed",
+    "evidence": "identical on 3.13, 3.10, 3.11 (float repr 0.8775000000000001, 0.9949999999999999)"
+   },
+   {
+    "claim": "recall non-decreasing in nprobe, 1.0 at nprobe=nlist",
+    "method": "executed",
+    "evidence": "30 random seeds/sizes: zero violations; plus derivation (probe sets nested, exact rank inside)"
+   },
+   {
+    "claim": "-1 padding counts as miss",
+    "method": "executed",
+    "evidence": "recall([[1,2,3,4]],[[1,-1,-1,-1]])=0.25"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Non-trivial implementation (k-means IVF, padded recall metric) plus evaluation methodology.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Method and IVF logic."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Runnable code; fenced code equals code.solution exactly (checked)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All concepts are discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0022",
+   "same_intent": false
+  },
+  "code_findings": "Rerun 3.13/3.10/3.11 identical; test passes; fenced==solution.",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-01-3",
+  "verdict": "correct",
+  "reasons": [
+   "Both applied changes are correct and consistent (hedge on norms; squared-L2 conversion). Overlaps with smi-h0009 on norm bias but intent differs (metric-flag migration, rebuild, threshold vs. code + metric relations). One leftover unverified claim: 'IVF, which clusters by L2'."
+  ],
+  "parts_answered": {
+   "all_question_parts_covered": true
+  },
+  "evidence": [
+   {
+    "claim": "dot products 0.9, 3.0, 2.0; cosines 0.9939, 0.7071, 0.9997",
+    "method": "derivation",
+    "evidence": "recomputed: 0.9/sqrt(0.82)=0.9939, 3/sqrt(18)... =0.7071, 2/sqrt(4.0025)=0.99969"
+   },
+   {
+    "claim": "||a-b||^2 = 2-2cos on unit vectors; FAISS returns squared L2",
+    "method": "derivation",
+    "evidence": "algebra; FAISS IndexFlatL2 returns squared distances (background)"
+   },
+   {
+    "claim": "generic chunks boosted by larger norms",
+    "method": "background_only",
+    "evidence": "now correctly hedged as encoder-dependent"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "(IVF, which clusters by L2)",
+    "problem": "Library-specific and not reliably true: in FAISS an IVF index with the inner-product metric trains its coarse quantiser through an IP quantiser, so 'clusters by L2' is wrong or unverified as a general statement.",
+    "replacement": "(IVF)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Diagnosis with a small derivation and an index-rebuild decision.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer, all parts (diagnosis, fix, existing index) covered."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All concepts are discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0009",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-01-4",
+  "verdict": "correct",
+  "reasons": [
+   "Applied hedge is correct and consistent. Two small imprecisions remain (valid B-vs-B scoring of new docs; 'the only case')."
+  ],
+  "parts_answered": {
+   "all_question_parts_covered": true
+  },
+  "evidence": [
+   {
+    "claim": "Same dimension does not imply shared space",
+    "method": "background_only",
+    "evidence": "standard; hedge about deliberately compatible models now present"
+   },
+   {
+    "claim": "Linear map between embedding spaces is a lossy bridge",
+    "method": "background_only",
+    "evidence": "hedged in text"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "while new documents look artificially strong or weak depending on score distributions",
+    "problem": "Imprecise: model-B queries against model-B documents are a valid comparison; the problem is that their scores are not comparable with the meaningless scores of old documents when merged in one ranking.",
+    "replacement": "while new documents are scored sensibly against model-B queries but their scores are not comparable with the meaningless scores of old documents, so new content tends to dominate or vanish depending on score distributions"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "are the only case where",
+    "problem": "Unsupported universal ('the only case').",
+    "replacement": "are a case where"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Scenario judgement: failure mode plus migration plan, no heavy calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Covers is-it-safe, what happens, rollout."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All concepts are discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close (max token Jaccard 0.17)",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-01-5",
+  "verdict": "correct",
+  "reasons": [
+   "Applied seed-range text is accurate and its 'ordering' claim verified. Edge: relative_contrast returns nan if the query equals a data point (min distance 0); not claimed in the answer."
+  ],
+  "parts_answered": {
+   "all_question_parts_covered": true
+  },
+  "evidence": [
+   {
+    "claim": "contrasts 266.6, 4.22, 0.484, 0.115 and 36.0",
+    "method": "executed",
+    "evidence": "identical on 3.13/3.10/3.11"
+   },
+   {
+    "claim": "seeds 0-9: 2-d range about 38 to 267, low-intrinsic about 21 to 47; ordering held for all ten",
+    "method": "executed",
+    "evidence": "min/max 38.34..266.64 and 21.13..47.18; for every seed uniform contrast strictly decreases across 2,10,100,1000, and low-rank > 10x uniform-1000, and < uniform-2d"
+   },
+   {
+    "claim": "hubness reported in high dimensions",
+    "method": "background_only",
+    "evidence": "Radovanovic et al. 2010; hedged"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Learned embeddings occupy a much lower-dimensional region",
+    "problem": "Empirical, data- and model-dependent claim stated as universal.",
+    "replacement": "Learned embeddings typically occupy a much lower-dimensional region"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Conceptual evaluation backed by a small experiment.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "71 words, consistent."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Theory and scope."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Experiment; fenced code equals code.solution."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "All concepts are discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0162",
+   "same_intent": false
+  },
+  "code_findings": "Rerun on all three interpreters identical; fenced==solution.",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-01-6",
+  "verdict": "correct",
+  "reasons": [
+   "Applied rewrite of the fits list is numerically correct and consistent with the 45-50 GB usable figure, but it now duplicates the exclusions in the next sentence (minor issue given)."
+  ],
+  "parts_answered": {
+   "all_question_parts_covered": true
+  },
+  "evidence": [
+   {
+    "claim": "raw: 30.72/61.44/81.92 GB; HNSW links 2.56 GB; totals f32 33.28/64.00/84.48, f16 17.92/33.28/43.52, int8 10.24/17.92/23.04",
+    "method": "executed",
+    "evidence": "python arithmetic; all stated roundings correct"
+   },
+   {
+    "claim": "float16 usually near-lossless; truncation only where documented",
+    "method": "background_only",
+    "evidence": "hedged"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": " The 768-d float32 index (about 64 GB) leaves no headroom, and 1,024-d float32 does not fit.",
+    "problem": "Exact repeat of the exclusions already stated two sentences earlier in the same paragraph (introduced by the correction).",
+    "replacement": ""
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Straight arithmetic across a grid plus judgement on headroom and compression.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Covers arithmetic, fit, beyond-arithmetic decision."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All concepts are discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close (max token Jaccard 0.17)",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-01-7",
+  "verdict": "correct",
+  "reasons": [
+   "The applied parenthetical contradicts 'a few cells' and states a recall mechanism as certain; replacement given. Otherwise diagnosis (stale quantiser), retraining, full re-add, PQ retrain, blue/green and monitoring are right."
+  ],
+  "parts_answered": {
+   "all_question_parts_covered": true
+  },
+  "evidence": [
+   {
+    "claim": "30M/4096 = 7,324 per list",
+    "method": "executed",
+    "evidence": "arithmetic"
+   },
+   {
+    "claim": "Skewed stale cells raise recall at fixed nprobe unless the new region spans more oversized cells than nprobe",
+    "method": "executed",
+    "evidence": "faiss IVFFlat sim, stale vs fresh: nprobe=4 recall 0.985 stale vs 0.881 fresh; 2 lists >5x mean, max/mean 71"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "answer",
+    "claim": "The new product line is therefore squeezed into a few cells, which become huge (that explains the 100x lists and the latency jump: probing a big cell scans far more vectors), while queries in that region still probe only 16 lists, so many true neighbours sit in cells that are not probed (the new content is cut into more oversized cells than nprobe = 16 covers, along boundaries that were fit to the old data).",
+    "problem": "The correction created an internal contradiction: new content is 'squeezed into a few cells' yet also 'cut into more oversized cells than nprobe = 16 covers'. Executed check (faiss IVFFlat, 64-d, stale centroids trained on old data, new data added): when a few cells absorb the new content, recall at fixed nprobe goes UP (0.985 vs 0.881 for a freshly trained index at nprobe=4) while latency suffers. A recall drop needs the new region to span more oversized cells than nprobe probes, with old centroid boundaries cutting through new neighbourhoods. So the recall mechanism is stated as certain but is only true in that case.",
+    "replacement": "The new product line is therefore squeezed into a comparatively small set of old cells, which become huge (that explains the 100x lists and the latency jump: probing a big cell scans far more vectors). Recall falls when that region spans more oversized cells than nprobe = 16 can probe and the old centroid boundaries cut through the new neighbourhoods, so true neighbours end up in cells that are not probed; if only a few giant cells held the new content, skew alone would usually raise recall and cost latency, so measure recall per content type to see which case you are in."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Subtle debugging: reconcile recall drop with latency rise and imbalance; fix/monitor.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Covers cause, diagnosis, fix, prevention."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All concepts are discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close (max token Jaccard 0.17)",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-03-2",
+  "verdict": "pass",
+  "reasons": [
+   "Applied hedge is supported by the paper and keeps the 'safe default' recommendation consistent. type debugging is acceptable."
+  ],
+  "parts_answered": {
+   "all_question_parts_covered": true
+  },
+  "evidence": [
+   {
+    "claim": "Convex combination beats RRF and RRF is sensitive to its parameters (Bruch et al.)",
+    "method": "paper",
+    "evidence": "arXiv 2210.11934 abstract: 'we find RRF to be sensitive to its parameters' and 'CC outperforms RRF in in-domain and out-of-domain settings'"
+   },
+   {
+    "claim": "BM25 gaps of several points vs cosine hundredths",
+    "method": "derivation",
+    "evidence": "4.4 and 6.7 vs 0.02 and 0.05"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Comparison of fusion methods with trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Why wrong plus four options with trade-offs and a default."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All concepts are discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close (max token Jaccard 0.17)",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2210.11934",
+    "status": "supported",
+    "evidence": "Abstract: 'we find RRF to be sensitive to its parameters'; 'CC outperforms RRF in in-domain and out-of-domain settings'."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "An Analysis of Fusion Functions for Hybrid Retrieval",
+    "url": "https://arxiv.org/abs/2210.11934",
+    "supports": "convex combination vs RRF and RRF parameter sensitivity"
+   }
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-03-4",
+  "verdict": "correct",
+  "reasons": [
+   "Both applied corrections are accurate and consistent (tf_part -> k1+1 for any length; rank_bm25 statement verified by execution, including that it does not de-duplicate query terms).",
+   "Code and test pass on 3.13/3.10/3.11; fenced code equals code.solution.",
+   "One unhedged universal claim remains: tokenisation/stop-words change scores \"far more\" than k1 or b."
+  ],
+  "parts_answered": {
+   "class with idf/score/rank": true,
+   "non-negative idf and repeated query terms counted once": true,
+   "tf saturation explained": true,
+   "length normalisation explained": true,
+   "b=0 and b=1 behaviour": true
+  },
+  "evidence": [
+   {
+    "claim": "Code passes its own test",
+    "method": "executed",
+    "evidence": "OK on 3.13, 3.10 and 3.11"
+   },
+   {
+    "claim": "Matches rank_bm25 BM25Okapi when its idf is replaced with ln(1+(N-df+.5)/(df+.5))",
+    "method": "executed",
+    "evidence": "5 docs, queries [a,d],[c],[zzz]: max abs diff <=2.2e-16"
+   },
+   {
+    "claim": "rank_bm25 does not de-duplicate repeated query terms",
+    "method": "executed",
+    "evidence": "query [a,a]: diff 1.3 vs this implementation (counts a twice in rank_bm25)"
+   },
+   {
+    "claim": "tf_part -> k1+1 as f grows for any fixed length factor",
+    "method": "derivation",
+    "evidence": "f(k1+1)/(f+k1*norm) -> k1+1 as f->inf for any norm>0"
+   },
+   {
+    "claim": "tenth occurrence adds much less than second (k1=1.2,b=.75,avg length)",
+    "method": "derivation",
+    "evidence": "f=1,2: 1.00,1.375 (+0.375); f=9,10: 1.941,1.964 (+0.023)"
+   },
+   {
+    "claim": "Older idf negative when df>N/2",
+    "method": "derivation",
+    "evidence": "(N-df+.5)/(df+.5)<1 iff df>N/2"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "tokenisation and stop-word handling change scores far more than k1 or b",
+    "problem": "Unhedged universal/comparative claim; it is an empirical, corpus-dependent statement.",
+    "replacement": "tokenisation and stop-word handling can change scores as much as, or more than, tuning k1 or b"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short class from a given formula plus explaining two mechanisms and parameter extremes; no subtle trap.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Rigorous explanation of formula, idf variants, saturation, normalisation."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Tested code, not duplicated in the detailed answer; the rank_bm25 note is now accurate."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (current)",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0010",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran solution+test on 3.13, 3.10, 3.11: pass. Extra cases: ties sort to lower index; empty query scores 0; top_n=0 returns []; unknown term idf>0; matches rank_bm25 (custom idf). Edge: BM25([]) or a corpus of only empty documents raises ZeroDivisionError (avgdl=0) - not covered by the question, minor. Stdlib only, no 3.11+ features.",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-03-5",
+  "verdict": "pass",
+  "reasons": [
+   "All three applied corrections are correct and verified: at lam=0 every first-step score is 0 so index 0 is picked; \"For lam>0\" qualifier right; O(n^2 d) for the precomputed matrix and O(k n d) lazily.",
+   "Code and test pass on three interpreters; fenced code equals solution.",
+   "Only minor robustness notes (empty candidate list, float-noise ties), not worth changing for the stated spec."
+  ],
+  "parts_answered": {
+   "mmr signature and greedy rule with cosine, tie and zero-vector rules": true,
+   "how lam behaves": true,
+   "where MMR is not the right tool": true
+  },
+  "evidence": [
+   {
+    "claim": "lam=0: first pick is lowest index, then least-redundant items",
+    "method": "executed",
+    "evidence": "mmr([1,0],[[1,0],[0,1],[1,0],[0,0]],4,0.0) -> [0,1,3,2]"
+   },
+   {
+    "claim": "lam=1 equals relevance ranking with low-index ties",
+    "method": "executed",
+    "evidence": "-> [0,2,1,3]"
+   },
+   {
+    "claim": "Matches independent brute-force implementation",
+    "method": "executed",
+    "evidence": "500 random cases on 3.13/3.10/3.11: differences only where scores are mathematically tied and differ by ~1e-17 float noise"
+   },
+   {
+    "claim": "Cost O(n^2 d) precompute vs O(k n d) lazy",
+    "method": "derivation",
+    "evidence": "d@d.T is n x n x d; lazy needs only k rows"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short numpy implementation of a known greedy algorithm with several stated conventions plus conceptual discussion.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Explains lam, cost, limits."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Tested code; distinct from detailed."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (current)",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": "Passes on 3.13/3.10/3.11. Own edge cases: lam outside [0,1] raises ValueError; k=0 and k<0 return []; zero query vector with lam=0.5 returns [0,1,3] (all rel 0, low-index ties); int inputs ok; k > n clipped. Minor limitations (not worth patching): empty docs list raises a matmul ValueError; mathematically tied scores can be broken by 1e-17 float noise rather than strictly to the lower index (e.g. q=[-1,0,1], docs [2,-1,2] and [1,-1,1], lam=1 picks index 1 first). stdlib+numpy only.",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-03-7",
+  "verdict": "correct",
+  "reasons": [
+   "Numbers verified: 0.1 expected matches in top-10, 0.99^100=0.366, P(>=10 of 1000)=0.543, 2k/s=2,000 gives P(>=10)=0.995.",
+   "Both applied corrections are consistent (1% of 80M = 800,000 lands in the filter-aware/partition band).",
+   "The word selectivity is used in two opposite senses (very selective = few match; 2k/selectivity = fraction matching); clarify."
+  ],
+  "parts_answered": {
+   "why 0-2 results": true,
+   "compare post/pre/filter-aware": true,
+   "strategy as function of selectivity": true
+  },
+  "evidence": [
+   {
+    "claim": "Expected matches in top-10 = 0.1; P(0)=0.904, P(1)=0.091, P(2)=0.004",
+    "method": "executed",
+    "evidence": "binomial(10,0.01)"
+   },
+   {
+    "claim": "P(no match in 100) = 0.99^100 = 0.366",
+    "method": "executed",
+    "evidence": "0.3660"
+   },
+   {
+    "claim": "P(>=10 matches in 1000 draws) = 0.54",
+    "method": "executed",
+    "evidence": "0.5427"
+   },
+   {
+    "claim": "2k/s = 2,000 candidates gives P(>=10) ~ 0.995",
+    "method": "executed",
+    "evidence": "0.9952"
+   },
+   {
+    "claim": "1% of 80M = 800,000 chunks",
+    "method": "derivation",
+    "evidence": "80e6*0.01"
+   },
+   {
+    "claim": "Behaviour of filtered HNSW traversal is engine-dependent",
+    "method": "background_only",
+    "evidence": "Answer hedges \"implementation-dependent\"; not checked against a specific engine doc"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "oversampling to about 2k/selectivity candidates (twice the number needed on average for k survivors)",
+    "problem": "selectivity is used elsewhere as \"very selective\" = few match; here it means the matching fraction.",
+    "replacement": "oversampling to about 2k/s candidates, where s is the fraction of chunks that match the filter (twice the number needed on average for k survivors)"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "when selectivity is low",
+    "problem": "Ambiguous in the same sense; \"selective\" filters elsewhere in the answer are the restrictive ones.",
+    "replacement": "when the filter is restrictive (few vectors match)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Needs probability reasoning, understanding of ANN filtering trade-offs and a banded strategy.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanisms and strategy bands."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Quantification and an operational routine; numbers verified and distinct from detailed."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (current)",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-02-2",
+  "verdict": "pass",
+  "reasons": [
+   "Applied correction (gate framed as flag-for-review with illustrative thresholds) is accurate and consistent with the detailed answer.",
+   "Diagnosis (reading order, headers/footers, floating objects), confirmation and fixes are sound; claims are generic and appropriately hedged."
+  ],
+  "parts_answered": {
+   "diagnose extraction problems": true,
+   "how to confirm each": true,
+   "pipeline changes": true
+  },
+  "evidence": [
+   {
+    "claim": "Extractors emit draw order / y-sorted text, causing column interleaving",
+    "method": "background_only",
+    "evidence": "widely documented behaviour of PDF text extraction; no tool-specific claim"
+   },
+   {
+    "claim": "Repeated header/footer detection by position across pages, digits normalised",
+    "method": "background_only",
+    "evidence": "standard technique"
+   },
+   {
+    "claim": "Titles survive interleaving because single short line",
+    "method": "derivation",
+    "evidence": "a short line cannot be interleaved with another column"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Diagnostic reasoning from a symptom string with several standard causes and fixes.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Causes, confirmation, gating."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete triage steps and thresholds, not a paraphrase."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (current)",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-02-4",
+  "verdict": "correct",
+  "reasons": [
+   "The rewritten diagnosis is better but introduces two wrong statements: \"index would roughly double each night\" (re-inserting every page adds ~1x the original size per night, i.e. linear, +100% of baseline) and \"Boundary shifts make it worse\" (in an append-only job that already re-inserts the whole page, boundary shifts add nothing; they matter for the hash-diff redesign).",
+   "Minor off-by-one: a paragraph that survived three edits exists four times, not three.",
+   "Practical answer mixes in-place per-document upserts with validation against a \"staged index\" without saying the changes go to a staged version.",
+   "Concise answer is 73 words and consistent with detailed."
+  ],
+  "parts_answered": {
+   "likely bug": true,
+   "idempotent re-ingestion": true,
+   "edits and deletions": true,
+   "rollback": true
+  },
+  "evidence": [
+   {
+    "claim": "Re-inserting all N chunks nightly gives (t+1)N after t nights, not doubling",
+    "method": "derivation",
+    "evidence": "increments of N per night: +100%, +50%, +33% of the running size"
+   },
+   {
+    "claim": "After e edits of a page (full re-insert, no delete) a surviving paragraph exists e+1 times",
+    "method": "derivation",
+    "evidence": "original + e copies"
+   },
+   {
+    "claim": "Concise answer word count",
+    "method": "executed",
+    "evidence": "73 words"
+   },
+   {
+    "claim": "3 weeks at 4%/night compounds to ~2.3x (1.04^21)",
+    "method": "executed",
+    "evidence": "2.28"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "detailed_answer",
+    "claim": "the index would roughly double each night",
+    "problem": "Wrong: re-inserting every unchanged page with new IDs adds one baseline copy per night (linear growth), it does not double each night.",
+    "replacement": "the index would grow by about its original size every night (+100% of the baseline per night, not 4%)"
+   },
+   {
+    "severity": "major",
+    "field": "detailed_answer",
+    "claim": "Boundary shifts make it worse: an edit near the start of a document can move every following fixed-size chunk boundary, so even untouched text gets new chunk hashes and is re-inserted.",
+    "problem": "Not a worsening of the append-only bug (the whole changed page is already re-inserted); the effect applies to the hash-diff redesign.",
+    "replacement": "Boundary shifts matter for the redesign: with fixed-size chunking an edit near the start of a document can move every following chunk boundary, so even untouched text gets new chunk hashes and is re-embedded; structure-aware chunking (headings, paragraphs) keeps diffs small."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "a paragraph that survived three edits exists three times (duplicates)",
+    "problem": "Off by one: original plus three re-inserted copies is four.",
+    "replacement": "a paragraph that survived two edits of its page exists three times (the original plus two re-inserted copies, i.e. duplicates)"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "Run validation queries against the staged index;",
+    "problem": "The steps above upsert/delete in place; staging is never described.",
+    "replacement": "Apply the adds and deletes to a staged index version (new collection or copy-on-write), not the live one, then run validation queries against it;"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open-ended pipeline redesign needing idempotency, deletion safety, rollback and quantitative reasoning about growth.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Genuinely shorter interview-ready answer (73 words), consistent with the corrected detailed text."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Full diagnosis and redesign."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Step-by-step nightly algorithm with thresholds, labelled hypothetical."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical (current)",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-04-6",
+  "verdict": "correct",
+  "reasons": [
+   "Arithmetic fully verified (5,292; 11 chunks; 12 spare; running totals; 292 remaining).",
+   "The applied truncation correction is right in substance but grammatically garbled, and it now contradicts step 5 (\"where truncation cannot reach them\") because truncation may hit either end.",
+   "Minor: trimmed tenth chunk window includes its 30 formatting tokens; no safety margin for chat-template/special tokens."
+  ],
+  "parts_answered": {
+   "how many chunks fit": true,
+   "long chunks": true,
+   "graceful token budget design": true
+  },
+  "evidence": [
+   {
+    "claim": "8192-600-100-1200-1000 = 5,292; 5,292/480 = 11.025 -> 11 chunks, 5,280 used, 12 spare",
+    "method": "executed",
+    "evidence": "python arithmetic"
+   },
+   {
+    "claim": "Running totals 480,1000,2020,2490,2970,3460,4070,4520,5000; chunk 10 -> 5,700; room 292",
+    "method": "executed",
+    "evidence": "cumulative sum of listed costs"
+   },
+   {
+    "claim": "Concise answer length",
+    "method": "executed",
+    "evidence": "67 words"
+   },
+   {
+    "claim": "Providers either reject or (some stacks) truncate over-length prompts",
+    "method": "background_only",
+    "evidence": "behaviour varies by API/framework; answer hedges it"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "truncates silently, depending on the stack by cutting the start or the end of the prompt",
+    "problem": "Garbled grammar introduced by the correction.",
+    "replacement": "truncates silently (depending on the stack, by cutting the start or the end of the prompt)"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Put the question and key instructions where truncation cannot reach them, and always verify the final token count before the call.",
+    "problem": "Contradicts the corrected statement that truncation may cut either end; no position is safe.",
+    "replacement": "Since truncation may hit either end, do not rely on position to protect the question and instructions: guarantee they fit by exact counting, and always verify the final token count before the call (reject or trim rather than send an over-budget prompt)."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "counted exactly.",
+    "problem": "No margin for chat-template or special tokens.",
+    "replacement": "counted exactly, plus a small safety margin for chat-template and special tokens."
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "trim chunk 10 to its best 292-token window (total exactly 5,292)",
+    "problem": "Chunk costs include 30 formatting tokens, so the text window is about 262 tokens; exact fill leaves no margin.",
+    "replacement": "trim chunk 10 to the best window that fits in 292 tokens including its 30 formatting tokens (about 262 tokens of text; total exactly 5,292, so keep a few tokens of margin in practice)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Straight arithmetic then a standard greedy-fill and degradation policy; open-ended part is modest.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Reserve fixed parts (system, answer budget) first, counted with the real tokenizer",
+    "tradeoff": "Guaranteed room for answer vs less context"
+   },
+   {
+    "decision": "Cap and truncate/summarise history oldest-first",
+    "tradeoff": "Context room vs lost conversational continuity"
+   },
+   {
+    "decision": "Fill chunks by running token count in rank order, not fixed k",
+    "tradeoff": "No overflow vs variable chunk count"
+   },
+   {
+    "decision": "Trim or skip a chunk that does not fit (best-window trimming)",
+    "tradeoff": "Uses leftover budget vs possible cut-off qualifiers"
+   },
+   {
+    "decision": "Relevance threshold: use fewer chunks than fit",
+    "tradeoff": "Less distraction and cost vs possible recall loss"
+   },
+   {
+    "decision": "Final exact recount and monitoring of cap-hit rate",
+    "tradeoff": "Safety vs small overhead"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Shorter answer with the key number and cut priority."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanisms and design."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked greedy fill with verified numbers."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical (current)",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0005",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-07-1",
+  "verdict": "correct",
+  "reasons": [
+   "Both applied corrections are accurate (recall vs precision wording; chunk-removed ablation conclusion is properly hedged).",
+   "Gaps remain: cause 5 (prompt instructions) has no discriminating experiment although the question asks for one per cause; the gold-only run that returns 30 (true parametric override) is not stated.",
+   "Hypothetical ablation numbers are internally consistent."
+  ],
+  "parts_answered": {
+   "step-by-step triage": true,
+   "experiment that separates each cause": "partial (cause 5 has none)"
+  },
+  "evidence": [
+   {
+    "claim": "Ablation ladder numbers consistent with causes",
+    "method": "derivation",
+    "evidence": "A 11/20, B 19/20 (generator can read gold), C 14/20 (+3 for position), D 18/20 (conflicts main cause)"
+   },
+   {
+    "claim": "Position effects are model-dependent",
+    "method": "background_only",
+    "evidence": "answer hedges \"model-dependent effect, so test\""
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(for example 'be concise' leading to dropping conditions).",
+    "problem": "No discriminating experiment for this cause.",
+    "replacement": "(for example 'be concise' leading to dropping conditions). Check: re-run with a strict 'answer only from the context, say not found otherwise' instruction and compare."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "If it then answers 60, distractors are the problem.",
+    "problem": "Missing the opposite outcome that separates parametric override from distractors.",
+    "replacement": "If it then answers 60, distractors are the problem; if it still answers 30 with only the gold chunk, the model is overriding or misreading the context (see 6)."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Structured diagnostic reasoning with several standard hypotheses; no calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Causes and checks."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked ablation ladder with numbers; labelled hypothetical."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (current)",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0003",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-07-4",
+  "verdict": "correct",
+  "reasons": [
+   "Applied correction (answer-span scoring across chunk sizes; same k covers half the text) is correct and important.",
+   "Practical numbers verified: model effect +2 points at both chunk sizes, chunk effect -7 at both models, new/256 vs baseline -5.",
+   "Minor wording: \"The interaction is also visible\" introduces model-prefix/normalisation points that are not interactions; the half-text-per-k point is now stated twice (steps 2 and 4)."
+  ],
+  "parts_answered": {
+   "isolate the cause": true,
+   "what to do before migration": true
+  },
+  "evidence": [
+   {
+    "claim": "model effect +2 (0.90-0.88, 0.83-0.81); chunk effect -7 (0.81-0.88, 0.83-0.90); net -5",
+    "method": "executed",
+    "evidence": "arithmetic on the 2x2 table"
+   },
+   {
+    "claim": "256-token chunks double the chunk count per document",
+    "method": "derivation",
+    "evidence": "512/256 = 2 (approximately)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "The interaction is also visible: the new model may need",
+    "problem": "Mislabelled; the listed items are model-specific requirements, not interaction effects.",
+    "replacement": "Interactions matter too, and the new model may need"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Experiment design with confounded changes plus pipeline-bug hunting and release-process prevention.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Procedure, bug checklist, prevention."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Verified 2x2 result table and reading; labelled hypothetical."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (current)",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0003",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-05-3",
+  "verdict": "pass",
+  "reasons": [
+   "Applied corrections (C's faithfulness made conditional in concise and detailed) are correct and mutually consistent; concise is 78 words (<=80).",
+   "No remaining wrong or overstated claim; hedging on C is exactly right because the prompt does not show the retrieved page text."
+  ],
+  "parts_answered": {
+   "faithful/relevant/correct for A,B,C": true,
+   "inputs each judgement needs": true,
+   "implication for headline metric": true
+  },
+  "evidence": [
+   {
+    "claim": "Faithfulness needs answer+context, relevance question+answer, correctness a reference",
+    "method": "background_only",
+    "evidence": "Standard RAG-eval definitions (e.g. RAGAS-style); no external page opened."
+   },
+   {
+    "claim": "A faithful/incorrect, B unfaithful/correct",
+    "method": "derivation",
+    "evidence": "30 in context, 60 absent from context; truth is 60."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Applies three definitions to three cases and draws a metric-selection conclusion; no calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "78 words, consistent with detailed incl. C's conditional faithfulness"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "adds diagnosis-by-pattern and cost of reference labels"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0003",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-05-4",
+  "verdict": "correct",
+  "reasons": [
+   "The applied softening of 'direct evidence of position bias' is right but the sentence still ends with 'depends on which answer is shown first, not on content', which re-asserts pure order dependence and ignores that a re-run also changes sampling noise; no same-order re-run control is proposed.",
+   "Numbers in the worked example are consistent: 95+43+62=200, 62/200=31%, 95/138=0.688, 47.5%/21.5%/31%. The 'B wins or ties vs A wins' phrase is unclear (the range is 47.5% to 78.5%)."
+  ],
+  "parts_answered": {
+   "what is going on": true,
+   "other biases": true,
+   "how to make usable": true
+  },
+  "evidence": [
+   {
+    "claim": "Worked example arithmetic",
+    "method": "executed",
+    "evidence": "95/(95+43)=0.6884; 95/200=0.475; 43/200=0.215; 62/200=0.31; B-win-or-tie 157/200=0.785"
+   },
+   {
+    "claim": "Length/self-preference/position bias exist in LLM judges but vary by model",
+    "method": "background_only",
+    "evidence": "Zheng et al. 2023 (MT-Bench) widely cited; not opened here; answer hedges as model-dependent."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "for nearly a third of pairs the verdict depends on which answer is shown first, not on content",
+    "problem": "Swapping order is confounded with re-sampling; flips could be partly plain randomness, so 'not on content' is too strong.",
+    "replacement": "for nearly a third of pairs the verdict changed when only the order changed; re-running the same order (to measure plain sampling noise) separates position bias from randomness"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "If the judge were consistent, only a few percent of verdicts should change.",
+    "problem": "Unsupported number; the expected flip rate depends on how many pairs are genuinely close.",
+    "replacement": "A judge that tracked content would flip on only a small fraction of pairs (how small depends on how many pairs are genuinely close)."
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "and 'B wins or ties' vs 'A wins' views give you a range instead of one number",
+    "problem": "Unclear and does not match the figures given.",
+    "replacement": "and counting every inconsistent pair for A or for B gives a range (B 47.5% to 78.5% of all 200 pairs) instead of one number"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Diagnose measurement validity, list biases, design a protocol; no deep derivation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "diagnosis, bias list, protocol"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked swap-consistent numbers, internally consistent and labelled illustrative"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0003",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-05-6",
+  "verdict": "correct",
+  "reasons": [
+   "Applied noise correction is right in principle (paired SE ~ sqrt(discordant)/200 = 1.6 points for 10 flips; unpaired SE 3.4 verified) but the example is parity-inconsistent: a net change of +3 cannot arise from exactly 10 flipped questions (b+c and b-c must have the same parity); 11 flips (7 up, 4 down) gives 1.66 points.",
+   "The 12 'newly hit queries' only holds if each question has one gold chunk; unstated.",
+   "common_mistakes still says '1.5-point change is well inside the error', stronger than the detailed 'within one standard error' (cannot be patched through the issues schema; suggest 'within about one standard error of the paired difference').",
+   "Replaced key_concepts ('generator bottleneck', 'paired noise') are discussed in the answer; 'lost in the middle' removal is fine because item 4 is hedged ('often')."
+  ],
+  "parts_answered": {
+   "at least four reasons": true,
+   "how to tell apart with existing data": true,
+   "ceiling experiment": true
+  },
+  "evidence": [
+   {
+    "claim": "SE of 61% at n=200 is 3.4 points",
+    "method": "executed",
+    "evidence": "sqrt(.61*.39/200)=0.03449"
+   },
+   {
+    "claim": "Paired SE sqrt(10)/200 = 1.6 points; sqrt(11)/200 = 1.66",
+    "method": "executed",
+    "evidence": "0.01581 / 0.01658"
+   },
+   {
+    "claim": "0.78->0.84 on 200 = 12 queries; 61%->62.5% = +3 questions",
+    "method": "derivation",
+    "evidence": "0.06*200=12; 122->125"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "for example 1.6 points if 10 questions flip",
+    "problem": "With +3 net change, the number of flipped questions must be odd; 10 is impossible and the following sentence reuses the example.",
+    "replacement": "for example 1.7 points if 11 questions flip (say 7 improved, 4 got worse)"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "recall@10 gain of +0.06 equals 12 queries newly hit",
+    "problem": "Holds only for one gold chunk per question and counts net, not gross, new hits.",
+    "replacement": "recall@10 gain of +0.06 equals 12 net newly hit queries (assuming one gold chunk per question)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multiple competing hypotheses, paired-noise reasoning, oracle-ceiling design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "hypotheses, diagnosis, ceiling experiment"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "numerically consistent transition example (7+5=12; +3 = 1.5 pts)"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok after correction",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0003",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-05-7",
+  "verdict": "correct",
+  "reasons": [
+   "Applied fix (5) is correct: unjudged hits count as misses so measured precision@k is a lower bound; recall caveat is accurate.",
+   "Example is correct (recall@5=2/3, precision@5 measured 2/5) but 'real precision 4/5' needs z to be non-relevant, which is not stated.",
+   "'bias every query the same way' is overstated; bias is systematic in direction, not identical."
+  ],
+  "parts_answered": {
+   "why metrics can say this": true,
+   "how to fix evaluation": true
+  },
+  "evidence": [
+   {
+    "claim": "Example numbers",
+    "method": "executed/derivation",
+    "evidence": "relevant {d1,d2,d3}; hits d1,d2 => recall 2/3, precision 2/5; with x,y relevant => 4/5 if z not relevant"
+   },
+   {
+    "claim": "Pooling bias and condensed lists",
+    "method": "background_only",
+    "evidence": "Zobel 1998; Buckley & Voorhees 2004; Sakai 2007 (condensed lists); not opened in this session."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "while the real precision@5 is 4/5",
+    "problem": "Requires z to be non-relevant.",
+    "replacement": "while the real precision@5 is 4/5 (if z is not relevant)"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "the missing labels bias every query the same way",
+    "problem": "Overstated.",
+    "replacement": "the missing labels bias every query in the same direction"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Needs knowledge of pooling and unjudged-document handling, with a short mechanism and fixes.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer, complete"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0010",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-05-8",
+  "verdict": "correct",
+  "reasons": [
+   "Applied question rewrite is correct and necessary: the four queries are now in the prompt and match the code test; numbers verified (k=3: 0.4583/0.25; k=4: 0.5417/0.25).",
+   "Detailed answer claims groups ensure 'one chunk should not be counted twice' but code lets one chunk cover several overlapping groups; claim is ambiguous.",
+   "aggregate([]) raises ZeroDivisionError (undocumented, minor)."
+  ],
+  "parts_answered": {
+   "evidence_coverage": true,
+   "aggregate": true,
+   "four-query example": true,
+   "why mean and full-rate diverge": true
+  },
+  "evidence": [
+   {
+    "claim": "k=3: 1,0.5,0,1/3 -> 0.4583, rate 0.25; k=4: 1,0.5,0,2/3 -> 0.5417, rate 0.25",
+    "method": "executed",
+    "evidence": "Ran on 3.13, 3.10, 3.11: ok; printed 0.4583333333333333 0.25 0.5416666666666666 0.25"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "and one chunk should not be counted twice",
+    "problem": "The implementation lets one chunk satisfy several groups; the claim is unclear.",
+    "replacement": "and several retrieved duplicates of the same group count once (a chunk listed in two groups would cover both, so keep groups disjoint)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short set-based code plus interpretation of two aggregates.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "rationale and worked numbers"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "code identical to code.solution (checked programmatically)"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0010",
+   "same_intent": false
+  },
+  "code_findings": "Ran solution+test on 3.13, 3.10, 3.11 with -I: pass. Extra edge cases (all pass): k=-1 -> (0.0,False); k beyond length with overlapping groups -> (1.0,True); empty ranked -> (0.0,False); duplicate ids in ranked -> (0.5,False); empty groups raises ValueError; aggregate([]) raises ZeroDivisionError. stdlib only, no 3.11+ features. Fenced code equals solution.",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-06-2",
+  "verdict": "pass",
+  "reasons": [
+   "Applied PQ-node correction is correct and consistent (11.4 GB fits one node, replica floor of 3, same as int8) and the decision paragraph agrees.",
+   "All numbers recomputed: 160.21, 480.64, 45.01, 11.41, 6.61 GB; shards ceil(160.2/100)=2, x3 = 6 nodes."
+  ],
+  "parts_answered": {
+   "memory estimate": true,
+   "node count": true,
+   "int8 and PQ comparison": true,
+   "choice and verification": true
+  },
+  "evidence": [
+   {
+    "claim": "160.2 / 480.6 / 45.0 / 11.4 / 6.6 GB",
+    "method": "executed",
+    "evidence": "hnsw_memory_gb outputs 160.2133, 45.0133, 11.4133; 3.13/3.10/3.11 ok"
+   },
+   {
+    "claim": "HNSW layer-0 max links 2M, upper layers M, node fraction ~1/(M-1)",
+    "method": "background_only",
+    "evidence": "HNSW paper (Malkov & Yashunin) / hnswlib defaults; not opened in this session."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-step capacity arithmetic plus a trade-off decision.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "State assumptions and compute vectors + links for a full copy (~160 GB)",
+    "tradeoff": "Order-of-magnitude honesty vs engine-specific overhead"
+   },
+   {
+    "decision": "Shard to fit (2 shards) then replicate (x3) = 6 nodes",
+    "tradeoff": "Replication buys availability/throughput, not capacity; shard fan-out adds latency"
+   },
+   {
+    "decision": "int8 scalar quantisation (45 GB per copy, 3 nodes)",
+    "tradeoff": "4x vector memory cut with usually small but data-dependent recall loss"
+   },
+   {
+    "decision": "PQ 96-byte codes (11.4 GB per copy) with full-precision re-rank from SSD",
+    "tradeoff": "Smallest RAM, but lossy distances, re-rank I/O latency; graph links then dominate"
+   },
+   {
+    "decision": "Validate recall, p95 latency at target QPS, build/rebuild time, headroom for growth",
+    "tradeoff": "Measurement cost vs risk of shipping a degraded index"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "full estimate and decision"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "calculator code, equal to solution"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0026",
+   "same_intent": false
+  },
+  "code_findings": "Solution+test pass on 3.13, 3.10, 3.11. Extra: hnsw_memory_gb(1,4,replicas=2) = 2.97e-07 (expected from formula); n=0 -> 0. stdlib only. Fenced code equals solution.",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-06-3",
+  "verdict": "correct",
+  "reasons": [
+   "Applied rewrite of the update procedure is logically sound and acknowledges the visibility-window trade-off.",
+   "Withdrawal step still says status is set 'in the metadata store' and takes effect 'through the filter', but the filter described in the same answer is active=true on chunk metadata; the two are not connected."
+  ],
+  "parts_answered": {
+   "mechanisms": true,
+   "update path": true,
+   "delete path": true
+  },
+  "evidence": [
+   {
+    "claim": "Soft deletes/tombstones in HNSW engines",
+    "method": "background_only",
+    "evidence": "hedged in text ('many', 'check the one you use'); not opened in this session."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "set the document's status to withdrawn in the metadata store first (takes effect at once through the filter)",
+    "problem": "Disconnected from the active=true chunk filter used above.",
+    "replacement": "set active:false on all chunks of that doc_id first (or mark the document withdrawn in a table that queries join against); this takes effect at once through the filter"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Several interacting failure mechanisms and an operational design with consistency trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "mechanisms and design"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "step-by-step procedure incl. visibility window"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0011",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-06-6",
+  "verdict": "correct",
+  "reasons": [
+   "Applied caveat on rank merging is correct but introduced an inconsistency: concise_answer still recommends 'or fuse by rank' as a fix for the shard problem while detailed_answer now says per-shard rank merging is unsafe when shards differ.",
+   "Item (3) wording 'normalise per query if you must' is vague; normalising does not fix skewed IDF.",
+   "Numbers verified: idf 10.72 and 8.73; RRF 0.03227 vs 0.03226."
+  ],
+  "parts_answered": {
+   "why it happens": true,
+   "merging": true,
+   "fusion": true
+  },
+  "evidence": [
+   {
+    "claim": "Lucene idf for n=5 and n=40, N=250000",
+    "method": "executed",
+    "evidence": "10.7245 and 8.7279"
+   },
+   {
+    "claim": "RRF 1/61+1/63 vs 2/62",
+    "method": "executed",
+    "evidence": "0.032266 vs 0.032258"
+   },
+   {
+    "claim": "RRF constant 60",
+    "method": "background_only",
+    "evidence": "Cormack et al. 2009; not opened in this session."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "concise_answer",
+    "claim": "or evenly distributed documents, or fuse by rank.",
+    "problem": "Contradicts the corrected detailed answer (rank merging across shards is unsafe on uneven shards).",
+    "replacement": "or evenly distributed documents; rank-based merging across shards is only a fallback and is unsafe when shards differ."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "normalise per query if you must, but note that merging by per-shard rank is also unsafe when shards differ in size or content, so prefer global statistics or even routing.",
+    "problem": "Normalising does not fix skewed IDF; both are fallbacks.",
+    "replacement": "per-query score normalisation or merging by per-shard rank are only fallbacks, because both remain unsafe when shards differ in size or content, so prefer global statistics or even routing."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Needs IDF mechanism, RRF and candidate depth; arithmetic is simple.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "68 words; needs fix for consistency"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "worked IDF and RRF numbers"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0011",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ }
+]

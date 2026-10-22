@@ -1,0 +1,10 @@
+# Direct dependencies for the NORMAL (pull-request) CI run. No GPU, no torch, no sentence-transformers, no model weights, no Ollama, no paid API.
+# Tests that need those are skipped automatically here and run in the separate heavy workflow (.github/workflows/heavy.yml).
+# CI installs the HASH-CHECKED lock generated from this file (requirements-ci.lock), not this file:
+#   uv pip compile requirements-ci.txt --universal --python-version 3.12 --generate-hashes -o requirements-ci.lock --no-header
+-r requirements-docker.in
+faiss-cpu>=1.7.4
+pytest>=7.4
+jsonschema>=4.0
+pyyaml>=6.0
+ruff>=0.5

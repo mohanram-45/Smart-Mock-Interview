@@ -1,0 +1,501 @@
+[
+ {
+  "id": "smi-0297",
+  "status": "ok",
+  "question": "How would you design a recommendation system for an e-commerce platform?",
+  "answer": "No company is specified, so I would state assumptions first and then design in layers.\n\n1. Objective and constraints: decide what is optimised (conversion, revenue per session, long-term retention), which surfaces are involved (home page, product page, cart, email), latency budget, catalogue size and how much cold start there is.\n2. Data: implicit feedback (views, clicks, add-to-cart, purchases) plus item metadata and user/context features. Implicit data is noisy and biased by what was previously shown (exposure bias), so a view is weaker evidence than a purchase and absence of interaction is not a dislike.\n3. Architecture: a two-stage pipeline. Candidate generation narrows the catalogue to hundreds of items using several sources, e.g. item-item co-occurrence, matrix factorisation or two-tower embeddings with approximate nearest-neighbour search, content-based similarity and popularity. A ranker (gradient-boosted trees or a neural model) then scores candidates with richer features, followed by re-ranking for business rules, stock, de-duplication and diversity.\n4. Cold start: use content features, popularity/trending and some exploration for new users and items.\n5. Offline evaluation: start with a popularity baseline, split by time to avoid leakage, and report Recall@K, NDCG@K or MAP, plus coverage and diversity.\n6. Online evaluation: A/B test on conversion and revenue per session with guardrails (latency, returns, diversity). Offline gains do not always carry over.\n7. Monitoring: data drift, feedback loops that reinforce popular items, and a retraining cadence.",
+  "key_concepts": [
+   "two-stage retrieval and ranking",
+   "candidate generation",
+   "collaborative filtering",
+   "content-based filtering",
+   "cold start",
+   "implicit feedback",
+   "NDCG@K",
+   "A/B testing"
+  ],
+  "difficulty": "Hard",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Answer was a generic outline and referenced an unspecified company. Rewrote as a concrete, structured design (objective, data, retrieval+ranking, cold start, offline/online evaluation, monitoring). No numbers or benchmarks claimed. Question kept.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0314",
+  "status": "ok",
+  "question": "In a normally distributed feature, values within one standard deviation of the mean are missing. What fraction of the data remains?",
+  "answer": "About 31.7%, assuming the feature really is normally distributed and 'remains' means the values that were not removed (those more than one standard deviation from the mean).\n\nFor a normal distribution, P(|X - mu| < sigma) = P(|Z| < 1) = erf(1/sqrt(2)) which is about 0.6827 (the '68' in the 68-95-99.7 rule). The values that remain are the two tails: 1 - 0.6827 = 0.3173, roughly 15.9% in each tail. This holds for any mean and standard deviation because it is a statement about z-scores.\n\nNotes: the mean, median and mode coincide for a normal distribution, so the choice of centre does not matter here, but for a skewed feature the 68% figure would not apply and the answer would have to come from the empirical distribution. The remaining data is also no longer normal; it is a two-tailed, truncated distribution with a gap in the middle, so its mean is still the original mean (by symmetry) but its variance is larger than the original.",
+  "key_concepts": [
+   "68-95-99.7 rule",
+   "normal distribution",
+   "z-score",
+   "truncated distribution",
+   "symmetry of the normal",
+   "tail probability"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original answer had muddled reasoning (mean/mode/median 'averages', 'uninfluenced by missing values') and did not state the result clearly. Gave explicit 1 - 0.6827 = 31.7% with the normality assumption stated. Value computed: 1 - erf(1/sqrt 2) = 0.3173. Question left unchanged though wording is loose; interpretation stated in the answer.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0323",
+  "status": "ok",
+  "question": "Can you mention some advantages and disadvantages of decision trees?",
+  "answer": "Advantages:\n- Easy to interpret and visualise; a prediction is a sequence of simple if-then rules.\n- Little preprocessing: no feature scaling needed, and splits depend only on the ordering of a feature, so trees are invariant to monotonic transformations and not much affected by outliers in the input features (a split threshold does not care how extreme an outlier is).\n- Handle numeric and categorical features and capture non-linear relationships and feature interactions without manual feature engineering.\n- Fast prediction (depth-limited traversal).\n\nDisadvantages:\n- High variance: a fully grown tree overfits, and small changes in the training data can produce a very different tree. Controlled with hyperparameters such as max depth, minimum samples per leaf, minimum impurity decrease, or cost-complexity pruning.\n- Greedy, locally optimal splits; the resulting tree is not guaranteed globally optimal.\n- Axis-aligned splits approximate diagonal boundaries poorly, and regression trees are piecewise constant and cannot extrapolate beyond the training range.\n- Impurity-based splitting can favour features with many distinct values.\n- Regression trees trained with squared error can still be affected by outliers in the target.\n\nA common remedy is to combine trees in ensembles (random forests, gradient boosting), which reduces variance at the cost of interpretability.\n\nNote that 'nonparametric' does not by itself imply outlier robustness, and trees do have several hyperparameters to tune.",
+  "key_concepts": [
+   "decision tree interpretability",
+   "overfitting and variance",
+   "pruning",
+   "greedy splitting",
+   "axis-aligned splits",
+   "invariance to monotonic transforms",
+   "ensembles"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Removed the faulty claim that 'nonparametric hence robust to outliers' and the claim of few hyperparameters. Robustness is now stated precisely (to input-feature outliers, due to threshold splits; not to target outliers under squared error). Added further disadvantages (greedy splits, axis-aligned, no extrapolation, high-cardinality bias) and remedies.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0343",
+  "status": "ok",
+  "question": "What is Semantic Analysis?",
+  "answer": "Semantic analysis is the NLP stage concerned with the meaning of words, phrases and sentences, as opposed to their form (lexical analysis) or grammatical structure (syntactic analysis). The goal is a representation of what a text says that a program can use.\n\nTypical tasks and techniques:\n- Word sense disambiguation: choose the sense of an ambiguous word from context ('bank' as a financial institution or a river bank).\n- Semantic role labelling: identify who did what to whom, when and where (agent, patient, instrument and so on).\n- Relation extraction and semantic parsing: turn text into relations or a logical/structured form.\n- Distributional and embedding-based representations: word and sentence vectors that place similar meanings close together, used for similarity and semantic search.\n- Named entity recognition and entity linking are information-extraction tasks that often serve as a supporting step.\n\nTypical difficulties are polysemy, synonymy, idioms, and meaning that depends on context beyond the sentence, which is the territory of pragmatics and discourse analysis.",
+  "key_concepts": [
+   "word sense disambiguation",
+   "semantic role labelling",
+   "relation extraction",
+   "word embeddings",
+   "polysemy",
+   "lexical vs syntactic vs semantic analysis"
+  ],
+  "difficulty": "Medium",
+  "domain": "NLP",
+  "code": null,
+  "sources": [],
+  "change_notes": "Previous answer was acceptable but short. Kept its techniques, clarified that NER/entity linking are information-extraction tasks used as a supporting step, placed semantic analysis relative to lexical/syntactic/pragmatic stages, and added difficulties.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0345",
+  "status": "ok",
+  "question": "How to tokenize a sentence using the nltk package?",
+  "answer": "Tokenization splits text into units (sentences or words) with nltk.tokenize. The standard high-level calls are sent_tokenize(text) for sentences and word_tokenize(text) for words (word_tokenize splits sentences first, then applies the Treebank-style word tokenizer). Both rely on a pretrained Punkt sentence model, which is a separate download: nltk.download('punkt_tab') on recent NLTK releases (older releases used 'punkt'). Without it they raise a LookupError.\n\nTokenizers that need no downloaded data are also in nltk.tokenize, for example TreebankWordTokenizer (splits punctuation off words) and RegexpTokenizer (you supply the pattern):\n\n```python\nfrom nltk.tokenize import TreebankWordTokenizer, RegexpTokenizer\n\ntext = \"Hello, world! NLP is fun.\"\n\n# Word tokens, Penn Treebank conventions (punctuation split off); no downloads needed\nwords = TreebankWordTokenizer().tokenize(text)\n\n# Pure regex tokenizers: keep only word characters / split into crude sentences\nalnum = RegexpTokenizer(r\"\\w+\").tokenize(text)\nsentences = RegexpTokenizer(r\"[^.!?]+[.!?]\").tokenize(text)\nsentences = [s.strip() for s in sentences]\n\nprint(words)\nprint(alnum)\nprint(sentences)\n```\n\nOutput:\n['Hello', ',', 'world', '!', 'NLP', 'is', 'fun', '.']\n['Hello', 'world', 'NLP', 'is', 'fun']\n['Hello, world!', 'NLP is fun.']\n\nCaveat: the simple regex sentence splitter above breaks on abbreviations ('Dr. Smith'); Punkt is trained to handle many of these, which is why sent_tokenize is preferred for real text.",
+  "key_concepts": [
+   "sent_tokenize",
+   "word_tokenize",
+   "Punkt model",
+   "TreebankWordTokenizer",
+   "RegexpTokenizer",
+   "tokenization"
+  ],
+  "difficulty": "Easy",
+  "domain": "NLP",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "from nltk.tokenize import TreebankWordTokenizer, RegexpTokenizer\n\ntext = \"Hello, world! NLP is fun.\"\n\n# Word tokens, Penn Treebank conventions (punctuation split off); no downloads needed\nwords = TreebankWordTokenizer().tokenize(text)\n\n# Pure regex tokenizers: keep only word characters / split into crude sentences\nalnum = RegexpTokenizer(r\"\\w+\").tokenize(text)\nsentences = RegexpTokenizer(r\"[^.!?]+[.!?]\").tokenize(text)\nsentences = [s.strip() for s in sentences]\n\nprint(words)\nprint(alnum)\nprint(sentences)",
+   "test": "assert words == ['Hello', ',', 'world', '!', 'NLP', 'is', 'fun', '.']\nassert alnum == ['Hello', 'world', 'NLP', 'is', 'fun']\nassert sentences == ['Hello, world!', 'NLP is fun.']",
+   "expected": [
+    "['Hello', ',', 'world', '!', 'NLP', 'is', 'fun', '.']",
+    "['Hello', 'world', 'NLP', 'is', 'fun']",
+    "['Hello, world!', 'NLP is fun.']"
+   ]
+  },
+  "sources": [],
+  "change_notes": "Answer only defined/outlined tokenization with inline pseudo-code run together. Replaced with a runnable example. sent_tokenize/word_tokenize need the punkt_tab resource, which could not be downloaded in the sandbox, so they are described in prose only and no output is claimed for them; the shown code (Treebank and regex tokenizers) was executed.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0347",
+  "status": "ok",
+  "question": "Explain Stemming with the help of an example.",
+  "answer": "Stemming reduces inflected or derived words to a root-like form (the stem) by stripping suffixes with heuristic rules, with no dictionary or part-of-speech information. The stem need not be a real word; the aim is only that related word forms map to the same string, which helps in search/indexing and bag-of-words models by shrinking the vocabulary.\n\nExample with NLTK's PorterStemmer:\n\n```python\nfrom nltk.stem import PorterStemmer\n\np = PorterStemmer()\nstems = [p.stem(w) for w in ['running', 'cookies', 'flying', 'stemming']]\nprint(stems)\n```\n\nOutput: ['run', 'cooki', 'fli', 'stem']\n\n'cooki' and 'fli' are not words, which shows the rule-based nature. Stemmers also make errors of two kinds: over-stemming (unrelated words merged) and under-stemming (related words not merged). Lemmatisation is the dictionary- and POS-aware alternative that returns real base forms (the lemma of the verb 'flying' is 'fly'), at higher cost and with a dependency on a POS tagger or lexicon. Choose a stemmer for speed and recall (e.g. search), a lemmatiser when readable, correct base forms matter.",
+  "key_concepts": [
+   "stemming",
+   "Porter stemmer",
+   "suffix stripping",
+   "over-stemming",
+   "lemmatisation",
+   "vocabulary reduction"
+  ],
+  "difficulty": "Medium",
+  "domain": "NLP",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "from nltk.stem import PorterStemmer\n\np = PorterStemmer()\nstems = [p.stem(w) for w in ['running', 'cookies', 'flying', 'stemming']]\nprint(stems)",
+   "test": "assert stems == ['run', 'cooki', 'fli', 'stem']",
+   "expected": [
+    "['run', 'cooki', 'fli', 'stem']"
+   ]
+  },
+  "sources": [],
+  "change_notes": "Output ['run','cooki','fli','stem'] was already correct but code was run together and the answer was dense. Reformatted as a fenced block and ran it (PorterStemmer gives exactly that list). Lemmatisation example is stated in prose only (not executed, WordNet data not used).",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0349",
+  "status": "ok",
+  "question": "How to check word similarity using the spacy package?",
+  "answer": "Load a spaCy pipeline that includes word vectors (for example en_core_web_md or en_core_web_lg; the small en_core_web_sm model has no real vectors, so similarity from it is unreliable), then call .similarity() on tokens, spans or docs.\n\n```python\nimport spacy\n\n# Needs a model that ships word vectors (md/lg), not the small 'sm' model\nnlp = spacy.load(\"en_core_web_md\")\n\ndoc1 = nlp(\"I like cats\")\ndoc2 = nlp(\"I love dogs\")\nsim = doc1.similarity(doc2)          # cosine similarity of averaged vectors\n\nw1, w2 = nlp(\"king\"), nlp(\"queen\")\nword_sim = w1.similarity(w2)\n\noov = nlp(\"xqzvk\")[0]\nprint(round(sim, 2), round(word_sim, 2), oov.has_vector)\n```\n\nThe score is the cosine similarity between the vectors (for a Doc or Span, the average of its token vectors). Cosine similarity lies in [-1, 1], not [0, 1]; it can be negative, although it is usually non-negative for typical word vectors. Words missing from the vector table (out-of-vocabulary, has_vector is False) have zero vectors and give a similarity of 0. Averaged vectors ignore word order, so 'dog bites man' and 'man bites dog' look near-identical. The md model's vector table is truncated (a fixed number of vectors shared across many words), so very different words can occasionally map to the same vector; for fine-grained similarity use a larger model or sentence-embedding / transformer-based approaches.",
+  "key_concepts": [
+   "spaCy similarity",
+   "cosine similarity",
+   "word vectors",
+   "en_core_web_md",
+   "out-of-vocabulary",
+   "averaged document vectors"
+  ],
+  "difficulty": "Easy",
+  "domain": "NLP",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import spacy\n\n# Needs a model that ships word vectors (md/lg), not the small 'sm' model\nnlp = spacy.load(\"en_core_web_md\")\n\ndoc1 = nlp(\"I like cats\")\ndoc2 = nlp(\"I love dogs\")\nsim = doc1.similarity(doc2)          # cosine similarity of averaged vectors\n\nw1, w2 = nlp(\"king\"), nlp(\"queen\")\nword_sim = w1.similarity(w2)\n\noov = nlp(\"xqzvk\")[0]\nprint(round(sim, 2), round(word_sim, 2), oov.has_vector)",
+   "test": "import numpy as np\nassert -1.0 <= sim <= 1.0 and -1.0 <= word_sim <= 1.0\nassert abs(nlp(\"king\").similarity(nlp(\"king\")) - 1.0) < 1e-4\nassert abs(w1.similarity(w2) - w2.similarity(w1)) < 1e-5\na, b = w1.vector, w2.vector\nmanual = float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))\nassert abs(manual - word_sim) < 1e-4\nassert oov.has_vector is False",
+   "expected": [
+    "has_vector False for out-of-vocabulary token; similarity values in [-1, 1]"
+   ]
+  },
+  "sources": [],
+  "change_notes": "Answer gave no code and said similarity lies in 0..1; cosine similarity is in [-1, 1]. Rewrote with runnable spaCy (en_core_web_md, spaCy 3.8.x) code; test checks range, self-similarity, symmetry, equality with manual cosine and OOV has_vector False. No numeric outputs are quoted because in the sandbox the md model's truncated vector table gave surprising values (e.g. identical vectors for unrelated words like apple/banana, good/bad); that caveat is stated in the answer. Not claimed: exact behaviour of similarity for OOV words ('0 or uninformative value' is hedged).",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0355",
+  "status": "ok",
+  "question": "What is the difference between NLP and NLU?",
+  "answer": "NLP (Natural Language Processing) is the broad field of getting computers to process human language: it covers understanding, generation (NLG), and supporting tasks such as tokenisation, tagging, parsing, translation, summarisation and speech-text interfaces. NLU (Natural Language Understanding) is the subfield focused on comprehension: extracting meaning from input, for example intent detection, entity extraction, semantic parsing, coreference and sentiment.\n\nA compact comparison:\n- Scope: NLP is the umbrella; NLU is a part of it (NLG is the other main part).\n- Direction: NLU goes from text to a machine-usable meaning representation; NLG goes from structured data or meaning to text.\n- Example: a tokeniser or machine translator is NLP but not really NLU; mapping 'book me a flight to Paris on Friday' to {intent: book_flight, destination: Paris, date: Friday} is NLU.\n\nSome authors use the terms loosely or differently, but 'NLU is a subset of NLP' is the usual framing.",
+  "key_concepts": [
+   "NLP",
+   "NLU",
+   "NLG",
+   "intent detection",
+   "entity extraction",
+   "semantic parsing"
+  ],
+  "difficulty": "Easy",
+  "domain": "NLP",
+  "code": null,
+  "sources": [],
+  "change_notes": "Previous version had a dangling 'table' reference in the source; current text had none but was thin and ended with a confusing slogan. Rewrote with the comparison in plain bullets and a concrete example; stated that usage varies.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0356",
+  "status": "ok",
+  "question": "What is the difference between NLP and a conversational interface (CI)?",
+  "answer": "NLP is a field and set of techniques for processing language (parsing, entity recognition, intent classification, generation, translation and so on). A conversational interface is a kind of application: a chatbot, voice assistant or messaging interface through which a user interacts with a system in natural language, turn by turn.\n\nDifferences:\n- Level: NLP is an enabling technology; a CI is a product or interaction style built from several components.\n- Components: a CI typically combines NLP/NLU for understanding input, a dialogue manager that tracks state and decides what to do next, back-end integrations (databases, APIs) and a response generator (templates or an NLG/language model). Voice interfaces add speech recognition and text-to-speech.\n- Dependence: NLP exists without a CI (search ranking, machine translation, document classification), whereas a CI needs some form of language processing, although a very simple one can be rule- or menu-based.\n\nExample: intent classification is an NLP task; the airline booking assistant that uses it, remembers your destination across turns and calls a booking API is a conversational interface.",
+  "key_concepts": [
+   "natural language processing",
+   "conversational interface",
+   "dialogue management",
+   "intent classification",
+   "speech recognition",
+   "NLG"
+  ],
+  "difficulty": "Easy",
+  "domain": "NLP",
+  "code": null,
+  "sources": [],
+  "change_notes": "Dangling table reference not present in the current text, but answer was thin; expanded into level/components/dependence with an example. No claims beyond standard architecture description.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0367",
+  "status": "ok",
+  "question": "What is NLTK? How is it different from Spacy?",
+  "answer": "NLTK (Natural Language Toolkit) is a Python library originally built for teaching and research. It provides many algorithms for tokenising, stemming, tagging, parsing and classification, along with interfaces to corpora and lexical resources such as WordNet. It mostly works on plain strings and lists of tokens and often offers several alternative implementations for the same task, which suits experimentation and learning.\n\nspaCy is geared to production use. You load a pretrained pipeline, call it on text and get a Doc object with tokens, part-of-speech tags, dependency parse, named entities, lemmas and (in models that include them) word vectors, all attached to the same object. It is implemented in Cython for speed, has a trainable pipeline architecture, supports transformer-based pipelines, and generally gives one maintained implementation per task rather than many.\n\nPractical differences: NLTK is convenient for classic algorithms, corpora and teaching, and for components spaCy does not provide (for example WordNet access and various stemmers); spaCy is the usual choice for building a processing pipeline for real applications. The two can be combined. Supported languages and available models differ and change between releases, so check the current documentation rather than relying on a fixed number.",
+  "key_concepts": [
+   "NLTK",
+   "spaCy",
+   "pretrained pipelines",
+   "Doc object",
+   "WordNet",
+   "production vs research toolkit",
+   "dependency parsing"
+  ],
+  "difficulty": "Medium",
+  "domain": "NLP",
+  "code": null,
+  "sources": [],
+  "change_notes": "Removed/avoided the dated language-count claim ('spaCy supports only 7 languages') and loosely worded comparisons; answer now states only stable, general differences and tells the reader to check current docs for language coverage. No sources opened.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0370",
+  "status": "ok",
+  "question": "What is Pragmatic Ambiguity in NLP?",
+  "answer": "Pragmatic ambiguity is ambiguity in what a sentence is meant to do or convey, which cannot be resolved from the words and grammar alone but depends on context, speaker intent, shared knowledge and the situation. The sentence may be perfectly clear lexically and syntactically.\n\nExamples:\n- 'Can you pass the salt?' is literally a question about ability but is normally a request (an indirect speech act).\n- 'It's cold in here' may be a statement or a request to close the window.\n- 'Great, another meeting' may be sincere or sarcastic.\n- Reference to the discourse or the world, such as 'Put it there' without knowing what 'it' and 'there' denote.\n\nContrast with other types: lexical ambiguity is one word with multiple senses ('bank' as a financial institution or river side); syntactic (structural) ambiguity is multiple parses ('I saw the man with the telescope'); semantic ambiguity concerns multiple readings of the meaning such as quantifier scope. Pragmatic ambiguity is the hardest for NLP systems because it needs world knowledge, dialogue history and models of intent; systems use discourse context, dialogue state and, increasingly, large pretrained language models, but it remains an open problem.",
+  "key_concepts": [
+   "pragmatic ambiguity",
+   "speech acts",
+   "lexical ambiguity",
+   "syntactic ambiguity",
+   "context and speaker intent",
+   "sarcasm"
+  ],
+  "difficulty": "Medium",
+  "domain": "NLP",
+  "code": null,
+  "sources": [],
+  "change_notes": "Current answer's example 'I saw him at the bank' is lexical ambiguity (word sense of 'bank'), not pragmatic, which contradicted its own definition. Replaced examples with genuine pragmatic cases (indirect speech act, indirect request, sarcasm, deixis) and added a contrast with lexical/syntactic/semantic ambiguity.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0395",
+  "status": "ok",
+  "question": "What would be good metrics of success for an advertising-driven consumer product? A service-driven consumer product?",
+  "answer": "Start with the business model: in each case the product's value comes from a different exchange, so the primary metric differs. For each, pick one north-star metric, a few supporting metrics, and guardrails.\n\nAdvertising-driven product (revenue comes from advertisers, so user attention is the asset):\n- North star: ad revenue per daily active user (or total ad revenue), which combines reach and monetisation.\n- Supporting: DAU/MAU and time spent or sessions per user (attention supply); ad impressions per session and fill rate; click-through rate and, where available, conversion rate and advertiser ROI; eCPM.\n- Guardrails: retention and session length (heavier ad load can drive users away), ad hides/reports and complaints, page latency, advertiser churn.\n\nService-driven product (users pay for or transact via the service):\n- North star: completed transactions, or revenue/gross profit per active user.\n- Supporting: conversion funnel rates (visit to sign-up to first transaction), repeat usage and retention by cohort, average order value, customer lifetime value against acquisition cost, support-ticket rate, customer satisfaction (CSAT or NPS).\n- Guardrails: refund/cancellation rate, delivery or fulfilment failures, unit economics.\n\nPitfalls: optimising CTR alone invites clickbait and accidental clicks; DAU alone can be inflated by notifications; use cohorts so growth from new users is not mistaken for engagement; check each metric by segment (new vs returning, platform, region) and over a long enough horizon to see retention effects.",
+  "key_concepts": [
+   "north-star metric",
+   "guardrail metrics",
+   "ARPU / revenue per DAU",
+   "click-through rate",
+   "retention cohorts",
+   "customer lifetime value",
+   "conversion funnel",
+   "segmentation"
+  ],
+  "difficulty": "Medium",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Moved from Machine Learning to Data Analysis (product metrics). Original answer was a bare list with no justification. Rewrote as a framework: north-star, supporting metrics, guardrails, pitfalls for each product type. No numeric claims.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0396",
+  "status": "ok",
+  "question": "What would be good metrics of success for a productivity tool? A MOOC?",
+  "answer": "Define success as users getting the job done (or learning), not just opening the product. For each: a north-star metric, supporting funnel/engagement metrics, and guardrails.\n\nProductivity tool (e.g. notes, tasks, documents):\n- North star: weekly active users who complete a core action (create/complete a task, edit and save a document), sometimes called 'activated and engaged' users. Raw logins overstate value.\n- Supporting: activation rate (new users reaching a first meaningful action in the first days), retention curves by signup cohort, frequency of use per week, depth (features used, items created), collaboration/sharing (teams adopting it), task completion rate, time to complete a task, and for paid tiers free-to-paid conversion and seat expansion.\n- Guardrails: error/crash and sync-failure rates, latency, support tickets, churn.\n\nMOOC (online courses):\n- North star: course completion rate among learners who start (or learners who achieve the learning goal), since enrolment alone is mostly intent.\n- Supporting: enrolment-to-start rate, progress through modules and week-over-week drop-off points, assessment performance and learning gain, engagement with videos/assignments, forum participation, paid certificate conversion, and learner satisfaction/ratings.\n- Guardrails: quality of content ratings, grading disputes, course refunds.\n\nPitfalls: completion rates are not comparable across courses with different audiences or paid vs free enrolment, so segment by learner intent and cohort; do not count passive activity (time on page) as success; and watch for survivorship bias when only looking at those who remain.",
+  "key_concepts": [
+   "activation rate",
+   "retention curves",
+   "north-star metric",
+   "completion rate",
+   "funnel drop-off",
+   "guardrail metrics",
+   "free-to-paid conversion",
+   "cohort analysis"
+  ],
+  "difficulty": "Medium",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Moved to Data Analysis. Original was an unjustified list. Rewrote with north-star/supporting/guardrail structure and pitfalls (cohorting, intent segmentation, survivorship). No numeric claims.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0397",
+  "status": "ok",
+  "question": "What would be good metrics of success for an e-commerce product? A subscription product? Premium subscriptions?",
+  "answer": "Match metrics to how each model makes money, and pair every growth metric with a quality/cost metric.\n\nE-commerce (transactions):\n- North star: revenue or gross margin per visitor/session (conversion rate times average order value times margin).\n- Supporting: funnel conversion (visit to product view to add-to-cart to checkout to purchase) and cart abandonment, AOV, repeat purchase rate and customer lifetime value, customer acquisition cost, search-to-purchase success.\n- Guardrails: return/refund rate, delivery on-time rate, payment failures, page speed, customer satisfaction.\n\nSubscription product (recurring revenue):\n- North star: monthly recurring revenue (MRR) or retained paying subscribers.\n- Supporting: new subscriber growth and CAC, churn rate (voluntary vs involuntary from failed payments), net revenue retention including upgrades and downgrades, LTV/CAC ratio and payback period, engagement leading indicators of churn (usage frequency), trial-to-paid conversion.\n- Guardrails: support load, refund rate, discounting that attracts low-quality sign-ups.\n\nPremium (freemium upgrade) subscriptions:\n- North star: free-to-paid conversion rate, tied to paid-subscriber revenue.\n- Supporting: time to convert, which free features trigger upgrades, premium retention/renewal by cohort, upgrade-downgrade flows, ARPU for paid users.\n- Guardrails: free-user engagement and growth (over-restrictive free tiers hurt the top of the funnel), cannibalisation of paid tiers.\n\nPitfalls: aggregate churn hides cohort differences; measure by signup cohort; LTV estimates rely on assumptions about future retention, so state them.",
+  "key_concepts": [
+   "conversion funnel",
+   "average order value",
+   "customer lifetime value",
+   "churn rate",
+   "MRR",
+   "LTV/CAC",
+   "free-to-paid conversion",
+   "cohort analysis"
+  ],
+  "difficulty": "Medium",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Moved to Data Analysis. Original was a three-line list with no reasoning. Rewrote with north-star, supporting metrics, guardrails and pitfalls per model. No numeric claims.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0398",
+  "status": "ok",
+  "question": "What would be good metrics of success for a consumer product that relies heavily on engagement and interaction? A messaging product?",
+  "answer": "For engagement-driven products the risk is optimising raw activity instead of value, so choose metrics that capture meaningful interactions and pair them with health guardrails.\n\nEngagement/interaction-heavy product (social, content, community):\n- North star: the count of users who perform the core value action regularly, for example weekly users who post, comment, or consume content for a meaningful period.\n- Supporting: DAU/MAU (stickiness), sessions per user and session length, interactions per active user (likes, comments, shares), content creation vs consumption ratio, new-user activation and retention cohorts, network effects such as connections made.\n- Guardrails: user-reported satisfaction or well-being, hides/blocks/reports, notification opt-outs and uninstalls, content quality and spam rates, retention over longer horizons (to detect addictive short-term gains that burn out users).\n\nMessaging product:\n- North star: daily active users who send and receive messages, or the number of conversations that get a reply (reciprocal exchange shows real use).\n- Supporting: messages sent per user, active conversations and group usage, number of contacts a user messages, response rate and response time, retention of new users and time to first sent message, share of conversations that are two-way.\n- Guardrails: delivery success and latency, crash rate, spam and abuse reports, opt-outs.\n\nPitfalls: do not count one-sided broadcast messages as engagement; DAU can be inflated by notifications; analyse by cohort and segment; and look at network effects, since a user's value depends on whether their contacts are also active.",
+  "key_concepts": [
+   "DAU/MAU stickiness",
+   "north-star metric",
+   "activation",
+   "retention cohorts",
+   "network effects",
+   "response rate",
+   "guardrail metrics",
+   "engagement quality"
+  ],
+  "difficulty": "Medium",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Moved to Data Analysis. Original was a bare list. Rewrote with north-star/supporting/guardrails and pitfalls; stressed meaningful vs raw engagement. No numeric claims.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0399",
+  "status": "ok",
+  "question": "What would be good metrics of success for a product that offered in-app purchases?",
+  "answer": "Success needs both monetisation and sustained engagement, since purchases come from a base of retained users.\n\nMonetisation metrics:\n- Payer conversion rate: share of active (or new) users who make at least one purchase.\n- ARPU (average revenue per user, including non-payers) and ARPPU (average revenue per paying user). They answer different questions: ARPU for overall monetisation, ARPPU for how much payers spend.\n- Purchase frequency and average transaction value; repeat-purchase rate.\n- LTV by acquisition cohort, compared with user acquisition cost (payback period).\n- Revenue concentration: share of revenue from the top payers; heavy dependence on a few big spenders is a risk.\n\nEngagement and funnel metrics: activation, day-1/day-7/day-30 retention, sessions per user, time to first purchase, store-view to checkout conversion, and checkout failure rate.\n\nGuardrails: refund and chargeback rates, negative reviews and complaints about monetisation, drop in retention after introducing a purchase prompt, and non-payer engagement (they supply the audience for payers and in some products for other users).\n\nPitfalls: report metrics by cohort and by segment (platform, country, acquisition channel), since aggregates mix new and mature users; watch for revenue pulled forward from future periods by discounts; and remember that a short-term revenue lift from aggressive prompts can lower retention, so test with an experiment and read long-run retention.",
+  "key_concepts": [
+   "payer conversion",
+   "ARPU vs ARPPU",
+   "customer lifetime value",
+   "retention cohorts",
+   "refund rate",
+   "revenue concentration",
+   "purchase frequency"
+  ],
+  "difficulty": "Medium",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Moved to Data Analysis. Original listed metric names without explanation. Rewrote with definitions (ARPU vs ARPPU), engagement metrics, guardrails and pitfalls. No numeric claims.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0400",
+  "status": "ok",
+  "question": "A certain metric is violating your expectations by going down or up more than you expect. How would you try to identify the cause of the change?",
+  "answer": "Work from cheap, likely explanations to deeper ones, and keep a record of what you ruled out.\n\n1. Confirm it is real: check the metric definition and the data pipeline (logging changes, delayed or missing data, duplicate events, timezone or backfill effects, dashboard filter or query changes). Compare with related metrics and other sources. Many 'changes' are measurement artefacts.\n2. Quantify against what you expected: compare to the same weekday last week or the same period last year to account for seasonality, day-of-week effects and trends; check whether the move is outside normal variation (for example past the usual range of week-to-week noise).\n3. Decompose the metric: split into its components (for a ratio, numerator and denominator; for revenue, users times conversion times order value) and see which moved. Then segment: platform, app version, country, acquisition channel, new vs returning users, device, user cohort. Find where the change is concentrated: a change confined to one version or region points to a technical cause, a uniform change to something broader.\n4. Line up the timing: product releases, experiments and feature flags, infrastructure incidents, marketing campaigns, pricing, policy changes, holidays, competitor events, external news or outages. A sharp step at one date suggests a discrete event; a gradual drift suggests behaviour or mix change.\n5. Check for mix shift (Simpson's paradox): the overall metric can change because the share of users in different segments changed, even if each segment's metric is stable.\n6. Form hypotheses, test them with further cuts or, where possible, experiments/holdouts, and decide on action (fix, rollback, monitor). Document findings and add monitoring or alerts.\n\nPitfall: correlation with a launch date is not proof; rule out co-timed events.",
+  "key_concepts": [
+   "metric decomposition",
+   "segmentation",
+   "data quality check",
+   "seasonality",
+   "mix shift / Simpson's paradox",
+   "root-cause analysis",
+   "release and experiment timeline"
+  ],
+  "difficulty": "Medium",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Moved to Data Analysis. Original was one sentence. Rewrote as a stepwise root-cause framework with concrete checks and pitfalls.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0401",
+  "status": "ok",
+  "question": "Growth for total number of tweets sent has been slow this month. What data would you look at to determine the cause of the problem?",
+  "answer": "Treat total tweets as a product: tweets = active users x tweets per active user (and further by tweet type), then find which factor slowed.\n\n1. Validate the data: confirm the logging and counting pipeline did not change and that the slowdown is not an artefact; compare with the same period in previous months to separate seasonality and holidays from a real change.\n2. Decompose:\n- User side: daily and monthly active users, new signups, resurrected users, churned users, retention by signup cohort. Slow user growth or higher churn lowers total volume.\n- Per-user side: tweets per active user, share of active users who post at all versus only read, and the distribution (did heavy posters reduce activity, or did the long tail shrink?).\n- Type of content: original tweets, replies, retweets/quote tweets, media tweets, and the client used (web, iOS, Android, API/bots).\n3. Segment: country, language, device/app version, acquisition channel, new vs old users, verified or high-follower accounts, and topic/community. Find where growth is lagging.\n4. Check the supply of reasons to tweet: events and news cycles, a large external event last month, spam or bot purges that removed accounts, and changes to rate limits, abuse enforcement or API access.\n5. Check product and funnel changes: releases, UI changes to the compose flow, notification and recommendation changes, outages or latency, and experiments that touched posting.\n6. Check competitors and external factors: other platforms' launches, outages elsewhere, and platform policy news.\n\nConclude with which factor explains most of the shortfall (a simple decomposition of the change), then validate with a deeper cut or experiment.",
+  "key_concepts": [
+   "metric decomposition",
+   "active users",
+   "cohort retention",
+   "tweets per active user",
+   "segmentation",
+   "data quality check",
+   "seasonality"
+  ],
+  "difficulty": "Medium",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Moved to Data Analysis. Original was a one-line list. Rewrote with an explicit decomposition (users x tweets per user), segmentation, external/product causes, and validation steps.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0402",
+  "status": "ok",
+  "question": "You are a restaurant and are approached by Groupon to run a deal. What data would you ask from them in order to determine whether or not to do the deal?",
+  "answer": "Decide by estimating the deal's incremental profit, so ask for data that lets you compute it and understand the risks.\n\nData to request:\n- Results from comparable deals: restaurants of similar type, price point and location; number of vouchers sold, redemption rates, and how many redeemers were new customers versus existing ones.\n- Expected volume: how many vouchers they expect to sell and over what period, to size capacity needs (staffing, kitchen, tables).\n- Deal terms: discount level, Groupon's revenue share/commission and payment timing, expiry date, and any limit on vouchers per customer.\n- Customer behaviour: what share of redeemers spend beyond the voucher value (average check, add-ons, drinks, tips), the repeat-visit rate after redemption, and whether redeemers return at full price.\n- Customer profile: demographics and location of buyers, and the proportion who are deal-seekers versus likely regulars.\n- Cannibalisation evidence: how many redeemers were already customers who would have paid full price.\n\nAnalysis: incremental profit = (redeemed vouchers x (average spend - voucher cost to Groupon share - variable cost of serving)) - lost full-price revenue from cannibalised customers - extra staffing and overhead; add the estimated lifetime value of customers who return. Compute a break-even redemption/new-customer rate and a range for pessimistic and optimistic cases.\n\nRisks to weigh: capacity constraints that degrade service for regular customers, deal-seeker customers who do not return, unredeemed vouchers (breakage) which may help or distort estimates, and brand effects of discounting. Where possible, run a small, limited deal or test first and track the results.",
+  "key_concepts": [
+   "incremental profit",
+   "cannibalisation",
+   "redemption rate",
+   "customer lifetime value",
+   "break-even analysis",
+   "repeat visit rate",
+   "capacity constraints"
+  ],
+  "difficulty": "Medium",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Moved to Data Analysis. Original was a one-line list. Rewrote with required data, an incremental-profit calculation, break-even idea and risks. No numeric claims.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0405",
+  "status": "ok",
+  "question": "How would you measure the impact that sponsored stories on Facebook News Feed have on user engagement? How would you determine the optimum balance between sponsored stories and organic content on a user's News Feed?",
+  "answer": "Use a randomised experiment, because comparing users who see more ads with those who see fewer confounds exposure with user behaviour.\n\nMeasuring the impact:\n- Randomise users (the unit should be the user, not the impression, to avoid within-user contamination) into control (current ad load) and treatment (different sponsored-story load, or none) groups, and run long enough to cover weekly cycles and to see retention effects, not just novelty.\n- Primary engagement metrics: time spent, sessions per day, likes/comments/shares on organic content, daily active users. Longer-term: retention and return rate after 1, 4 and more weeks.\n- Guardrails and quality: ad hides, 'don't want to see' and report rates, complaints, feed load time, and user satisfaction survey scores.\n- Ad-side metrics for the other half of the trade-off: advertiser outcomes (CTR, conversions, ROI) and revenue per user.\n- Check for interference: if friends are in different arms (network effects), consider cluster randomisation. A holdout group kept at low or zero ad load over a long period measures long-term effects.\n- Analyse overall effects and segments (new vs heavy users, region) with confidence intervals and a pre-defined sample size.\n\nFinding the balance:\n- Vary the ad load across several levels (e.g. fraction of feed slots), not just on/off, and fit a response curve for user engagement/retention and for revenue as a function of ad load.\n- Choose the load that maximises long-term value, i.e. revenue subject to constraints that engagement and retention stay above thresholds (or maximises a combined objective such as lifetime value). Short-term revenue typically rises with ad load while engagement and retention eventually fall, so the optimum is where marginal revenue equals the marginal long-term cost.\n- Personalise: the best load may vary by user and by ad relevance; relevant ads cost less engagement than irrelevant ones, so improving ad quality shifts the curve.\n\nPitfalls: short experiments miss long-term attrition; novelty effects; interference between users; optimising only for revenue or clicks.",
+  "key_concepts": [
+   "randomised controlled experiment",
+   "unit of randomisation",
+   "guardrail metrics",
+   "retention and long-term effects",
+   "network interference",
+   "holdout group",
+   "ad load response curve",
+   "revenue-engagement trade-off"
+  ],
+  "difficulty": "Hard",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Moved to Data Analysis (experiment design). Original was one line without design details. Rewrote with randomisation unit, metrics, guardrails, interference, holdout, response-curve optimisation and pitfalls. No numeric claims.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0457",
+  "status": "defer",
+  "question": "How do you create a simple REST API using Flask?",
+  "answer": "",
+  "key_concepts": [],
+  "difficulty": "Medium",
+  "domain": "Python",
+  "code": null,
+  "sources": [],
+  "change_notes": "Deferred: building web APIs with a web framework (Flask) is outside the six interview domains (ML, DL, NLP, Python, SQL, Data Analysis) in scope for this knowledge base. Recommend removal or relabelling rather than a rewrite. Current answer has no code.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0459",
+  "status": "defer",
+  "question": "Implement JWT authentication in a Flask API.",
+  "answer": "",
+  "key_concepts": [],
+  "difficulty": "Hard",
+  "domain": "Python",
+  "code": null,
+  "sources": [],
+  "change_notes": "Deferred: authentication/JWT implementation in a web framework is outside the six domains and is security-sensitive; a correct answer needs verified handling of secret management, token expiry/refresh, algorithm pinning and password storage, which was not verified here. Recommend removal.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0463",
+  "status": "ok",
+  "question": "How do you use mocking in unit tests with pytest?",
+  "answer": "Mocking replaces a dependency of the code under test (network call, database, clock, environment) with a controllable fake, so the unit test is fast, deterministic and checks only your logic. In pytest you use the standard library's unittest.mock together with pytest's built-in monkeypatch fixture (pytest does not ship its own mock objects; the pytest-mock plugin adds a 'mocker' fixture that wraps unittest.mock, but is not needed).\n\n```python\nimport sys\nfrom unittest.mock import patch, create_autospec\nimport pytest\n\n\ndef fetch_json(url):\n    raise RuntimeError(\"real network call - must be mocked in unit tests\")\n\n\ndef get_username(user_id):\n    data = fetch_json(f\"https://api.example.com/users/{user_id}\")\n    return data[\"name\"].title()\n\n\nTHIS = sys.modules[__name__]\n\n\ndef test_with_unittest_mock_patch():\n    with patch.object(THIS, \"fetch_json\", return_value={\"name\": \"ada lovelace\"}) as m:\n        assert get_username(7) == \"Ada Lovelace\"\n        m.assert_called_once_with(\"https://api.example.com/users/7\")\n\n\ndef test_with_monkeypatch(monkeypatch):\n    monkeypatch.setattr(THIS, \"fetch_json\", lambda url: {\"name\": \"alan turing\"})\n    assert get_username(1) == \"Alan Turing\"\n\n\ndef test_error_path():\n    with patch.object(THIS, \"fetch_json\", side_effect=TimeoutError(\"slow\")):\n        with pytest.raises(TimeoutError):\n            get_username(2)\n\n\ndef test_autospec_rejects_wrong_signature():\n    m = create_autospec(fetch_json, return_value={\"name\": \"x\"})\n    m(\"url\")\n    with pytest.raises(TypeError):\n        m(\"url\", \"extra\")\n\n\ndef test_unpatched_call_hits_real_function():\n    with pytest.raises(RuntimeError):\n        get_username(3)\n```\n\nThis file was run with pytest: 5 tests pass. Key points: return_value fixes the result and side_effect makes the mock raise or return a sequence, which lets you test error handling; assert_called_once_with checks how the dependency was called; create_autospec (or patch(..., autospec=True)) makes the mock follow the real function's signature so wrong calls fail; patch and monkeypatch undo the change automatically when the test or block ends.\n\nThe most common pitfall is patching the wrong name: patch where the object is looked up (the module that uses it, e.g. 'myapp.service.fetch_json'), not where it was defined. Also avoid over-mocking, which couples tests to implementation details, and keep a few integration tests that exercise the real dependency.",
+  "key_concepts": [
+   "unittest.mock.patch",
+   "monkeypatch fixture",
+   "return_value and side_effect",
+   "autospec",
+   "assert_called_once_with",
+   "patch where it is used",
+   "test isolation"
+  ],
+  "difficulty": "Medium",
+  "domain": "Python",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import sys\nfrom unittest.mock import patch, create_autospec\nimport pytest\n\n\ndef fetch_json(url):\n    raise RuntimeError(\"real network call - must be mocked in unit tests\")\n\n\ndef get_username(user_id):\n    data = fetch_json(f\"https://api.example.com/users/{user_id}\")\n    return data[\"name\"].title()\n\n\nTHIS = sys.modules[__name__]\n\n\ndef test_with_unittest_mock_patch():\n    with patch.object(THIS, \"fetch_json\", return_value={\"name\": \"ada lovelace\"}) as m:\n        assert get_username(7) == \"Ada Lovelace\"\n        m.assert_called_once_with(\"https://api.example.com/users/7\")\n\n\ndef test_with_monkeypatch(monkeypatch):\n    monkeypatch.setattr(THIS, \"fetch_json\", lambda url: {\"name\": \"alan turing\"})\n    assert get_username(1) == \"Alan Turing\"\n\n\ndef test_error_path():\n    with patch.object(THIS, \"fetch_json\", side_effect=TimeoutError(\"slow\")):\n        with pytest.raises(TimeoutError):\n            get_username(2)\n\n\ndef test_autospec_rejects_wrong_signature():\n    m = create_autospec(fetch_json, return_value={\"name\": \"x\"})\n    m(\"url\")\n    with pytest.raises(TypeError):\n        m(\"url\", \"extra\")\n\n\ndef test_unpatched_call_hits_real_function():\n    with pytest.raises(RuntimeError):\n        get_username(3)",
+   "test": "import subprocess, sys, tempfile, os\nd = tempfile.mkdtemp()\nwith open(os.path.join(d, \"test_users.py\"), \"w\") as f:\n    f.write(SOLUTION_SRC)\nr = subprocess.run([sys.executable, \"-m\", \"pytest\", \"-q\", d], capture_output=True, text=True)\nassert r.returncode == 0, r.stdout + r.stderr\nassert \"5 passed\" in r.stdout",
+   "expected": [
+    "5 passed"
+   ]
+  },
+  "sources": [],
+  "change_notes": "Answer was only a definition with no pytest example. Wrote a real example using unittest.mock.patch.object, monkeypatch, side_effect, create_autospec, and executed it under pytest (5 passed). Notes on pytest-mock and 'patch where used' are standard documented guidance and not tested in the example.",
+  "confidence": "high"
+ }
+]

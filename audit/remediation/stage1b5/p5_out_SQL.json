@@ -1,0 +1,387 @@
+[
+ {
+  "id": "smi-i0011",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "Result 4 vs 7 rows; UNION 4 distinct values incl. one NULL",
+    "method": "executed",
+    "evidence": "Executed solution vs expected on py3.13+SQLite 3.37.2 (LD_LIBRARY_PATH lib), py3.13+3.45.1, py3.11+3.37.2, py3.11+3.45.1, py3.10+3.53.1 (bundled): all match expected. Query returns [union,4],[union_all,7]."
+   },
+   {
+    "claim": "UNION removes duplicates, UNION ALL keeps all; NULLs equal for duplicate determination; same column count; ORDER BY/LIMIT only at end of compound; 3+ operands group left to right",
+    "method": "doc",
+    "evidence": "https://www.sqlite.org/lang_select.html quotes: 'duplicate rows are removed from the final result set'; 'NULL values are considered equal to other NULL values'; 'all the constituent SELECTs must return the same number of result columns'; 'ORDER BY and LIMIT clauses may only occur at the end of the entire compound SELECT'; '(A op B op C) is processed as ((A op B) op C)'."
+   },
+   {
+    "claim": "Column-count mismatch raises an error; ORDER BY inside the first SELECT is an error",
+    "method": "executed",
+    "evidence": "3.37.2: 'SELECTs to the left and right of UNION do not have the same number of result columns'; 'ORDER BY clause should come after UNION not before'."
+   },
+   {
+    "claim": "Output column names come from first SELECT; columns matched by position",
+    "method": "executed",
+    "evidence": "select email as a ... union select email as b -> description ['a']; ORDER BY b also resolves (doc: ORDER BY terms are aliases for result columns of the compound)."
+   },
+   {
+    "claim": "SQLite does not enforce type compatibility",
+    "method": "executed",
+    "evidence": "select 1 union select 'x' -> [[1],['x']] on 3.37.2."
+   },
+   {
+    "claim": "'stricter databases' enforce type compatibility; UNION typically needs sort/hash/temp index and may need to consume input",
+    "method": "background_only",
+    "evidence": "Not opened in an engine doc; already hedged in text ('typically', 'usually')."
+   },
+   {
+    "claim": "Originally flagged cost hedge applied",
+    "method": "executed",
+    "evidence": "Text now reads 'usually has to consume its input before the final rows are known'. No new inconsistency; fenced SQL identical to code.solution."
+   }
+  ],
+  "remaining_limitations": [
+   "Cost and cross-database type-strictness statements are background_only (hedged)."
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null,
+  "sqlite_versions_used": "3.37.2 (py3.13 and py3.11 via LD_LIBRARY_PATH), 3.45.1 (py3.13/3.11 default), 3.53.1 (py3.10 bundled)"
+ },
+ {
+  "id": "smi-i0013",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Result rows (billing_only,3),(crm_only,3),(crm_only,4),(billing_only,5); row 2 absent",
+    "method": "executed",
+    "evidence": "Executed solution vs expected on py3.13+SQLite 3.37.2 (LD_LIBRARY_PATH lib), py3.13+3.45.1, py3.11+3.37.2, py3.11+3.45.1, py3.10+3.53.1 (bundled): all match expected."
+   },
+   {
+    "claim": "EXCEPT treats NULL=NULL for duplicate determination; EXCEPT removes duplicates (set-based)",
+    "method": "doc",
+    "evidence": "https://www.sqlite.org/lang_select.html: 'NULL values are considered equal to other NULL values'; 'Duplicate rows are removed from the results of INTERSECT and EXCEPT operators'."
+   },
+   {
+    "claim": "Anti-join with = on phone wrongly reports row 2: ids 2,3,4",
+    "method": "executed",
+    "evidence": "NOT EXISTS(... b.id=c.id AND b.email=c.email AND b.phone=c.phone) and LEFT JOIN ... IS NULL both return [2],[3],[4] on 3.37.2; with 'b.phone IS c.phone' -> [3],[4]. A plain inner join on phone only returns id 1 (misses row 2 too)."
+   },
+   {
+    "claim": "UNION instead of UNION ALL gives identical rows here",
+    "method": "executed",
+    "evidence": "Replacing UNION ALL by UNION returns the same 4 rows."
+   },
+   {
+    "claim": "Flat (unwrapped) compound gives left-to-right grouping",
+    "method": "executed",
+    "evidence": "An unwrapped tagged variant returned 8 rows in my attempt because the tag column differs between EXCEPT operands, so the subqueries are what make the reconciliation correct and readable; the stated reason in the text ('lets the final ORDER BY apply to the whole stacked result') is not the real reason, since ORDER BY applies to the whole compound anyway (doc)."
+   },
+   {
+    "claim": "IS NOT DISTINCT FROM in standard SQL/PostgreSQL; IS in SQLite",
+    "method": "background_only",
+    "evidence": "SQLite 3.37.2 rejects IS NOT DISTINCT FROM (syntax error), consistent with text saying 'IS in SQLite'. PostgreSQL doc fetch was blocked by the permission system; claim is background_only."
+   },
+   {
+    "claim": "Originally flagged items fixed",
+    "method": "executed",
+    "evidence": "'I ran this' removed; UNION ALL rationale now correct; common_mistake 3 corrected."
+   }
+  ],
+  "remaining_limitations": [
+   "IS NOT DISTINCT FROM in standard SQL/PostgreSQL is background_only (PG docs could not be opened).",
+   "The b/c aliases in the NOT EXISTS sentence are never defined in the answer (fixed below)."
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "Wrapping each EXCEPT in a subquery lets the final ORDER BY apply to the whole stacked result.",
+    "problem": "The stated reason is wrong: in a compound SELECT the trailing ORDER BY applies to the whole compound regardless of subqueries. The subqueries are there to keep each difference self-contained rather than relying on the strict left-to-right grouping of a flat compound.",
+    "replacement": "Wrapping each EXCEPT in a subquery keeps the two differences self-contained instead of relying on the strict left-to-right grouping of a flat compound SELECT; the final ORDER BY then applies to the whole stacked result."
+   },
+   {
+    "severity": "minor",
+    "claim": "a NOT EXISTS (or LEFT JOIN ... IS NULL) anti-join with b.phone = c.phone treats row 2",
+    "problem": "Aliases b and c are never defined, so the reported 'ids 2, 3 and 4' result cannot be reproduced from the text.",
+    "replacement": "an anti-join such as NOT EXISTS (SELECT 1 FROM billing_contacts b WHERE b.id = c.id AND b.email = c.email AND b.phone = c.phone) over crm_contacts c (or the equivalent LEFT JOIN ... IS NULL) treats row 2"
+   }
+  ],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null,
+  "sqlite_versions_used": "3.37.2 (py3.13 and py3.11 via LD_LIBRARY_PATH), 3.45.1 (py3.13/3.11 default), 3.53.1 (py3.10 bundled)"
+ },
+ {
+  "id": "smi-i0015",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Medians Eng 140, HR 75, Ops 60, Sales 90",
+    "method": "derivation",
+    "evidence": "Eng sorted 120,130,140,140,150 -> 140; HR 70,80 -> 75; Ops 50,60,70 (NULL excluded) -> 60; Sales 60,90,90,100 -> (90+90)/2 = 90."
+   },
+   {
+    "claim": "Query output matches expected",
+    "method": "executed",
+    "evidence": "Executed solution vs expected on py3.13+SQLite 3.37.2 (LD_LIBRARY_PATH lib), py3.13+3.45.1, py3.11+3.37.2, py3.11+3.45.1, py3.10+3.53.1 (bundled): all match expected."
+   },
+   {
+    "claim": "Without the NULL filter Ops gives 55",
+    "method": "executed",
+    "evidence": "Removing WHERE salary IS NOT NULL returns Ops 55.0 (NULL sorts first: rows NULL,50,60,70 -> middle 50,60)."
+   },
+   {
+    "claim": "Row-index arithmetic (cnt+1)/2,(cnt+2)/2 integer division",
+    "method": "derivation",
+    "evidence": "cnt=1:1,1; 2:1,2; 3:2,2; 4:2,3; 5:3,3. Extra edge cases executed: single-row dept One -> 5.0; two-row dept Two (5,7) -> 6.0; all-NULL dept Zed disappears."
+   },
+   {
+    "claim": "AVG returns floating point",
+    "method": "doc",
+    "evidence": "https://www.sqlite.org/lang_aggfunc.html: 'The result of avg() is always a floating point value ... even if all inputs are integers.'"
+   },
+   {
+    "claim": "Window functions need SQLite 3.25+; row_number numbers by window ORDER BY",
+    "method": "doc",
+    "evidence": "https://www.sqlite.org/windowfunctions.html: 'first added ... release version 3.25.0 (2018-09-15)'."
+   },
+   {
+    "claim": "No built-in MEDIAN",
+    "method": "executed",
+    "evidence": "3.37.2 and 3.45.1: 'no such function: median'. BUT the SQLite 3.53.1 bundled with python3.10 accepted median(salary) (returned 90.0), so 'Standard SQLite builds ... have no built-in MEDIAN' is not universally true for recent versions. changes.html: 3.47.0 added median() etc. to the CLI; 3.51.0 built percentile extension into the amalgamation, disabled by default (compile-time -DSQLITE_ENABLE_PERCENTILE)."
+   },
+   {
+    "claim": "Alternatives (self-join, LIMIT/OFFSET)",
+    "method": "background_only",
+    "evidence": "Mentioned only as alternatives, not executed."
+   }
+  ],
+  "remaining_limitations": [
+   "Source list contains only the window-functions page; the MEDIAN-availability claim is supported by changes.html which is not listed in sources (add it)."
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "Standard SQLite builds (including the 3.37.2 library) have no built-in MEDIAN aggregate.",
+    "problem": "Over-absolute: executed on a SQLite 3.53.1 build where median() exists. Releases 3.47.0 (CLI) and 3.51.0 (optional compile-time extension) introduced it.",
+    "replacement": "Assume no built-in MEDIAN aggregate (the 3.37.2 library has none; recent SQLite releases only ship median()/percentile() in the CLI or as an optional extension)."
+   }
+  ],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null,
+  "sqlite_versions_used": "3.37.2 (py3.13 and py3.11 via LD_LIBRARY_PATH), 3.45.1 (py3.13/3.11 default), 3.53.1 (py3.10 bundled)"
+ },
+ {
+  "id": "smi-i0017",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Session results match answer (user1 2 sessions 3+2; user2 3+1; user3 1)",
+    "method": "executed",
+    "evidence": "Executed solution vs expected on py3.13+SQLite 3.37.2 (LD_LIBRARY_PATH lib), py3.13+3.45.1, py3.11+3.37.2, py3.11+3.45.1, py3.10+3.53.1 (bundled): all match expected."
+   },
+   {
+    "claim": "Gap 09:10->09:40 is exactly 1800 s and stays in session; 09:40->10:11 = 31 min splits",
+    "method": "derivation",
+    "evidence": "1800 > 1800 false; 31*60=1860 > 1800."
+   },
+   {
+    "claim": "Default RANGE frame gives same result",
+    "method": "executed",
+    "evidence": "Removing the ROWS clause gives output identical to expected on 3.37.2."
+   },
+   {
+    "claim": "Extra edge cases",
+    "method": "executed",
+    "evidence": "Added duplicate 09:40 row for user 1 (n_events 4, still 3 events sessions); user 4 with 10:00, 10:30 (exactly 1800 stays), two events at 10:30:01 -> one session of 4 events."
+   },
+   {
+    "claim": "fractional julianday differences can misjudge the exact-30-minute boundary",
+    "method": "executed",
+    "evidence": "(julianday diff)*86400 for exactly 30 min = 1800.000013..., and for 480 of 720 tested hh:mm pairs exactly 30 min apart the test '> 1800' wrongly evaluated true; epoch-seconds integers avoid this."
+   },
+   {
+    "claim": "lag() returns NULL for first row; window functions since 3.25",
+    "method": "doc",
+    "evidence": "https://www.sqlite.org/windowfunctions.html quotes: 'if there is no previous row ... NULL'; 'first added ... 3.25.0'."
+   },
+   {
+    "claim": "Default RANGE frame treats equal ORDER BY values as peers",
+    "method": "doc",
+    "evidence": "windowfunctions.html: 'rows that have the same values for all ORDER BY expressions will also have the same value for the result of the window function'."
+   },
+   {
+    "claim": "Tied-row ordering is not defined by ORDER BY alone",
+    "method": "doc",
+    "evidence": "windowfunctions.html does not guarantee order of peers for row_number; hedge present. Not executable to break (SQLite orders identically)."
+   },
+   {
+    "claim": "(user_id, event_ts) index advice",
+    "method": "background_only",
+    "evidence": "Not tested; reasonable and hedged as advice."
+   },
+   {
+    "claim": "Originally flagged items fixed",
+    "method": "executed",
+    "evidence": "Tie-breaker hedge present. But the fix left an internal contradiction: 'has to be an explicit running one (ROWS frame)' followed by 'the default RANGE frame would also work'."
+   }
+  ],
+  "remaining_limitations": [
+   "Index advice is background_only.",
+   "Tie-order non-determinism is documented only by absence of a guarantee; could not be triggered in SQLite."
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "The sum has to be an explicit running one (ROWS frame); the default RANGE frame would also work here and treats equal timestamps as peers",
+    "problem": "Self-contradictory: says an explicit ROWS frame is required, then says the default RANGE frame also works (verified executed). With an ORDER BY the default frame is already cumulative.",
+    "replacement": "The sum has to be a running (cumulative) one, which the ORDER BY in the window already gives; the default RANGE frame would also work here and treats equal timestamps as peers"
+   }
+  ],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null,
+  "sqlite_versions_used": "3.37.2 (py3.13 and py3.11 via LD_LIBRARY_PATH), 3.45.1 (py3.13/3.11 default), 3.53.1 (py3.10 bundled)"
+ },
+ {
+  "id": "smi-i0018",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "viewed 7, carted 4, purchased 3, 57.1/75.0/42.9",
+    "method": "derivation",
+    "evidence": "Viewers: users 1,2,3,4,5,7,8 =7; carted after first view: 1,2,5,8 (user 7 cart 10:00 < view 10:05 dropped) =4; purchases after first cart: 1,5,8 =3 (user 6 no view, excluded). 4/7=57.14; 3/4=75; 3/7=42.857->42.9."
+   },
+   {
+    "claim": "Query output",
+    "method": "executed",
+    "evidence": "Executed solution vs expected on py3.13+SQLite 3.37.2 (LD_LIBRARY_PATH lib), py3.13+3.45.1, py3.11+3.37.2, py3.11+3.45.1, py3.10+3.53.1 (bundled): all match expected."
+   },
+   {
+    "claim": "10 view events for 7 viewers; 4 purchase events incl. user 6",
+    "method": "executed",
+    "evidence": "count(*)=10, count(distinct user_id)=7 on view rows; purchase events =4."
+   },
+   {
+    "claim": "COUNT(col) ignores NULL vs COUNT(*)",
+    "method": "doc",
+    "evidence": "https://www.sqlite.org/lang_aggfunc.html: 'count(X) ... number of times that X is not NULL'; 'count(*) ... total number of rows'."
+   },
+   {
+    "claim": "Division by zero returns NULL in SQLite",
+    "method": "executed",
+    "evidence": "select 1/0 -> NULL on 3.37.2; empty events table returns 0,0,0,NULL,NULL,NULL."
+   },
+   {
+    "claim": "Limitation about cart before view then later cart",
+    "method": "executed",
+    "evidence": "Added user 9: cart 10:00, view 10:05, cart 10:10, purchase 11:00 -> viewed 8 but carted stays 4, as the text states."
+   },
+   {
+    "claim": "'other databases error' on division by zero",
+    "method": "background_only",
+    "evidence": "Not opened; widely true (e.g. PostgreSQL), left as is."
+   },
+   {
+    "claim": "Originally flagged items fixed; key concept 'users vs events' consistent",
+    "method": "executed",
+    "evidence": "Limitation sentence present; COUNT DISTINCT removed from key_concepts."
+   }
+  ],
+  "remaining_limitations": [
+   "Other-database division-by-zero behaviour is background_only."
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null,
+  "sqlite_versions_used": "3.37.2 (py3.13 and py3.11 via LD_LIBRARY_PATH), 3.45.1 (py3.13/3.11 default), 3.53.1 (py3.10 bundled)"
+ },
+ {
+  "id": "smi-i0020",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "ROW_NUMBER result ids 2,6,7,9",
+    "method": "executed",
+    "evidence": "Executed solution vs expected on py3.13+SQLite 3.37.2 (LD_LIBRARY_PATH lib), py3.13+3.45.1, py3.11+3.37.2, py3.11+3.45.1, py3.10+3.53.1 (bundled): all match expected."
+   },
+   {
+    "claim": "Correlated MAX returns ids 5 and 6 for user 2; user 4 gets id 9",
+    "method": "executed",
+    "evidence": "Output rows: [2],[5],[6],[7],[9]."
+   },
+   {
+    "claim": "GROUP BY with MAX bare columns returns id 5 for user 2 (arbitrary on ties)",
+    "method": "executed",
+    "evidence": "id 5 on SQLite 3.37.2, 3.45.1 and 3.53.1 (text says 'here it returned', and calls it arbitrary). Doc: https://www.sqlite.org/lang_select.html 'bare columns in the result set take values from an input row which also contains the minimum or maximum'; 'If the same minimum or maximum value occurs on two or more rows, then bare values might be selected from any of those rows. The choice is arbitrary.' (section 2.5 confirmed on lang_select page, absent from lang_aggfunc)."
+   },
+   {
+    "claim": "MAX ignores NULLs; NULLs sort smallest, last in DESC",
+    "method": "doc",
+    "evidence": "lang_aggfunc: 'max() returns NULL if and only if there are no non-NULL values'; lang_select: 'NULL values to be smaller than any other values ... at the end of a DESC order-by'. Executed: user 4 DESC order gives id 9 then id 8."
+   },
+   {
+    "claim": "All-NULL user: bare form arbitrary row, correlated no row, ROW_NUMBER highest id",
+    "method": "executed",
+    "evidence": "User 5 (ids 10,11,12 all NULL): ROW_NUMBER -> id 12; correlated -> []; bare MAX -> id 12 (arbitrary, matches 'arbitrary one')."
+   },
+   {
+    "claim": "PostgreSQL sorts NULLs first for DESC by default; most other DBs reject/do not guarantee the bare-column query",
+    "method": "background_only",
+    "evidence": "PostgreSQL docs fetch blocked by permission system; widely known, not verified here."
+   },
+   {
+    "claim": "Originally flagged items fixed (covering->supporting index wording, NULL handling, typo)",
+    "method": "executed",
+    "evidence": "Text now says 'benefits from an index', NULL handling covers all three forms, 'user 2's rows'."
+   }
+  ],
+  "remaining_limitations": [
+   "PostgreSQL NULL-ordering and cross-database bare-column claims are background_only.",
+   "Source 1 title says 'compound select operators' but the cited bare-column/NULL-order content is in other sections of the same lang_select page; title is loose, content supported."
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null,
+  "sqlite_versions_used": "3.37.2 (py3.13 and py3.11 via LD_LIBRARY_PATH), 3.45.1 (py3.13/3.11 default), 3.53.1 (py3.10 bundled)"
+ }
+]

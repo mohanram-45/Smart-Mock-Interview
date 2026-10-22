@@ -1,0 +1,54 @@
+name: Heavy checks (manual / weekly)
+
+# Not part of normal pull-request checks. Downloads the ~90 MB MiniLM sentence-transformer and a CPU PyTorch build, installs Playwright's Chromium and builds the
+# image WITH the optional ML extras. Still: no GPU, no live Ollama, no paid API, no candidate data, and no Qwen benchmark is ever run.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: heavy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  OLLAMA_HOST: "http://127.0.0.1:9"
+  SMART_LLM_PROVIDER: none
+  SMART_LLM_ALLOW_PAID: "0"
+  SMART_CODEEVAL_EXEC: ""
+
+jobs:
+  rag-and-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - run: |
+          pip install --require-hashes -r requirements-ci-mlops.lock
+          pip install --extra-index-url https://download.pytorch.org/whl/cpu torch sentence-transformers playwright
+          python -m playwright install --with-deps chromium
+      - name: Retrieval and Flask tests with the real embedding model available (downloads all-MiniLM-L6-v2)
+        run: python -m pytest tests/retrieval tests/app -q -rs
+      - name: Real-browser journeys (Chromium) against the stand-in-scorer demo server
+        run: |
+          SMART_DEMO_CODE_EVAL=1 python scripts/stage4a_demo_server.py --port 5058 > /tmp/demo_server.log 2>&1 &
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:5058/demo/ > /dev/null && break; sleep 1; done
+          python scripts/stage6a_browser_journey.py --base http://127.0.0.1:5058 --out "$RUNNER_TEMP/shots"
+  docker-ml-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Build the image with the optional ML extras
+        run: docker build --build-arg INSTALL_ML=1 -t smart-mock-interview:ml .

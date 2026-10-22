@@ -1,0 +1,212 @@
+[
+ {
+  "id": "smi-g0028",
+  "verdict": "pass",
+  "reasons": [
+   "Both queries and the survivor list re-run identically on SQLite 3.45.1 and 3.37.2."
+  ],
+  "parts_answered": {
+   "(a) duplicated emails with counts, trim+lower": true,
+   "(b) DELETE keeping earliest by created_at then id, NULLs untouched": true,
+   "show surviving ids": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "normalised email (lower(trim(email)))",
+    "problem": "Empty-string or whitespace-only emails normalise to '' and would be treated as duplicates of each other (verified: ('', 2) group on ''/' '). Not in the sample, so optional to mention.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Window-function dedupe with normalisation, NULL protection and tiebreaker; one concept family, short code.",
+  "key_concepts_findings": "All 7 concepts are discussed in the answer. No weak ones.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0027",
+   "same_intent": false
+  },
+  "code_findings": "Run on sqlite 3.45.1 (system lib) and real 3.37.2 (/tmp/claude-0/s/x/usr/lib/x86_64-linux-gnu/libsqlite3.so.0 via LD_LIBRARY_PATH, python3 sqlite3.sqlite_version confirmed 3.37.2). (a) returns [('lee@example.com',2),('sam@example.com',3)]. (b) survivors [2,3,6,7,8]; deleted 1,4,5, matches the answer. Break tests: removing the WHERE email IS NOT NULL deletes id 7 (survivors [2,3,6,8]), confirming the claim about NULL partition. Empty/space-only emails group together as ''; tab-prefixed ' \\tA@x.com' is trimmed only for spaces by trim() (default trim strips spaces only), so tab-padded duplicates would NOT match; lower() does not fold non-ASCII (E-acute vs e-acute not matched). None affect the stated sample. Window function in DELETE subquery needs SQLite >= 3.25; fine for 3.37.2. Fenced code equals tested code.",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0032",
+  "verdict": "pass",
+  "reasons": [
+   "Reference queries return Bruno and Dev on both SQLite versions; colleague-1 query returns 0 rows and colleague-2 query returns only Dev, as the question says."
+  ],
+  "parts_answered": {
+   "correct query": true,
+   "explain colleague 1 (zero rows)": true,
+   "explain colleague 2 (only Dev)": true,
+   "compare NOT EXISTS with LEFT JOIN IS NULL": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Testing a nullable column for IS NULL instead of the key (common_mistakes list) / Using NOT IN on a nullable column",
+    "problem": "Two common_mistakes (NOT IN, nullable column test) are only partly covered; the nullable-column test is covered in the answer, NOT IN is not mentioned at all in the answer. Harmless (it is covered by smi-g0031) but not discussed here.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Two-part explanation of ON vs WHERE and anti-join comparison; mechanism-level, no multi-step design.",
+  "key_concepts_findings": "All six concepts are discussed; 'correlated subquery' is only implicit in the NOT EXISTS form (fine).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0031",
+   "same_intent": false
+  },
+  "code_findings": "Run on sqlite 3.45.1 (system lib) and real 3.37.2 (/tmp/claude-0/s/x/usr/lib/x86_64-linux-gnu/libsqlite3.so.0 via LD_LIBRARY_PATH, python3 sqlite3.sqlite_version confirmed 3.37.2). Colleague-1 query count=0; colleague-2 (no date test) returns [(4,'Dev')]; NOT EXISTS and ON-clause LEFT JOIN both return [(2,'Bruno'),(4,'Dev')]. Break tests: added order 6 for Dev on '2024-12-31 23:59:59' (correctly counted in 2024 by the half-open range, Dev drops out), an order with NULL order_date for Bruno and an order with NULL customer_id: NOT EXISTS result stays [(2,)], as expected. Fenced code equals tested code. The claim that NOT EXISTS 'is safe if the tested column is nullable' and cannot multiply rows holds.",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0033",
+  "verdict": "pass",
+  "reasons": [
+   "Query result and every figure in the stated result re-verified on SQLite 3.45.1 and 3.37.2."
+  ],
+  "parts_answered": {
+   "one row per month with 3 category columns + total": true,
+   "0 not NULL for empty category": true,
+   "order by month": true,
+   "why preferred over three queries": true,
+   "limitation": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "SUM(amount) AS total",
+    "problem": "total is not COALESCEd, so a month whose amounts are all NULL gives total NULL (verified). Not required by the question and not in the sample.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Pivot via conditional aggregation with NULL-aggregate handling; a standard application.",
+  "key_concepts_findings": "All seven concepts are covered.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0034",
+   "same_intent": false
+  },
+  "code_findings": "Run on sqlite 3.45.1 (system lib) and real 3.37.2 (/tmp/claude-0/s/x/usr/lib/x86_64-linux-gnu/libsqlite3.so.0 via LD_LIBRARY_PATH, python3 sqlite3.sqlite_version confirmed 3.37.2). Verified: 2024-01 (200,200,0,400); 2024-02 (95,0,40,135); 2024-03 (60,200,0,260), matches the answer. Break tests: a row with category 'frames ' (wrong case/space) lands in no column but total counts it (month 2024-04 -> 0,0,0,total 10), confirming the limitation claim; a NULL amount row gives total NULL. Fenced code equals tested code. strftime is SQLite-specific, noted nowhere here but not claimed otherwise.",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0035",
+  "verdict": "correct",
+  "reasons": [
+   "All three queries and the all-equal / empty / one-row cases check out on both versions, and the SQLite 3.37.2 anomaly claim is real (reproduced).",
+   "The answer contains first-person process narration ('I put', 'I checked', 'I did not investigate the cause') and an unhedged, data-specific '100' that the question's data does not support; fix wording."
+  ],
+  "parts_answered": {
+   "single column second_highest_salary": true,
+   "NULL not zero rows": true,
+   "LIMIT/OFFSET approach": true,
+   "compare MAX approach": true,
+   "compare DENSE_RANK approach": true,
+   "what goes wrong with naive LIMIT 1 OFFSET 1": true
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "the more compact form SELECT (SELECT DISTINCT salary ... ORDER BY salary DESC LIMIT 1 OFFSET 1) returned 100 instead of NULL when every employee had the same salary on SQLite 3.37.2 (it was correct on 3.45.1; I did not investigate the cause), so this form is the safer one.",
+    "problem": "Reference answers should not narrate the author's process; the '100' is an unexplained value not in the question's data (reproduced: with all salaries equal to 5 the compact form returns 5 on 3.37.2 and NULL on 3.45.1). The version-specific behaviour is a product-internals claim and should be stated hedged and generically.",
+    "replacement": "the more compact form SELECT (SELECT DISTINCT salary ... ORDER BY salary DESC LIMIT 1 OFFSET 1) returns the salary itself instead of NULL when every employee has the same salary on SQLite 3.37.2 (it returns NULL on 3.45.1; the cause is not established here), so the derived-table form is the safer one."
+   },
+   {
+    "severity": "minor",
+    "claim": "I checked all three against the empty, one-row and all-equal cases and each returns a single NULL row.",
+    "problem": "First-person process remark; the fact is true (verified on 3.37.2 and 3.45.1).",
+    "replacement": "All three return a single NULL row for the empty, one-row and all-equal cases."
+   },
+   {
+    "severity": "minor",
+    "claim": "because NULL would otherwise count as a distinct value that sorts last",
+    "problem": "True for SQLite in a DESC sort (NULLs are smallest); engine-dependent elsewhere (e.g. PostgreSQL sorts NULLs first in DESC).",
+    "replacement": "because in SQLite NULL would otherwise count as a distinct value that sorts last in a DESC order (NULL placement differs between engines)."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Several equivalent formulations to compare plus NULL/empty-set edge handling; none is multi-step design.",
+  "key_concepts_findings": "All six discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0027",
+   "same_intent": false
+  },
+  "code_findings": "Run on sqlite 3.45.1 (system lib) and real 3.37.2 (/tmp/claude-0/s/x/usr/lib/x86_64-linux-gnu/libsqlite3.so.0 via LD_LIBRARY_PATH, python3 sqlite3.sqlite_version confirmed 3.37.2). Main data: offset/compact/max/dense_rank all 200, naive 300. Empty, one-row: all four candidates give a single NULL row, naive gives zero rows. All-equal (5,5): offset, MAX, DENSE_RANK -> NULL on both versions; compact form -> 5 on 3.37.2 (bug reproduced, NULL on 3.45.1); naive gives 5 on both. NULL-salary break tests (NULL,5,7 -> 5; NULL,5 -> NULL) fine. DENSE_RANK needs SQLite >= 3.25. Fenced code equals tested code.",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0037",
+  "verdict": "pass",
+  "reasons": [
+   "Result (both: 10,13; jan_not_feb: 11,14) and all row counts (Jan 6, Feb 4, UNION ALL 10, UNION 5) re-verified; the SQLite parenthesisation claim is true."
+  ],
+  "parts_answered": {
+   "one result set with both segments, set operators only": true,
+   "correct column names and ordering": true,
+   "EXCEPT/INTERSECT vs UNION/UNION ALL explained": true,
+   "row-count difference shown from Jan and Feb lists": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Use UNION ALL by default, UNION only when duplicates are actually possible and unwanted.",
+    "problem": "Slight over-generalisation (default depends on intent), acceptable as interview advice.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Comparison of set operators with a short composed query.",
+  "key_concepts_findings": "All seven covered, including NULL equality (mentioned briefly; verified true in SQLite).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0034",
+   "same_intent": false
+  },
+  "code_findings": "Run on sqlite 3.45.1 (system lib) and real 3.37.2 (/tmp/claude-0/s/x/usr/lib/x86_64-linux-gnu/libsqlite3.so.0 via LD_LIBRARY_PATH, python3 sqlite3.sqlite_version confirmed 3.37.2). Output [('both',10),('both',13),('jan_not_feb',11),('jan_not_feb',14)]. Counts: Jan rows 6, Feb rows 4; UNION ALL 10, UNION 5. 'select 1 union all (select 2 except select 3)' -> syntax error, confirming 'cannot be parenthesised'. Break test: added NULL user_id in both months and user 16 with '2024-01-31 23:59:59' and '2024-02-01 00:00:00'; result adds ('both',NULL) and ('both',16), so NULLs match in INTERSECT as claimed and month boundaries are handled by the half-open range. Fenced code equals tested code. Identical on 3.37.2 and 3.45.1.",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0039",
+  "verdict": "correct",
+  "reasons": [
+   "Query and result table are correct on both SQLite versions.",
+   "One factual arithmetic error in the explanation: April vs February would be -50%, not +50%."
+  ],
+  "parts_answered": {
+   "month, orders, prev_orders, mom_pct columns": true,
+   "all months incl. March with 0": true,
+   "NULL for first month and zero previous": true,
+   "rounded to 1 decimal": true,
+   "order by month": true,
+   "why generate month list": true
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "so LAG would compare April with February and report +50% growth for April, silently wrong.",
+    "problem": "April has 3 orders and February 6, so the wrong comparison gives (3-6)/6 = -50.0%, not +50% (and the correct April value is NULL because March has 0).",
+    "replacement": "so LAG would compare April with February and report -50.0% for April (3 vs 6) instead of the correct NULL, silently wrong."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-step: recursive calendar generation, LEFT JOIN with COUNT(column), LAG, NULLIF and correct NULL semantics, with several traps.",
+  "key_concepts_findings": "All eight discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0029",
+   "same_intent": false
+  },
+  "code_findings": "Run on sqlite 3.45.1 (system lib) and real 3.37.2 (/tmp/claude-0/s/x/usr/lib/x86_64-linux-gnu/libsqlite3.so.0 via LD_LIBRARY_PATH, python3 sqlite3.sqlite_version confirmed 3.37.2). Output exactly: 2024-01 4,NULL,NULL; 2024-02 6,4,50.0; 2024-03 0,6,-100.0; 2024-04 3,0,NULL; 2024-05 5,3,66.7 on both versions. Break tests: single-month table -> one row with NULLs; year wrap 2023-11 and 2024-02 -> fills 2023-12 and 2024-01 correctly; Dec->Jan 3->3 gives 0.0; EMPTY table returns one junk row (NULL month,0,NULL,NULL) because MIN is NULL, not mentioned in the answer and not required by the question. Recursive CTE and window need SQLite >= 3.25; fine on 3.37.2. Fenced code equals tested code.",
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/lang_with.html",
+    "status": "supported",
+    "evidence": "Page: 'cte-table-name AS (initial-select UNION ALL recursive-select)'; 'Recursive SELECT statements may not use aggregate functions or window functions' (the answer's recursive step uses none); series example 'cnt(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM cnt WHERE x<1000000)' matches the WHERE-bounded stepping pattern. The page does not itself cover date(...,'+1 month'); that is from the date-functions docs, not relied on by the 'supports' sentence. A scalar subquery in the recursive WHERE is allowed because it does not reference the CTE."
+   }
+  ]
+ }
+]

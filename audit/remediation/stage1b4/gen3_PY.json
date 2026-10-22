@@ -1,0 +1,336 @@
+[
+ {
+  "id": "P3-PY-01",
+  "plan_id": "P3-PY-01",
+  "status": "ok",
+  "question": "A nightly job must count the lines containing ' ERROR ' in a 40 GB application log on a machine with 8 GB of RAM. The file is mostly UTF-8 but a few lines contain stray invalid bytes, and some lines end in \\r\\n. A colleague wrote `data = open('app.log').read().splitlines()`. What is wrong with that, and how would you write it? Show a function plus a test.",
+  "answer": "Do not call read() on a file that may exceed memory: it builds the whole decoded string (and splitlines() builds a second copy as a list of strings), so memory use is at least the file size and typically more. Iterate over the file object instead. A text file is an iterator of lines; it reads and decodes in buffered chunks, so memory stays roughly constant regardless of file size (the exception is a single enormous line, which is still held whole).\n\nAlso:\n- Use a with block so the file is closed deterministically, even on an exception, instead of relying on garbage collection.\n- Pass encoding explicitly. Without it open() uses a locale-dependent default, so the same job can behave differently on another machine.\n- Decide what to do with bad bytes. The default errors='strict' raises UnicodeDecodeError at the first invalid byte, possibly hours into the run. errors='replace' substitutes U+FFFD and keeps going; that is fine for counting, but not if you must preserve the data exactly (then open in binary mode and decode per line, or use errors='surrogateescape').\n- Newline handling: in text mode with the default newline=None, \\r\\n and lone \\r are translated to \\n, so the loop sees clean lines. Pass newline='' only when you need the original endings.\n\n```python\ndef count_error_lines(path, encoding=\"utf-8\"):\n    \"\"\"Count lines containing ' ERROR ' without loading the file into memory.\"\"\"\n    count = 0\n    with open(path, \"r\", encoding=encoding, errors=\"replace\") as f:\n        for line in f:\n            if \" ERROR \" in line:\n                count += 1\n    return count\n```\n\nThe test builds a small file with CRLF, a lone CR, an invalid byte and no trailing newline, and checks the count, that strict decoding would have failed, and the newline behaviour.",
+  "key_concepts": [
+   "lazy line iteration",
+   "context manager",
+   "explicit encoding",
+   "UnicodeDecodeError",
+   "errors='replace'",
+   "universal newlines",
+   "memory footprint of read()"
+  ],
+  "difficulty": "Medium",
+  "domain": "Python",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "def count_error_lines(path, encoding=\"utf-8\"):\n    \"\"\"Count lines containing ' ERROR ' without loading the file into memory.\"\"\"\n    count = 0\n    with open(path, \"r\", encoding=encoding, errors=\"replace\") as f:\n        for line in f:\n            if \" ERROR \" in line:\n                count += 1\n    return count\n",
+   "test": "import os, tempfile\n\nwith tempfile.TemporaryDirectory() as d:\n    p = os.path.join(d, \"app.log\")\n    data = (b\"2026-01-01 INFO  ok\\r\\n\"\n            b\"2026-01-01 ERROR  disk\\xff full\\r\\n\"   # invalid UTF-8 byte\n            b\"2026-01-02 ERROR  timeout\\n\"\n            b\"old-mac-line\\r\"                        # lone CR is also a line break\n            b\"2026-01-03 ERROR  last line, no trailing newline\")\n    with open(p, \"wb\") as f:\n        f.write(data)\n    assert count_error_lines(p) == 3\n    # strict decoding would raise on the bad byte\n    try:\n        with open(p, encoding=\"utf-8\") as f:\n            f.read()\n        raise AssertionError(\"expected UnicodeDecodeError\")\n    except UnicodeDecodeError:\n        pass\n    # default newline handling translates CRLF and CR to '\\n'\n    with open(p, encoding=\"utf-8\", errors=\"replace\") as f:\n        lines = list(f)\n    assert len(lines) == 5 and lines[0] == \"2026-01-01 INFO  ok\\n\"\n    # newline='' keeps the original endings\n    with open(p, encoding=\"utf-8\", errors=\"replace\", newline=\"\") as f:\n        assert next(f).endswith(\"\\r\\n\")\n",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "New question; behaviour of encoding/errors/newline verified by running the test on 3.10, 3.11 and 3.13.",
+  "confidence": "high",
+  "question_type": "scenario",
+  "interview_style_note": "Strong candidate iterates the file object, uses with, names the encoding and an errors policy deliberately, and knows text-mode newline translation; also notes that one huge line still sits in memory.",
+  "common_mistakes": [
+   "Calling read() or readlines() on the whole file",
+   "Omitting encoding= and relying on the platform default",
+   "Using errors='ignore' without noting it silently drops data",
+   "Opening without a with block"
+  ]
+ },
+ {
+  "id": "P3-PY-02",
+  "plan_id": "P3-PY-02",
+  "status": "ok",
+  "question": "Your team's scripts build paths like `base + '/' + name + '.csv'` and `os.path.join(...)`, and a Windows colleague's run fails on paths copied from Linux. Argue for or against moving to pathlib, naming concrete things Path objects give you and the cases where you would still need care.",
+  "answer": "For new code pathlib is generally preferable, because a path becomes an object with operations instead of a string you manipulate by hand.\n\nWhat you get:\n- Joining with the / operator: Path('data') / 'raw' / 'a.csv' uses the right separator for the platform. Like os.path.join, joining with an absolute component discards what came before: PurePosixPath('a') / '/b' is /b.\n- Parsing as attributes: .name, .stem, .suffix, .suffixes, .parent, .parts. Note .suffix is only the last extension: 'b.tar.gz' gives '.gz' and stem 'b.tar'. A dotfile like .bashrc has no suffix.\n- Safe edits: p.with_suffix('.json'), p.with_name(...).\n- Filesystem calls on the object: exists(), is_file(), mkdir(parents=True, exist_ok=True), glob('*.csv'), rglob('*.csv'), read_text(encoding=...), write_text(...), iterdir().\n- Platform semantics: WindowsPath accepts both / and \\ as separators and compares case-insensitively; PosixPath treats a backslash as an ordinary filename character, so PurePosixPath('a\\\\b').parts is a single part. That is the usual reason Windows-style strings break on Linux.\n\nCare points: Path objects are not strings, so older APIs may need str(p) or os.fspath(p) (most standard-library functions accept them). Use PureWindowsPath/PurePosixPath when you need to manipulate foreign-platform paths without touching the disk. read_text/write_text still need an explicit encoding, and they load the whole file, so they are no replacement for streaming. os.path remains fine for quick string work, but there is no functional gap that forces you to keep it.",
+  "key_concepts": [
+   "pathlib.Path",
+   "/ operator joining",
+   "suffix vs suffixes",
+   "with_suffix",
+   "glob and rglob",
+   "PurePosixPath vs PureWindowsPath",
+   "os.fspath"
+  ],
+  "difficulty": "Medium",
+  "domain": "Python",
+  "code": null,
+  "sources": [],
+  "change_notes": "New question; suffix/stem/parts/equality/absolute-join behaviour checked by running PurePosixPath and PureWindowsPath on 3.10 and 3.13.",
+  "confidence": "high",
+  "question_type": "concept",
+  "interview_style_note": "Strong candidate lists concrete API advantages, knows the platform-dependent separator and case rules, and flags the string-vs-Path interoperability and read_text encoding caveats.",
+  "common_mistakes": [
+   "Saying pathlib is just a prettier os.path",
+   "Believing .suffix returns all extensions",
+   "Expecting a backslash to be a separator when parsing with PosixPath"
+  ]
+ },
+ {
+  "id": "P3-PY-03",
+  "plan_id": "P3-PY-03",
+  "status": "ok",
+  "question": "A service rewrites its config file with `open(path, 'w').write(json.dumps(cfg))`. After a kill -9 during a deploy, the file was empty and the service would not start. Explain why this happens and write a safer function. Include a test that shows the old file survives a failed write.",
+  "answer": "open(path, 'w') truncates the file immediately, and the new bytes arrive afterwards. If the process dies in between, readers see an empty or partial file. The standard fix is write-then-rename: write the new content to a temporary file in the same directory, flush it to disk, then os.replace(tmp, path). On POSIX the rename is atomic when source and destination are on the same filesystem, so any reader sees either the whole old file or the whole new one. os.replace also overwrites an existing destination on all platforms (os.rename does not on Windows). The temp file must be in the same directory: a rename across filesystems is not atomic and may fail.\n\n```python\nimport os\nimport shutil\nimport tempfile\n\n\ndef atomic_write_text(path, text, encoding=\"utf-8\"):\n    \"\"\"Replace the file at `path` with `text`; readers see old or new content, never a partial file.\"\"\"\n    path = os.path.abspath(path)\n    directory = os.path.dirname(path)\n    fd, tmp = tempfile.mkstemp(dir=directory, prefix=\".tmp-\", suffix=\".part\")\n    try:\n        with os.fdopen(fd, \"w\", encoding=encoding) as f:\n            f.write(text)\n            f.flush()\n            os.fsync(f.fileno())\n        try:\n            shutil.copymode(path, tmp)   # mkstemp creates the file as 0600\n        except FileNotFoundError:\n            pass\n        os.replace(tmp, path)\n    except BaseException:\n        try:\n            os.unlink(tmp)\n        except FileNotFoundError:\n            pass\n        raise\n```\n\nCaveats to state:\n- fsync before the rename matters. Without it, after a power loss (not merely a process kill) the filesystem may persist the rename but not the data. For full durability on POSIX you also fsync the containing directory; I left that out for brevity and portability. Process kills alone do not need fsync, since the kernel still holds the written data.\n- tempfile.mkstemp creates the file with mode 0600, so the replaced file would otherwise silently lose its original permissions; the example copies them. Ownership, ACLs and hard links are not preserved either.\n- On Windows, replace can fail with PermissionError if another process has the destination open.\n- It protects against torn writes, not concurrent writers: two processes can still overwrite each other (last writer wins) unless you add locking.",
+  "key_concepts": [
+   "atomic rename",
+   "os.replace",
+   "tempfile.mkstemp",
+   "same-filesystem requirement",
+   "fsync",
+   "file permissions after replace",
+   "truncate-on-open"
+  ],
+  "difficulty": "Hard",
+  "domain": "Python",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import os\nimport shutil\nimport tempfile\n\n\ndef atomic_write_text(path, text, encoding=\"utf-8\"):\n    \"\"\"Replace the file at `path` with `text`; readers see old or new content, never a partial file.\"\"\"\n    path = os.path.abspath(path)\n    directory = os.path.dirname(path)\n    fd, tmp = tempfile.mkstemp(dir=directory, prefix=\".tmp-\", suffix=\".part\")\n    try:\n        with os.fdopen(fd, \"w\", encoding=encoding) as f:\n            f.write(text)\n            f.flush()\n            os.fsync(f.fileno())\n        try:\n            shutil.copymode(path, tmp)   # mkstemp creates the file as 0600\n        except FileNotFoundError:\n            pass\n        os.replace(tmp, path)\n    except BaseException:\n        try:\n            os.unlink(tmp)\n        except FileNotFoundError:\n            pass\n        raise\n",
+   "test": "import os, stat, tempfile\n\n\ndef read(path):\n    with open(path, encoding=\"utf-8\") as f:\n        return f.read()\n\n\nwith tempfile.TemporaryDirectory() as d:\n    p = os.path.join(d, \"config.json\")\n    atomic_write_text(p, '{\"v\": 1}')\n    assert read(p) == '{\"v\": 1}'\n    if os.name == \"posix\":\n        os.chmod(p, 0o644)\n    atomic_write_text(p, '{\"v\": 2}')\n    assert read(p) == '{\"v\": 2}'\n    if os.name == \"posix\":\n        assert stat.S_IMODE(os.stat(p).st_mode) == 0o644\n    # a failure mid-write (unencodable text) leaves the old file intact and no temp file behind\n    try:\n        atomic_write_text(p, '{\"v\": \"é\"}', encoding=\"ascii\")\n        raise AssertionError(\"expected UnicodeEncodeError\")\n    except UnicodeEncodeError:\n        pass\n    assert read(p) == '{\"v\": 2}'\n    assert os.listdir(d) == [\"config.json\"]\n",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "New question; the example was run on 3.10, 3.11 and 3.13 with -W error. Statements about atomicity, Windows behaviour and directory fsync are from general knowledge, not from an opened source.",
+  "confidence": "medium",
+  "question_type": "scenario",
+  "interview_style_note": "Strong candidate explains truncation on open, uses a same-directory temp file plus os.replace, cleans up on failure, and distinguishes crash safety from power-loss durability (fsync, directory fsync) and permission loss.",
+  "common_mistakes": [
+   "Writing the temp file in /tmp, which may be on another filesystem",
+   "Using os.rename and assuming it overwrites on Windows",
+   "Skipping fsync and claiming durability",
+   "Forgetting to remove the temp file on error"
+  ]
+ },
+ {
+  "id": "P3-PY-04",
+  "plan_id": "P3-PY-04",
+  "status": "ok",
+  "question": "A teammate parses a CSV export with `for line in f: a, b, c = line.strip().split(',')` and it crashes on some rows; another row is split into two records. The file contains values like `\"Smith, J\"` and a multi-line comment field. Explain what is going wrong, show the correct reading code, and say why csv documentation tells you to open files with newline=''. Include a test.",
+  "answer": "split(',') knows nothing about CSV quoting. A field such as \"Smith, J\" contains a delimiter, so the row yields too many pieces and the unpack fails. A quoted field can also contain a line break, so iterating by physical lines cuts one logical record into two. Quote doubling (\"\" for a literal quote) is not handled either. The csv module parses a stream according to these rules, so use csv.reader or csv.DictReader instead.\n\nnewline='' matters because the csv reader needs to see the raw line endings. With the default universal-newlines mode, Python translates \\r\\n (and \\r) to \\n before csv sees the data, which silently rewrites line breaks that are legitimately inside quoted fields. When writing, the csv writer emits its own line terminator (\\r\\n by default), and without newline='' on Windows the text layer would translate \\n again and can produce \\r\\r\\n, i.e. blank lines between rows.\n\n```python\nimport csv\n\n\ndef read_rows(path):\n    with open(path, \"r\", encoding=\"utf-8\", newline=\"\") as f:\n        return list(csv.DictReader(f))\n```\n\nDictReader uses the first row as keys, so values are looked up by column name and column order changes do not break the code. All values come back as strings; convert types yourself (int(), float(), or pandas' read_csv with dtype). Other pitfalls: pass encoding explicitly (an Excel export may be utf-8-sig, which strips the BOM that would otherwise stick to the first column name), and set delimiter= for semicolon files. The test round-trips tricky values and also demonstrates that the naive split gives the wrong record count and that omitting newline='' turns an embedded CRLF into LF.",
+  "key_concepts": [
+   "csv.DictReader",
+   "quoted fields",
+   "embedded newlines",
+   "newline=''",
+   "universal newlines",
+   "quote doubling",
+   "utf-8-sig BOM"
+  ],
+  "difficulty": "Medium",
+  "domain": "Python",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import csv\n\n\ndef read_rows(path):\n    with open(path, \"r\", encoding=\"utf-8\", newline=\"\") as f:\n        return list(csv.DictReader(f))\n",
+   "test": "import csv, os, tempfile\n\nrows = [\n    {\"id\": \"1\", \"name\": \"Smith, J\", \"note\": \"line one\\nline two\"},\n    {\"id\": \"2\", \"name\": \"Lee\", \"note\": 'said \"hi\"'},\n    {\"id\": \"3\", \"name\": \"Kim\", \"note\": \"crlf\\r\\ninside\"},\n]\nwith tempfile.TemporaryDirectory() as d:\n    p = os.path.join(d, \"x.csv\")\n    with open(p, \"w\", encoding=\"utf-8\", newline=\"\") as f:\n        w = csv.DictWriter(f, fieldnames=[\"id\", \"name\", \"note\"])\n        w.writeheader()\n        w.writerows(rows)\n    assert read_rows(p) == rows\n    # the naive approach breaks on commas and embedded newlines\n    with open(p, encoding=\"utf-8\", newline=\"\") as f:\n        naive = [line.rstrip(\"\\r\\n\").split(\",\") for line in f]\n    assert len(naive) > len(rows) + 1\n    assert naive[1] != [\"1\", \"Smith, J\", \"line one\\nline two\"]\n    # without newline='' the embedded CRLF is silently changed to LF\n    with open(p, encoding=\"utf-8\") as f:\n        translated = list(csv.DictReader(f))\n    assert translated[2][\"note\"] == \"crlf\\ninside\" != rows[2][\"note\"]\n",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "New question; test run on 3.10, 3.11, 3.13. The newline='' explanation is based on the behaviour demonstrated by the test; the csv documentation page could not be opened in this task.",
+  "confidence": "high",
+  "question_type": "debugging",
+  "interview_style_note": "Strong candidate diagnoses both failure modes (delimiter inside quotes, newline inside quotes), knows why newline='' is required and that csv returns strings, and mentions encoding/BOM.",
+  "common_mistakes": [
+   "Fixing it with a regex split",
+   "Opening the file without newline=''",
+   "Assuming csv converts numbers",
+   "Ignoring the encoding and BOM"
+  ]
+ },
+ {
+  "id": "P3-PY-05",
+  "plan_id": "P3-PY-05",
+  "status": "ok",
+  "question": "Two modules, `orders.py` and `customers.py`, each start with an import of the other: orders has `from customers import get_customer` and customers has `from orders import latest_order`. Running `import orders` fails with `ImportError: cannot import name 'latest_order' from partially initialized module 'orders' (most likely due to a circular import)`. Walk through exactly why, and give three fixes in order of preference.",
+  "answer": "What happens: import orders creates the module object for orders, puts it in sys.modules immediately, and starts executing its body. Line 1 imports customers, which creates and registers customers and starts executing its body. Its first line, from orders import latest_order, finds orders already in sys.modules, but orders has not yet reached the def of latest_order because it is still stuck on its own first import. So the module exists but is only partially initialised, and the name lookup fails. Notice that it is the from-import form that fails: it needs the attribute right now. Plain import orders would succeed, because it only binds the module object, and the attribute is looked up later at call time. (If you start with import customers instead, the error names customers and get_customer.)\n\nFixes, best first:\n1. Remove the cycle by restructuring. Move the shared pieces into a third module that both import, or move the function to the module where it logically belongs. A cycle usually indicates two modules that are too entangled.\n2. Import the module, not the name: import customers, then call customers.get_customer(...) inside functions. The attribute lookup is deferred until the module is fully loaded, provided nothing uses it at import time.\n3. Import inside the function that needs it. This is a legitimate local workaround with a small per-call lookup cost (the module is cached in sys.modules), but it hides the dependency and is a smell if used widely.\n\nAvoid reordering imports to the bottom of the file or catching ImportError: both are brittle, since they depend on which module happens to be imported first. For type-only references, put the import under if TYPE_CHECKING: with annotations as strings. Debugging aid: inspect sys.modules to see which modules are mid-import.",
+  "key_concepts": [
+   "circular import",
+   "partially initialised module",
+   "sys.modules",
+   "from-import vs import",
+   "deferred import",
+   "TYPE_CHECKING",
+   "dependency restructuring"
+  ],
+  "difficulty": "Medium",
+  "domain": "Python",
+  "code": null,
+  "sources": [],
+  "change_notes": "New question; the exact error text and the import-module-works behaviour were reproduced with throwaway modules on 3.10 and 3.13.",
+  "confidence": "high",
+  "question_type": "debugging",
+  "interview_style_note": "Strong candidate explains the sys.modules registration before execution finishes, why from X import name fails while import X works, and prefers restructuring over import-order hacks.",
+  "common_mistakes": [
+   "Blaming Python for 'not finding' the file",
+   "Fixing it by shuffling import order or wrapping in try/except ImportError",
+   "Moving imports into functions everywhere without addressing the design"
+  ]
+ },
+ {
+  "id": "P3-PY-06",
+  "plan_id": "P3-PY-06",
+  "status": "ok",
+  "question": "You have a project folder `shop/` with `shop/__init__.py`, `shop/cli.py` and `shop/db.py`, and cli.py contains `from . import db`. `python shop/cli.py` fails with `ImportError: attempted relative import with no known parent package`, but `python -m shop.cli` works. Explain why, what `__init__.py` is for, and what `if __name__ == '__main__':` actually tests.",
+  "answer": "Running python shop/cli.py executes the file as a top-level script: its __name__ is '__main__' and it has no package (__package__ is empty), and sys.path[0] becomes the shop/ directory itself. A relative import such as from . import db is resolved against the module's package, so with no parent package Python raises the error you saw. Running python -m shop.cli instead imports shop as a package, then runs cli inside it; __name__ is still '__main__' but __package__ is 'shop', so the relative import resolves. sys.path[0] is then the current working directory, so you must run it from the folder that contains shop/ (or have the project installed).\n\n__init__.py marks a directory as a regular package and its code runs when the package is first imported; it is the place to expose a public API or set __all__, and can be empty. Since Python 3.3, a directory without __init__.py can still be imported as a namespace package; this works but behaves differently (no single location, no init code), so add the file when you mean a normal package.\n\nAbsolute imports (from shop import db) name the full path from a sys.path entry and work from anywhere the package is importable; relative imports (from . import db, from ..x import y) only work inside a package and survive renaming of the top package. Many teams prefer absolute imports for readability and use relative ones within tightly coupled subpackages. Either is valid.\n\nif __name__ == '__main__': is true only when the file is the entry point (script or -m). Code under it does not run when another module imports the file, which is why it hosts the CLI or demo while the functions above stay importable and testable. In a package you can also provide shop/__main__.py to make python -m shop work.",
+  "key_concepts": [
+   "__init__.py",
+   "relative import",
+   "absolute import",
+   "python -m",
+   "__name__ == '__main__'",
+   "namespace package",
+   "sys.path[0]"
+  ],
+  "difficulty": "Medium",
+  "domain": "Python",
+  "code": null,
+  "sources": [],
+  "change_notes": "New question; the error message, -m behaviour, __package__ values and namespace-package import were reproduced in a temp directory on 3.10 and 3.13.",
+  "confidence": "high",
+  "question_type": "concept",
+  "interview_style_note": "Strong candidate ties the relative-import failure to __package__ being empty when run as a script, explains -m and sys.path[0], and states the purpose of the __main__ guard.",
+  "common_mistakes": [
+   "Adding __init__.py and expecting the script run to work",
+   "Fixing it by editing sys.path in the script",
+   "Thinking __name__ is the module name when run with -m",
+   "Saying __init__.py is required for any import in Python 3"
+  ]
+ },
+ {
+  "id": "P3-PY-07",
+  "plan_id": "P3-PY-07",
+  "status": "ok",
+  "question": "You inherit a small internal Flask service and a reusable parsing library, both of which 'work on my laptop' because everything was pip-installed into the system Python. Describe how you would set both up properly: virtual environments, what goes in pyproject.toml, and how you would pin dependencies differently for the service and for the library.",
+  "answer": "Virtual environments: create one per project (python -m venv .venv, then activate it or call .venv/bin/python -m pip ...). It gives the project its own site-packages, so projects with conflicting versions do not clash, and the machine's Python, which the OS or other tools may rely on, is not modified. Many Linux distributions now mark the system Python as externally managed, and pip refuses to install into it; that is a further reason not to.\n\npyproject.toml is the standard project metadata file. Its [build-system] table names the build requirements and backend (for example setuptools, hatchling or flit-core), so tools like pip can build the project. The [project] table holds name, version, requires-python, dependencies and optional-dependencies; tool settings live under [tool.*]. The format is defined by PyPA specifications, but I did not open them in this task, so check the packaging guide for the exact field list.\n\nPinning, which differs by role:\n- Library: declare abstract, permissive ranges in dependencies (for example requests>=2.28,<3 or a lower bound only), because your users must be able to resolve your requirements together with their own. Tight pins make installs conflict. Test against the lowest and highest versions you claim.\n- Application/service: you control the deployment, so you want reproducible installs. Keep the loose requirements in pyproject.toml and generate a fully pinned lock (pip-compile, uv, poetry or pip freeze from a clean venv; ideally with hashes) that CI and production install from. Update it deliberately.\n\nPitfall: a bare pip freeze from a polluted environment captures unrelated packages. Start from a fresh venv and install from the declared dependencies.",
+  "key_concepts": [
+   "virtual environment",
+   "pyproject.toml",
+   "build backend",
+   "abstract vs pinned dependencies",
+   "lock file",
+   "requires-python",
+   "externally managed environment"
+  ],
+  "difficulty": "Medium",
+  "domain": "Python",
+  "code": null,
+  "sources": [],
+  "change_notes": "New question. No PyPA page could be opened in this task (fetch was denied), so no sources are listed; claims are from general knowledge and hedged where specific.",
+  "confidence": "medium",
+  "question_type": "scenario",
+  "interview_style_note": "Strong candidate separates library ranges from application pins, explains why the system interpreter is avoided, and knows pyproject.toml has build-system and project tables.",
+  "common_mistakes": [
+   "Pinning exact versions in a library",
+   "Using unpinned requirements for a production service",
+   "Running pip install with sudo into the system Python",
+   "Confusing requirements.txt with project metadata"
+  ]
+ },
+ {
+  "id": "P3-PY-08",
+  "plan_id": "P3-PY-08",
+  "status": "ok",
+  "question": "What does this print, and what does `swallow()` return? Explain the order in which try, except, else and finally run, why `return` inside finally is dangerous, and why a bare `except:` is considered harmful.\n\n```python\ndef f(kind):\n    try:\n        print('try')\n        if kind == 'raise':\n            raise ValueError\n        if kind == 'return':\n            return 'from try'\n    except ValueError:\n        print('except')\n        return 'from except'\n    else:\n        print('else')\n        return 'from else'\n    finally:\n        print('finally')\n\ndef swallow():\n    try:\n        raise RuntimeError('boom')\n    finally:\n        return 'done'\n```\nfor f('ok'), f('raise'), f('return').",
+  "answer": "Results: f('ok') prints try, else, finally and returns 'from else'. f('raise') prints try, except, finally and returns 'from except'. f('return') prints try, finally and returns 'from try'. swallow() returns 'done' and no exception escapes.\n\nSemantics: the try body runs first. If it raises, the first matching except clause runs. The else clause runs only if the try body finished without an exception and without executing return, break or continue; that is why f('return') skips it. finally runs in every case, including when a return, break or exception is leaving the block, and it runs after the chosen return value has been computed but before the function actually returns. An exception raised in else is not handled by the except clauses of the same try.\n\nPurpose of else: keep the try body to the one statement that can raise the exception you expect, and put the follow-up code in else. That way an unrelated error in the follow-up code is not accidentally caught by your except.\n\nA return (or break/continue) in finally overrides whatever was pending, so it discards an in-flight exception, as swallow() shows, and also replaces a return value. Avoid it; linters flag it.\n\nBare except: catches everything, including KeyboardInterrupt and SystemExit (they derive from BaseException), so Ctrl-C and sys.exit stop working, and it hides programming errors like NameError. Catch the specific exceptions you can actually handle; use except Exception only at a top-level boundary where you log and re-raise or fail clearly, and never use pass to silence an error.\n\n```python\ndef run(kind):\n    log = []\n\n    def f():\n        try:\n            log.append(\"try\")\n            if kind == \"raise\":\n                raise ValueError(\"bad\")\n            if kind == \"return\":\n                return \"from try\"\n        except ValueError:\n            log.append(\"except\")\n            return \"from except\"\n        else:\n            log.append(\"else\")\n            return \"from else\"\n        finally:\n            log.append(\"finally\")\n\n    return f(), log\n\n\ndef swallow():\n    try:\n        raise RuntimeError(\"boom\")\n    finally:\n        return \"finally wins\"   # discards the in-flight RuntimeError\n```\n\nThe tests assert the order logs above and that an exception raised in else escapes the same try.",
+  "key_concepts": [
+   "try/except/else/finally order",
+   "return in finally",
+   "else clause purpose",
+   "specific exception handling",
+   "bare except",
+   "BaseException vs Exception",
+   "KeyboardInterrupt"
+  ],
+  "difficulty": "Medium",
+  "domain": "Python",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "def run(kind):\n    log = []\n\n    def f():\n        try:\n            log.append(\"try\")\n            if kind == \"raise\":\n                raise ValueError(\"bad\")\n            if kind == \"return\":\n                return \"from try\"\n        except ValueError:\n            log.append(\"except\")\n            return \"from except\"\n        else:\n            log.append(\"else\")\n            return \"from else\"\n        finally:\n            log.append(\"finally\")\n\n    return f(), log\n\n\ndef swallow():\n    try:\n        raise RuntimeError(\"boom\")\n    finally:\n        return \"finally wins\"   # discards the in-flight RuntimeError\n",
+   "test": "assert run(\"ok\") == (\"from else\", [\"try\", \"else\", \"finally\"])\nassert run(\"raise\") == (\"from except\", [\"try\", \"except\", \"finally\"])\nassert run(\"return\") == (\"from try\", [\"try\", \"finally\"])   # else is skipped when try returns\nassert swallow() == \"finally wins\"\n\n# an exception raised in else is NOT handled by the same try's except clauses\ndef else_raises():\n    try:\n        pass\n    except ValueError:\n        return \"handled\"\n    else:\n        raise ValueError(\"from else\")\n\ntry:\n    else_raises()\n    raise AssertionError(\"should have raised\")\nexcept ValueError as e:\n    assert str(e) == \"from else\"\n",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "New question; outputs were produced by running the code on 3.10, 3.11, 3.13. The code in the answer is the instrumented version (log list) of the printing function in the question.",
+  "confidence": "high",
+  "question_type": "concept",
+  "interview_style_note": "Strong candidate predicts all three traces including the skipped else on return, explains that finally can swallow exceptions, and justifies narrow except clauses.",
+  "common_mistakes": [
+   "Saying else runs after finally",
+   "Believing else runs when the try body returns",
+   "Thinking finally cannot override an exception",
+   "Using except: pass to make errors go away"
+  ]
+ },
+ {
+  "id": "P3-PY-09",
+  "plan_id": "P3-PY-09",
+  "status": "ok",
+  "question": "You are writing a small library, `acmeconf`, that reads configuration files. Design its exception hierarchy. A caller should be able to catch 'anything this library raised' with one clause, but also handle a bad value differently from a missing file. Inside the library you call int() on a port string; show how to re-raise as your own type while keeping the original error visible, and explain `__cause__` versus `__context__` and when `from None` is appropriate.",
+  "answer": "Design: define one base class, class ConfigError(Exception), and derive specific errors from it (for example ConfigValueError, plus one for file problems). Callers can catch the base to handle everything from the library, or a subclass for specific handling. Derive from Exception, not BaseException, so ordinary except Exception handlers work. Do not make subclasses of ValueError and friends unless callers really benefit from catching them as such; a multiple-inheritance mix (class ConfigValueError(ConfigError, ValueError)) is possible when you need both. Keep the number of types small: add one only if a caller would handle it differently. Document them as part of the public API, and put useful context in the message (the offending value, the key).\n\nChaining: raise NewError(...) from exc sets __cause__ to exc and marks it explicit; the traceback shows 'The above exception was the direct cause of the following exception'. If you raise a new exception inside an except block without from, Python still records the active exception in __context__ automatically, and the traceback says 'During handling of the above exception, another exception occurred'. That wording tells readers it may be an accident or a bug in the handler. raise ... from None sets __cause__ to None and sets __suppress_context__, which hides the context from the printed traceback (the __context__ attribute is still set). Use it sparingly, when the original is an irrelevant implementation detail, such as an internal KeyError you translated into a clean public error. Default to from exc so debugging information is not thrown away.\n\n```python\nclass ConfigError(Exception):\n    \"\"\"Base class: callers can catch this to handle any error from the library.\"\"\"\n\n\nclass ConfigValueError(ConfigError):\n    pass\n\n\ndef parse_port(text):\n    try:\n        value = int(text)\n    except ValueError as exc:\n        raise ConfigValueError(f\"port must be an integer, got {text!r}\") from exc\n    if not 0 < value < 65536:\n        raise ConfigValueError(f\"port out of range: {value}\")\n    return value\n\n\ndef implicit_chain():\n    try:\n        int(\"x\")\n    except ValueError:\n        raise ConfigValueError(\"raised without 'from'\")\n\n\ndef suppressed_chain():\n    try:\n        int(\"x\")\n    except ValueError:\n        raise ConfigValueError(\"raised 'from None'\") from None\n```\n\nAvoid swallowing tracebacks: don't catch Exception just to raise a new one without chaining, and don't log-and-return None. The test checks the base-class catch, __cause__, __context__ and __suppress_context__ in all three raising styles.",
+  "key_concepts": [
+   "exception hierarchy",
+   "base exception class",
+   "raise from",
+   "__cause__",
+   "__context__",
+   "__suppress_context__",
+   "from None"
+  ],
+  "difficulty": "Hard",
+  "domain": "Python",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "class ConfigError(Exception):\n    \"\"\"Base class: callers can catch this to handle any error from the library.\"\"\"\n\n\nclass ConfigValueError(ConfigError):\n    pass\n\n\ndef parse_port(text):\n    try:\n        value = int(text)\n    except ValueError as exc:\n        raise ConfigValueError(f\"port must be an integer, got {text!r}\") from exc\n    if not 0 < value < 65536:\n        raise ConfigValueError(f\"port out of range: {value}\")\n    return value\n\n\ndef implicit_chain():\n    try:\n        int(\"x\")\n    except ValueError:\n        raise ConfigValueError(\"raised without 'from'\")\n\n\ndef suppressed_chain():\n    try:\n        int(\"x\")\n    except ValueError:\n        raise ConfigValueError(\"raised 'from None'\") from None\n",
+   "test": "assert parse_port(\"8080\") == 8080\n\ntry:\n    parse_port(\"abc\")\nexcept ConfigError as e:                       # caught via the base class\n    assert isinstance(e, ConfigValueError)\n    assert isinstance(e.__cause__, ValueError)  # explicit: raise ... from exc\n    assert e.__suppress_context__ is True\n\ntry:\n    implicit_chain()\nexcept ConfigError as e:\n    assert e.__cause__ is None\n    assert isinstance(e.__context__, ValueError)  # implicit chaining\n    assert e.__suppress_context__ is False\n\ntry:\n    suppressed_chain()\nexcept ConfigError as e:\n    assert e.__cause__ is None\n    assert isinstance(e.__context__, ValueError)  # still recorded...\n    assert e.__suppress_context__ is True         # ...but hidden from the traceback display\n\ntry:\n    parse_port(\"70000\")\nexcept ConfigValueError as e:\n    assert e.__cause__ is None and e.__context__ is None\n",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "New question; the chaining attributes asserted in the test were verified on 3.10, 3.11, 3.13. Traceback wording quoted from memory of the standard output, not re-checked here.",
+  "confidence": "medium",
+  "question_type": "design",
+  "interview_style_note": "Strong candidate designs a shallow hierarchy with one public base, explains explicit versus implicit chaining and the traceback wording, and defends when to suppress context.",
+  "common_mistakes": [
+   "Raising bare Exception('...') from library code",
+   "Re-raising a new exception without chaining and losing the root cause",
+   "Overusing from None",
+   "Creating a deep hierarchy with a class per error message"
+  ]
+ },
+ {
+  "id": "P3-PY-10",
+  "plan_id": "P3-PY-10",
+  "status": "ok",
+  "question": "A script that splits a list of records into batches of 100 for an API upload reports success, but the vendor says the last few records are missing. There is no traceback. Describe, step by step, how you would find and prove the bug, and then show a minimal reproduction with a fix and a test. Cover how you would use the traceback when there is one, logging versus print, breakpoint(), assertions and shrinking the input.",
+  "answer": "Process, in order:\n1. Reproduce reliably. Capture the exact input and settings, and make the failure a one-command repro. A bug you cannot repeat cannot be proved fixed.\n2. Shrink the input. Bisect the data or parameters (half the records, then half again; lower the batch size from 100 to 2) until the smallest case still fails. Here, 3 items with batch size 2 are enough: the third item is lost.\n3. State the invariant that should hold and check it. For batching: flattening the batches must equal the input, and every batch has between 1 and size items. An assert (or a test) turns a vague 'records missing' into a failing check at the exact function. Remember asserts are removed under python -O, so they are for development and tests, not for validating user input.\n4. Observe the real values. Use breakpoint() to stop in the debugger (pdb by default; the PYTHONBREAKPOINT environment variable can change or disable it) and inspect the range bounds. For long-running or remote code use the logging module, not print: levels, timestamps, module names, configurable destinations, and it can stay in production at a low level.\n5. If there is a traceback, read it from the bottom: the last line is the exception type and message, the frame above it is where it was raised, and the frames above that are the call path. The root cause is often a few frames higher than the raise.\n6. Fix, then add a regression test using the shrunken case, and check neighbouring edge cases (empty list, exact multiples, size 1).\n\nBuggy code: range(0, len(items) - size, size), an off-by-one in the range stop, which drops the final batch. It never raises, because the result is valid but short.\n\n```python\ndef chunks(items, size):\n    \"\"\"Split `items` into consecutive lists of at most `size` elements.\"\"\"\n    if size <= 0:\n        raise ValueError(\"size must be positive\")\n    return [items[i:i + size] for i in range(0, len(items), size)]\n```\n\nThe test keeps the buggy variant for contrast, asserts the minimal failure, and then checks the invariant over many lengths and sizes.",
+  "key_concepts": [
+   "reproduce and minimise",
+   "traceback reading",
+   "invariant assertion",
+   "logging vs print",
+   "breakpoint() and pdb",
+   "off-by-one",
+   "regression test"
+  ],
+  "difficulty": "Medium",
+  "domain": "Python",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "def chunks(items, size):\n    \"\"\"Split `items` into consecutive lists of at most `size` elements.\"\"\"\n    if size <= 0:\n        raise ValueError(\"size must be positive\")\n    return [items[i:i + size] for i in range(0, len(items), size)]\n",
+   "test": "def chunks_buggy(items, size):\n    return [items[i:i + size] for i in range(0, len(items) - size, size)]\n\n# minimal reproduction found by shrinking the input\nassert chunks_buggy([1, 2, 3], 2) == [[1, 2]]           # the 3 is lost\nassert chunks_buggy([1, 2, 3, 4], 2) == [[1, 2]]        # even an exact multiple loses the last chunk\n\n# the invariant an assertion would have caught\ndef check(items, size):\n    out = chunks(items, size)\n    assert [x for c in out for x in c] == items\n    assert all(0 < len(c) <= size for c in out)\n\nfor n in range(0, 12):\n    for size in (1, 2, 3, 5, 20):\n        check(list(range(n)), size)\nassert chunks([1, 2, 3], 2) == [[1, 2], [3]]\nassert chunks([], 3) == []\ntry:\n    chunks([1], 0)\n    raise AssertionError\nexcept ValueError:\n    pass\n",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "New question; buggy/fixed example and the invariant sweep were run on 3.10, 3.11, 3.13. Statements about breakpoint()/PYTHONBREAKPOINT and python -O are from general knowledge, not an opened source.",
+  "confidence": "high",
+  "question_type": "scenario",
+  "interview_style_note": "Strong candidate follows a disciplined sequence (reproduce, shrink, state invariant, inspect, fix, regression test), knows asserts vanish under -O, and distinguishes logging from print.",
+  "common_mistakes": [
+   "Adding prints everywhere without a hypothesis",
+   "Fixing the symptom by appending the last batch separately",
+   "Testing only the failing size and not edge cases",
+   "Using assert to validate production input"
+  ]
+ }
+]

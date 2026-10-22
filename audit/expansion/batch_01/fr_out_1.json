@@ -1,0 +1,315 @@
+[
+ {
+  "plan_id": "B1-GEN-04-1",
+  "verdict": "pass",
+  "reasons": [
+   "Recomputed all numbers; applied corrections are accurate and consistent with other fields."
+  ],
+  "parts_answered": {
+   "all parts": true
+  },
+  "evidence": [
+   {
+    "claim": "1,000,000 x 4 ms = 4,000 s ~ 67 min; 50 pairs = 200 ms",
+    "method": "derivation",
+    "evidence": "recomputed"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism comparison with simple arithmetic.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "66 words, 1e6*4ms=4000s=66.7min ok"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "adds mechanism, 50*4ms=200ms, late interaction; applied edit (one vector per token, 'aim of') is accurate and hedged"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "Specific and each discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "existing-nearest-not-matched",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://sbert.net/examples/sentence_transformer/applications/retrieve_rerank/README.html",
+    "status": "supported",
+    "evidence": "'Scoring thousands or millions of (query, document)-pairs would be rather slow... retriever to create a set of e.g. 100 possible candidates which are then re-ranked by the Cross-Encoder.'"
+   },
+   {
+    "url": "https://arxiv.org/abs/2004.12832",
+    "status": "partially",
+    "evidence": "Not opened (network refused); ColBERT precomputes document representations offline is well-known background."
+   }
+  ],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-04-4",
+  "verdict": "pass",
+  "reasons": [
+   "Recomputed all numbers; applied corrections are accurate and consistent with other fields."
+  ],
+  "parts_answered": {
+   "all parts": true
+  },
+  "evidence": [
+   {
+    "claim": "MMR lambda 0.7 is relevance-leaning",
+    "method": "derivation",
+    "evidence": "MMR = lambda*Sim(q,d) - (1-lambda)*max Sim(d,d')"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Scenario design of a dedupe/compress pipeline with risks.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "three causes, fixes, compression risks"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "ordered pipeline with checks; edits hedge thresholds and lambda (0.7 = relevance-leaning under standard MMR formula) correctly, consistent with 'modest diversity weight'"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Specific and each discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "existing-nearest-not-matched",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://www.cs.cmu.edu/~jgc/publication/The_Use_MMR_Diversity_Based_LTMIR_1998.pdf",
+    "status": "partially",
+    "evidence": "Not opened; supports text already hedged as illustrative"
+   },
+   {
+    "url": "https://arxiv.org/abs/2310.04408",
+    "status": "partially",
+    "evidence": "Source text honestly states paper does not claim risks"
+   }
+  ],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-04-6",
+  "verdict": "pass",
+  "reasons": [
+   "Recomputed all numbers; applied corrections are accurate and consistent with other fields."
+  ],
+  "parts_answered": {
+   "all parts": true
+  },
+  "evidence": [
+   {
+    "claim": "8192-600-100-1200-1000=5292; 5292/480=11.025; running totals; leftover 292",
+    "method": "executed",
+    "evidence": "recomputed by hand and python"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-step budget arithmetic plus degradation design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Reserve fixed parts (system, answer budget) first, counted with the real tokenizer",
+    "tradeoff": "Guaranteed room for answer vs less context"
+   },
+   {
+    "decision": "Cap and truncate/summarise history oldest-first",
+    "tradeoff": "Context room vs lost conversational continuity"
+   },
+   {
+    "decision": "Fill chunks by running token count in rank order, not fixed k",
+    "tradeoff": "No overflow vs variable chunk count"
+   },
+   {
+    "decision": "Trim or skip a chunk that does not fit (best-window trimming)",
+    "tradeoff": "Uses leftover budget vs possible cut-off qualifiers"
+   },
+   {
+    "decision": "Relevance threshold: use fewer chunks than fit",
+    "tradeoff": "Less distraction and cost vs possible recall loss"
+   },
+   {
+    "decision": "Final exact recount and monitoring of cap-hit rate",
+    "tradeoff": "Safety vs small overhead"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "67 words; 5,292, 11 chunks, 12 spare verified"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "edited truncation sentence is accurate and hedged"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked greedy fill; running totals 480..5000 verified, chunk10 trimmed to 262 text +30 =292 verified"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "Specific and each discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "existing-nearest-not-matched",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://platform.claude.com/docs/en/build-with-claude/context-windows",
+    "status": "partially",
+    "evidence": "Unreachable (egress refused); claim about 400 error for over-long input is background_only. Detailed text now hedged to 'as the Claude API does'."
+   }
+  ],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-05-4",
+  "verdict": "correct",
+  "reasons": [
+   "Recomputed all numbers; applied corrections are accurate and consistent with other fields."
+  ],
+  "parts_answered": {
+   "all parts": true
+  },
+  "evidence": [
+   {
+    "claim": "worked example numbers",
+    "method": "derivation",
+    "evidence": "95/200=47.5, 43/200=21.5, 157/200=78.5; 62% headline compatible (29 of 62 flips favour B in the first order)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(position bias and/or plain instability; check whether flips favour the first slot): for nearly a third of pairs the verdict changed when only the order changed; re-running the same order (to measure plain sampling noise) separates position bias from randomness.",
+    "problem": "First sentence is garbled/run-on (parenthesis then colon then semicolon); meaning is right.",
+    "replacement": "(position bias and/or plain instability): for nearly a third of pairs the verdict changed when only the order changed. Check whether flips favour the first slot, and re-run the same order to measure plain sampling noise, which separates position bias from randomness."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Diagnosing measurement validity, multiple biases, and building a debiased protocol.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "diagnosis, bias list, protocol"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "95+43+62=200; 95/138=0.688; 47.5%/21.5%/31%; B range 47.5-78.5% verified"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Specific and each discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "existing-nearest-not-matched",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/pdf/2306.05685",
+    "status": "supported",
+    "evidence": "Not re-opened; matches known paper content (position, verbosity, self-enhancement; conservative both-orders rule)"
+   }
+  ],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-06-1",
+  "verdict": "pass",
+  "reasons": [
+   "Recomputed all numbers; applied corrections are accurate and consistent with other fields."
+  ],
+  "parts_answered": {
+   "all parts": true
+  },
+  "evidence": [
+   {
+    "claim": "expected survivors 0.5; ef~2000; 307 MB",
+    "method": "derivation",
+    "evidence": "recomputed"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism plus selectivity-based strategy choice.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "61 words; 100*0.005=0.5 ok"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "10/0.005=2000, 100k*768*4=307.2MB verified; applied edit about engine differences is accurate"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "Specific and each discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "existing-nearest-not-matched",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://qdrant.tech/articles/filterable-hnsw/",
+    "status": "supported",
+    "evidence": "'There is a clear threshold when the search begins to fail... decomposition of the graph into small connected components.'"
+   },
+   {
+    "url": "https://docs.weaviate.io/weaviate/concepts/filtering",
+    "status": "partially",
+    "evidence": "Post-filter 'may not contain any match'; flat-search switch is a Weaviate option (~15% cutoff), so 'engines fall back' is Weaviate-specific, wording acceptable"
+   }
+  ],
+  "added_sources": [],
+  "code_patch": null
+ }
+]

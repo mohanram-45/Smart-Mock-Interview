@@ -1,0 +1,14 @@
+# Proposes pull requests (never merges anything) when pinned GitHub Actions or the base image move. Python lock files are refreshed deliberately
+# with `uv pip compile` (docs/MLOPS.md "Refreshing the locks") so that every bump is reviewed together with a full test run.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2

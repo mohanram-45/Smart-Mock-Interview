@@ -1,0 +1,597 @@
+[
+ [
+  "B4-MLO-14-6",
+  "detailed_answer",
+  "Saving per incident about 51,400 (assuming monitoring catches every incident within 3 days);",
+  "Saving per incident about 51,440 (assuming monitoring catches every incident within 3 days and reading the 2% as a loss rate while the incident lasts; if the 2% is instead the whole pre-detection cost of an incident, the saving is 24M x 0.02 x (1 - 3/42), about 445,700, and B wins by a wide margin, so confirm how the 2% was measured);",
+  "fv_major"
+ ],
+ [
+  "B4-MLO-14-6",
+  "detailed_answer",
+  "24M x 0.02 x 6/52 = 55,400",
+  "24M x 0.02 x 6/52 = 55,385",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-14-6",
+  "detailed_answer",
+  "24M x 0.02 x 3/365 = 3,900",
+  "24M x 0.02 x 3/365 = 3,945",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-14-6",
+  "detailed_answer",
+  "(120,000 / 51,400)",
+  "(120,000 / 51,440)",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-14-6",
+  "detailed_answer",
+  "+85,700 for 1 to 4",
+  "+85,800 for 1 to 4",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-14-6",
+  "detailed_answer",
+  "so the incident rate is unlikely to fall by itself.",
+  "so the incident rate should not be assumed to fall by itself.",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-14-6",
+  "practical_answer",
+  "(saving about 51,430 each, year-1 cost 120,000)",
+  "(saving about 51,440 each, year-1 cost 120,000)",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-14-6",
+  "practical_answer",
+  "4 -> net +85,700",
+  "4 -> net +85,800",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-14-6",
+  "practical_answer",
+  "(60,000 / 51,400)",
+  "(60,000 / 51,440)",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-08-8",
+  "answer",
+  "That is a constant small offset, easy to miss, and it does not accumulate.",
+  "That is a constant small offset, easy to miss when seasonal swings and alert tolerances are of similar size, and it does not accumulate.",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-08-8",
+  "answer",
+  "so its noise floor is higher and holidays contaminate it.",
+  "so its noise floor is higher than C's 7-day pool (4 days of rows instead of 7) and holidays contaminate it.",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-10-1",
+  "code_patch.solution",
+  "import numpy as np\n\n\ndef _as_float(X):\n    \"\"\"Float matrix (integer input is cas",
+  "import numpy as np\n\n\ndef _as_float(X):\n    \"\"\"Float matrix (integer input is cas",
+  "fv_patch"
+ ],
+ [
+  "B4-MLO-10-1",
+  "code_patch.test",
+  "def _make_model(leak_weight):\n    w = np.array([0.9, 1.1, 0.0, leak_weight])  # ",
+  "def _make_model(leak_weight):\n    w = np.array([0.9, 1.1, 0.0, leak_weight])  # ",
+  "fv_patch"
+ ],
+ [
+  "B4-MLO-10-1",
+  "practical_answer",
+  "X2[:, col] = perturb(X[:, col])",
+  "X2[:, col] = perturb(X[:, col].copy())",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-10-1",
+  "detailed_answer",
+  "then fix tol before looking at the candidate; the allowed failure rate is usually at or near zero.",
+  "then fix tol before looking at the candidate; for invariance checks the allowed failure rate is typically set at or near zero.",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-11-1",
+  "detailed_answer",
+  "Protects against: a stolen notebook token reaching production. Does not protect against: an insider who holds the promotion role.",
+  "Protects against: a stolen notebook token writing to the production bucket path or moving the alias directly. If that identity can also launch pipeline jobs, it can still get a malicious artifact registered, so the approval step and the loader hardening below carry that case; artifacts in the experiment namespace stay untrusted. Does not protect against: an insider who holds the promotion role.",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-11-1",
+  "detailed_answer",
+  "Immutable log of who registered, approved and moved each alias, linked to run, code commit and data version.",
+  "Immutable log of who registered, approved and moved each alias, linked to run, code commit and data version, with an alert on every production-alias move.",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-11-5",
+  "detailed_answer",
+  "Differentially private training, or adding noise to outputs, which OWASP also lists. DP training gives a formal bound on how much any one record can influence the model, at a cost in accuracy, complexity and compute; it is the strongest option but not cheap.",
+  "Differentially private training. (OWASP also lists adding noise to predictions, but noise on scores that leaves the label unchanged is a form of confidence masking and does not stop label-only attacks.) DP training gives a formal bound on how much any one record can influence the model, at a cost in accuracy, complexity and compute; Choquette-Choo et al. report DP and strong L2 regularisation as the only defences that stopped all the attacks they tried. It is the strongest option but not cheap.",
+  "fv_major"
+ ],
+ [
+  "B4-MLO-11-5",
+  "concise_answer",
+  "Cheap mitigations: reduce overfitting, return less (label or coarse score), round outputs, authenticate and rate-limit; stronger but costlier: differentially private training.",
+  "Cheap mitigations: reduce overfitting (targets the root signal); return less or round scores (label-only attacks still work); authenticate and rate-limit (does not stop a single-query test; keys can be multiplied). Strongest but costlier: differentially private training.",
+  "fv_major"
+ ],
+ [
+  "B4-MLO-11-5",
+  "detailed_answer",
+  "but do nothing against a single-query threshold test by an authorised caller, and per-key limits can be sidestepped with many keys.",
+  "but do nothing against a single-query threshold test by an authorised caller (at 10,000 calls a day one key could test up to 10,000 records, about 3,300 if each needs three augmented queries, but only about 4 at the 2,500 queries of the paper's boundary-distance attack), and per-key limits can be sidestepped with many keys (the paper notes Sybil attacks make query limiting an unlikely defence).",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-11-5",
+  "detailed_answer",
+  "It is worse when the model overfits",
+  "It tends to be worse when the model overfits",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-11-5",
+  "practical_answer",
+  "1. Hold out a set of records that were never in training (non-members) and sample an equal number of training records (members).",
+  "1. Hold out a set of records that were never in training (non-members), drawn from the same distribution as the training data (a random split, not a later period, or drift will inflate the AUC), and sample an equal number of training records (members).",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-11-5",
+  "practical_answer",
+  "(for example 0.1%, which needs several thousand non-members to estimate)",
+  "(for example 0.1%, which needs at least several thousand non-members to estimate)",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-7",
+  "detailed_answer",
+  "or to a holdout or shadow model that kept the old feature",
+  "or, if one existed, to a holdout slice still served with the old feature (a shadow model has no click outcomes; it can only show how scores and rankings would have differed on logged requests)",
+  "fv_major"
+ ],
+ [
+  "B4-MLO-12-7",
+  "detailed_answer",
+  "the drift was spread over time as user caches or cohorts refreshed",
+  "a loss that ramps over 19 days when the default applied to every user needs its own explanation (for example cached recommendations or daily-refreshed features ageing out, or a staged rollout of the rename), which the postmortem should check rather than assume",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-7",
+  "detailed_answer",
+  "a canary comparison against the previous model on live traffic",
+  "a comparison of live feature values and scores against a logged reference (the training distribution or a frozen sample of earlier requests), since a canary against the previous model shares the same broken upstream data",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-7",
+  "practical_answer",
+  "disable the feature (so it is intentionally imputed and flagged)",
+  "disable the feature only if the model was trained or validated with it missing (otherwise this reproduces the fault), so it is intentionally imputed and flagged",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-13-3",
+  "detailed_answer",
+  "Cost scales with tokens per request, not with requests.",
+  "Cost scales with total tokens (requests times tokens per request), so 8% more requests cannot explain a 40% rise: cost per request must have risen by about 30% (1.40 / 1.08 = 1.30).",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-13-3",
+  "detailed_answer",
+  "That explains the 30% rise only if the tenant is most of the traffic",
+  "That explains the 30% rise only if the tenant is about 85% of the traffic (0.30 / 0.35)",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-13-3",
+  "detailed_answer",
+  "many providers reuse work only when the beginning of the prompt is byte-identical",
+  "cache reuse typically requires the beginning of the prompt to match exactly (OpenAI's documentation says the entire rendered prefix must match)",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-14-4",
+  "answer",
+  "exploration or randomised-ranking traffic is the clean mitigation",
+  "exploration or randomised-ranking traffic is one mitigation (Sculley et al. also mention isolating part of the data from the model's influence)",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-14-5",
+  "practical_answer",
+  "Caveats: the inner join to tolerances silently drops any feature that has no tolerance row, so require one per logged feature, and recomputed must be unique per (request_id, feature) or the counts double.",
+  "Caveats: the inner join to tolerances silently drops any feature that has no tolerance row, so require one per logged feature, and recomputed must be unique per (request_id, feature) or the counts double. The comparison is also numeric only: for text ids or categories ABS(s.value - r.value) is 0, so a changed value would be reported as a match. Encode such features as integers (for example a dictionary index) or add a null-safe exact test such as (t.abs_tol = 0 AND t.rel_tol = 0 AND s.value IS NOT r.value) before relying on the query for them.",
+  "fv_major"
+ ],
+ [
+  "B4-MLO-14-5",
+  "practical_answer",
+  "Reading it: in the 14:00 hour, 4 of 11 orders_24h values were off by one and one request had no recomputation",
+  "Reading it: in the 14:00 hour, 4 of the 10 recomputed orders_24h values were off by one and one more request had no recomputation",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-14-5",
+  "practical_answer",
+  "(10 clean requests per hour plus a deploy-time fault in the 14:00 hour)",
+  "(10 requests per hour, with a deploy-time fault in 4 of the 10 in the 14:00 hour, plus one NULL-served value and one request without recomputation)",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-14-5",
+  "rubric_points",
+  " and higher sampling during canary",
+  "",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-08-3",
+  "detailed_answer",
+  "1. Alert on symptoms first.",
+  "1. Alert on model-level symptoms and hard data-quality invariants first.",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-08-3",
+  "practical_answer",
+  "score-distribution PSI above its own 99th-percentile historical value for 2 consecutive windows",
+  "score-distribution PSI above its own 99th-percentile historical value for 2 consecutive windows (a model-output symptom; per-feature drift metrics stay at ticket or dashboard level)",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-08-5",
+  "answer",
+  "where tree models flatten and neural nets can behave unpredictably",
+  "where tree-based models predict a constant beyond the observed range and neural nets can behave unpredictably",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-08-5",
+  "answer",
+  "Re-score a recent sample after replacing each drifted feature (or the group) with values resampled from the reference.",
+  "Re-score a recent sample after replacing each drifted feature (or the group) with values resampled from the reference. Independent resampling breaks correlations with the other features, so treat the result as a sensitivity check, not an exact estimate.",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-08-6",
+  "answer",
+  "The ML Test Score paper makes the parallel point for prediction quality: models should have zero bias in aggregate and on slices.",
+  "The ML Test Score paper makes a parallel point for prediction bias: models should have zero bias in aggregate and on slices.",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-08-7",
+  "detailed_answer",
+  "The decision is reproducible, uncorrelated with feature values and needs no coordination",
+  "The decision is reproducible, uncorrelated with feature values as long as request IDs are not derived from user or feature data, and needs no coordination",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-08-7",
+  "detailed_answer",
+  "even 50 rows gives 9 x (0.00001 + 0.02), about 0.18",
+  "even 50 rows gives roughly 9 x (0.00001 + 0.02), about 0.18 (the approximation is rough at so few rows; a simulation gave about 0.24)",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-08-7",
+  "practical_answer",
+  "log everything once (under a short retention)",
+  "log everything once (under a short retention, with security sign-off)",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-09-3",
+  "answer",
+  "A single guardrail is not enough: the failure needed corrupted training data, a corrupted holdout and a missing sanity check to align.",
+  "Guardrails 1 and 2 alone would very likely have stopped this incident; the later layers are defence in depth, covering a missed quality check, a corrupted holdout, or a model that passes AUC but behaves abnormally.",
+  "fv_major"
+ ],
+ [
+  "B4-MLO-09-4",
+  "answer",
+  "little idle freshness lag",
+  "a smaller gap between new data arriving and the model reflecting it",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-09-4",
+  "answer",
+  "for each day, produce both variants using only data available then",
+  "for each day, produce both variants using only data available then (at 14 hours per full retrain, 60 daily full retrains is costly, so use a sample of 10 to 15 origin days or a subsampled dataset)",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-10-2",
+  "detailed_answer",
+  "On the example run (SQLite dialect, executed in the test): refund_flag has all 4 rows from the future",
+  "On the example run (SQLite dialect, executed in the test on 4 training rows and 12 feature values, where refund_flag is stamped between 12 hours and about 20 days after prediction time and days_since_login is stamped 23:59 on the prediction day for three of the four rows): refund_flag has all 4 rows from the future",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-10-2",
+  "practical_answer",
+  "run in the test below against a four-row in-memory dataset",
+  "run in the test (code.test) against a four-row in-memory dataset",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-10-2",
+  "detailed_answer",
+  "Features with no timestamp, leakage that is not temporal",
+  "Features with no timestamp, rows whose label_ts is NULL (they are never counted in rows_after_label), leakage that is not temporal",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-1",
+  "detailed_answer",
+  "shifting traffic back to v11 buys time for the investigation;",
+  "shifting most traffic back to v11 buys time for the investigation (keep a small slice or a replay on v12 so versions can still be compared);",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-3",
+  "detailed_answer",
+  "so about 2.9 KiB of memory retained per request.",
+  "so about 2.9 KiB of memory per request if growth is proportional to requests (at flat traffic growth per hour and per request look identical, so confirm with the traffic test below).",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-3",
+  "detailed_answer",
+  "and whether memory stays high when traffic stops",
+  "and whether memory stays high when traffic stops (a leak and allocator retention both do, so use the live-object comparison below to tell them apart)",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-3",
+  "detailed_answer",
+  "It is usually bounded and shows as a sawtooth that never returns to baseline.",
+  "It is usually bounded, so resident size tends to plateau high rather than climb linearly without end; a steady linear climb at flat traffic fits a leak or an unbounded cache better.",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-3",
+  "detailed_answer",
+  "and output tensors retained with their gradient history because gradients were not disabled at inference",
+  "and, in PyTorch services, stored output tensors that still carry autograd history because inference ran with gradient tracking on",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-4",
+  "detailed_answer",
+  "The ML Test Score rubric lists 'Serving models can be rolled back' as a test, which means rehearsed, not assumed.",
+  "The ML Test Score rubric lists 'Models can be quickly and safely rolled back to a previous serving version' as a test and says rollback should be practised outside emergencies, so rehearsed, not assumed.",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-4",
+  "detailed_answer",
+  "(as in the question, where 30 minutes of data was written under the new feature)",
+  "(the question notes that the new feature has been written for 30 minutes, so check whether the old model can still read those rows)",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-4",
+  "detailed_answer",
+  "traffic shifting is often faster than either.",
+  "shifting traffic weight back to the old bundle, or turning the new feature off with a flag, is often faster than redeploying either build.",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-4",
+  "detailed_answer",
+  "record the timeline, and confirm recovery",
+  "record the timeline, quarantine or mark the feature values written in the last 30 minutes so they are not served or reused for training, and confirm recovery",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-4",
+  "practical_answer",
+  "Decision rule: run the 2-minute replay of recent requests through the old bundle. If outputs look normal, roll back;",
+  "Decision rule: while you freeze deployments and start shifting a small share of traffic to the old bundle, run the 2-minute replay of recent requests through it. If outputs look normal, roll back fully;",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-5",
+  "detailed_answer",
+  "The two dependencies have different roles, so they need different designs.",
+  "At 99.95% over 30 days the error budget is only 0.0005 x 43,200 = 21.6 minutes, so last month's 22-minute feature-store outage alone used all of it. The two dependencies have different roles, so they need different designs.",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-5",
+  "detailed_answer",
+  "and bounded retries with jitter.",
+  "and bounded retries with jitter. On recovery, close the circuit gradually and confirm that feature writes missed during the outage are backfilled (or the features are fresh again) before leaving the fallback modes.",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-5",
+  "detailed_answer",
+  "(decide in advance whether fallback responses count as good events)",
+  "(a valid, in-time fallback response normally counts as good for the availability SLO, which is why the fallback rate needs its own objective; decide this in advance)",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-5",
+  "practical_answer",
+  "| 0 normal |",
+  "| 1 normal |",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-5",
+  "practical_answer",
+  "| 1 stale cache |",
+  "| 2 stale cache |",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-5",
+  "practical_answer",
+  "| 2 request-only model |",
+  "| 3 request-only model |",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-5",
+  "practical_answer",
+  "| 3 safe default |",
+  "| 4 safe default |",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-5",
+  "practical_answer",
+  "a miss or older entry sends that request to mode 2",
+  "a miss or older entry sends that request to mode 3",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-5",
+  "practical_answer",
+  "recovery back to mode 0 happens without a thundering herd",
+  "recovery back to mode 1 happens without a thundering herd",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-6",
+  "detailed_answer",
+  "Adapt that to quality: when the quality budget is exhausted,",
+  "Adapt that to quality: let the proxy budget drive the immediate freeze and paging, and the matured-label budget confirm, extend or lift it; when the quality budget is exhausted,",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-8",
+  "detailed_answer",
+  "Results from the executed model (abstract units): the daily traffic is 4,302,000 requests.",
+  "Results from an executed model that uses an assumed hourly profile of average requests/s (about 5 to 8 overnight, rising to the 100 requests/s peak at 19:00 and summing to 4,302,000 requests a day; the profile is an illustration, not data from the question, so (a) to (c) change with a different shape): the daily traffic is 4,302,000 requests.",
+  "fv_major"
+ ],
+ [
+  "B4-MLO-12-8",
+  "detailed_answer",
+  "so the fleet is on average about 31% loaded; it is sized for the peak of 100 requests/s at 70% target utilisation (28 requests/s per replica gives 4 replicas).",
+  "so the fleet is on average about 31% loaded; 4 replicas is consistent with sizing for the peak of 100 requests/s at 70% target utilisation (100 / 28 = 3.6, rounded up), although the question does not say how 4 was chosen.",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-8",
+  "detailed_answer",
+  "accelerators plus supporting services such as feature reads, logging and network",
+  "replicas (CPU or accelerator) plus supporting services such as feature reads, logging and network",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-8",
+  "detailed_answer",
+  "or scale on a metric that reflects the accelerator's queue rather than CPU",
+  "or scale on a metric that reflects saturation, such as in-flight requests or queue wait (CPU is a poor signal if the work runs on an accelerator)",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-12-8",
+  "detailed_answer",
+  "Include non-GPU costs and the engineering time the change costs.",
+  "Include costs beyond the replicas (feature reads, logging, network, cache storage) and the engineering time the change costs.",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-11-2",
+  "detailed_answer",
+  "Pseudonymisation lowers risk but the data is generally still regarded as personal data in many jurisdictions, because re-identification remains possible with additional information; exactly where the line sits depends on jurisdiction and legal advice.",
+  "Pseudonymisation lowers risk but pseudonymised data is generally still treated as personal data, because re-identification remains possible with additional information (the UK ICO's guidance says it is personal data in the hands of anyone who holds the additional information, which includes the team holding the key and the raw IDs); exactly where the line sits for a given recipient depends on jurisdiction and legal advice.",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-11-2",
+  "detailed_answer",
+  "Date of birth plus postcode is a classic quasi-identifier combination, so even",
+  "Date of birth plus postcode is a classic quasi-identifier combination (Sweeney estimated that about 87% of the US population was likely unique on 5-digit ZIP, gender and date of birth), so even",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-11-3",
+  "answer",
+  "Models that memorise (for example small data, high capacity, overfitting, or rare or repeated records) are more likely to retain recognisable traces of individual records, so treat that as a factor in how aggressively you retrain; this is model- and data-dependent and absence of memorisation is hard to demonstrate.",
+  "Models can retain recognisable traces of individual records (the Secret Sharer study found unintended memorisation of rare sequences in language models, arising early in training rather than only from overtraining, and increasing with model size), so treat that as a factor in how aggressively you retrain; this is model- and data-dependent and absence of memorisation is hard to demonstrate.",
+  "fv_major"
+ ],
+ [
+  "B4-MLO-12-9",
+  "question_type",
+  "scenario",
+  "design",
+  "fv"
+ ],
+ [
+  "B4-MLO-12-9",
+  "answer",
+  "that checkpoint overhead is small relative to step time",
+  "that checkpoint write time is small relative to the checkpoint interval",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-13-1",
+  "answer",
+  "you can see from the logged identifier whether the underlying model changed",
+  "you can see from the model identifier recorded on each request (the resolved snapshot returned in the response, where the API reports it) whether the underlying model changed",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-13-2",
+  "detailed_answer",
+  "Pull 50 to 100 blocked items across categories",
+  "Pull 50 to 100 blocked items across categories (with that few labels the estimated false-positive share is rough, about plus or minus 10 to 14 points at 95% confidence for a share near 50%; label more for a tighter estimate)",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-14-1",
+  "answer",
+  "(3) Novelty and exposure effects: early click lift may fade while a narrowing of what users see (less diversity, fewer discovery items) accumulates.",
+  "(3) Exposure and novelty effects: click-through is still up here, so the click lift has not faded, but a narrowing of what users see (less diversity, fewer discovery items) can accumulate over weeks and depress later purchases; a novelty effect also means the 2-week test window may not have been representative.",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-14-2",
+  "answer",
+  "recommend saving the features used at serving time so that serving and training values can be checked for consistency",
+  "recommend saving the features used at serving time and logging them for use at training time, which also gives you the exact values to compare against offline recomputation",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-14-3",
+  "practical_answer",
+  "If it shows a difference or SRM, the platform is the problem, not the model.",
+  "If it shows SRM or a repeatable significant difference between identical arms (a single A/A run will show p < 0.05 about 5% of the time by chance), the platform is the problem, not the model.",
+  "fv_minor"
+ ],
+ [
+  "B4-MLO-11-2",
+  "detailed_answer",
+  "so deletion and access requests can be honoured",
+  "(erasure is not absolute hedge)",
+  "gdpr_lead"
+ ]
+]

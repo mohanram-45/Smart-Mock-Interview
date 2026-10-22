@@ -1,0 +1,457 @@
+[
+ {
+  "id": "P2-NLP-01",
+  "verdict": "pass",
+  "reasons": [
+   "Examples (0.24 vs 0.36), wide-beam == exhaustive and length-normalisation behaviour all reproduced; claims hedged appropriately."
+  ],
+  "parts_answered": {
+   "(a) teacher forcing + exposure bias + why val loss hides it": true,
+   "(b) wider beam higher probability but worse translations": true,
+   "(c) beam_search implementation": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "(none blocking) max_len=0 with alpha>0",
+    "problem": "beam_search(...,max_len=0,alpha=1.0) raises ZeroDivisionError (0.0 / 0**1); with alpha=0 returns [((),0.0)]. Edge case outside the stated contract.",
+    "replacement": null
+   },
+   {
+    "severity": "minor",
+    "claim": "finished hypotheses do not occupy beam slots",
+    "problem": "This is one valid convention but not the only one (other libraries count finished beams against beam_size); the question's spec is explicit enough that the reference is not arbitrary.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Three-part: conceptual (exposure bias), mechanism (length bias of wide beams) and a non-trivial implementation with eos handling, deterministic ties, length normalisation and truncation fallback.",
+  "key_concepts_findings": "All six concepts discussed. 'cumulative log-probability' is present implicitly; fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0005",
+   "same_intent": false
+  },
+  "code_findings": "Fenced block == tested solution. Passes on 3.13, 3.10, 3.11. Own edge cases: beam_size=0 -> []; max_len=1 returns truncated beams ordered by score; max_len=2 beam 3 returns only the finished hypotheses (unfinished dropped, as specified); -inf log-probs do not crash; beam 50 alpha=1 ranks b</s> first. Only break: max_len=0 & alpha>0 ZeroDivisionError.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-NLP-02",
+  "verdict": "pass",
+  "reasons": [
+   "All numbers re-derived: T=0.5 -> [.685,.247,.062,.007], T=2 -> [.379,.294,.208,.120]; ten equal tokens: top-k=2 keeps 2 (0.5 each), top-p=0.8 keeps 8 (0.125 each)."
+  ],
+  "parts_answered": {
+   "(a) temperature effect and T>0": true,
+   "(b) surviving tokens, renormalised probs, top-p vs top-k on flat": true,
+   "(c) sampling_probs": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "(none blocking) code behaviour outside spec",
+    "problem": "All -inf logits gives NaN plus RuntimeWarning; top_k<0 silently drops tokens (top_k=-1 on 3 equal logits returns [.5,.5,0]); top_p>1 or <0 not validated. Unspecified in the question.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short numpy implementation with several edge-case requirements and a worked comparison; no multi-step design.",
+  "key_concepts_findings": "All seven covered in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0005",
+   "same_intent": false
+  },
+  "code_findings": "Fenced block == tested solution. Pass on 3.13/3.10/3.11. Own checks: temperature=nan returns NaN array (no ValueError, since nan<=0 is False); top_p=0.5 on [.5,.5] keeps one token (index 0) as required by tie rule; 1e308 logits stable; top_p=0.0 and negative keep one token. Spec'd behaviours all hold.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-NLP-03",
+  "verdict": "correct",
+  "reasons": [
+   "Sound diagnostic structure; one overstated phrase about reranker recovery and answer relevance is only named, not defined."
+  ],
+  "parts_answered": {
+   "separate retrieval from generation": true,
+   "metrics (context recall, faithfulness, answer relevance) and how computed": true,
+   "fix per bucket": true,
+   "problems with 60-sample": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "15 of them recoverable by a reranker over a top-50 candidate set",
+    "problem": "Presence in the top-50 is only an upper bound on what a reranker could rescue; it does not mean they are recovered.",
+    "replacement": "15 of them are within the top-50, so a reranker over a 50-candidate set could rescue at most those 15"
+   },
+   {
+    "severity": "minor",
+    "claim": "Answer relevance: does it address the question asked.",
+    "problem": "Metric is named but not operationalised although the question asks how to compute it.",
+    "replacement": "Answer relevance: does it address the question asked; compute it with an LLM judge (1-5 or yes/no against a rubric) or, as RAGAS does, by generating questions from the answer and measuring their embedding similarity to the original question; validate on human labels."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open-ended diagnosis requiring decomposition of failure modes, metric design, per-bucket remedies and statistical caveats.",
+  "key_concepts_findings": "All eight present. Wilson 95% interval for 21/60 re-computed: 24.2%-47.6%, matches 'roughly 24% to 48%'.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0011",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-NLP-04",
+  "verdict": "correct",
+  "reasons": [
+   "Part (b) asks to 'show with numpy' that merged and unmerged outputs agree and rank <= r; the answer only asserts it and the demonstration exists only in the hidden test."
+  ],
+  "parts_answered": {
+   "(a) parameter count and comparison": true,
+   "(b) three functions": true,
+   "(b) numpy demonstration of equivalence and rank<=r": false,
+   "(c) B=0 init, alpha/r, when poor": true
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "the update has rank at most r even though W is full rank.",
+    "problem": "The question explicitly asks to show merge equivalence and rank <= r with numpy; no demonstration code appears in the answer.",
+    "replacement": "the update has rank at most r even though W is full rank. Demonstration:\n```python\nrng = np.random.default_rng(0)\nd_out, d_in, r, alpha = 12, 20, 4, 8\nW = rng.normal(size=(d_out, d_in)); A = rng.normal(size=(r, d_in)) * 0.1; B = rng.normal(size=(d_out, r)) * 0.1\nx = rng.normal(size=(5, d_in))\nWm = merge_lora(W, A, B, alpha, r)\nassert np.allclose(x @ Wm.T, lora_forward(x, W, A, B, alpha, r), atol=1e-10)\nassert np.linalg.matrix_rank(Wm - W, tol=1e-9) == r  # <= r in general; == r for random A, B\n```"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Parameter arithmetic, short numpy functions and a linearity argument; no multi-step design.",
+  "key_concepts_findings": "All seven discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0025",
+   "same_intent": false
+  },
+  "code_findings": "Fenced functions == tested solution. Pass 3.13/3.10/3.11. Own checks: 1-D x and batched (2,4,9) x agree merged vs unmerged; float32 merged/unmerged max diff 3.8e-6; r=0 gives 0 params; (10,5,0)->(0,50,0.0). Numbers: 65,536; 4,194,304; 1,073,741,824; 0.39% all verified (4,194,304 also matches the commonly cited Llama-7B q,v r=8 figure, from memory, not re-fetched).",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-NLP-05",
+  "verdict": "pass",
+  "reasons": [
+   "All example values re-derived (unigram 6/6,6/7; bigram 4/5,4/6; LCS 6; contradiction F1 0.9333, LCS recall 1.0); ROUGE-Lsum remark correct."
+  ],
+  "parts_answered": {
+   "rouge_n clipped": true,
+   "rouge_l LCS": true,
+   "empty inputs": true,
+   "what ROUGE rewards/misses with the contradiction example": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "(none blocking) tokeniser",
+    "problem": "The mandated [a-z0-9]+ tokeniser splits non-ASCII words (e.g. 'f\u00fcr' becomes 'f','r'); required by the question, so no change.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Two short metric implementations plus a critique; standard LCS DP.",
+  "key_concepts_findings": "All seven covered.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0012",
+   "same_intent": false
+  },
+  "code_findings": "Fenced block == tested solution. Pass on all three interpreters. Own checks: rouge_n('','',1) all 0; identical single token 1.0; n larger than text -> zeros; the the the vs the -> (1/3,1,0.5); punctuation/case ignored by rouge_l; n=0 returns (1,1,1) (degenerate, unspecified).",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-NLP-06",
+  "verdict": "correct",
+  "reasons": [
+   "Core claims verified (examples, window-coverage guarantee L <= overlap+1). merge_windows is under-specified and ignores the null decision that part (c) introduces."
+  ],
+  "parts_answered": {
+   "(a) why independent argmax wrong": true,
+   "(b) best_span": true,
+   "(c) predict with null_threshold": true,
+   "(d) sliding_windows": true,
+   "(d) merge_windows combining per-window answers": true,
+   "(d) which answers guaranteed to fit": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "How to combine the per-window null scores differs between implementations (for example, using the smallest null score across windows), so define it explicitly and tune the threshold on dev data.",
+    "problem": "As written, merge_windows silently drops windows without an answer, so any window with a spurious span overrides windows that preferred null; the code never applies the part (c) null decision across windows.",
+    "replacement": "How to combine the per-window null scores differs between implementations (for example, using the smallest null score across windows and comparing it with the best merged span score); merge_windows below only merges real spans, so apply the null_threshold decision on its result yourself and tune the threshold on dev data."
+   },
+   {
+    "severity": "minor",
+    "claim": "merge_windows(per_window)",
+    "problem": "The question does not state the input format of merge_windows, so the reference format ((window_start, (i, j, score) or None)) is one arbitrary choice.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Four sub-parts: vectorised masked pair search, null-span logic, window arithmetic with a coverage proof and cross-window merging.",
+  "key_concepts_findings": "All six discussed; context_mask and overlap covered.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0008",
+   "same_intent": false
+  },
+  "code_findings": "Fenced block == tested solution. Pass on 3.13/3.10/3.11. Own checks: max_answer_len=0 -> None; all-equal logits -> (0,0) (smallest start, then end); all -inf logits over a valid context returns (0,0,-inf), an index that is not a meaningful answer (should be None); sliding_windows(0,4,2)->[(0,0)], (5,4,0)->[(0,4),(4,5)], negative overlap gives gapped windows [(0,4),(5,5)] (no validation). Window guarantee exhaustively checked in test for n=23.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-NLP-07",
+  "verdict": "correct",
+  "reasons": [
+   "Hashing/n-gram code correct; one example in the prose is wrong ('he' is never generated with n_min=3)."
+  ],
+  "parts_answered": {
+   "how char n-grams give OOV a vector": true,
+   "char_ngrams": true,
+   "fnv1a_32": true,
+   "ngram_buckets": true,
+   "word_vector": true,
+   "what it does not fix": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "'<he' (start of 'her') differs from 'he' within 'where'",
+    "problem": "No 2-gram 'he' is produced with n_min=3. The distinction the markers make is between the word 'her' ('<her>') and 'her' inside 'where'.",
+    "replacement": "'<her>' (the word 'her') differs from 'her' inside 'where'"
+   },
+   {
+    "severity": "minor",
+    "claim": "fastText's default is, to my knowledge, around two million buckets and n-gram lengths 3 to 6",
+    "problem": "Hedged and matches my recollection (bucket=2000000, minn=3, maxn=6) but I could not open the fastText docs to confirm.",
+    "replacement": null
+   },
+   {
+    "severity": "minor",
+    "claim": "plus the whole marked word '<word>' as a hashed unit",
+    "problem": "In real fastText the in-vocabulary word has its own embedding row, not a hashed bucket; for an OOV word the hashed '<word>' bucket is an untrained random row adding noise. Answer already says untrained n-grams are random, but not that this unit is a deviation.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short string/hash code plus conceptual explanation of subword embeddings.",
+  "key_concepts_findings": "All seven discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0001",
+   "same_intent": false
+  },
+  "code_findings": "Fenced block == tested solution. Pass on 3.13/3.10/3.11. Verified FNV-1a vectors ('a'=0xE40C292C, 'foobar'=0xBF9CF968). Jaccard refund/refundd = 0.50, refund/refnud = 0.086 (answer says 'about 0.09': ok). fastText's signed-char variant gives a different hash for non-ASCII ('\u00e9' 0x3cfa68c1 vs 0x1e9de8c1), supporting the 'variant' claim. Own edges: '' -> ['<>']; 'a' -> ['<a>'] without duplicate; n_min>n_max -> whole word only. Note overlap of scenario with smi-g0001 (same refundd ticket setting) though intent differs (hashing implementation vs BPE comparison).",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-NLP-08",
+  "verdict": "correct",
+  "reasons": [
+   "Good scenario answer; the 'test that decides' is stated loosely and the latency claim for the baseline is unhedged."
+  ],
+  "parts_answered": {
+   "baseline": true,
+   "evaluation protocol and metric": true,
+   "error analysis and label noise": true,
+   "test deciding fine-tune justified": true,
+   "latency check": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "it trains in seconds and has p95 latency far below 30 ms on CPU",
+    "problem": "Plausible but unmeasured; should be hedged and tied to the later latency check.",
+    "replacement": "it trains in seconds and normally has p95 latency of a few milliseconds on CPU (confirm with the latency check below)"
+   },
+   {
+    "severity": "minor",
+    "claim": "but this should be shown on your data with several random seeds, since small-data fine-tunes vary run to run.",
+    "problem": "The decision rule is not explicit: no paired comparison or minimum gain.",
+    "replacement": "but decide with a paired comparison on identical folds: fine-tune with several seeds, bootstrap the macro-F1 / QWK difference against the baseline, and adopt the transformer only if the lower confidence bound of the gain exceeds a threshold agreed in advance (and its distilled or quantised form still meets the 30 ms p95)."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Standard applied-ML process with several components but little technical novelty; judgement rather than derivation.",
+  "key_concepts_findings": "All eight present.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0007",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-NLP-09",
+  "verdict": "correct",
+  "reasons": [
+   "Numbers verified, but the Euclidean statement is wrong for the question's own example."
+  ],
+  "parts_answered": {
+   "(a) relation of dot, cosine, Euclid and when rankings agree": true,
+   "(b) topk_cosine": true,
+   "(b) matches pre-normalised dot": true,
+   "(c) hubness and anisotropy hedged": true
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "So switching to Euclidean does not address a norm effect; normalising does.",
+    "problem": "Euclidean distance is norm-sensitive and in the example ranks [2, 0, 1] (squared distances 0.45, 81.8, 163.8 vs the long vector [10,10]), so it demotes the long vector; it just differs from cosine by penalising any norm mismatch (including short, correct documents) instead of ignoring norm.",
+    "replacement": "So switching to Euclidean does not reproduce cosine: it penalises any norm mismatch with the query (here it ranks [0.5, 0.45], then [10, 0], then [10, 10], whereas cosine ranks [10, 10] second), so it can demote the long vectors but also demotes legitimate documents whose norm differs from the query's; normalising is the targeted fix."
+   },
+   {
+    "severity": "minor",
+    "claim": "If every vector is L2-normalised, |a-b|^2 = 2 - 2cos, so cosine, dot product and Euclidean distance produce identical rankings",
+    "problem": "Sufficient but not necessary: equal document norms already make all three rankings identical for a given query.",
+    "replacement": "If every vector is L2-normalised (or, for a fixed query, all documents merely share one norm), |a-b|^2 = 2 - 2cos up to constants, so cosine, dot product and Euclidean distance produce identical rankings"
+   },
+   {
+    "severity": "minor",
+    "claim": "scores = (M / safe[:, None]) @ (q / qn)",
+    "problem": "Builds a float64 copy of the whole matrix per query (about 6 GB for 1M x 768, plus another normalised copy), contrary to the answer's own advice to normalise once; also exactly parallel rows scaled by different factors differ by an ulp so 'ties by lower index' only holds for bit-identical scores.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Metric identities plus a short numpy top-k with tie/zero handling.",
+  "key_concepts_findings": "All eight covered; np.partition discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": "Fenced block == tested solution. Pass on 3.13/3.10/3.11. Own breaks: empty matrix -> IndexError; k=0 -> empty arrays (ok); zero-norm query -> ValueError (not specified in question); NaN in a row with k=2 returns empty arrays silently (thr becomes NaN); five scaled copies of the query all score 1.0 but are returned as [1,2,3,0,4], not index order (1-ulp differences). Euclidean order for the example computed as [2,0,1].",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-NLP-10",
+  "verdict": "correct",
+  "reasons": [
+   "Metric values verified (0.5784 / 0.6078) but the duplicate convention in the question is ambiguous and the code's reading shifts ranks."
+  ],
+  "parts_answered": {
+   "recall_at_k": true,
+   "reciprocal_rank and mrr": true,
+   "ndcg_at_k with exponential option and ideal from all judged docs": true,
+   "duplicates/no-relevant/unjudged conventions": true,
+   "what each metric hides": true
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "ranked lists may contain duplicates (count a document once, at its first position)",
+    "problem": "Ambiguous: 'at its first position' suggests positions are preserved, but the code deletes repeats and shifts later documents up (reciprocal_rank(['a','a','b'],{'b'}) = 0.5, not 1/3; recall_at_k(['a','a','b'],{'b'},2) = 1.0). Two defensible readings give different scores.",
+    "replacement": "ranked lists may contain duplicates (drop every repeat after a document's first occurrence before ranking, so later documents move up one position per dropped repeat)"
+   },
+   {
+    "severity": "minor",
+    "claim": "a system that finds the second and third relevant documents at ranks 2 and 3 scores the same as one that finds nothing else.",
+    "problem": "Confusing: the point is that MRR depends only on the rank of the first relevant document.",
+    "replacement": "a system whose first relevant document is at rank 1 scores 1.0 whether or not it also retrieves the remaining relevant documents."
+   },
+   {
+    "severity": "minor",
+    "claim": "nDCG@k equals 1.0 only when the top k matches the best possible top k from the judged set",
+    "problem": "Documents with equal gain can be swapped (the test shows this) so it is the gain sequence that must match.",
+    "replacement": "nDCG@k equals 1.0 only when the gains of the top k, in order, equal the best possible gain sequence from the judged set"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Three short metric functions with conventions; no complex algorithm.",
+  "key_concepts_findings": "All seven covered.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": "Fenced block == tested solution. Pass on 3.13/3.10/3.11. Own checks: nDCG k=0 -> 0.0; negative k in recall -> 0.0; relevant given as a list with repeats still 1.0; fractional exponential gains work; duplicate-shift behaviour confirmed (see issue). Hand-computed values: linear 2.7542/4.7619=0.5784; exponential 5.7086/9.3928=0.6078.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-NLP-11",
+  "verdict": "correct",
+  "reasons": [
+   "Strong ordered checklist; omits the model's position limit as an effect of the max_length change."
+  ],
+  "parts_answered": {
+   "ordered cheapest-first checklist": true,
+   "likely causes per symptom (short tickets, non-stopping)": true,
+   "cause for the max_length change": false,
+   "how to confirm the fix": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Changing 512 to 1024 can also alter which examples were cut off between training and evaluation, so the data seen at test time differs from training; keep them consistent.",
+    "problem": "Does not check that 1024 is within the model's trained context / max_position_embeddings; exceeding it errors or gives degraded positional behaviour, and padding to a fixed 1024 adds many pad tokens for short tickets.",
+    "replacement": "Changing 512 to 1024 can also alter which examples were cut off between training and evaluation, so the data seen at test time differs from training; keep them consistent. Also check that 1024 does not exceed the model's trained context (max_position_embeddings / rotary scaling), and whether padding to a fixed 1024 turns short tickets into mostly pad tokens."
+   },
+   {
+    "severity": "minor",
+    "claim": "a different pad token",
+    "problem": "Tokenizer upgrades can also change default padding_side, truncation_side or special-token insertion; this should be on the diff list (hedged, version dependent).",
+    "replacement": "a different pad token, a different default padding side or truncation side"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Subtle multi-cause debugging requiring knowledge of padding, masking, position ids, tokenizer semantics and label masking.",
+  "key_concepts_findings": "All eight appear in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0003",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-NLP-12",
+  "verdict": "correct",
+  "reasons": [
+   "Code correct; threshold trade-off asked in the question is barely discussed."
+  ],
+  "parts_answered": {
+   "contamination_report": true,
+   "what n-gram overlap cannot catch": true,
+   "n trade-off": true,
+   "threshold trade-off": false,
+   "web scale": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "A full match of a 40-token question is strong evidence of exposure; 10% overlap on an 8-token question is not.",
+    "problem": "The threshold's own trade-off (what raising or lowering overlap >= threshold does) is not stated although the question asks for it.",
+    "replacement": "A full match of a 40-token question is strong evidence of exposure; 10% overlap on an 8-token question is not. Raising the threshold flags only near-verbatim copies (fewer false positives, misses partial leaks such as question-only or lightly edited items); lowering it catches partial leaks but flags templated or boilerplate-heavy items, so pick it on known leaked and clean examples."
+   },
+   {
+    "severity": "minor",
+    "claim": "Normalising case and punctuation prevents trivial formatting differences from hiding a copy",
+    "problem": "The mandated [a-z0-9]+ tokeniser drops all non-Latin scripts, so non-English items return None (unchecked) rather than a score (verified with a Chinese example).",
+    "replacement": "Normalising case and punctuation prevents trivial formatting differences from hiding a copy (but this [a-z0-9]+ tokeniser yields no tokens for non-Latin scripts, so multilingual benchmarks need a different tokeniser)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short set-based implementation plus evaluation-methodology discussion.",
+  "key_concepts_findings": "All seven covered.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0012",
+   "same_intent": false
+  },
+  "code_findings": "Fenced block == tested solution. Pass on 3.13/3.10/3.11. Own checks: item with exactly n tokens -> overlap 1.0 flagged; n-1 tokens -> (None, False); empty test_items -> []; threshold=0.0 flags everything checkable; Chinese text -> None; partial leak 9/15... gives 0.222 below 0.5. GPT-3 13-gram claim verified at arxiv.org/pdf/2005.14165 ('13-gram overlap').",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/pdf/2005.14165",
+    "status": "supported",
+    "evidence": "'examples that have a 13-gram overlap with anything in the pretraining set' (via fetch summary); the answer cites this only as hedged context."
+   }
+  ]
+ }
+]

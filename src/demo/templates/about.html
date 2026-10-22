@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}About this project · SMART Mock Interview{% endblock %}
+{% block page %}about{% endblock %}
+{% block body %}
+<section class="hero">
+  <h1>About this project</h1>
+  <p class="lead">SMART Mock Interview is a local practice tool for technical interviews (machine learning, deep learning, NLP, Python, SQL, data analysis). It is also a research prototype: this page says what is built, how the parts connect, and what has <strong>not</strong> been shown to work.</p>
+</section>
+
+<section class="card" aria-labelledby="h-arch">
+  <h2 id="h-arch" class="first">How an interview flows</h2>
+  <figure class="diagram">
+    <svg viewBox="0 0 880 330" role="img" aria-labelledby="dg-t dg-d" xmlns="http://www.w3.org/2000/svg">
+      <title id="dg-t">Interview data flow</title>
+      <desc id="dg-d">A curated question bank is loaded read-only through the retrieval layer. The interview plans an introduction, technical questions by role, deterministic follow-ups and a practical exercise. Each technical answer goes to separate checks: a Sentence-BERT similarity scorer, an optional experimental modular evaluator, and an optional static code check. Results are saved to a local session file and shown on the summary page.</desc>
+      <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="dg-arrow"/></marker></defs>
+      <g class="dg-box"><rect x="10" y="20" width="190" height="78" rx="10"/><text x="105" y="48" class="dg-h">Curated question bank</text><text x="105" y="68" class="dg-s">666 verified records</text><text x="105" y="85" class="dg-s">read-only</text></g>
+      <g class="dg-box"><rect x="245" y="20" width="190" height="78" rx="10"/><text x="340" y="48" class="dg-h">Retrieval layer</text><text x="340" y="68" class="dg-s">corpus loader + checks</text><text x="340" y="85" class="dg-s">(FAISS / BM25 search: API only)</text></g>
+      <g class="dg-box"><rect x="480" y="20" width="190" height="78" rx="10"/><text x="575" y="48" class="dg-h">Interview session</text><text x="575" y="68" class="dg-s">role (+ job description)</text><text x="575" y="85" class="dg-s">planned stages</text></g>
+      <g class="dg-box"><rect x="705" y="20" width="165" height="78" rx="10"/><text x="787" y="48" class="dg-h">Your answer</text><text x="787" y="68" class="dg-s">text and/or code</text><text x="787" y="85" class="dg-s">stored exactly as typed</text></g>
+      <path d="M200 59H243" class="dg-line" marker-end="url(#ar)"/><path d="M435 59H478" class="dg-line" marker-end="url(#ar)"/><path d="M670 59H703" class="dg-line" marker-end="url(#ar)"/>
+      <path d="M787 98V130H440M787 130H150M787 130H730" class="dg-line"/>
+      <path d="M150 130V160M440 130V160M730 130V160" class="dg-line" marker-end="url(#ar)"/>
+      <g class="dg-box dg-legacy"><rect x="10" y="162" width="280" height="96" rx="10"/><text x="150" y="190" class="dg-h">1. Similarity score (default)</text><text x="150" y="211" class="dg-s">compares your text with the reference answer</text><text x="150" y="228" class="dg-s">0-100 %: resemblance, not correctness</text><text x="150" y="245" class="dg-s">Sentence-BERT only</text></g>
+      <g class="dg-box dg-exp"><rect x="300" y="162" width="280" height="96" rx="10"/><text x="440" y="190" class="dg-h">2. Modular evaluation (opt-in)</text><text x="440" y="211" class="dg-s">local LLM lists which concepts you state</text><text x="440" y="228" class="dg-s">evidence-checked; usually no number</text><text x="440" y="245" class="dg-s">experimental, not validated</text></g>
+      <g class="dg-box dg-code"><rect x="590" y="162" width="280" height="96" rx="10"/><text x="730" y="190" class="dg-h">3. Code check (opt-in)</text><text x="730" y="211" class="dg-s">reads your code, never runs it by default</text><text x="730" y="228" class="dg-s">found / missing / incorrect / unverified</text><text x="730" y="245" class="dg-s">no score, experimental</text></g>
+      <g class="dg-box"><rect x="10" y="285" width="860" height="38" rx="10"/><text x="440" y="309" class="dg-s dg-c">Saved to a local session file &#8594; per-question feedback &#8594; summary &#8594; JSON export. Nothing changes which question comes next.</text></g>
+    </svg>
+  </figure>
+</section>
+
+<div class="cards cards2">
+  <article class="card"><h3>Retrieval (the RAG part)</h3>
+    <p>The question bank is a curated corpus of <strong>666</strong> records (487 frozen v5 records plus 179 approved expansion records), each with a reference answer and key concepts. A retrieval layer loads and verifies it (fingerprints, manifests, quarantine list) and can embed it with <code>all-MiniLM-L6-v2</code> into a FAISS index with a BM25 baseline.</p>
+    <p class="muted small"><strong>In this interview app</strong> questions are planned by role, topic coverage and a fixed Easy-to-Hard progression from that corpus. Retrieval (MiniLM and FAISS, or the BM25 fallback) only <em>orders</em> candidate questions, for example against a job description; it never grades a candidate. The separate <code>/api/retrieval</code> routes expose the same search. Its benchmark labels are AI-generated, not human ground truth.</p></article>
+  <article class="card"><h3>1. Similarity score</h3>
+    <p>Compares your answer's text with the reference answer using Sentence-BERT cosine similarity. It is the only scorer new interviews use. (The earlier Bi-LSTM and TF-IDF scorers remain in the repository for stored sessions and research evidence.)</p>
+    <p class="muted small"><strong>Limits:</strong> it measures resemblance. A correct answer in different words can score low; an answer that borrows the reference's vocabulary can score high. For code it compares text, not behaviour. It has not been checked against human marking. The comment shown with it depends only on the score band.</p></article>
+  <article class="card"><h3>2. Modular evaluation <span class="chip chip-adv">EXPERIMENTAL</span></h3>
+    <p>Opt-in. A local model (Ollama, qwen2.5:7b) labels which required concepts your answer states, each backed by a quote from your answer. Fixed rules turn that into a rubric, and a number appears only for the few questions where the scope allows it.</p>
+    <p class="muted small"><strong>Limits:</strong> the recorded 20-answer run <strong>failed its acceptance gate</strong> (abstain rate 0.45, limit 0.40), so the project's decision is <em>do not advance</em>. It never influences question selection.</p></article>
+  <article class="card"><h3>3. Code check <span class="chip chip-code">EXPERIMENTAL</span></h3>
+    <p>Opt-in, for two Python questions. It separates code from your written explanation, reads the code (parsing only) and reports which required parts are present, missing, incorrect or unverified. Behaviour tests exist but run only inside a locked-down container you set up yourself; otherwise the page says the code was <em>read, not run</em>.</p>
+    <p class="muted small"><strong>Limits:</strong> "found in the code" is not proof it works; explanation checks match wording only and are always unverified. No score is given.</p></article>
+</div>
+
+<section class="card">
+  <h2 class="first">What is and is not established</h2>
+  <ul class="plainlist">
+    <li><strong>Built and tested:</strong> the interview flow, session saving and recovery, the Sentence-BERT similarity scorer, the corpus loader and retrieval index, the opt-in evaluator and the static code check (automated tests plus real-browser runs).</li>
+    <li><strong>Not established:</strong> that any score matches human judgement; that the modular evaluator is reliable enough to use; that behaviour tests are safe against hostile code (a container shares the host's kernel).</li>
+    <li><strong>By design:</strong> nothing here controls adaptive difficulty, and follow-ups are fixed, bank-backed prompts rather than generated text. Your answers stay on this computer and are deleted after 14 days, or when you delete them.</li>
+  </ul>
+  <p class="actions"><a class="btn primary" href="{{ url_for('demo.setup_page') }}">Start an interview</a><a class="btn" href="{{ url_for('demo.guide_page') }}">How to read the labels</a><a class="btn" href="{{ url_for('demo.recorded_page') }}">Recorded model run</a></p>
+</section>
+{% endblock %}

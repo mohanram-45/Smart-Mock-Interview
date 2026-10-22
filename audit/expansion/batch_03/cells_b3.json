@@ -1,0 +1,51 @@
+[
+ {
+  "cell_id": "MLO-01",
+  "topic": "ML lifecycle and reproducibility (data/model versioning, experiment tracking, environments)",
+  "count": 7,
+  "type_hint": "concept;scenario;debugging",
+  "guidance": "Include 1-2 genuinely introductory Easy questions (e.g. what an experiment run must record to be reproducible; why 'works on my machine' fails for ML). Other angles: a result cannot be reproduced after 3 weeks - systematic checklist (code commit, data snapshot/hash, config, seeds, library versions, hardware nondeterminism, data order); what experiment tracking should log vs what belongs in a model registry; versioning large datasets (content hashing, immutable snapshots, pointer files) vs copying; why setting a random seed is necessary but not sufficient (GPU nondeterminism, multiprocessing data loaders, library changes); environment pinning (lockfile vs loose requirements, base image digest); comparing runs fairly (same data split, seed variance, report mean and spread); tying a deployed model back to its training run (lineage). Tool names (MLflow, DVC, etc.) allowed only if you opened their docs and describe documented behaviour; no versions."
+ },
+ {
+  "cell_id": "MLO-02",
+  "topic": "CI/CD for ML (data and model tests, gating, rollback) - includes data and model validation",
+  "count": 8,
+  "type_hint": "concept;scenario;coding;debugging",
+  "guidance": "Cover data validation (schema, ranges, null rates, distribution checks at training and serving; fail vs warn; where it runs in a pipeline) and model validation (metric thresholds vs baseline, slice metrics, calibration, behavioural/invariance tests, latency and size budgets, comparing to the current production model), plus CI/CD mechanics: what triggers retraining/CI, what a pull request check can and cannot test for ML (flaky tests from randomness, slow training - use small fixtures), model promotion gates, rollback criteria and keeping the previous model artifact deployable. Also ML pipelines as DAG steps: idempotent steps, caching by input hash, retries, backfills (keep orchestration at ML level - generic data orchestration belongs to a later batch). One or two tested stdlib+numpy/pandas-free functions are welcome (e.g. a data-validation function that checks schema/range/null-rate and returns structured violations; or a promotion-gate function comparing candidate vs baseline with a minimum-improvement and non-regression-on-slices rule with confidence handling). Hypothetical numbers only."
+ },
+ {
+  "cell_id": "MLO-03",
+  "topic": "Model registry and packaging (containers, ONNX, signatures, dependency pinning)",
+  "count": 5,
+  "type_hint": "concept;scenario;design",
+  "guidance": "Angles: what a registry stores and why it is more than a file bucket (versions, stage/alias, lineage, metadata, signatures, approvals); promotion by alias/stage and what changes atomically; pickle/joblib risks (version coupling, arbitrary code execution on load) vs an exchange format such as ONNX (what it fixes and what it does not: custom ops, preprocessing outside the graph); model signature/input schema validation; packaging preprocessing with the model; pinning dependencies and base images; reproducing a past deployment from the registry. Describe documented behaviour only after opening the docs (ONNX, MLflow models/registry, Python pickle docs, etc.)."
+ },
+ {
+  "cell_id": "MLO-04",
+  "topic": "Serving patterns (batch, online, streaming, REST/gRPC, autoscaling, batching) - includes monitoring fundamentals for serving",
+  "count": 7,
+  "type_hint": "concept;scenario;design;coding",
+  "guidance": "Angles: choosing batch vs online vs streaming inference for a described use case (latency, freshness, cost, failure handling); REST vs gRPC trade-offs conceptually; dynamic request batching (latency/throughput trade-off) and autoscaling on the right signal (queue depth/concurrency vs CPU; cold start, warm-up); timeouts, retries and idempotency; model loading, memory and warm pools; fallbacks (default prediction, previous model); monitoring fundamentals at the serving layer: what to log per prediction (request id, model version, features hash, prediction, latency), the four golden signals / RED metrics for a model endpoint, SLOs and percentile latency, alerting on error rate and latency vs on data drift (drift itself is a later batch). One tested stdlib-only function is welcome (e.g. a micro-batching scheduler simulation or a latency percentile / SLO burn check). Hypothetical numbers only; no vendor limits."
+ },
+ {
+  "cell_id": "MLO-05",
+  "topic": "Deployment strategies (shadow, canary, A/B, blue-green, rollback)",
+  "count": 6,
+  "type_hint": "scenario;concept;evaluation",
+  "guidance": "Include 1 introductory Easy question if warranted (difference between canary and blue-green). Angles: choosing shadow vs canary vs A/B for a model change and what each can and cannot reveal (shadow cannot measure user-feedback effects; canary at 1% has low statistical power for rare outcomes); canary success criteria and automatic rollback thresholds (guardrail metrics, minimum sample before decision); rollback of a model when the feature pipeline or schema also changed (compatibility, expand-contract); database/feature-store coupling; traffic splitting by user vs by request (consistency, interference/novelty); delayed labels making online evaluation slow - use proxy metrics; blue-green cost/benefit. Experiment statistics beyond sample-size basics stay in Data Analysis."
+ },
+ {
+  "cell_id": "MLO-06",
+  "topic": "Containers, orchestration and ML pipelines in practice (Docker, Kubernetes basics, GPU scheduling, pipeline steps)",
+  "count": 6,
+  "type_hint": "concept;scenario;debugging",
+  "guidance": "Include 1 introductory Easy question if warranted. Angles: Docker image for an ML service (layer caching and ordering so code changes do not reinstall dependencies; image size; non-root; pinning by digest); why a model container works locally but OOMs/crashes in Kubernetes (requests vs limits, OOMKilled, shared memory for data loaders); Kubernetes readiness vs liveness vs startup probes for a slow model load; rolling update behaviour and maxUnavailable for a model service; GPU scheduling basics (requesting GPUs as resources, one pod per GPU, bin-packing, node selectors/taints; sharing is not automatic); batch training jobs vs long-running services; pipeline orchestration for ML at the conceptual level (DAG, retries, idempotent steps, artifacts passed between steps, caching). Keep cloud-vendor managed services out. Open the Kubernetes/Docker docs and describe only documented behaviour."
+ },
+ {
+  "cell_id": "MLO-07",
+  "topic": "Feature stores and training-serving skew",
+  "count": 6,
+  "type_hint": "concept;scenario;debugging",
+  "guidance": "Include 1 introductory Easy question if warranted (what training-serving skew is). v5 smi-i0009 covers an offline-vs-online gap generally; do not repeat. Angles: sources of skew (different code paths for the same feature, different data freshness, default/null handling, timezone/units, library version, categorical encoding with unseen values); point-in-time correct joins and how leakage arises when joining features as of today; online vs offline store and why both exist; feature freshness/TTL and backfill; sharing one transformation definition for training and serving; detecting skew (log served features and compare to training distribution; replay requests); when a feature store is overkill. A tested stdlib+numpy function is welcome (e.g. a point-in-time join on timestamped feature rows or a skew check that compares a served feature sample with a training sample). Open the docs of a feature store (e.g. Feast) or the TFX data-validation docs for documented behaviour."
+ }
+]

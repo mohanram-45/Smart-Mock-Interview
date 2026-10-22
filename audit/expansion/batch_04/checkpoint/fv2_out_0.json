@@ -1,0 +1,702 @@
+[
+ {
+  "plan_id": "B4-MLO-08-3",
+  "verdict": "correct",
+  "reasons": [
+   "Edited text (symptom-first heading, PSI parenthetical) is consistent with the tier table and rubric.",
+   "Closing claim that the design fixes the missed null-rate incident is only true for top-10 features: null rate of the other 110 features is 'dashboard only' in the tier table.",
+   "Daily job + 'for 2 consecutive windows' delays a null-rate page by two days unless data-quality checks run more often."
+  ],
+  "parts_answered": {
+   "why noisy (1.2/day, ~70%)": true,
+   "redesign principles": true,
+   "fixes missed null-rate incident": "partly (top-10 only)"
+  },
+  "evidence": [
+   {
+    "claim": "120 x 0.01 = 1.2 false hits/day; 1-0.99^120 = 0.7006",
+    "method": "executed",
+    "evidence": "python: 1.2, 0.7006"
+   },
+   {
+    "claim": "ML Test Score: alert thresholds need careful tuning for false-positive/false-negative balance",
+    "method": "paper",
+    "evidence": "Monitor 2: 'careful tuning of alerting thresholds is needed to achieve a useful balance between false positive and false negative rates.'"
+   },
+   {
+    "claim": "Sculley et al.: action limits broad enough not to trigger spuriously; alerts trigger investigation",
+    "method": "paper",
+    "evidence": "'These limits should be broad enough not to trigger spuriously.' / 'automated alerts should fire and trigger manual intervention or investigation.'"
+   },
+   {
+    "claim": "SRE book: page on symptoms, every page actionable, dashboards for subcritical problems",
+    "method": "doc",
+    "evidence": "'It focuses primarily on symptoms for paging...' 'Every page should be actionable.' 'favor a dashboard that monitors all ongoing subcritical problems.'"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "- Ticket (next business day): any single feature's drift metric",
+    "problem": "Tier table pages only on null rate of the top 10 features; a null-rate regression in any other feature falls to 'dashboard only', i.e. the original missed-incident class can recur, yet the answer says the design fixes it and promises 'one page for the null-rate class of incident'.",
+    "replacement": "- Ticket (next business day): null rate of any other feature above its 90-day maximum by more than a set margin; any single feature's drift metric"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "above its 90-day maximum by more than a set margin for 2 consecutive windows",
+    "problem": "The question describes a daily job; two consecutive daily windows means a two-day delay before a null-rate page.",
+    "replacement": "above its 90-day maximum by more than a set margin for 2 consecutive windows (compute these data-quality checks hourly, so a regression pages within hours rather than after two daily runs)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Application of multiple-testing arithmetic and several alert-design principles; no deep derivation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Rationale and principles (304 words)."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete tier table with thresholds and replay-before-enable step; not a paraphrase."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (keep both)",
+  "key_concepts_findings": "All seven concepts are discussed; no change needed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0006",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/46555.pdf",
+    "status": "supported",
+    "evidence": "Monitor 2 quotes on schema divergence and threshold tuning; Monitor 7 'zero bias, in aggregate and on slices'."
+   },
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "supported",
+    "evidence": "Action-limit sentences quoted above."
+   },
+   {
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "status": "supported",
+    "evidence": "Symptom paging / actionable pages / dashboards quotes above."
+   }
+  ],
+  "unsourced_claims": [
+   "Effect-size thresholds from 60-90 day percentiles are practitioner convention, not sourced (illustrative)."
+  ],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-08-8",
+  "verdict": "pass",
+  "reasons": [
+   "Re-derived all numbers: 60x0.05=3 sd; 7,200 rows (2/(0.05/3)^2); pool mean 1.0714 so weekend +16.7%, weekday -6.7%; ages 4 and 17.5 days -> 0.2 and 0.875 sd; sigma>5 mu condition.",
+   "Edited sentences (offset 'easy to miss when ... similar size', D noise floor vs C) are correct and consistent with the recommendation.",
+   "Answer is 437 words (limit 450)."
+  ],
+  "parts_answered": {
+   "four options on false alarms": true,
+   "four options on creep": true,
+   "recommendation": true
+  },
+  "evidence": [
+   {
+    "claim": "Rows needed to see a 0.05 sd day-over-day change at 3 SE = 7,200",
+    "method": "executed",
+    "evidence": "2/(0.05/3)^2 = 7200.0"
+   },
+   {
+    "claim": "Weekly mean 1.0714; weekend/pool 1.167; weekday/pool 0.933",
+    "method": "executed",
+    "evidence": "python"
+   },
+   {
+    "claim": "Average pool age 4 days -> 0.2 sd; D 17.5 days -> 0.875 sd",
+    "method": "derivation",
+    "evidence": "(1..7)/7=4; (7+14+21+28)/4=17.5"
+   },
+   {
+    "claim": "0.05 sd < weekly swing 0.25 mu iff sigma < 5 mu",
+    "method": "derivation",
+    "evidence": "0.05 sigma < 0.25 mu"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Several quantitative sub-derivations and a trade-off recommendation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single-answer record; no variants."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All seven concepts discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0013",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [],
+  "unsourced_claims": [
+   "Holiday contamination and stable weekly pattern assumptions are stated as conditions, acceptable."
+  ],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-10-2",
+  "verdict": "pass",
+  "reasons": [
+   "Re-ran SQL in 3.13/3.10/3.11: identical output [('refund_flag',4,4,1.0,470.0,4),('days_since_login',4,3,0.75,15.0,0)].",
+   "Edited descriptions of the example (12 h to ~20 d; 23:59 stamps for 3 of 4 rows; NULL label_ts not counted) all verified against the data and an edge-case run.",
+   "Config content equals fenced SQL; fenced SQL is contained in code.solution."
+  ],
+  "parts_answered": {
+   "query": true,
+   "per-feature count/share/worst hours/after-label": true,
+   "only offending features": true,
+   "interpretation": true,
+   "limits": true
+  },
+  "evidence": [
+   {
+    "claim": "Outputs and 470.0 / 15.0 hours",
+    "method": "executed",
+    "evidence": "3 interpreters + SQLite; row1 refund 03-21 00:00 vs 03-01 10:00 = 470 h"
+   },
+   {
+    "claim": "NULL label_ts rows never counted in rows_after_label",
+    "method": "executed",
+    "evidence": "edge case: label_ts NULL, feature at 03-02 -> rows_after_label 0"
+   },
+   {
+    "claim": "Mixed 'T'/space ISO formats break string comparison",
+    "method": "executed",
+    "evidence": "edge case: '2026-03-01T12:00:00' vs '2026-03-01 10:00:00' compares by string ('T' > ' '); answer's same-format caveat is right"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short SQL with aggregation plus interpretation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Reasoning, result reading and limits."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Query, output and gating policy."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (keep both)",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0041",
+   "same_intent": false
+  },
+  "code_findings": "Edge cases: (a) NULL label_ts and NULL feature_ts rows: NULL feature_ts counts in n_rows (denominator) but never as future; (b) orphan feature rows (no training row) dropped by inner join; (c) equal timestamps not flagged; all behave as the answer's 'Limits' imply. 3.10/3.11/3.13 all pass.",
+  "sources_findings": [],
+  "unsourced_claims": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-11-5",
+  "verdict": "correct",
+  "reasons": [
+   "Executed arithmetic OK (10,000/3 = 3,333; 10,000/2,500 = 4). Concise 78 words; detailed 439 words, so the edits left almost no headroom.",
+   "Claim that Choquette-Choo et al. report DP and strong L2 as the only defences that 'stopped all the attacks they tried' follows the abstract but is stronger than the body (large epsilon at useful accuracy; L2 costs accuracy)."
+  ],
+  "parts_answered": {
+   "plain-terms risk": true,
+   "conditions making it worse": true,
+   "ranked mitigations": true
+  },
+  "evidence": [
+   {
+    "claim": "Boundary-distance label-only attack ~2,500 queries; augmentation N=3 rotations",
+    "method": "paper",
+    "evidence": "arXiv 2007.14321: 'With ~2,500 queries, the label-only attack matches the white-box upper-bound'; 'For rotations, we generate N=3 images'"
+   },
+   {
+    "claim": "Query limiting unlikely to be suitable because of Sybil attacks",
+    "method": "paper",
+    "evidence": "'Query limiting would likely not be a suitable defense, as Sybil attacks can circumvent it.'"
+   },
+   {
+    "claim": "OWASP lists regularisation and noise/DP",
+    "method": "doc",
+    "evidence": "Prevention: 'Model Obfuscation ... adding random noise or using differential privacy', 'Regularisation'."
+   },
+   {
+    "claim": "TPR at low FPR evaluation",
+    "method": "paper",
+    "evidence": "LiRA abstract: 'attacks should instead be evaluated by computing their true-positive rate at low (e.g., <0.1%) false-positive rates'"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "report DP and strong L2 regularisation as the only defences that stopped all the attacks they tried",
+    "problem": "Body of the paper says these are the only defences that meaningfully decrease leakage, strong L2 underfits, and DP at useful accuracy needed epsilon > 100 (weak formal guarantee); 'stopped all' is stronger than the evidence for a RAG reference.",
+    "replacement": "report DP and strong L2 regularisation as the only known defences that stopped their label-only attacks (at an accuracy cost; DP's epsilon was large at useful accuracy)"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Model inversion is a related but different risk: using outputs to reconstruct attributes or representative inputs; for a tabular scorer this matters most when sensitive attributes are predictable from other inputs.",
+    "problem": "Off-question aside; trimming it offsets the hedge above (detailed 439 -> 432 words, under the 450 limit).",
+    "replacement": "Model inversion (reconstructing attributes or inputs from outputs) is a related but different risk."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism explanation, ranking and a measurement protocol; no multi-step derivation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "78 words, consistent with detailed (rounding, label-only, rate limit, DP)."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanism and per-mitigation limits with numbers."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Measurement protocol not in detailed."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical (keep all)",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none (no membership-inference question in 626)",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://owasp.github.io/www-project-machine-learning-security-top-10/docs/ML04_2023-Membership_Inference_Attack",
+    "status": "supported",
+    "evidence": "Model Obfuscation (noise/DP) and Regularisation listed."
+   },
+   {
+    "url": "https://arxiv.org/abs/2007.14321",
+    "status": "supported",
+    "evidence": "Abstract: label-only attacks match confidence-based attacks and break confidence-masking defences; DP and strong L2 only known defences."
+   },
+   {
+    "url": "https://arxiv.org/abs/2112.03570",
+    "status": "supported",
+    "evidence": "TPR at low FPR."
+   },
+   {
+    "url": "https://arxiv.org/pdf/2007.14321",
+    "status": "supported",
+    "evidence": "2,500 queries; N=3; Sybil sentence."
+   }
+  ],
+  "unsourced_claims": [
+   "'AUC 0.6 or higher means act' is flagged in-text as a judgement, fine.",
+   "'Noise that leaves the label unchanged is confidence masking' is an inference from the paper, not a quote."
+  ],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-5",
+  "verdict": "correct",
+  "reasons": [
+   "Edited error-budget sentence overstates: 0.0005 x 43,200 = 21.6 min holds only for a 30-day window and only if all requests failed for the full 22 minutes (a 31-day month gives 22.3 min, so 22 minutes would not exhaust it).",
+   "Mode renumbering (1-4) is consistent across detailed, table, game day and rubric.",
+   "Detailed 401 words."
+  ],
+  "parts_answered": {
+   "registry design": true,
+   "feature-store degradation": true,
+   "recovery": true,
+   "logging for retraining": true,
+   "testing": true
+  },
+  "evidence": [
+   {
+    "claim": "Error budget 21.6 min (30 d) / 22.32 (31 d)",
+    "method": "executed",
+    "evidence": "python"
+   },
+   {
+    "claim": "SRE book: graceful degradation and 'code path you never use ... often doesn't work'; exercise regularly",
+    "method": "doc",
+    "evidence": "'Remember that the code path you never use is the code path that (often) doesn't work.' / 'regularly running a small subset of servers near overload'"
+   },
+   {
+    "claim": "Bounded retries + jitter",
+    "method": "doc",
+    "evidence": "AWS builder page: 'Jitter adds some amount of randomness to the backoff'; 'limit the number of times that the client retries'"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "so last month's 22-minute feature-store outage alone used all of it",
+    "problem": "Assumes a 30-day month and that every request failed for the full 22 minutes; neither is stated in the question.",
+    "replacement": "so last month's 22-minute feature-store outage, if every request failed throughout, used essentially all of it (a 31-day month allows 22.3 minutes)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-part design with SLO arithmetic, two dependency types and test plan.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Design and reasoning."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Mode table with example numbers, drills and pass criteria."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (keep both)",
+  "key_concepts_findings": "All eight discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0005",
+   "same_intent": false
+  },
+  "code_findings": "No code. Rubric items 6 (fallback SLI) and detailed 'decide in advance' wording agree.",
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/addressing-cascading-failures/",
+    "status": "supported",
+    "evidence": "Quotes above."
+   },
+   {
+    "url": "https://builder.aws.com/content/3EumjoZascWd1oZiEgL8ORlv3qE/timeouts-retries-and-backoff-with-jitter",
+    "status": "supported",
+    "evidence": "Jitter and limiting retries."
+   }
+  ],
+  "unsourced_claims": [
+   "'A valid, in-time fallback normally counts as good for the availability SLO' is a convention, correctly hedged by 'normally' and 'decide in advance'.",
+   "Table thresholds are labelled example numbers."
+  ],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-9",
+  "verdict": "correct",
+  "reasons": [
+   "question_type was changed to 'design' by the edit but rubric_points is null; design records need 4-8 rubric points (provided). Alternatively revert to 'scenario'.",
+   "Numbers verified: 2 x (15 + 5) = 40 min; 40/420 = 9.5%; 07:45-18:00 = 10.25 h.",
+   "'Bound the extra at roughly 40 minutes' ignores time to obtain replacement capacity."
+  ],
+  "parts_answered": {
+   "fine-tune strategy": true,
+   "classifier strategy": true,
+   "customer endpoint strategy": true,
+   "what would change my mind": true
+  },
+  "evidence": [
+   {
+    "claim": "40 min extra = about 9.5% of 7 h",
+    "method": "executed",
+    "evidence": "python"
+   },
+   {
+    "claim": "Spot interruption notice is two minutes and best effort",
+    "method": "doc",
+    "evidence": "'Interruption notices are emitted on a best effort basis.' '... issued two minutes before'"
+   },
+   {
+    "claim": "Flexibility across instance types/AZs and fault tolerance",
+    "method": "doc",
+    "evidence": "spot-best-practices: 'You should be flexible about which instance types you request and in which Availability Zones'; 'architect your application to be fault-tolerant'"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "answer",
+    "claim": "(rubric_points missing)",
+    "problem": "question_type is 'design' (open-ended, several acceptable strategies) but rubric_points is null, violating the schema; a RAG grader has no decision/trade-off list. Add the supplied rubric_points (or change type to 'scenario').",
+    "replacement": null
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "bound the extra at roughly 40 minutes on a 7-hour job (about 10%) in this example",
+    "problem": "Not a bound if replacement capacity is slow to arrive.",
+    "replacement": "bound the extra at roughly 40 minutes on a 7-hour job (about 10%) in this example, provided replacement capacity arrives within the restore time"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Matching workloads to capacity types with simple arithmetic.",
+  "type_ok": true,
+  "suggested_type": "scenario (or keep design with the supplied rubric)",
+  "rubric_points": [
+   {
+    "decision": "Fine-tune on reclaimable capacity only if resumable: checkpoint model, optimizer, data-loader and RNG state to durable storage at a fixed interval",
+    "tradeoff": "Discount vs repeated work (up to interval + restore per interruption) and checkpoint write cost"
+   },
+   {
+    "decision": "Deadline rule: fall back to on-demand if interruptions exceed a threshold or the morning deadline is at risk",
+    "tradeoff": "Cost certainty and deadline vs losing the discount"
+   },
+   {
+    "decision": "Internal classifier: scheduled warm-up or scheduled single replica during office hours instead of 24/7 or pure scale-to-zero",
+    "tradeoff": "Idle spend (about 10 h vs 24 h) vs a 3-minute first-request wait"
+   },
+   {
+    "decision": "Alternatives for the classifier: asynchronous interface or shorter cold start (smaller model, node-cached weights)",
+    "tradeoff": "Engineering effort and user experience vs cost"
+   },
+   {
+    "decision": "Customer endpoint: on-demand baseline sized for steady load with headroom; reclaimable capacity only for burst above it",
+    "tradeoff": "Higher steady cost vs surviving mass reclamation with short notice"
+   },
+   {
+    "decision": "Spread burst capacity across zones and instance types, drain gracefully, scale on queue depth or concurrency",
+    "tradeoff": "Operational complexity vs lower reclamation correlation and a stable p99"
+   },
+   {
+    "decision": "State what would change the choice (reclamation frequency, spikiness, acceptable fallback, resumability)",
+    "tradeoff": "Re-evaluation effort vs choosing on stale assumptions"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer; options 1 and 2 for the classifier overlap (scheduled warm-up vs scheduled replica) but are acceptable."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All eight discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0038",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-instance-termination-notices.html",
+    "status": "supported",
+    "evidence": "Two-minute notice, best effort."
+   },
+   {
+    "url": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-best-practices.html",
+    "status": "supported",
+    "evidence": "Flexibility across types/AZs; fault tolerance."
+   }
+  ],
+  "unsourced_claims": [
+   "'Reclamation can remove many replicas at once' is general reasoning, not sourced."
+  ],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-1",
+  "verdict": "correct",
+  "reasons": [
+   "Edited mechanism (3) asserts 'the click lift has not faded' although the question only says click-through is 'still up'; and 'a novelty effect also means the 2-week window may not have been representative' is a vague non sequitur given the preceding clause. key_concepts and interview note still list novelty.",
+   "The question asks what evidence separates the mechanisms; the answer gives a general holdback comparison but no mapping from evidence to mechanism.",
+   "Answer is 391 words."
+  ],
+  "parts_answered": {
+   "mechanisms": true,
+   "evidence to separate": "partly",
+   "release practice": true
+  },
+  "evidence": [
+   {
+    "claim": "Rules of ML #39: A/B-measurable metrics are proxies; launch decisions weigh several metrics",
+    "method": "doc",
+    "evidence": "'The only easy launch decisions are when all metrics get better'; A/B metrics are stand-ins for longer-term goals"
+   },
+   {
+    "claim": "SRE workbook canary size and duration",
+    "method": "doc",
+    "evidence": "'It should be sizeable and last long enough to be representative of the overall deployment.'"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "click-through is still up here, so the click lift has not faded, but",
+    "problem": "The question says click-through is still up, not by how much; 'has not faded' is unsupported.",
+    "replacement": "click-through is still up, so a classic novelty fade in the click lift is not what is observed (check the lift by weeks since launch), but"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "; a novelty effect also means the 2-week test window may not have been representative.",
+    "problem": "Vague, unsupported claim about test-window representativeness that follows a clause saying the click lift has not faded; drop it.",
+    "replacement": "."
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "Check that the metric definition and tracking did not change at the same time.",
+    "problem": "No mapping from evidence to mechanism although the question asks what would separate them.",
+    "replacement": "Check that the metric definition and tracking did not change at the same time. What separates them: a repeat-purchase gap between holdback and exposed users points to the model (proxy mismatch, or narrowing if item diversity also fell); the same dip in both groups points to season or cohort mix; a gap opening only after the test's 2-week horizon shows in cohort curves by weeks since launch."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Several mechanisms and evidence design; no heavy derivation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "novelty effect is discussed (as less likely given clicks still up) after the fix; others fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0033",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule 39."
+   },
+   {
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "status": "supported",
+    "evidence": "'sizeable and last long enough to be representative'."
+   }
+  ],
+  "unsourced_claims": [
+   "Repurchase interval 3 to 6 weeks and holdback 2 to 5% are conditional/illustrative."
+  ],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-5",
+  "verdict": "pass",
+  "reasons": [
+   "Re-ran Python+SQL on 3.13/3.10/3.11: output matches the asserted two rows.",
+   "Edits verified: 4 of 10 recomputed orders_24h off by one, one more not recomputed, avg_basket NULL vs 25.0, 13:00 diffs 0.004 within tolerance 0.01+0.001*|r|; text-column caveat demonstrated by edge run; suggested null-safe clause works.",
+   "Fenced Python equals code.solution; config SQL is contained in it.",
+   "Rule of three 3/20,000 = 0.015% correct."
+  ],
+  "parts_answered": {
+   "what to log": true,
+   "how/when recompute": true,
+   "tolerances by type": true,
+   "timestamps for root cause": true,
+   "alerting": true,
+   "executed SQL": true
+  },
+  "evidence": [
+   {
+    "claim": "Output [('2026-03-01 14:00','avg_basket',11,0,1),('2026-03-01 14:00','orders_24h',11,1,4)]",
+    "method": "executed",
+    "evidence": "3 interpreters"
+   },
+   {
+    "claim": "Text ids compare as match: ABS('abc'-'abd') = 0, and adding (abs_tol=0 AND rel_tol=0 AND s.value IS NOT r.value) catches it",
+    "method": "executed",
+    "evidence": "edge run: 'cat' feature reported only with the added clause"
+   },
+   {
+    "claim": "Missing tolerance row drops the feature; duplicate recomputed rows double counts",
+    "method": "executed",
+    "evidence": "edge run: 'nofeat' absent; orders_24h n 12, mismatched 5"
+   },
+   {
+    "claim": "Rule #29 and Monitor 3",
+    "method": "doc",
+    "evidence": "'save the set of features used at serving time'; 'Training and serving features compute the same values'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-part design plus executed SQL and subtle timing semantics.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Design (383 words)."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Executed query, results, caveats."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (keep both)",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0043",
+   "same_intent": false
+  },
+  "code_findings": "Edge cases: text values, missing tolerance row, duplicate recomputed rows, null-safe clause: behave as the caveats say. Minor non-blocking: rubric item 1 mentions privacy, not discussed in the answer.",
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule 29 save serving-time features, small fraction acceptable."
+   },
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "'Monitor 3: Training and serving features compute the same values'."
+   }
+  ],
+  "unsourced_claims": [],
+  "added_sources": [],
+  "code_patch": null
+ }
+]

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>{% block title %}SMART Mock Interview{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('demo.static', filename='demo.css') }}">
+<link rel="stylesheet" href="{{ url_for('demo.static', filename='app.css') }}">
+</head>
+<body data-page="{% block page %}{% endblock %}">
+<a class="skip" href="#main">Skip to content</a>
+<svg width="0" height="0" aria-hidden="true" focusable="false" class="defs-svg"><defs>
+  <linearGradient id="tg" x1="0" x2="1"><stop offset="0" stop-color="#4ade80"/><stop offset="1" stop-color="#22c55e"/></linearGradient>
+  <linearGradient id="ta" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4ade80" stop-opacity=".28"/><stop offset="1" stop-color="#4ade80" stop-opacity="0"/></linearGradient>
+  <linearGradient id="bg" x1="0" x2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#4ade80"/></linearGradient>
+  <linearGradient id="pg" x1="0" x2="1"><stop offset="0" stop-color="#4ade80"/><stop offset="1" stop-color="#2dd4bf"/></linearGradient>
+  <linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4ade80"/><stop offset="1" stop-color="#a78bfa"/></linearGradient>
+</defs></svg>
+{% set pg = self.page() %}
+<div class="app">
+  <header class="topbar">
+    <div class="topbar-in">
+      <a class="brand" href="{{ url_for('demo.dashboard_page') }}" aria-label="SMART Mock Interview, dashboard">
+        <svg width="34" height="34" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="9" fill="url(#tg)"/><path d="M8 10h14M8 15h9" stroke="#04150b" stroke-width="2.2" stroke-linecap="round"/><rect x="19" y="13" width="2.6" height="9" rx="1.3" fill="#04150b"/></svg>
+        <span>SMART <b>Mock Interview</b></span></a>
+      <nav class="mainnav" id="mainnav" aria-label="Primary">
+        <span class="nav-ind" aria-hidden="true"></span>
+        <a href="{{ url_for('demo.dashboard_page') }}"{% if pg == 'dashboard' %} aria-current="page"{% endif %}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 4l8 7.5V20a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg><span>Dashboard</span></a>
+        <a href="{{ url_for('demo.setup_page') }}"{% if pg == 'setup' %} aria-current="page"{% endif %}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>New interview</span></a>
+        <a href="{{ url_for('demo.history_page') }}"{% if pg in ('history', 'summary') %} aria-current="page"{% endif %}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>History</span></a>
+        <a href="{{ url_for('demo.settings_page') }}"{% if pg == 'settings' %} aria-current="page"{% endif %}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Settings</span></a>
+      </nav>
+      <div class="topbar-end">
+        {% if pg not in ('setup', 'interview') %}<a class="btn primary sm cta-top" href="{{ url_for('demo.setup_page') }}">Start interview</a>{% endif %}
+        <a class="btn ghost sm exit-link" href="{{ url_for('demo.dashboard_page') }}">Leave interview <span class="muted">(saved)</span></a>
+      </div>
+    </div>
+  </header>
+  <main id="main" class="stage"><div class="stage-in">
+<noscript><div class="banner banner-warn"><strong>JavaScript is off</strong><span>Starting an interview and submitting answers needs JavaScript. Saved summaries can still be read.</span></div></noscript>
+{% block body %}{% endblock %}
+  </div></main>
+  <footer class="site-foot">
+    <p><strong>Demonstration build.</strong> Similarity numbers measure resemblance to a reference answer, not technical correctness. Nothing here is human-validated, and scores never change which questions you get.</p>
+    <nav aria-label="More"><a href="{{ url_for('demo.about_page') }}">About this project</a><a href="{{ url_for('demo.guide_page') }}">How to read the labels</a><a href="{{ url_for('demo.recorded_page') }}">Recorded model run</a></nav>
+  </footer>
+</div>
+<script src="{{ url_for('demo.static', filename='demo.js') }}" defer></script>
+</body>
+</html>

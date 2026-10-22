@@ -1,0 +1,500 @@
+[
+ {
+  "plan_id": "B3-MLO-06-2",
+  "verdict": "correct",
+  "reasons": [
+   "Applied change (loader overhead folded into 0.6 GiB) is consistent: 2x1.4+0.8=3.6, +0.6=4.2, +0.5 shm=4.7; option (a) 1.4+0.4+0.6+0.5=2.9, 2.9/3.5=82.9% (~83%), 3.5/2.9=1.207 (~20% margin); option (b) 5.5/4.7=17% margin.",
+   "Minor inconsistency: detailed says set request close to steady state but the example request is 3Gi (idle steady state is ~1.8 GiB for option a)."
+  ],
+  "parts_answered": {},
+  "evidence": [
+   {
+    "claim": "arithmetic 3.6/4.2/4.7/2.9/83%/20%",
+    "method": "executed",
+    "evidence": "recomputed in python"
+   },
+   {
+    "claim": "memory limits via OOM kills; OOMKilled means exceeded limit; emptyDir Memory counts against container limit",
+    "method": "doc",
+    "evidence": "manage-resources-containers lines 48, 721; volumes line 184-186"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "set the request close to steady state so the scheduler packs nodes honestly",
+    "problem": "Example in practical_answer uses a 3Gi request, near the 2.9 GiB peak, not steady state.",
+    "replacement": "set the request from measured typical busy-state usage so the scheduler packs nodes honestly (the example below uses 3Gi, near the estimated peak, which is conservative)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-process memory accounting, tmpfs charge, resizing trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "mechanism and measurement"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked sizing and spec"
+   }
+  ],
+  "suggested_answer_set": "concise? detailed+practical",
+  "key_concepts_findings": "specific, each discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/storage/volumes/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-06-3",
+  "verdict": "pass",
+  "reasons": [
+   "The round-two probe fix is correct: with a blocking server a 350 s load exceeds 30x10=300 s so the startup probe fails and kubelet restarts; 200 s passes; when the server answers /health/live during background load, a long load only leaves the pod unready (readiness not run before startup succeeds, then fails, no kill). Validation paragraph is now internally consistent (first sentence gives both architectures, second pins the blocking one).",
+   "Timeline check: probes at 20,30,40 s with threshold 3 -> kill about 40 s (answer says 40 to 50 s, fine with timeouts).",
+   "Minor redundancy only (last sentence repeats the first branch); no change needed."
+  ],
+  "parts_answered": {},
+  "evidence": [
+   {
+    "claim": "startup budget = failureThreshold x periodSeconds = 300 s; 350 s load fails, 200 s passes",
+    "method": "derivation",
+    "evidence": "30*10; probes docs: liveness/readiness not run until startup succeeds; failed startup -> kubelet kills container"
+   },
+   {
+    "claim": "readiness runs whole lifecycle; not-ready pods get no Service traffic",
+    "method": "doc",
+    "evidence": "configure-probes lines 348-352"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Probe interplay, budget arithmetic, test design that actually exercises the failure path.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "probe roles and failure modes"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "config plus validation test"
+   }
+  ],
+  "suggested_answer_set": "concise? detailed+practical",
+  "key_concepts_findings": "specific, each discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/concepts/workloads/pods/probes/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   },
+   {
+    "url": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-06-4",
+  "verdict": "pass",
+  "reasons": [
+   "Both applied changes are correct: minReadySeconds doc says new Pod must be ready without crashing for that many seconds to count as available; proviso on readiness gating is correct.",
+   "Numbers: 4x90=360 s=6 min; 4x(90+30)=8 min; 3/3.4=88.2% (~88%).",
+   "Note (no field available, not an issue): common_mistakes item 3 states the 'still loading counts as unavailable' point without the new proviso; acceptable."
+  ],
+  "parts_answered": {},
+  "evidence": [
+   {
+    "claim": "maxSurge and maxUnavailable cannot both be 0; defaults 25%; revisionHistoryLimit default 10",
+    "method": "doc",
+    "evidence": "deployment.md lines 1206, 1217, 1359"
+   },
+   {
+    "claim": "arithmetic",
+    "method": "executed",
+    "evidence": "6.0 min, 8.0 min, 0.882"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Deadlock reasoning from rollout parameters plus capacity/time trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "deadlock cause and options"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "rollout arithmetic and spec"
+   }
+  ],
+  "suggested_answer_set": "concise? detailed+practical",
+  "key_concepts_findings": "specific, each discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-06-5",
+  "verdict": "pass",
+  "reasons": [
+   "Applied gang-scheduling hedge is accurate: gang-scheduling page shows feature-state GenericWorkload (feature-gated) and 'all-or-nothing'; priority/preemption page: preemptionPolicy defaults to PreemptLowerPriority.",
+   "GPU rules match scheduling-gpus page (limits only, request must equal limit, no request without limit); whole-number restriction and no overcommit match manage-resources page; taint page has a Dedicated Nodes use case.",
+   "Concise answer is 77 words (<=80)."
+  ],
+  "parts_answered": {},
+  "evidence": [
+   {
+    "claim": "GPU request/limit rules",
+    "method": "doc",
+    "evidence": "scheduling-gpus.md lines 43-48"
+   },
+   {
+    "claim": "gang scheduling feature-gated in core scheduler",
+    "method": "doc",
+    "evidence": "gang-scheduling.md feature-state GenericWorkload"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Rules recall plus per-node fragmentation reasoning and pool design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "distinct short answer"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "rigorous"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "layout and yaml"
+   }
+  ],
+  "suggested_answer_set": "concise? detailed+practical",
+  "key_concepts_findings": "specific, each discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/gang-scheduling/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-06-6",
+  "verdict": "correct",
+  "reasons": [
+   "Applied change matches Job doc ('the same program may sometimes be started twice').",
+   "Minor: practical_answer ids inconsistent: pipeline run 2026-10-08 but feature path run-0908."
+  ],
+  "parts_answered": {},
+  "evidence": [
+   {
+    "claim": "Job program may be started twice",
+    "method": "doc",
+    "evidence": "job.md lines 487-489"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "features/run-0908/attempt-1/",
+    "problem": "Run id contradicts the 2026-10-08 run used for the registry key.",
+    "replacement": "features/run-1008/attempt-1/"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Idempotency, atomic publication, cache keys, retry policy design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "properties and policies"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "replay of the incidents"
+   }
+  ],
+  "suggested_answer_set": "concise? detailed+practical",
+  "key_concepts_findings": "specific, each discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/concepts/workloads/controllers/job/",
+    "status": "supported",
+    "evidence": "Opened (kubernetes/website markdown on GitHub); text supports the sentence as worded."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-07-4",
+  "verdict": "correct",
+  "reasons": [
+   "Applied changes are correct. DST example verified by derivation: with a fall-back day inside the window, 30 calendar days = 721 h so a 720 h window starts 1 h later and can miss an order in that hour; replacement text is neutral and consistent with 'window definition (calendar vs hours, timezone)'.",
+   "Feast page (opened via WebFetch): heading '[Alpha] On demand feature views' and 'executed in both the historical retrieval and online retrieval paths'; the page also says the transformations are executed locally and do not scale well to offline retrieval (optional caveat).",
+   "Minor wording: 'Feast documents (documented as an alpha feature)' is awkward."
+  ],
+  "parts_answered": {},
+  "evidence": [
+   {
+    "claim": "DST 25-hour day example",
+    "method": "derivation",
+    "evidence": "720 h vs 721 h"
+   },
+   {
+    "claim": "Feast on-demand executed in both paths, alpha",
+    "method": "doc",
+    "evidence": "WebFetch of docs.feast.dev feature-view"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Feast documents (documented as an alpha feature) on-demand",
+    "problem": "Redundant 'documents ... documented'.",
+    "replacement": "Feast documents on-demand (an alpha feature in its docs)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open design comparison plus parity-proof methodology.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Compute once, serve from store",
+    "tradeoff": "no second implementation vs cannot cover request-time inputs; freshness limited by pipeline"
+   },
+   {
+    "decision": "Shared transformation code in both paths",
+    "tradeoff": "one definition vs same runtime/version pinning and latency"
+   },
+   {
+    "decision": "Declarative spec compiled to SQL and service code",
+    "tradeoff": "language independence vs new DSL and generator risk"
+   },
+   {
+    "decision": "Two implementations with parity tests",
+    "tradeoff": "no re-architecture vs recurring cost, coverage-bound"
+   },
+   {
+    "decision": "Log served features and train on logs",
+    "tradeoff": "no skew by construction vs history wait and baked-in bugs"
+   },
+   {
+    "decision": "Explicit semantics (window, rounding, defaults, knowledge time)",
+    "tradeoff": "upfront specification effort vs silent drift"
+   },
+   {
+    "decision": "Replay-based parity test in CI incl. edge cases",
+    "tradeoff": "coverage and cost vs regression protection"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "options and trade-offs"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "parity procedure and worked bug"
+   }
+  ],
+  "suggested_answer_set": "concise? detailed+practical",
+  "key_concepts_findings": "specific, each discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://docs.feast.dev/getting-started/concepts/feature-view",
+    "status": "supported",
+    "evidence": "'executed in both the historical retrieval and online retrieval paths'; '[Alpha] On demand feature views'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-07-5",
+  "verdict": "correct",
+  "reasons": [
+   "Applied change is correct and consistent: late arrivals lower online values, deletions push the other way (online counts, backfill does not).",
+   "Recomputed: 1-0.97^4=11.47% (~11.5%), complement 88.5% (88 to 89%); Poisson(mean 4) alternative gives 88.7%, consistent. 'cancelled-then-deleted ... expect somewhat lower' consistent.",
+   "Unsourced: the TTL sentence states a generic behaviour; Feast docs only say TTL limits historical lookback, so hedge it."
+  ],
+  "parts_answered": {},
+  "evidence": [
+   {
+    "claim": "11.5% / 88.5%",
+    "method": "executed",
+    "evidence": "1-0.97**4=0.1147"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "its TTL decides when a stale value is treated as missing",
+    "problem": "Store-dependent; not verified for a specific store (Feast page only documents TTL for historical lookback).",
+    "replacement": "its TTL (in stores that enforce one) decides when a stale value is treated as missing"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Subtle bitemporal leakage with quantified diagnosis.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "mechanism and repair"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked example and audit"
+   }
+  ],
+  "suggested_answer_set": "concise? detailed+practical",
+  "key_concepts_findings": "specific, each discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "its TTL decides when a stale value is treated as missing"
+  ],
+  "code_patch": null,
+  "sources_to_drop": []
+ }
+]

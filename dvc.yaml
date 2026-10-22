@@ -1,0 +1,30 @@
+# DVC pipeline - deliberately ONE stage. See docs/REPRODUCIBILITY.md ("What DVC is, and is not, used for").
+# Corpus CSVs, manifests, fingerprints and the frozen Stage 3C data stay in Git: they are small (< 4 MB each) and already protected by the project's own
+# sha256 controls (src/retrieval/corpus.py, scripts/stage3c2_freeze_v2.py, scripts/check_integrity.py). DVC adds value only for DERIVED BINARY artifacts that
+# are git-ignored today: the FAISS indexes and the embedding cache.
+stages:
+  build_index:
+    desc: Verify corpus integrity, then rebuild the FAISS index + embedding cache with the project's own CLI. Needs the embedding model in the local HF cache (never downloads).
+    cmd: >-
+      python scripts/check_integrity.py &&
+      python -m src.retrieval.cli build --backend ${embedding.backend} --doc-mode ${embedding.doc_mode} --model ${embedding.model} --local-files-only
+    deps:
+      - data/retrieval/corpus_manifest.json
+      - data/curated/v5/curated_questions.csv
+      - data/curated/v5/code_tests.json
+      - data/expansion/batch_01/batch_01_accepted.csv
+      - data/expansion/batch_02/batch_02_accepted.csv
+      - data/expansion/batch_03/batch_03_accepted.csv
+      - data/expansion/batch_04/batch_04_accepted.csv
+      - src/retrieval
+    params:
+      - embedding.backend
+      - embedding.doc_mode
+      - embedding.model
+    outs:
+      - data/retrieval/index:
+          cache: true
+          persist: true
+      - data/retrieval/cache:
+          cache: true
+          persist: true

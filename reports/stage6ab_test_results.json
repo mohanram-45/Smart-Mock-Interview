@@ -1,0 +1,96 @@
+{
+ "date": "2026-10-15",
+ "environment": "Linux, Python 3.13.16, docker 29.8.2, dvc 3.67.1, mlflow 3.17.1",
+ "results": [
+  {
+   "check": "Evaluation tests",
+   "command": "python -m pytest tests/evaluation -q",
+   "result": "426 passed, 2 skipped (jsonschema not installed in this venv; installed in CI)"
+  },
+  {
+   "check": "Retrieval tests",
+   "command": "python -m pytest tests/retrieval -q",
+   "result": "137 passed, 1 skipped (needs sentence-transformers; heavy workflow)"
+  },
+  {
+   "check": "Flask integration (legacy routes golden tests, demo, E2E journeys)",
+   "command": "python -m pytest tests/app -q",
+   "result": "199 passed, 5 skipped (real MiniLM not available offline)"
+  },
+  {
+   "check": "Static code-evaluation",
+   "command": "python -m pytest tests/codeeval -q",
+   "result": "42 passed, 1 skipped (needs a Docker daemon plus the code-check image; deliberately not run)"
+  },
+  {
+   "check": "New MLOps tests (observability, privacy, startup safety, packaging, CI structure)",
+   "command": "python -m pytest tests/mlops -q (no MLflow installed)",
+   "result": "36 passed, 1 module skipped (MLflow tracking)"
+  },
+  {
+   "check": "New MLOps tests incl. MLflow tracking (50 tests)",
+   "command": "python -m pytest tests/mlops -q (full mlflow 3.17)",
+   "result": "50 passed"
+  },
+  {
+   "check": "Dataset / frozen-experiment integrity",
+   "command": "python scripts/check_integrity.py",
+   "result": "INTEGRITY OK, no drift (corpus 666 records, freeze v2, bench_v2)"
+  },
+  {
+   "check": "MLflow vs source files",
+   "command": "python scripts/mlflow_import_history.py --verify",
+   "result": "30 runs, 642 metrics: all match"
+  },
+  {
+   "check": "Lint",
+   "command": "ruff check (whole repo, correctness rules); ruff check + ruff format --check (new files)",
+   "result": "clean"
+  },
+  {
+   "check": "CI workflows",
+   "command": "actionlint .github/workflows/*.yml",
+   "result": "clean (never executed on GitHub)"
+  },
+  {
+   "check": "Compose file",
+   "command": "docker compose config; docker compose --profile ollama config",
+   "result": "valid"
+  },
+  {
+   "check": "Docker image (substitute py3.13 base)",
+   "command": "docker build; docker run (read-only, cap-drop ALL, non-root); docker compose up --no-build",
+   "result": "built; healthy; /demo 200; sessions persist across container recreation"
+  },
+  {
+   "check": "DVC",
+   "command": "dvc repro / status / checkout (dev-LSA backend); dvc add/push/pull (stand-in checkpoint)",
+   "result": "stage runs; outputs restored from cache; rebuilt index.faiss sha256 equals recorded; checkpoint hash identical"
+  },
+  {
+   "check": "Browser: stage 6A journey (stand-in scorer)",
+   "command": "scripts/stage6a_browser_journey.py",
+   "result": "47/47"
+  },
+  {
+   "check": "Browser: stage 4B journey",
+   "command": "scripts/stage4b_browser_journey.py",
+   "result": "31/31"
+  },
+  {
+   "check": "Browser: stage 4D journey",
+   "command": "scripts/stage4d_browser_journey.py",
+   "result": "25/25"
+  },
+  {
+   "check": "Browser smoke against the Docker container (real app, no scorers installed)",
+   "command": "scripts/stage6b_browser_smoke.py",
+   "result": "16/16: honest 'scorer unavailable' state, interview completes, metrics +1/+1/+5, no answer text in metrics"
+  },
+  {
+   "check": "Stage 3C-2 freeze v2",
+   "command": "python scripts/stage3c2_freeze_v2.py verify",
+   "result": "freeze v2 verified: no drift"
+  }
+ ]
+}

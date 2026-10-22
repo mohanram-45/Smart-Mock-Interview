@@ -1,0 +1,1577 @@
+[
+ {
+  "plan_id": "B3-MLO-03-1",
+  "verdict": "correct",
+  "reasons": [
+   "Sound conceptual answer covering both parts.",
+   "Two sentences attribute to MLflow's page things it does not state (version immutability, who-moved-it audit record); hedge them."
+  ],
+  "parts_answered": {
+   "what a registry adds beyond a folder": true,
+   "situation where a folder is enough": true
+  },
+  "evidence": [
+   {
+    "claim": "Each new registration increments the version",
+    "method": "doc",
+    "evidence": "Registry page: 'Each new model registered to the same model name increments the version number.'"
+   },
+   {
+    "claim": "Aliases are mutable named references",
+    "method": "doc",
+    "evidence": "'Model aliases allow you to assign a mutable, named reference to a particular version'"
+   },
+   {
+    "claim": "Lineage to producing run",
+    "method": "doc",
+    "evidence": "'linked to the MLflow run, logged model or notebook that produced it'"
+   },
+   {
+    "claim": "Immutable version / audit record of who moved the pointer",
+    "method": "background_only",
+    "evidence": "Not stated on the cited page; access control is mentioned only for managed backends."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "(MLflow's registry documents this behaviour)",
+    "problem": "The cited page documents that each registration increments the version number; it does not state that versions are immutable.",
+    "replacement": "(MLflow's registry documents the incrementing version number; treating a version as immutable is the intended usage rather than something that page spells out)"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "and the registry keeps a record of who moved it and when",
+    "problem": "Audit history of alias moves is not documented on the cited page; it depends on the registry/backend.",
+    "replacement": "and a registry with auditing enabled can record who moved it and when"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Comparison of storage vs managed model identity plus a judgement on when simplicity wins; no calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer is appropriate; no other fields."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "'signature' is only mentioned once in the answer; acceptable. Others discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0275",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/ml/model-registry/",
+    "status": "partially",
+    "evidence": "Supported: 'Each new model registered to the same model name increments the version number.'; lineage 'linked to the MLflow run, logged model or notebook that produced it'; tags; 'Model aliases allow you to assign a mutable, named reference to a particular version of a registered model.' Not on the page: version immutability, audit trail of who moved an alias (access control only for managed backends)."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Governance (approvals, audit trail) is generic registry capability; not documented for open-source MLflow on the cited page."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-03-2",
+  "verdict": "pass",
+  "reasons": [
+   "Both failure modes (version coupling, unpickle code execution) explained and tied to the loading path; fixes are concrete and correctly hedged.",
+   "All doc claims verified (pickle warning, instance-data-only, hmac suggestion, sklearn unsupported cross-version load, joblib pickle-based)."
+  ],
+  "parts_answered": {
+   "explain compatibility problem": true,
+   "explain security problem": true,
+   "what to change in loading path": true
+  },
+  "evidence": [
+   {
+    "claim": "Pickle can execute arbitrary code during unpickling; only instance data pickled; hmac signing",
+    "method": "doc",
+    "evidence": "Python pickle docs quotes (see sources_findings)."
+   },
+   {
+    "claim": "sklearn: loading across versions unsupported, InconsistentVersionWarning, different results or crash; joblib pickle-based",
+    "method": "doc",
+    "evidence": "scikit-learn model_persistence page quotes."
+   },
+   {
+    "claim": "Practical loader contract order (hash check before deserialization, version check, smoke test)",
+    "method": "derivation",
+    "evidence": "Order is logically required: deserialization is the dangerous step, so integrity must be checked first."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Needs mechanism knowledge of pickle and a layered remediation, but no heavy computation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Rigorous diagnosis and fix list."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete loader contract with a test plan, not a paraphrase."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Specific and all discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0023",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://docs.python.org/3/library/pickle.html",
+    "status": "supported",
+    "evidence": "'execute arbitrary code during unpickling'; 'Only the instance data are pickled'; 'Consider signing data with hmac if you need to ensure that it has not been tampered with.'"
+   },
+   {
+    "url": "https://scikit-learn.org/stable/model_persistence.html",
+    "status": "supported",
+    "evidence": "'no supported ways to load a model trained with a different version'; 'could give different and unexpected results, or even crash your Python process'; InconsistentVersionWarning; joblib 'Pickle based format'; ONNX 'Serve models without a Python environment', 'Not all scikit-learn models are supported', 'arbitrary computations can be represented ... sandboxed environment'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Suggested alternative formats (item 6) are hedged and unsourced; acceptable."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-03-3",
+  "verdict": "correct",
+  "reasons": [
+   "Good structure, but the claim that float32 alone plausibly explains 0.8% label flips is overstated; skl2onnx docs say float vs double comparison gives the same result in most cases, and a 0.8% flip rate would need that share of rows within rounding error of a split/threshold.",
+   "The practical 'all 1,600 flips within 1e-4' branch is presented as the expected benign outcome but is itself implausible for a continuous score."
+  ],
+  "parts_answered": {
+   "what ONNX fixes": true,
+   "what can still differ": true,
+   "how to test export": true,
+   "does ONNX guarantee identical behaviour (explicit no)": true
+  },
+  "evidence": [
+   {
+    "claim": "200,000 x 0.8% = 1,600 rows",
+    "method": "executed",
+    "evidence": "Arithmetic checked."
+   },
+   {
+    "claim": "Float64 vs float32 final-score rounding is tiny",
+    "method": "executed",
+    "evidence": "100-tree GradientBoostingClassifier on 20k rows, sklearn 1.9.1: max |p - sigmoid(float32(decision_function))| = 1.2e-8; fraction of rows with |p-0.5|<1e-4 was 0.0. So flips from rounding alone are rare."
+   },
+   {
+    "claim": "ONNX IR: portable serialized graph; model must name opsets; runtime must support all operators or reject",
+    "method": "doc",
+    "evidence": "IR.md quotes."
+   },
+   {
+    "claim": "sklearn guide: ONNX needs no Python env, not all estimators supported, arbitrary computation -> sandbox",
+    "method": "doc",
+    "evidence": "model_persistence quotes."
+   },
+   {
+    "claim": "Tree threshold comparisons in float vs double can differ",
+    "method": "doc",
+    "evidence": "skl2onnx: 'A decision tree compares features to thresholds. In most cases, float and double comparison gives the same result.' but 'the probability that both comparisons give different results is not null.'"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "detailed_answer",
+    "claim": "A 0.8% label difference is plausible from this alone, but it is a hypothesis to check, not a conclusion.",
+    "problem": "Overstated. Float32 rounding flips a row only if its feature is within rounding error of a split or its score within rounding error of the threshold; for a continuous score that is far below 0.8% of rows. skl2onnx docs: in most cases float and double comparison gives the same result.",
+    "replacement": "Float32 rounding alone usually flips far fewer rows than 0.8% (it needs that share of rows to sit within rounding error of a split or of the decision threshold; the skl2onnx documentation says float and double comparisons give the same result in most cases), so treat a 0.8% difference as a sign of a real discrepancy, such as unseen-category or missing-value handling, scaler dtype, or preprocessing outside the graph, until the margin analysis shows otherwise."
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "If all 1,600 have |p - threshold| < 1e-4, the flips are numeric ties at the threshold and acceptable",
+    "problem": "Internally inconsistent with a realistic score distribution: it would put 0.8% of all rows within 1e-4 of the threshold (density ~40x average); possible only for quantised/tied scores.",
+    "replacement": "If all 1,600 have |p - threshold| < 1e-4 (unlikely for a continuous score, since it would put 0.8% of all rows within 1e-4 of the threshold; look for quantised or tied scores), the flips are numeric ties at the threshold and acceptable"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Combines export semantics, numerics, and a quantitative parity-test design; requires judging whether an observed discrepancy is explainable.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Explains guarantees and non-guarantees."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked parity-test procedure with acceptance numbers and bisection; not a paraphrase."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Specific and all discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0026",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://github.com/onnx/onnx/blob/main/docs/IR.md",
+    "status": "supported",
+    "evidence": "'ONNX specifies the portable, serialized format of a computation graph.'; 'Each model MUST explicitly name the operator sets that it relies on'; 'An implementation must support all operators in the set or reject the model.'; 'Operator sets other than the default operator set MUST specify a domain'. No numeric-precision guidance (not claimed)."
+   },
+   {
+    "url": "https://scikit-learn.org/stable/model_persistence.html",
+    "status": "supported",
+    "evidence": "'no supported ways to load a model trained with a different version'; 'could give different and unexpected results, or even crash your Python process'; InconsistentVersionWarning; joblib 'Pickle based format'; ONNX 'Serve models without a Python environment', 'Not all scikit-learn models are supported', 'arbitrary computations can be represented ... sandboxed environment'."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "sklearn-onnx: Issues when switching to float (float vs double)",
+    "url": "https://onnx.ai/sklearn-onnx/auto_tutorial/plot_ebegin_float_double.html",
+    "supports": "Float/double comparisons in trees usually agree but can differ; ONNX-ML TreeEnsemble historically uses float coefficients.",
+    "quote": "A decision tree compares features to thresholds. In most cases, float and double comparison gives the same result.",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Acceptance tolerances (1e-4 max, 1e-6 for 99.9%) are labelled as choices to justify; fine."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-03-4",
+  "verdict": "correct",
+  "reasons": [
+   "Correctly separates type/shape contract from semantic validity; MLflow behaviour (reject string->double, reject lossy float->long) confirmed in source.",
+   "Minor: integer inference claim is too broad (a float column holding whole numbers stays double)."
+  ],
+  "parts_answered": {
+   "which clients a signature catches": true,
+   "which it cannot": true,
+   "what to add": true
+  },
+  "evidence": [
+   {
+    "claim": "Signature = expected format of inputs/outputs/params, inferred from input_example",
+    "method": "doc",
+    "evidence": "MLflow signatures page: 'Defines the expected format for model inputs, outputs, and parameters.'; 'MLflow automatically generates model signatures when you provide an input_example'."
+   },
+   {
+    "claim": "String for double and float for long are rejected by MLflow schema enforcement; int->double allowed only in safe cases",
+    "method": "doc",
+    "evidence": "mlflow/models/utils.py: '# NB: conversion between incompatible types (e.g. floats -> ints or double -> float) are not allowed.' and error 'Can not safely convert ...'. Strings reach the same error by control flow (no explicit rule). Source code, not prose docs."
+   },
+   {
+    "claim": "Hours vs days is type-correct",
+    "method": "derivation",
+    "evidence": "Both are numeric longs; no type rule can distinguish units."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "a column that happens to hold whole numbers in the example becomes an integer type even if the model should accept doubles",
+    "problem": "Too broad: inference follows the dtype of the example (Python ints / int64 become integer; a float64 column holding 34.0 stays double). Not stated on the cited page.",
+    "replacement": "a column whose example values are integers (for instance Python ints or an int64 column) is inferred as an integer type even if the model should accept doubles"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Application of schema validation limits to concrete failure cases with layered mitigations.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer suffices."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Specific and all discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0040",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/ml/model/signatures/",
+    "status": "partially",
+    "evidence": "Supports: signature defines expected format; inferred from input_example. Page excerpt does not cover type-coercion or integer-inference rules (the answer hedges coercion as serving-layer dependent)."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "MLflow source: _enforce_mlflow_datatype (mlflow/models/utils.py)",
+    "url": "https://raw.githubusercontent.com/mlflow/mlflow/master/mlflow/models/utils.py",
+    "supports": "Lossy float->int conversion is rejected rather than truncated; error 'Can not safely convert'.",
+    "quote": "# NB: conversion between incompatible types (e.g. floats -> ints or double -> float) are not allowed. While supported by pandas and numpy, these conversions alter the values significantly.",
+    "type": "secondary"
+   }
+  ],
+  "unsourced_claims": [
+   "Integer inference from an example (now hedged in replacement)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-03-5",
+  "verdict": "correct",
+  "reasons": [
+   "Complete design covering record, packaging, promotion/rollback and atomicity.",
+   "Hedge two statements attributed to or implied by MLflow docs (versions never change; alias update atomic)."
+  ],
+  "parts_answered": {
+   "what each version records": true,
+   "how model is packaged": true,
+   "promotion with aliases": true,
+   "rollback with aliases": true,
+   "what is/is not atomic": true,
+   "behaviour-equivalence tolerance": true
+  },
+  "evidence": [
+   {
+    "claim": "Alias is a mutable named reference",
+    "method": "doc",
+    "evidence": "MLflow registry page."
+   },
+   {
+    "claim": "Lineage links version to run",
+    "method": "doc",
+    "evidence": "'linked to the MLflow run ... that produced it'"
+   },
+   {
+    "claim": "Day arithmetic in practical (Day 5 -> Day 26 = 21 days; 7 days to Day 33)",
+    "method": "derivation",
+    "evidence": "Checked."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Versions never change; aliases",
+    "problem": "Immutability is a design rule not stated by the cited page.",
+    "replacement": "Versions should never change (treat them as immutable by convention); aliases"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "The pointer update is atomic in the registry",
+    "problem": "Atomicity is not documented on the cited page; it depends on the registry backend (a single-row write in typical database-backed registries).",
+    "replacement": "A single alias update is one registry write (atomic in typical database-backed registries, though the cited page does not state it)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open design with reproducibility, immutability, rollout semantics and retention trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Immutable versions with content digest of artifact",
+    "tradeoff": "Guarantees 'v39' is one artifact vs storage cost and need for retention policy"
+   },
+   {
+    "decision": "Record lineage: commit, data snapshot id, config, seeds, feature-definition version",
+    "tradeoff": "Enables rebuild/audit vs discipline to log it at training time"
+   },
+   {
+    "decision": "Package or version preprocessing with the model",
+    "tradeoff": "Behavioural equivalence vs coupling model releases to feature code"
+   },
+   {
+    "decision": "Lockfile with hashes plus base image by digest, retain images (or rebuild path)",
+    "tradeoff": "Reproducible environment vs registry storage and cleanup-job risk"
+   },
+   {
+    "decision": "Promote by moving an alias; record resolved version+image digest in the deployment record",
+    "tradeoff": "Atomic registry pointer vs replicas only change on redeploy/re-resolve"
+   },
+   {
+    "decision": "Define equivalence as agreement within tolerance on a replay set; rehearse rollback",
+    "tradeoff": "Realistic across hardware vs bit-exactness"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "66 words; genuinely shorter, consistent with detailed."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Rationale and caveats."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked audit replay and rollback drill; adds new steps."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "Specific and all discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0034",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/ml/model-registry/",
+    "status": "partially",
+    "evidence": "Supported: 'Each new model registered to the same model name increments the version number.'; lineage 'linked to the MLflow run, logged model or notebook that produced it'; tags; 'Model aliases allow you to assign a mutable, named reference to a particular version of a registered model.' Not on the page: version immutability, audit trail of who moved an alias (access control only for managed backends)."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Base image digest pinning vs tags, lockfile hashes: standard practice, unsourced."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-04-1",
+  "verdict": "correct",
+  "reasons": [
+   "Good mode selection and hybrid discussion.",
+   "Question asks to justify each case on cost; case (c) has no cost statement."
+  ],
+  "parts_answered": {
+   "(a) choice+latency/freshness/cost/failure": true,
+   "(b) choice+...": true,
+   "(c) latency/freshness/failure": true,
+   "(c) cost": false,
+   "where hybrid beats pure": true
+  },
+  "evidence": [
+   {
+    "claim": "At-least-once delivery requires deduplicated/idempotent alerts",
+    "method": "background_only",
+    "evidence": "Standard stream-processing property; no source opened."
+   },
+   {
+    "claim": "Batch idempotent partition overwrite",
+    "method": "background_only",
+    "evidence": "Standard practice."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "Apply backpressure rather than dropping data silently.",
+    "problem": "Cost dimension for (c) requested by the question is missing.",
+    "replacement": "Apply backpressure rather than dropping data silently. Cost is a continuously running, stateful cluster sized for the peak of 50,000 events/s, so keep the per-event model light."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mapping requirements to serving modes; no heavy computation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "(a) Scheduled batch with partitioned, retried, idempotent writes",
+    "tradeoff": "Cheapest and simplest; week-old freshness acceptable, failure leaves last output in place"
+   },
+   {
+    "decision": "(b) Online endpoint with latency budget and precomputed slow features in a key-value store",
+    "tradeoff": "Meets 100 ms but pays for peak capacity and feature-store complexity"
+   },
+   {
+    "decision": "(b) Streaming job maintaining 10-minute aggregates into the store",
+    "tradeoff": "Freshness vs operating a streaming pipeline and training/serving skew risk"
+   },
+   {
+    "decision": "(b) Pre-agreed fallback decision on timeout",
+    "tradeoff": "Checkout availability vs fraud risk during degraded scoring"
+   },
+   {
+    "decision": "(c) Stateful stream processor with windows, event time, checkpointing, dedup of alerts",
+    "tradeoff": "Seconds-level alerts vs complexity of late/out-of-order data and at-least-once delivery"
+   },
+   {
+    "decision": "Hybrid: batch heavy features/embeddings + light online model; or lookup of precomputed predictions",
+    "tradeoff": "Removes inference from the request path vs staleness"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer appropriate."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Specific and all discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0039",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Streaming delivery semantics and batch idempotency are general engineering practice; no source needed beyond textbook."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-04-2",
+  "verdict": "pass",
+  "reasons": [
+   "Payload arithmetic reproduced exactly; protocol trade-offs correct and appropriately hedged; payload-first insight is valuable."
+  ],
+  "parts_answered": {
+   "move to gRPC?": true,
+   "checks before the move": true,
+   "checks after the move": true,
+   "payload size arithmetic": true
+  },
+  "evidence": [
+   {
+    "claim": "150,528 floats as JSON text ~3.05 MB; raw float32 0.602 MB (~5.07x); 4-decimal rounding 1.19 MB",
+    "method": "executed",
+    "evidence": "json.dumps of 150,528 random doubles: 3.0509 MB; rounded to 4 d.p.: 1.1877 MB; 150528*4 = 602,112 bytes."
+   },
+   {
+    "claim": "300 req/s: 0.915 GB/s JSON (7.3 Gbit/s) vs 0.181 GB/s raw",
+    "method": "executed",
+    "evidence": "300 x 3.0509 MB = 0.915 GB/s; x 602,112 B = 0.181 GB/s."
+   },
+   {
+    "claim": "gRPC has no default deadline; always set one; propagation",
+    "method": "doc",
+    "evidence": "grpc.io deadlines guide."
+   },
+   {
+    "claim": "Browsers cannot call native gRPC; need gRPC-Web proxy",
+    "method": "doc",
+    "evidence": "gRPC-Web basics: 'we will use the Envoy proxy to forward the gRPC browser request to the backend server'."
+   },
+   {
+    "claim": "Connection-level balancing pins long-lived HTTP/2 connections",
+    "method": "doc",
+    "evidence": "gRPC LB blog: L7 LB can 'distribute the streams from one client among multiple backends'; L4 works at connection level (implication)."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Trade-off decision plus quick arithmetic; no deep derivation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Fix the payload first (send encoded image or binary tensor, preprocess server-side)",
+    "tradeoff": "Largest bandwidth/CPU win vs moving preprocessing to server"
+   },
+   {
+    "decision": "Adopt gRPC/protobuf for the internal route",
+    "tradeoff": "Compact binary, typed contract, HTTP/2 vs tooling/debuggability and L7/client-side balancing needs"
+   },
+   {
+    "decision": "Set explicit deadlines (within 150 ms budget) and propagate",
+    "tradeoff": "Prevents unbounded waits vs tuning from measured latency"
+   },
+   {
+    "decision": "Keep REST (or gRPC-Web gateway) for browser dashboard",
+    "tradeoff": "Browser compatibility vs two protocols to maintain"
+   },
+   {
+    "decision": "Benchmark p50/p95/p99 and CPU per request before/after; run both routes during deprecation",
+    "tradeoff": "Evidence-based and reversible vs temporary duplicate operation"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "71 words; numbers consistent with detailed (3.05 MB, 0.60 MB, 5x, 0.9 vs 0.18 GB/s)."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Adds deadlines, balancing, browser constraints and checks."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "Specific and all discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0037",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://grpc.io/docs/guides/deadlines/",
+    "status": "supported",
+    "evidence": "'By default, gRPC does not set a deadline'; 'you should always explicitly set a realistic deadline in your clients'; deadline propagation 'is supported by some gRPC implementations'."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "gRPC Load Balancing (gRPC blog)",
+    "url": "https://grpc.io/blog/grpc-load-balancing/",
+    "supports": "Proxy (L7) balancing can spread streams of one HTTP/2 connection across backends, which L3/L4 balancing does not; client-side balancing alternative.",
+    "quote": "With HTTP/2, LB can distribute the streams from one client among multiple backends.",
+    "type": "official_doc"
+   },
+   {
+    "title": "gRPC-Web basics (grpc.io)",
+    "url": "https://grpc.io/docs/platforms/web/basics/",
+    "supports": "Browser clients reach gRPC services through gRPC-Web with a proxy such as Envoy.",
+    "quote": "we will use the Envoy proxy to forward the gRPC browser request to the backend server",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Encoded image size being 'a small fraction' of raw tensor is hedged with 'typically'."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-04-3",
+  "verdict": "correct",
+  "reasons": [
+   "Code is correct; tests and all reported numbers reproduce on Python 3.10, 3.11, 3.13; fenced code equals tested solution; stdlib only.",
+   "max_wait=0 does not mean 'no batching': requests queued behind a busy worker still batch (sizes [1,3] for arrivals [0,1,2,3], max_batch 8). Two statements overstate this."
+  ],
+  "parts_answered": {
+   "simulate_microbatch": true,
+   "percentile nearest-rank": true,
+   "ValueError cases": true,
+   "explanation for 1000/s and 50/s with overhead 10, per_item 0.5": true
+  },
+  "evidence": [
+   {
+    "claim": "Hand cases: [0,1,2,3],2,5,10,2 -> [15,14,27,26]; lone request 17; [0,4,6] -> [19,15,25]",
+    "method": "executed",
+    "evidence": "Re-derived by hand and passed on 3.10/3.11/3.13."
+   },
+   {
+    "claim": "p95 18,051 / 260.5 / 38 (mean batch 19.6) at 1/ms; 10.5 and 15.5 at 1/20ms",
+    "method": "executed",
+    "evidence": "Re-ran: 18051.0 (first 10.5, last 19001.0); 260.5; 38.0, mean batch 19.607; {10.5}; {15.5} with all batch sizes 1."
+   },
+   {
+    "claim": "32 requests per 26 ms capacity > 1/ms arrival",
+    "method": "derivation",
+    "evidence": "10 + 0.5*32 = 26 ms for 32 requests = 1.23/ms; 16-batch capacity 16/18 = 0.889/ms < 1 (queue grows)."
+   },
+   {
+    "claim": "Dispatch = max(free, min(full_time, oldest+max_wait))",
+    "method": "derivation",
+    "evidence": "Matches the stated rule."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "max_wait = 0 (no batching)",
+    "problem": "With max_wait=0 requests already queued behind a busy worker, or arriving simultaneously, are still batched (arrivals [0,1,2,3], max_batch 8, max_wait 0, overhead 10, per_item 1 -> sizes [1,3]).",
+    "replacement": "max_wait = 0 (a batch contains only requests already waiting, so batching still occurs under backlog or simultaneous arrivals; only max_batch=1 disables it)"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "max_wait=0 gives unbatched latencies",
+    "problem": "True only for the widely spaced arrivals in that test case.",
+    "replacement": "max_wait=0 with widely spaced arrivals gives unbatched latencies"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Needs a precise event-driven dispatch rule with worker-busy interaction plus interpretation of load regimes.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Rule derivation, edge cases, interpretation."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Reference code plus observed results; distinct."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Specific and all discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0035",
+   "same_intent": false
+  },
+  "code_findings": "Ran provided test on python3 (3.13.16), v310 (3.10.20), v311 (3.11.17): pass. Own edge cases all pass on all three: empty arrivals -> ([],[]); five simultaneous arrivals max_batch 2 max_wait 5 -> sizes [2,2,1], latencies [12,12,24,24,35]; backlog with max_wait 0 -> sizes [1,3]; max_batch=0 and max_wait<0 raise ValueError; percentile([]) raises; percentile([1,2,3,4],50)=2, 100->4, tiny p->1; full batch before timeout dispatches immediately ([0,1],2,100 -> [13,12]); arrival exactly at dispatch time included. Fenced code is byte-identical to code.solution. Only math imported; no 3.11+ features. Suggest (optional) adding a test for the backlog case.",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-04-4",
+  "verdict": "correct",
+  "reasons": [
+   "Diagnosis and Little's-law sizing are right (33 rps/replica, 24 in flight, 6 replicas at 100%, 10 at 60%).",
+   "The '9,000 requests' figure assumes 200 rps from t=0 although traffic ramps over two minutes.",
+   "Practical policy sets a scheduled minimum of 4 replicas, which cannot carry the 09:00 ramp (4 x 33 = 133 rps < 200) and contradicts its own verification target."
+  ],
+  "parts_answered": {
+   "diagnose failure": true,
+   "why CPU metric silent": true,
+   "redesign scaling signal": true,
+   "startup lag": true,
+   "overload protection": true
+  },
+  "evidence": [
+   {
+    "claim": "4 / 0.12 = 33.3 rps per replica; 3 replicas ~100 rps",
+    "method": "executed",
+    "evidence": "Arithmetic."
+   },
+   {
+    "claim": "Little's law 200 x 0.12 = 24 in flight; 24/4 = 6 replicas; 24/2.4 = 10; 6/2.4 = 2.5 -> 3",
+    "method": "executed",
+    "evidence": "Arithmetic."
+   },
+   {
+    "claim": "Excess backlog during 90 s lag",
+    "method": "executed",
+    "evidence": "With linear ramp 50->200 rps over 120 s and 100 rps capacity, reactive scaling starting when saturation begins (t=40 s) yields ~5,000 queued requests by t=130 s; 100 rps x 90 s = 9,000 is the upper bound."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "detailed_answer",
+    "claim": "at least roughly 9,000 requests",
+    "problem": "Treats the surplus as 100 rps for the full 90 s, but traffic ramps over 2 minutes; 9,000 is an upper bound, not a lower bound.",
+    "replacement": "up to roughly 9,000 requests (fewer while the ramp is still climbing)"
+   },
+   {
+    "severity": "major",
+    "field": "practical_answer",
+    "claim": "minimum 4 replicas on weekdays from 08:45 (scheduled)",
+    "problem": "4 replicas give ~133 rps, below the 200 rps peak; with 90 s start-up the 09:00 ramp would still overload, contradicting the 'p99 under SLO' verification and the 10 replicas computed for peak.",
+    "replacement": "scheduled minimum of 10 replicas on weekdays from 08:45 (the sized peak requirement), 3 otherwise"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-step capacity arithmetic plus control-loop lag reasoning and layered redesign.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Diagnosis, arithmetic, principles."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete policy parameters and verification; distinct (after fix, consistent with 10-replica peak)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Specific and all discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0036",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "status": "supported",
+    "evidence": "'How \"full\" your service is.' (saturation); 'It's important to distinguish between the latency of successful requests and the latency of failed requests.'; warns against designing on the mean; 'it's better to spend much more effort on catching symptoms than causes'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Autoscaler behaviours (stabilisation window, scale-up percent policies) are described generically; Kubernetes HPA page could not be read in full, so no source added."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-04-5",
+  "verdict": "pass",
+  "reasons": [
+   "Retry amplification arithmetic is correct (1.875x; 80% x 1.875 = 150%); mitigations are standard and correctly attributed.",
+   "Retry-budget (about 10%) is supported by SRE book 'Handling Overload'."
+  ],
+  "parts_answered": {
+   "mechanism": true,
+   "client changes": true,
+   "server changes": true,
+   "timeouts": true,
+   "retries": true,
+   "idempotency": true,
+   "fallbacks": true
+  },
+  "evidence": [
+   {
+    "claim": "1 + f + f^2 + f^3 = 1.875 at f=0.5; 0.8 x 1.875 = 1.5",
+    "method": "executed",
+    "evidence": "Arithmetic."
+   },
+   {
+    "claim": "gRPC: no default deadline, propagate deadlines",
+    "method": "doc",
+    "evidence": "grpc.io deadlines guide."
+   },
+   {
+    "claim": "Distinguish latency of failed vs successful requests",
+    "method": "doc",
+    "evidence": "SRE book monitoring chapter."
+   },
+   {
+    "claim": "Retry budget ~10%, per-request cap of 3, randomized exponential backoff",
+    "method": "doc",
+    "evidence": "SRE book handling-overload / addressing-cascading-failures."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Positive-feedback analysis with quantification and multi-layer mitigations.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer appropriate."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Specific and all discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0027",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://grpc.io/docs/guides/deadlines/",
+    "status": "supported",
+    "evidence": "'By default, gRPC does not set a deadline'; 'you should always explicitly set a realistic deadline in your clients'; deadline propagation 'is supported by some gRPC implementations'."
+   },
+   {
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "status": "supported",
+    "evidence": "'How \"full\" your service is.' (saturation); 'It's important to distinguish between the latency of successful requests and the latency of failed requests.'; warns against designing on the mean; 'it's better to spend much more effort on catching symptoms than causes'."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Handling Overload (Google SRE Book)",
+    "url": "https://sre.google/sre-book/handling-overload/",
+    "supports": "Client-side retry budget of about 10% and per-request cap of three attempts.",
+    "quote": "A request will only be retried as long as this ratio is below 10%.",
+    "type": "official_doc"
+   },
+   {
+    "title": "Addressing Cascading Failures (Google SRE Book)",
+    "url": "https://sre.google/sre-book/addressing-cascading-failures/",
+    "supports": "Randomized exponential backoff, limit retries, load shedding, server should not keep working past the deadline, deadline propagation.",
+    "quote": "Always use randomized exponential backoff when scheduling retries.",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Circuit breaker pattern: not covered by the SRE chapter fetched; general practice."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-04-6",
+  "verdict": "correct",
+  "reasons": [
+   "Solid log schema, golden-signal mapping, paging policy, volume arithmetic (43.2M/day, ~43 GB/day) verified.",
+   "The question asks which latency statistic to alert on; answer implies SLO-burn on fraction slow but never says so explicitly.",
+   "Practical cross-references another record ('MLO-04-7') that a standalone reader does not have."
+  ],
+  "parts_answered": {
+   "per-prediction logs": true,
+   "dashboard panels from golden signals": true,
+   "alerts": true,
+   "which latency statistic to alert on": "implicit",
+   "what not to page on": true,
+   "cost and privacy": true
+  },
+  "evidence": [
+   {
+    "claim": "500 x 86,400 = 43.2M/day; x1 KB = 43.2 GB/day",
+    "method": "executed",
+    "evidence": "Arithmetic."
+   },
+   {
+    "claim": "Golden signals; failed vs successful latency; averages hide tail; symptoms over causes",
+    "method": "doc",
+    "evidence": "SRE book monitoring chapter."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Alert on symptoms users feel: error ratio and latency SLO burn (for example, page when the share of requests slower than the latency objective burns the budget quickly).",
+    "problem": "Does not name the alerting statistic explicitly.",
+    "replacement": "Alert on symptoms users feel: error ratio and latency SLO burn. The latency statistic you alert on is the fraction of requests slower than the objective (for example 300 ms) burning the budget quickly, not the mean; p95/p99 panels support diagnosis."
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "(see MLO-04-7)",
+    "problem": "Refers to a different record; not self-contained.",
+    "replacement": "(burn-rate rules over a long and a short window, as in a standard 99.9% SLO policy)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Applies standard SRE monitoring concepts to ML serving; breadth over depth.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Structured per-request log with request id, model+feature-set version, fallback flag, latency breakdown",
+    "tradeoff": "Enables joins with outcomes and debugging vs storage and PII exposure"
+   },
+   {
+    "decision": "Golden-signal panels split by model version/route/client",
+    "tradeoff": "Catches regressions in one version vs dashboard cardinality"
+   },
+   {
+    "decision": "Page on SLO burn (error ratio and fraction slow) over multiple windows",
+    "tradeoff": "Symptom-based, low noise vs misses slow quality drift"
+   },
+   {
+    "decision": "Do not page on drift, offline accuracy, single noisy metrics; ticket/dashboard them",
+    "tradeoff": "Avoids alert fatigue vs slower reaction to model-quality problems"
+   },
+   {
+    "decision": "Sample full features (e.g. 1%), hash identifiers, set retention and access limits",
+    "tradeoff": "Cost/privacy vs ability to debug and replay"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Reasoning and volume numbers."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Example record and alert set, distinct."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Specific and all discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0024",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "status": "supported",
+    "evidence": "'How \"full\" your service is.' (saturation); 'It's important to distinguish between the latency of successful requests and the latency of failed requests.'; warns against designing on the mean; 'it's better to spend much more effort on catching symptoms than causes'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Specific thresholds (fallback >2% for 30 min) are labelled illustrative."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-04-7",
+  "verdict": "pass",
+  "reasons": [
+   "All numbers verified (15x, 4x, 2.08%, 2 days, 43.2 min, 0.9 min); multiwindow rule read correctly; parameters match workbook table."
+  ],
+  "parts_answered": {
+   "burn rate": true,
+   "budget used by the hour": true,
+   "would the page fire": true,
+   "fallback counting": true
+  },
+  "evidence": [
+   {
+    "claim": "Error budget 0.1%; burn 1.5/0.1=15, 0.4/0.1=4",
+    "method": "executed",
+    "evidence": "Arithmetic."
+   },
+   {
+    "claim": "15/720=2.083%; 30/15=2 days; 0.1% of 43,200 min=43.2 min; 15x60x0.001=0.9",
+    "method": "executed",
+    "evidence": "Arithmetic."
+   },
+   {
+    "claim": "14.4x, 1h/5m, 2% budget; 6x 6h/30m 5%; ticket 1x 3d",
+    "method": "doc",
+    "evidence": "SRE workbook Table 5-8."
+   },
+   {
+    "claim": "Short window prevents firing for an hour after recovery",
+    "method": "doc",
+    "evidence": "Workbook: alert 'ceasing to fire five minutes later, rather than one hour later.'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short calculation chain and rule interpretation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer appropriate."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Specific and all discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0036",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/workbook/alerting-on-slos/",
+    "status": "supported",
+    "evidence": "'Burn rate is how fast, relative to the SLO, the service consumes the error budget.'; Table 5-8: Page, 1 hour, 5 minutes, burn rate 14.4, 2%; Page 6 hours/30 min/6/5%; Ticket 3 days/6 hours/1/10%."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Fallback accounting is a judgement, hedged with 'usually'."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-05-1",
+  "verdict": "pass",
+  "reasons": [
+   "Accurate contrast with costs; canary definition matches the workbook; combination note is correct."
+  ],
+  "parts_answered": {
+   "how canary differs from blue-green": true,
+   "cost of canary": true,
+   "cost of blue-green": true
+  },
+  "evidence": [
+   {
+    "claim": "Canary = partial, time-limited deployment with rest as control; must be representative",
+    "method": "doc",
+    "evidence": "SRE workbook canarying."
+   },
+   {
+    "claim": "Blue-green: two environments, switch router, switch back to roll back",
+    "method": "doc",
+    "evidence": "Fowler BlueGreenDeployment."
+   },
+   {
+    "claim": "Shared database/schema is a challenge",
+    "method": "doc",
+    "evidence": "Fowler: 'Databases can often be a challenge with this technique'."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Comparison with trade-offs; no calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "71 words, interview-ready."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Adds representativeness, combination, shared-state caveat."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "Specific and all discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0172",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "status": "supported",
+    "evidence": "'a partial and time-limited deployment of a change in a service and its evaluation'; rest is 'the control'; 'sizeable and last long enough to be representative'; 'just a handful of queries doesn't provide a useful signal'; 'no more than a dozen' metrics; 'pause and roll back the deployment'."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "BlueGreenDeployment (Martin Fowler)",
+    "url": "https://martinfowler.com/bliki/BlueGreenDeployment.html",
+    "supports": "Two production environments, router switch, switch back for rollback; database challenge.",
+    "quote": "if anything goes wrong you switch the router back to your blue environment.",
+    "type": "secondary"
+   }
+  ],
+  "unsourced_claims": [
+   "Duplicate capacity cost especially for GPUs: general reasoning (Fowler page does not discuss cost)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-05-2",
+  "verdict": "pass",
+  "reasons": [
+   "Correctly separates operational validation from user-response evidence; sequence shadow -> canary -> A/B -> ramp is sound; claims hedged."
+  ],
+  "parts_answered": {
+   "what shadow can tell": true,
+   "what it cannot": true,
+   "sequencing shadow/canary/A-B": true
+  },
+  "evidence": [
+   {
+    "claim": "Shadow: copy of requests to new variant, only production response returned",
+    "method": "doc",
+    "evidence": "SageMaker shadow tests page."
+   },
+   {
+    "claim": "Selection bias of logged feedback for ranking",
+    "method": "derivation",
+    "evidence": "Labels exist only for displayed items."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Applies knowledge of deployment strategies to a flawed plan.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer appropriate."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Specific and all discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0009",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "status": "supported",
+    "evidence": "'a partial and time-limited deployment of a change in a service and its evaluation'; rest is 'the control'; 'sizeable and last long enough to be representative'; 'just a handful of queries doesn't provide a useful signal'; 'no more than a dozen' metrics; 'pause and roll back the deployment'."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Shadow tests (Amazon SageMaker AI developer guide)",
+    "url": "https://docs.aws.amazon.com/sagemaker/latest/dg/shadow-tests.html",
+    "supports": "Shadow variant gets a copy of live requests; only the production variant's responses are returned; useful for latency and error rate.",
+    "quote": "Only the responses of the production variant are returned to the calling application.",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Feedback-effect and selection-bias statements are reasoning, not sourced."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-05-3",
+  "verdict": "correct",
+  "reasons": [
+   "Statistics reproduce (z=1.41, p=0.16, upper bound 0.31% = +54%, 38% power at 20k).",
+   "Sample-size figure of 58,000 depends on variance convention (about 47k with baseline variance, 56.5k with 0.26% variance, ~34k for a one-sided non-inferiority test); state it as approximate."
+  ],
+  "parts_answered": {
+   "evaluate colleague 1": true,
+   "evaluate colleague 2": true,
+   "design the check": true,
+   "delayed outcome handling": true
+  },
+  "evidence": [
+   {
+    "claim": "Expected 40 complaints, SD 6.32",
+    "method": "executed",
+    "evidence": "20,000 x 0.002 = 40; sqrt(40 x 0.998)=6.32."
+   },
+   {
+    "claim": "SE diff 0.035 pp; z=1.41; two-sided p=0.16",
+    "method": "executed",
+    "evidence": "SE with control of 1.98M requests = 0.0354 pp; z=1.410; p=0.161."
+   },
+   {
+    "claim": "One-sided 95% upper bound 0.308% (+54%)",
+    "method": "executed",
+    "evidence": "0.0025+1.645 x sqrt(0.0025 x 0.9975/20000)=0.00308."
+   },
+   {
+    "claim": "Required n for 80% power (0.20% -> 0.26%)",
+    "method": "executed",
+    "evidence": "Two-sided alpha .05: 47,251 (baseline variance), 56,5xx with 0.26% variance; one-sided: 37,601. Power at 20,000 is 38% (0.26% variance) or ~48% (baseline variance)."
+   },
+   {
+    "claim": "Dozen-level canary metric guidance; need for representative size",
+    "method": "doc",
+    "evidence": "SRE workbook canarying."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "needs about 58,000 canary requests",
+    "problem": "Figure is convention-dependent: 47k (baseline variance, two-sided), 56.5k (0.26% variance), 37.6k (one-sided).",
+    "replacement": "needs roughly 57,000 canary requests (about 47,000 if the baseline variance is used for both hypotheses)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Poisson/binomial reasoning, interval bounds and power planning with delayed outcomes.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer appropriate."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Specific and all discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0036",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "status": "supported",
+    "evidence": "'a partial and time-limited deployment of a change in a service and its evaluation'; rest is 'the control'; 'sizeable and last long enough to be representative'; 'just a handful of queries doesn't provide a useful signal'; 'no more than a dozen' metrics; 'pause and roll back the deployment'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Power/CI calculations are derivations, executed."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-05-4",
+  "verdict": "correct",
+  "reasons": [
+   "Policy structure, sample arithmetic (7.5 rps, 27,000/h, 4,500/10 min, SE 0.105 pp; 25%: 22,500, SE 0.047 pp) verified.",
+   "Outcome check at 14 days contradicts labels arriving up to 45 days late and calls the result 'matured'."
+  ],
+  "parts_answered": {
+   "comparison baseline": true,
+   "guardrail metrics": true,
+   "min samples per stage": true,
+   "example thresholds": true,
+   "manual vs automatic": true,
+   "why naive rule is poor": true
+  },
+  "evidence": [
+   {
+    "claim": "150 x 5% = 7.5 rps; 27,000/h; 4,500/10 min; 25% -> 22,500/10 min",
+    "method": "executed",
+    "evidence": "Arithmetic."
+   },
+   {
+    "claim": "SE sqrt(0.005 x 0.995/4500) = 0.105 pp; at 22,500 = 0.047 pp",
+    "method": "executed",
+    "evidence": "0.00105 and 0.000470."
+   },
+   {
+    "claim": "0.5 pp is ~4.7 SE (5 stated) ",
+    "method": "executed",
+    "evidence": "0.5/0.105 = 4.76; with control noise SE_diff slightly higher, still ~4.5."
+   },
+   {
+    "claim": "Canary with concurrent control; handful of queries gives no signal",
+    "method": "doc",
+    "evidence": "SRE workbook canarying; before/after comparison is hard because time causes change."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "practical_answer",
+    "claim": "Outcome check: 14 days after Stage 3 starts, compare matured chargeback and false-positive rates for the cohorts scored by old and new models, using the sticky assignment log.",
+    "problem": "Chargebacks arrive up to 45 days late, so nothing is matured 14 days after Stage 3 starts; also the previous model is kept warm only 7 days.",
+    "replacement": "Outcome check: run an interim comparison 14 days after Stage 3 starts (chargebacks are only partly matured, so compare same-age slices of the cohorts scored by the old and new models), and the final comparison of matured chargeback and false-positive rates once labels have had the full 45 days, using the sticky assignment log."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open-ended policy design needing statistics, delayed labels and automation boundaries.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Compare against a concurrent control with sticky assignment, not yesterday's numbers",
+    "tradeoff": "Removes time-of-day/mix effects vs needs traffic splitting"
+   },
+   {
+    "decision": "Tiered metrics: operational guardrails auto-rollback; behavioural proxies banded; outcomes verified later",
+    "tradeoff": "Fast decisions vs slow ground truth (45-day chargebacks)"
+   },
+   {
+    "decision": "Minimum samples/time per stage derived from traffic and baseline variance",
+    "tradeoff": "Statistical reliability vs longer exposure"
+   },
+   {
+    "decision": "Thresholds with margin plus persistence over consecutive windows",
+    "tradeoff": "Fewer false rollbacks vs slower detection"
+   },
+   {
+    "decision": "Automatic rollback, gated automatic promotion, human review on behavioural-band breach",
+    "tradeoff": "Speed vs risk of unintended strictness changes"
+   },
+   {
+    "decision": "Keep previous model warm and verify matured outcomes later",
+    "tradeoff": "Cheap rollback vs duplicate capacity and long tail of delayed labels"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Rationale and sample sizing."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete stage table with numbers."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Specific and all discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0006",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "status": "supported",
+    "evidence": "'a partial and time-limited deployment of a change in a service and its evaluation'; rest is 'the control'; 'sizeable and last long enough to be representative'; 'just a handful of queries doesn't provide a useful signal'; 'no more than a dozen' metrics; 'pause and roll back the deployment'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Threshold values are illustrative and labelled hypothetical."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-05-5",
+  "verdict": "correct",
+  "reasons": [
+   "Diagnosis (model rolled back, data contract not) and expand-contract remedy are right; timeline arithmetic consistent.",
+   "One statement implies a gate that blocks rollback during an incident; the gate belongs at release time (and when dropping the column)."
+  ],
+  "parts_answered": {
+   "why rollback failed": true,
+   "release structure for safe rollback": true
+  },
+  "evidence": [
+   {
+    "claim": "Parallel change = expand, migrate, contract",
+    "method": "doc",
+    "evidence": "Fowler ParallelChange."
+   },
+   {
+    "claim": "Timeline: Day 5 -> Day 26 = 21 days; Day 26 -> 33 = 7",
+    "method": "derivation",
+    "evidence": "Checked."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "Had this existed, the original rollback attempt would have been blocked with a clear message instead of silently degrading.",
+    "problem": "Blocking a rollback mid-incident is not the useful outcome; the gate should have blocked dropping the column while v6 still declared it.",
+    "replacement": "Had this existed at release time, dropping the old column would have been blocked because v6, the rollback target, still declares it; run at rollback time it at least fails loudly instead of silently degrading."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Single mechanism with a known pattern (expand-contract).",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "72 words, accurate summary."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Steps and controls."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Timeline and gate; distinct."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "Specific and all discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0029",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "ParallelChange (Martin Fowler)",
+    "url": "https://martinfowler.com/bliki/ParallelChange.html",
+    "supports": "Expand, migrate, contract for backward-incompatible interface changes.",
+    "quote": "you augment the interface to support both the old and the new versions.",
+    "type": "secondary"
+   }
+  ],
+  "unsourced_claims": [
+   "Model/feature coupling and default-branch behaviour are reasoning."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-05-6",
+  "verdict": "pass",
+  "reasons": [
+   "Balanced, hedged treatment of split unit, interference and novelty; remedies are standard."
+  ],
+  "parts_answered": {
+   "compare splitting methods for consistency": true,
+   "interference": true,
+   "explain decay": true,
+   "what to put in place": true
+  },
+  "evidence": [
+   {
+    "claim": "SRM indicates data-quality/assignment problem",
+    "method": "paper",
+    "evidence": "Fabijan et al. KDD 2019: SRM is 'a symptom for a variety of data quality issues.'"
+   },
+   {
+    "claim": "Marketplace interference biases Bernoulli randomization; cluster randomization as remedy",
+    "method": "paper",
+    "evidence": "arXiv 2004.12489 abstract."
+   },
+   {
+    "claim": "Novelty effects occur (mainly recommendations), run ~two weeks to look for decay",
+    "method": "paper",
+    "evidence": "Kohavi et al. 2014: 'novelty and primacy effects are uncommon', 'After one connects to the top recommendations, the effect of the new algorithm dies down.'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Experiment-design trade-offs; qualitative.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer appropriate."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Specific and all discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0034",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "Diagnosing Sample Ratio Mismatch in Online Controlled Experiments (Fabijan et al., KDD 2019)",
+    "url": "https://www.lukasvermeer.nl/publications/papers/2019/07/25/diagnosing-sample-ratio-mismatch-in-online-controlled-experiments.html",
+    "supports": "Sample ratio check.",
+    "quote": "Just like fever is a symptom for multiple types of illness, an SRM is a symptom for a variety of data quality issues.",
+    "type": "paper"
+   },
+   {
+    "title": "Reducing Interference Bias in Online Marketplace Pricing Experiments (arXiv 2004.12489)",
+    "url": "https://arxiv.org/abs/2004.12489",
+    "supports": "Interference in marketplace experiments; cluster randomization.",
+    "quote": "estimates obtained through Bernoulli randomized experiments are often biased due to violations",
+    "type": "paper"
+   },
+   {
+    "title": "Seven Rules of Thumb for Web Site Experimenters (Kohavi et al., KDD 2014)",
+    "url": "https://exp-platform.com/Documents/2014%20experimentersRulesOfThumb.pdf",
+    "supports": "Novelty effects can decay lift over weeks; recommends running long enough.",
+    "quote": "After one connects to the top recommendations, the effect of the new algorithm dies down.",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [
+   "Experiment-specific hash salt and switchback designs: standard practice, no source opened."
+  ],
+  "code_patch": null
+ }
+]

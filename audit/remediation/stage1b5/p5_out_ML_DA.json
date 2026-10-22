@@ -1,0 +1,323 @@
+[
+ {
+  "id": "smi-i0003",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "Calibration definition; 0.30 predicted vs 12% observed = overestimate of risk",
+    "method": "derivation",
+    "evidence": "12% < 30% so predicted risk is too high; flagged 'overconfident' wording removed"
+   },
+   {
+    "claim": "Reliability diagram = mean predicted prob vs fraction of positives per bin; calibration_curve does this",
+    "method": "doc",
+    "evidence": "https://scikit-learn.org/stable/modules/calibration.html: 'binning the predictions such that the x-axis represents the average predicted probability in each bin. The y-axis is then the fraction of positives'; CalibrationDisplay 'uses calibration_curve'"
+   },
+   {
+    "claim": "Simulation: logit~N(-1.5,1.5), n=200000, tripled logit: AUC ~0.82 unchanged, ECE 0.002 -> 0.13 (10 equal-width bins)",
+    "method": "executed",
+    "evidence": "4 seeds, numpy: AUC 0.8172-0.8189 for both scores (identical); ECE calibrated 0.0018-0.0025; tripled 0.1245-0.1271. Matches text."
+   },
+   {
+    "claim": "AUC unchanged by strictly increasing transforms",
+    "method": "derivation",
+    "evidence": "AUC depends only on pairwise orderings; confirmed identical to full precision in run"
+   },
+   {
+    "claim": "Brier/log loss are proper scoring rules combining calibration and discrimination",
+    "method": "doc",
+    "evidence": "https://scikit-learn.org/stable/modules/calibration.html: 'Strictly proper scoring rules ... brier_score_loss and log_loss assess calibration (reliability) and discriminative power (resolution) ... at the same time'"
+   },
+   {
+    "claim": "Source supports: calibration generally does not affect ranking metrics such as ROC-AUC",
+    "method": "doc",
+    "evidence": "https://scikit-learn.org/stable/modules/calibration.html: 'It is generally expected that calibration does not affect ranking metrics such as ROC-AUC.'"
+   },
+   {
+    "claim": "Both originally flagged issues fixed; no new inconsistency",
+    "method": "derivation",
+    "evidence": "Numbers now match reproduction; wording now 'overestimates'."
+   }
+  ],
+  "remaining_limitations": [
+   "ECE definition (sample-weighted mean abs gap over bins) is standard but binning-dependent, which the text states.",
+   "Use-case list for when calibration matters is background_only (judgement)."
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "n/a (no code)",
+   "py3.11": "n/a (no code)",
+   "py3.10": "n/a (no code)"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-i0004",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "Platt scaling can struggle on highly imbalanced problems where errors are not symmetric",
+    "method": "doc",
+    "evidence": "https://scikit-learn.org/stable/modules/calibration.html: 'logistic model works best if the calibration error is symmetrical ... can be a problem for highly imbalanced classification problems'"
+   },
+   {
+    "claim": "Sigmoid suits small samples; isotonic more flexible, more prone to overfit on small data; isotonic >= sigmoid above ~1000 samples",
+    "method": "doc",
+    "evidence": "https://scikit-learn.org/stable/modules/calibration.html: 'most effective for small sample sizes'; isotonic 'more prone to overfitting, especially on small datasets'; 'as well as or better than sigmoid when there is enough data (greater than ~ 1000 samples)'"
+   },
+   {
+    "claim": "Calibrator should not be fit on classifier training data (overconfident map toward 0/1)",
+    "method": "doc",
+    "evidence": "https://scikit-learn.org/stable/modules/calibration.html: 'would thus result in a biased calibrator that maps to probabilities closer to 0 and 1 than it should'"
+   },
+   {
+    "claim": "Isotonic introduces ties so ROC-AUC may differ; sigmoid strictly monotonic keeps ranking",
+    "method": "doc",
+    "evidence": "https://scikit-learn.org/stable/modules/calibration.html: 'these metrics might differ after calibration when using method=\"isotonic\" since isotonic regression introduces ties ... sigmoid ... strictly monotonic ... keeps the ranking'"
+   },
+   {
+    "claim": "Positive-count heuristic (60 vs 6,000 positives)",
+    "method": "background_only",
+    "evidence": "Explicitly labelled in the text as the author's own heuristic, not documented; hedge is adequate."
+   },
+   {
+    "claim": "Option B: compare by cross-validated log loss/Brier; repeated/nested CV for option A",
+    "method": "background_only",
+    "evidence": "Reasonable practice; not from a cited source. Brier/log loss as proper scores verified in docs."
+   },
+   {
+    "claim": "All three flagged issues fixed",
+    "method": "derivation",
+    "evidence": "Hedged heuristic, CV alternative for option A, 'usually' removed; no contradiction with question."
+   }
+  ],
+  "remaining_limitations": [
+   "Minor: with CalibratedClassifierCV(ensemble=True) the averaged per-fold sigmoids need not keep ranking exactly; the 'sigmoid keeps ranking' claim holds for a single fitted sigmoid, which is what the answer describes."
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "n/a (no code)",
+   "py3.11": "n/a (no code)",
+   "py3.10": "n/a (no code)"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-i0005",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "Definitions of covariate (P(X)), label/prior (P(y), P(X|y) stable) and concept (P(y|X)) drift",
+    "method": "paper",
+    "evidence": "Lipton et al. 2018 (arxiv 1802.03916): label shift = p(y) changes while p(x|y) stays the same."
+   },
+   {
+    "claim": "Label drift can be estimated from predictions under stable P(X|y) assumption without labels",
+    "method": "paper",
+    "evidence": "Same paper: BBSE estimates test label distribution from unlabeled data via black-box classifier predictions, given invertible confusion matrix. Text hedges as 'estimated ... under the assumption'."
+   },
+   {
+    "claim": "P(X) change detectable without labels via PSI/KS but cannot discriminate covariate vs label shift",
+    "method": "derivation",
+    "evidence": "P(X)=sum_y P(X|y)P(y) moves when P(y) moves, so a P(X) shift alone is ambiguous; PSI/KS are standard distribution comparisons (usage background_only)."
+   },
+   {
+    "claim": "Recession example hedged to mix of label and concept drift",
+    "method": "derivation",
+    "evidence": "Hedge present; flagged issues both fixed with no new inconsistency."
+   }
+  ],
+  "remaining_limitations": [
+   "sources list is empty; claims rest on standard definitions plus Lipton 2018 which I opened. Consider adding it to sources.",
+   "Difficulty Easy is borderline (three definitions + examples + detectability) but acceptable."
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "n/a (no code)",
+   "py3.11": "n/a (no code)",
+   "py3.10": "n/a (no code)"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-i0006",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "Precision depends on prevalence; stable flag rate with falling precision can reflect falling fraud rate",
+    "method": "derivation",
+    "evidence": "precision = P(fraud|flagged) = TPR*prev / (TPR*prev + FPR*(1-prev)); decreases when prev falls with TPR, FPR fixed."
+   },
+   {
+    "claim": "PSI cut-offs 0.1 / 0.25 are an industry convention, PSI depends on binning and sample size",
+    "method": "background_only",
+    "evidence": "Not opened a primary source; text already frames it as convention and tells reader to check sensitivity, so hedge is adequate."
+   },
+   {
+    "claim": "Large samples make tiny shifts significant in KS test",
+    "method": "derivation",
+    "evidence": "KS critical value scales ~1/sqrt(n) so any fixed nonzero distance becomes significant as n grows."
+   },
+   {
+    "claim": "Review-confirmation proxies are noisy, say little about recall; random sample of unflagged traffic",
+    "method": "derivation",
+    "evidence": "Only flagged items reviewed => no outcome information on unflagged; random audit gives unbiased recall estimate."
+   },
+   {
+    "claim": "Maturity window (e.g. 60 days) matches 30-60 day chargeback delay",
+    "method": "derivation",
+    "evidence": "Question states 30-60 days; 60-day window covers upper bound."
+   },
+   {
+    "claim": "Threshold setting from historical variation + two consecutive windows; retrain triggers; shadow validation",
+    "method": "background_only",
+    "evidence": "Standard MLOps practice, presented as examples/design choices, trade-offs stated."
+   },
+   {
+    "claim": "Major flagged defect (no threshold method) fixed",
+    "method": "derivation",
+    "evidence": "Text now gives method and trade-offs; covers all items the question lists (input, score, proxy, delayed label, thresholds, retraining, trade-offs)."
+   }
+  ],
+  "remaining_limitations": [
+   "No sources; operational guidance is practitioner judgement (background_only), appropriately hedged."
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "n/a (no code)",
+   "py3.11": "n/a (no code)",
+   "py3.10": "n/a (no code)"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-i0009",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "Question no longer self-contradictory",
+    "method": "derivation",
+    "evidence": "Now 'higher AUC on a held-out month' with worse online uplift; consistent with answer."
+   },
+   {
+    "claim": "Skew causes 1-4 (feature code path, staleness/point-in-time, missing values, encodings) and isolation steps via logged serving features",
+    "method": "background_only",
+    "evidence": "Standard training-serving skew taxonomy and practice (e.g. Google ML rules); not opened a source; stated as suspects/procedure rather than documented facts."
+   },
+   {
+    "claim": "Churn AUC (who will leave) differs from uplift (who responds), so higher AUC can give lower uplift",
+    "method": "derivation",
+    "evidence": "Uplift = E[Y|treat]-E[Y|control] is a causal quantity; ranking by churn risk need not rank by treatment effect (e.g. sure-gone / sure-stay groups have zero uplift)."
+   },
+   {
+    "claim": "Procedure now terminates in a cause when (a)-(d) show no gap (objective mismatch, A/B validity)",
+    "method": "derivation",
+    "evidence": "Added fallback present; major flagged issue fixed."
+   }
+  ],
+  "remaining_limitations": [
+   "Item 6 'A/B assignment itself' as a population shift is loosely phrased (randomised assignment should not shift population unless broken); the later SRM check covers it. Not worth a change.",
+   "No sources; guidance is practitioner knowledge."
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "n/a (no code)",
+   "py3.11": "n/a (no code)",
+   "py3.10": "n/a (no code)"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-i0033",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "MCAR/MAR/MNAR definitions and examples",
+    "method": "background_only",
+    "evidence": "Rubin (1976) taxonomy, textbook; I did not open a source this run. Definitions in the text are the standard ones."
+   },
+   {
+    "claim": "Complete-case unbiased under MCAR (loses power), can be biased under MAR/MNAR; mean imputation shrinks variance; MI preferred under MAR",
+    "method": "derivation",
+    "evidence": "Under MCAR the complete cases are a random subsample; mean fill reduces variance by construction (imputed values equal the mean). 'can be biased' is appropriately hedged."
+   },
+   {
+    "claim": "Observed-variable comparisons give evidence against MCAR only; null result does not prove MCAR; Little's test targets MCAR; MAR vs MNAR untestable from data alone",
+    "method": "derivation",
+    "evidence": "Failing to reject has power limits; MAR vs MNAR depends on the distribution of unobserved values, which the observed data cannot identify. Flagged major overstatement fixed with correct hedge."
+   }
+  ],
+  "remaining_limitations": [
+   "No sources; textbook claims, mark as background_only if provenance is required."
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "n/a (no code)",
+   "py3.11": "n/a (no code)",
+   "py3.10": "n/a (no code)"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-i0034",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "5% relative lift (4.0->4.2%), alpha 0.05 two-sided, 80% power: ~154,000 per arm",
+    "method": "executed",
+    "evidence": "Pooled two-proportion formula = 154,303.9 per arm; unpooled 154,301."
+   },
+   {
+    "claim": "10% relative lift (4.0->4.4%): ~39,500 per arm",
+    "method": "executed",
+    "evidence": "39,474.8 per arm."
+   },
+   {
+    "claim": "~8 days at 20,000 per arm per day",
+    "method": "executed",
+    "evidence": "154,000/20,000 = 7.7 days; text correctly caveated as best case with unique new users, then two full weeks (280k/arm) comfortably exceeds requirement."
+   },
+   {
+    "claim": "SRM, user-level randomisation, novelty effect, peeking inflates false positives, sequential methods",
+    "method": "background_only",
+    "evidence": "Standard A/B testing practice (Kohavi et al.); not opened this run, stated generally without numeric claims."
+   },
+   {
+    "claim": "All flagged numeric issues fixed and consistent with common_mistakes/key_concepts",
+    "method": "executed",
+    "evidence": "Numbers in text match computation; no residual 150,000/38,000 figures."
+   }
+  ],
+  "remaining_limitations": [
+   "No sources; non-numeric guidance is practitioner knowledge."
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "n/a (no code)",
+   "py3.11": "n/a (no code)",
+   "py3.10": "n/a (no code)"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ }
+]

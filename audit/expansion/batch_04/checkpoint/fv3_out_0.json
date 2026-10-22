@@ -1,0 +1,643 @@
+[
+ {
+  "plan_id": "B4-MLO-08-3",
+  "verdict": "correct",
+  "reasons": [
+   "Edits (null-rate ticket tier, hourly data-quality checks) are consistent with the principles, rubric and 'intended result' hedge.",
+   "Numbers verified: 120x0.01=1.2; 1-0.99^120=0.7006. Persistence of 1/90-day-max tiers is consistent; per-feature 3-of-5 rule at 99th percentile has null false-hit rate ~1e-5 per feature.",
+   "Minor tension with prior answer smi-l0026 ('Do not page on drift statistics ... send them to dashboards and tickets'): this record pages on score-distribution PSI. Defensible as a model-output symptom, but it should be hedged or moved to ticket tier."
+  ],
+  "parts_answered": {
+   "all question parts": true
+  },
+  "evidence": [
+   {
+    "claim": "expected false hits 1.2/day, P(>=1)=70%",
+    "method": "executed",
+    "evidence": "1-0.99**120=0.7006"
+   },
+   {
+    "claim": "ML Test Score threshold tuning; Sculley action limits",
+    "method": "paper",
+    "evidence": "quotes above"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "(a model-output symptom; per-feature drift metrics stay at ticket or dashboard level)",
+    "problem": "Paging on a score-distribution drift statistic conflicts with earlier answer smi-l0026 (do not page on drift statistics) unless justified; the record presents it as unconditional.",
+    "replacement": "(a model-output symptom; page on it only if replaying past incidents shows it tracks quality, otherwise treat it as a ticket-level signal like other drift statistics; per-feature drift metrics stay at ticket or dashboard level)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Application of multiple-testing arithmetic plus a tiered alert design; several parts but familiar ideas.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "rigorous reasoning and principles"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "concrete tier table not in detailed"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0041",
+   "same_intent": false
+  },
+  "code_findings": "no code/config in record; arithmetic re-executed",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/46555.pdf",
+    "status": "supported",
+    "evidence": "'careful tuning of alerting thresholds is needed to achieve a useful balance between false positive and false negative rates'"
+   },
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "supported",
+    "evidence": "'These limits should be broad enough not to trigger spuriously'; 'automated alerts should fire and trigger manual intervention or investigation'"
+   },
+   {
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "status": "supported",
+    "evidence": "'focuses primarily on symptoms for paging'; 'Every page should be actionable'; dashboard for subcritical problems"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Hourly data-quality windows and 90-day-maximum bands are design suggestions (labelled illustrative); no source needed."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-08-6",
+  "verdict": "pass",
+  "reasons": [
+   "Re-ran the simulation on 3.13/3.10/3.11 (100k rows, 10% new market, 10 quantile bins): mean 52.96-53.05; aggregate PSI 0.061-0.063; new-market PSI 6.0-7.4 depending on floor (>5 holds); rest 0.0002 (edit from 0.0001 is correct).",
+   "Noise-floor formula (B-1)(1/n+1/m) confirmed by simulation (e.g. n=1e5,m=1e3: 0.0091 vs 0.0091).",
+   "No contradictions with prior answers (smi-i0006 also calls 0.1/0.25 conventions)."
+  ],
+  "parts_answered": {
+   "all question parts": true
+  },
+  "evidence": [
+   {
+    "claim": "aggregate PSI ~0.06, slice PSI >5, rest 0.0002",
+    "method": "executed",
+    "evidence": "sim.py on three interpreters"
+   },
+   {
+    "claim": "PSI null floor",
+    "method": "executed",
+    "evidence": "nf.py"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short quantitative reasoning plus monitoring design trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer 314 words, within 450"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0006",
+   "same_intent": false
+  },
+  "code_findings": "no code/config in record; arithmetic re-executed",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/46555.pdf",
+    "status": "supported",
+    "evidence": "'models should have zero bias, in aggregate and on slices'"
+   },
+   {
+    "url": "https://arxiv.org/pdf/2303.01227",
+    "status": "supported",
+    "evidence": "0.1/0.25 rules of thumb; critical values depend on sample size and number of groups"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Mix-shift interpretation is standard reasoning, unsourced but not a documented-behaviour claim."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-09-4",
+  "verdict": "correct",
+  "reasons": [
+   "Edited backtest sentence is now coherent (cheap warm-start chain, sampled full-retrain baseline), 405 words.",
+   "Minor: 'day-to-day stability' cannot be computed for the baseline that is only run on 10-15 sampled days; key_concept 'catastrophic forgetting' is not named in the text (only 'forgetting')."
+  ],
+  "parts_answered": {
+   "all question parts": true
+  },
+  "evidence": [
+   {
+    "claim": "40 min vs 14 h",
+    "method": "derivation",
+    "evidence": "given in question"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "along with day-to-day stability and the cost",
+    "problem": "The full-retrain baseline is run only on a sample of days, so stability can be compared only for the warm-start chain (or between sampled days).",
+    "replacement": "along with the cost and day-to-day stability (visible in full for the warm-start chain, only coarsely for the sampled full retrains)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Trade-off comparison with an evaluation design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single, 405 words"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": [
+   "warm start",
+   "sliding-window retrain",
+   "forgetting and recency bias",
+   "error persistence",
+   "lineage",
+   "hybrid schedule",
+   "rolling-origin backtest"
+  ],
+  "nearest_existing": {
+   "id": "smi-l0015",
+   "same_intent": false
+  },
+  "code_findings": "no code/config in record; arithmetic re-executed",
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule 8: 'How much does performance degrade if you have a model that is a day old? A week old? A quarter old?'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Tree-library continuation behaviour is hedged ('check the library's documented behaviour')."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-11-2",
+  "verdict": "pass",
+  "reasons": [
+   "Concise answer is exactly 80 whitespace-separated words (limit met, no headroom; 81 by regex tokenisation) and agrees with detailed (keyed pseudonym, 90-day label window plus slack, deletion lookup, hedged legal scope).",
+   "Edits verified: Sweeney 1990 census, 87% 'likely unique' on {5-digit ZIP, gender, DOB}; ICO: personal data 'in the hands of someone who holds the additional information'; Recital 26 present on EUR-Lex page.",
+   "No contradiction with smi-l0026 / smi-k0030."
+  ],
+  "parts_answered": {
+   "all question parts": true
+  },
+  "evidence": [
+   {
+    "claim": "87% unique figure",
+    "method": "paper",
+    "evidence": "Sweeney abstract"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Multi-part privacy engineering scenario with several defensible controls.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "80 words, genuinely shorter"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "422 words, within 450"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0030",
+   "same_intent": false
+  },
+  "code_findings": "no code/config in record; arithmetic re-executed",
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule 29: save the set of features used at serving time; even a small fraction is useful"
+   },
+   {
+    "url": "https://dataprivacylab.org/projects/identifiability/paper1.pdf",
+    "status": "supported",
+    "evidence": "'87% ... likely unique based only on {5-digit ZIP, gender, date of birth}', 1990 census"
+   },
+   {
+    "url": "https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/data-sharing/anonymisation/pseudonymisation/",
+    "status": "supported",
+    "evidence": "personal data 'in the hands of someone who holds the additional information'; additional information kept separately"
+   },
+   {
+    "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32016R0679",
+    "status": "supported",
+    "evidence": "Recital 26 text confirmed in first 100000 chars"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Salt vs keyed-HMAC argument is standard cryptographic reasoning."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-11-5",
+  "verdict": "pass",
+  "reasons": [
+   "Edit 1 ('only known defences that stopped their label-only attacks (at an accuracy cost; DP's epsilon was large at useful accuracy)') matches Choquette-Choo: only strong L2 (lambda>=1) and DP-SGD consistently reduced MI, matching undefended accuracy needs epsilon>100.",
+   "Query arithmetic verified: 10000/3=3333, 10000/2500=4; paper: rotation attack N=3 queries, main boundary-distance experiments 2,500 queries; Sybil quote present.",
+   "Concise 78 words, detailed 432 (448 by regex tokenisation; close to the 450 cap, keep further edits neutral)."
+  ],
+  "parts_answered": {
+   "all question parts": true
+  },
+  "evidence": [
+   {
+    "claim": "3,333 and 4 records per day",
+    "method": "executed",
+    "evidence": "arithmetic"
+   },
+   {
+    "claim": "DP/L2 only defences",
+    "method": "paper",
+    "evidence": "quotes above"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism explanation plus ranking of mitigations with caveats and measurement.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "78 words"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "mechanism and ranked mitigations"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "measurement procedure not in detailed"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0030",
+   "same_intent": false
+  },
+  "code_findings": "no code/config in record; arithmetic re-executed",
+  "sources_findings": [
+   {
+    "url": "https://owasp.github.io/www-project-machine-learning-security-top-10/docs/ML04_2023-Membership_Inference_Attack",
+    "status": "supported",
+    "evidence": "lists regularisation and noise/differential privacy as prevention methods"
+   },
+   {
+    "url": "https://arxiv.org/abs/2007.14321",
+    "status": "supported",
+    "evidence": "confidence masking not viable; label-only attacks defeat MemGuard etc."
+   },
+   {
+    "url": "https://arxiv.org/abs/2112.03570",
+    "status": "supported",
+    "evidence": "attacks should be evaluated by TPR at low FPR"
+   },
+   {
+    "url": "https://arxiv.org/pdf/2007.14321",
+    "status": "supported",
+    "evidence": "2,500 queries; N=3 rotation queries; 'Query limiting would likely not be a suitable defense, as Sybil attacks can circumvent it'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-5",
+  "verdict": "pass",
+  "reasons": [
+   "Edited outage sentence is correct: 0.0005x43,200=21.6 min; 31-day month 22.32 min; 22 min is ~102% of the 30-day budget.",
+   "Table, ladder, rubric (7 points) and key_concepts are consistent; fallback-as-good-event matches smi-l0027.",
+   "Minor unsourced: timeouts and circuit breakers have no cited page (AWS page supports bounded retries and jitter only); standard practice, not a documented-behaviour claim."
+  ],
+  "parts_answered": {
+   "all question parts": true
+  },
+  "evidence": [
+   {
+    "claim": "error budget",
+    "method": "executed",
+    "evidence": "21.6 / 22.32 minutes"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Two dependencies, degradation ladder, SLO arithmetic, observability and test design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Take the registry off the scale-up path: bake the approved model into the image or use a regional read-through cache keyed by digest",
+    "tradeoff": "Larger images and coupling of model and deploy vs scaling that survives a registry outage"
+   },
+   {
+    "decision": "On registry outage start from the last known good verified artifact; refuse unverified ones",
+    "tradeoff": "May serve a slightly older model vs safety and availability"
+   },
+   {
+    "decision": "Feature store degradation ladder: stale cache with per-feature age bound, request-only fallback model, business-defined safe default",
+    "tradeoff": "Prediction quality vs availability; cost of building and maintaining a fallback model"
+   },
+   {
+    "decision": "Short timeouts, circuit breaker, bounded retries with jitter, gradual re-close",
+    "tradeoff": "Fast failover vs flapping and thundering herd on recovery"
+   },
+   {
+    "decision": "Keep fallback defaults identical to training-time missing-value handling; tag each prediction with its mode; exclude or mark degraded predictions from retraining and evaluation",
+    "tradeoff": "Lost training rows vs learning from degraded behaviour as normal"
+   },
+   {
+    "decision": "Treat fallback rate as its own SLI and decide in advance whether fallback responses count as good events",
+    "tradeoff": "Honest quality measurement vs availability numbers"
+   },
+   {
+    "decision": "Test with registry-block drill and feature-store fault-injection game days; keep warm headroom replicas",
+    "tradeoff": "Engineering time and risk of tests vs confidence the rarely used paths work"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "412 words"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "table, drill, game day"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0025",
+   "same_intent": false
+  },
+  "code_findings": "no code/config in record; arithmetic re-executed",
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/addressing-cascading-failures/",
+    "status": "supported",
+    "evidence": "'Serve lower-quality, cheaper-to-compute results'; 'the code path you never use is the code path that (often) doesn't work'"
+   },
+   {
+    "url": "https://builder.aws.com/content/3EumjoZascWd1oZiEgL8ORlv3qE/timeouts-retries-and-backoff-with-jitter",
+    "status": "supported",
+    "evidence": "limits retries; jitter spreads retries"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Short timeouts and circuit breakers: no source attached."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-7",
+  "verdict": "pass",
+  "reasons": [
+   "Edited practical step 5 now reads correctly and agrees with the detailed answer.",
+   "Rule 10 and SRE postmortem-culture quotes verified ('usually implies manual incident discovery'; good intentions; fix systems and processes).",
+   "Numbers (19 days, 7% relative) consistent in all fields; detailed 424 words."
+  ],
+  "parts_answered": {
+   "all question parts": true
+  },
+  "evidence": [],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Postmortem scenario: counterfactual estimation, causes, action items.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "postmortem outline"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "runbook and timeline"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0006",
+   "same_intent": false
+  },
+  "code_findings": "no code/config in record; arithmetic re-executed",
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/postmortem-culture/",
+    "status": "supported",
+    "evidence": "blameless = everyone had good intentions; monitoring failure trigger"
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule 10: 'a particular table that is being joined is no longer being updated'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-9",
+  "verdict": "pass",
+  "reasons": [
+   "Added rubric (7 points) matches the answer; question_type design is acceptable with it.",
+   "Arithmetic: 2x15 + 2x5 = 40 min = 9.5% of 7 h (about 10%); 07:45-18:00 = 10.25 h (about 10 h). Added proviso on replacement capacity is correct.",
+   "AWS pages: 2-minute best-effort notice; flexibility across instance types and AZs; fault-tolerance. Consistent with smi-l0024 on scaling signal."
+  ],
+  "parts_answered": {
+   "all question parts": true
+  },
+  "evidence": [
+   {
+    "claim": "40 min bound, 10 h",
+    "method": "executed",
+    "evidence": "arithmetic"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Three-part capacity trade-off; borderline Hard because it is trade-off design, but each part is a standard pattern.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Fine-tune on reclaimable capacity only if resumable: checkpoint model, optimizer, data-loader and RNG state to durable storage at a fixed interval",
+    "tradeoff": "Discount vs repeated work (up to interval + restore per interruption) and checkpoint write cost"
+   },
+   {
+    "decision": "Deadline rule: fall back to on-demand if interruptions exceed a threshold or the morning deadline is at risk",
+    "tradeoff": "Cost certainty and deadline vs losing the discount"
+   },
+   {
+    "decision": "Internal classifier: scheduled warm-up or scheduled single replica during office hours instead of 24/7 or pure scale-to-zero",
+    "tradeoff": "Idle spend (about 10 h vs 24 h) vs a 3-minute first-request wait"
+   },
+   {
+    "decision": "Alternatives for the classifier: asynchronous interface or shorter cold start (smaller model, node-cached weights)",
+    "tradeoff": "Engineering effort and user experience vs cost"
+   },
+   {
+    "decision": "Customer endpoint: on-demand baseline sized for steady load with headroom; reclaimable capacity only for burst above it",
+    "tradeoff": "Higher steady cost vs surviving mass reclamation with short notice"
+   },
+   {
+    "decision": "Spread burst capacity across zones and instance types, drain gracefully, scale on queue depth or concurrency",
+    "tradeoff": "Operational complexity vs lower reclamation correlation and a stable p99"
+   },
+   {
+    "decision": "State what would change the choice (reclamation frequency, spikiness, acceptable fallback, resumability)",
+    "tradeoff": "Re-evaluation effort vs choosing on stale assumptions"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "342 words single"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0036",
+   "same_intent": false
+  },
+  "code_findings": "no code/config in record; arithmetic re-executed",
+  "sources_findings": [
+   {
+    "url": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-instance-termination-notices.html",
+    "status": "supported",
+    "evidence": "'issued two minutes before'; 'best effort basis'"
+   },
+   {
+    "url": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-best-practices.html",
+    "status": "supported",
+    "evidence": "'be flexible about which instance types ... and in which Availability Zones'; architect for fault tolerance"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-1",
+  "verdict": "pass",
+  "reasons": [
+   "Edits are coherent: novelty wording now consistent with click-through still being up; new 'What separates them' sentence matches the holdback discussion.",
+   "Answer is 443 words (whitespace) - under 450 but close (460 by regex tokenisation); do not add text.",
+   "Rule 39 and SRE workbook canary quotes verified."
+  ],
+  "parts_answered": {
+   "all question parts": true
+  },
+  "evidence": [],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Multiple overlapping mechanisms with evidence-based separation and release practice.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All key_concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0009",
+   "same_intent": false
+  },
+  "code_findings": "no code/config in record; arithmetic re-executed",
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule 39: launch decisions as proxies; only easy when all metrics get better"
+   },
+   {
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "status": "supported",
+    "evidence": "'should be sizeable and last long enough to be representative of the overall deployment'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Selection / feedback-loop point (5) unsourced but standard (Sculley 2015 covers feedback loops)."
+  ],
+  "code_patch": null
+ }
+]

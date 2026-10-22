@@ -1,0 +1,486 @@
+[
+ {
+  "plan_id": "P-NLP-01",
+  "question_type": "concept",
+  "difficulty": "Medium",
+  "question": "You are building a ticket classifier for a support inbox whose text contains typos ('refundd'), SKU codes ('XJ-2200B') and newly coined words. A teammate wants a 500k-entry word-level vocabulary; you prefer a 32k BPE vocabulary. How does each handle an unseen word such as 'unrefundable', and what changes if you move the BPE vocabulary from 8k to 128k entries?",
+  "answer": "The BPE vocabulary handles unseen words; the word-level one cannot. A word-level vocabulary maps 'unrefundable' to <unk> (or to a hashed/rare bucket), so the model loses all information about it, and it still needs a huge embedding table in which most rows are rare and poorly trained. BPE starts from characters (or bytes) and repeatedly merges the most frequent adjacent pair until the target vocabulary size is reached. An unseen word is then segmented into known pieces, for example something like un + refund + able, though the actual split depends on the learned merges. With a byte-level base vocabulary no input is truly out of vocabulary. WordPiece is similar but chooses merges by a likelihood-style score instead of raw pair frequency.\nVocabulary-size trade-off: a larger vocabulary gives shorter token sequences (cheaper attention, more text per context window) but a larger embedding/output matrix, and many rare tokens that see few updates. A smaller vocabulary gives longer sequences and less meaningful pieces but compact, well-trained embeddings. Tune on a validation metric, and check how SKUs and numbers are split, since subwords are not guaranteed to be semantically aligned.",
+  "key_concepts": [
+   "byte pair encoding",
+   "WordPiece",
+   "out-of-vocabulary",
+   "unknown token",
+   "byte-level base vocabulary",
+   "vocabulary size trade-off",
+   "sequence length"
+  ],
+  "interview_style_note": "Explains the merge procedure and why unseen words decompose, and gives a two-sided vocab-size trade-off rather than 'bigger is better'.",
+  "common_mistakes": [
+   "Claiming subword tokenisers split words along true morphemes",
+   "Saying a bigger vocabulary is always better because sequences get shorter",
+   "Believing BPE can never produce <unk> regardless of base vocabulary"
+  ],
+  "sources": [
+   {
+    "title": "Hugging Face Transformers: Summary of the tokenizers",
+    "url": "https://huggingface.co/docs/transformers/tokenizer_summary",
+    "supports": "BPE merges the most frequent adjacent pair up to a target vocab size, byte-level BPE uses 256 byte base tokens so no <unk> is needed, word-level vocabularies map unseen words to <unk> and have very large embedding matrices, WordPiece selects merges by likelihood-style score rather than raw frequency."
+   }
+  ],
+  "change_notes": "New question.",
+  "confidence": "high",
+  "code": null,
+  "status": "ok",
+  "id": "smi-gen-nlp-01",
+  "domain": "NLP"
+ },
+ {
+  "plan_id": "P-NLP-02",
+  "question_type": "coding",
+  "difficulty": "Medium",
+  "question": "Without calling scikit-learn in your solution, implement tfidf(docs) that returns (vocab, rows) reproducing TfidfVectorizer's default output (lowercasing, default token pattern, smooth idf, l2-normalised rows). Then explain why a word that appears in every document does not get weight zero, and how you would verify your implementation against sklearn on a tiny corpus.",
+  "answer": "Smoothed idf is idf(t) = ln((1+n)/(1+df(t))) + 1, tf is the raw count, tf-idf = tf*idf, and each row is then l2-normalised (sklearn defaults). A term in every document gets idf = 1, not 0, so it is down-weighted but never discarded; the textbook ln(n/df) would zero it. Default tokenisation is lowercase with tokens of 2+ word characters.\n```python\nimport math\nfrom collections import Counter\n\ndef tfidf(docs, token_pattern=r\"(?u)\\b\\w\\w+\\b\"):\n    \"\"\"sklearn-style: lowercase, tokens of 2+ word chars, smooth idf, l2 norm.\n    Returns (vocab, matrix) with vocab sorted alphabetically.\"\"\"\n    import re\n    toks = [re.findall(token_pattern, d.lower()) for d in docs]\n    vocab = sorted({t for ts in toks for t in ts})\n    n = len(docs)\n    df = Counter(t for ts in toks for t in set(ts))\n    idf = {t: math.log((1 + n) / (1 + df[t])) + 1 for t in vocab}\n    rows = []\n    for ts in toks:\n        c = Counter(ts)\n        row = [c[t] * idf[t] for t in vocab]\n        norm = math.sqrt(sum(x * x for x in row))\n        rows.append([x / norm if norm else 0.0 for x in row])\n    return vocab, rows\n```\nThe test builds a three-document corpus, asserts the vocabulary equals TfidfVectorizer's, that the matrix matches with np.allclose, and that every row has unit l2 norm. Note the sort order: sklearn sorts the vocabulary alphabetically, so columns line up only if you do too.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import math\nfrom collections import Counter\n\ndef tfidf(docs, token_pattern=r\"(?u)\\b\\w\\w+\\b\"):\n    \"\"\"sklearn-style: lowercase, tokens of 2+ word chars, smooth idf, l2 norm.\n    Returns (vocab, matrix) with vocab sorted alphabetically.\"\"\"\n    import re\n    toks = [re.findall(token_pattern, d.lower()) for d in docs]\n    vocab = sorted({t for ts in toks for t in ts})\n    n = len(docs)\n    df = Counter(t for ts in toks for t in set(ts))\n    idf = {t: math.log((1 + n) / (1 + df[t])) + 1 for t in vocab}\n    rows = []\n    for ts in toks:\n        c = Counter(ts)\n        row = [c[t] * idf[t] for t in vocab]\n        norm = math.sqrt(sum(x * x for x in row))\n        rows.append([x / norm if norm else 0.0 for x in row])\n    return vocab, rows",
+   "test": "import math\nfrom collections import Counter\n\ndef tfidf(docs, token_pattern=r\"(?u)\\b\\w\\w+\\b\"):\n    \"\"\"sklearn-style: lowercase, tokens of 2+ word chars, smooth idf, l2 norm.\n    Returns (vocab, matrix) with vocab sorted alphabetically.\"\"\"\n    import re\n    toks = [re.findall(token_pattern, d.lower()) for d in docs]\n    vocab = sorted({t for ts in toks for t in ts})\n    n = len(docs)\n    df = Counter(t for ts in toks for t in set(ts))\n    idf = {t: math.log((1 + n) / (1 + df[t])) + 1 for t in vocab}\n    rows = []\n    for ts in toks:\n        c = Counter(ts)\n        row = [c[t] * idf[t] for t in vocab]\n        norm = math.sqrt(sum(x * x for x in row))\n        rows.append([x / norm if norm else 0.0 for x in row])\n    return vocab, rows\n\nimport numpy as np\nfrom sklearn.feature_extraction.text import TfidfVectorizer\ndocs = [\"The cat sat on the mat\", \"The dog sat on the log\", \"Cats and dogs: the cat, the dog\"]\nvocab, rows = tfidf(docs)\nsk = TfidfVectorizer()\nX = sk.fit_transform(docs).toarray()\nassert vocab == list(sk.get_feature_names_out())\nassert np.allclose(np.array(rows), X)\nassert np.allclose(np.linalg.norm(np.array(rows), axis=1), 1.0)\nprint(vocab); print(np.round(X,3))\n# the term in all docs gets smallest idf = 1\ni = vocab.index(\"the\"); print(\"the idf\", sk.idf_[i])\nassert abs(sk.idf_[i]-1.0)<1e-12\nprint(\"ok\")",
+   "expected": []
+  },
+  "key_concepts": [
+   "smooth idf",
+   "l2 normalisation",
+   "term frequency",
+   "document frequency",
+   "token pattern",
+   "TfidfVectorizer"
+  ],
+  "interview_style_note": "Gets the +1 inside and outside the log right, normalises rows, and verifies against the library instead of trusting memory.",
+  "common_mistakes": [
+   "Using textbook log(n/df) without smoothing so mismatch with sklearn",
+   "Forgetting l2 row normalisation",
+   "Using log10 or forgetting that the default tokenizer drops 1-character tokens"
+  ],
+  "sources": [
+   {
+    "title": "scikit-learn TfidfTransformer",
+    "url": "https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.TfidfTransformer.html",
+    "supports": "With smooth_idf=True idf(t)=ln((1+n)/(1+df(t)))+1, tf-idf=tf*idf, and rows are l2-normalised by default."
+   },
+   {
+    "title": "scikit-learn: Feature extraction (text)",
+    "url": "https://scikit-learn.org/stable/modules/feature_extraction.html",
+    "supports": "CountVectorizer's default tokenizer keeps words of at least 2 characters, and the built-in 'english' stop-word list has known issues and may include informative words."
+   }
+  ],
+  "change_notes": "New question. Test executed and compared with sklearn 1.9.1.",
+  "confidence": "high",
+  "status": "ok",
+  "id": "smi-gen-nlp-02",
+  "domain": "NLP"
+ },
+ {
+  "plan_id": "P-NLP-03",
+  "question_type": "debugging",
+  "difficulty": "Hard",
+  "question": "A support-ticket router (TF-IDF + logistic regression over 12 queues) scored 0.96 macro-F1 in offline random-split cross-validation, but a week-one spot check of production predictions shows roughly 60% agreement with agents. The offline pipeline fitted the vectorizer on the full labelled dataset, then split it; labels are the queue the ticket was finally resolved in. List the most likely causes in the order you would check them, with a concrete diagnostic for each.",
+  "answer": "Check in this order, cheapest first.\n1) Duplicates and threads: random splits put near-identical tickets (reply chains, templated emails) in both train and test. Diagnose by deduplicating/near-dup hashing and re-evaluating with a group split by thread/customer and a time-based split.\n2) Label leakage via artefacts: signatures, 'Category: Billing' headers, queue footers, or ticket-ID prefixes that exist only after routing. Inspect the top-weighted features, ablate suspicious fields, and check that every input field is available at prediction time. Labels set after resolution also differ from what the router sees at arrival.\n3) Preprocessing mismatch: production may lowercase, strip HTML, normalise Unicode or truncate differently. Replay the same raw tickets through both paths and diff the cleaned text and feature vectors; ship one serialised Pipeline (preprocessing + vectorizer + model).\n4) Vectorizer fitted on all data: for unsupervised TF-IDF this leaks only vocabulary/idf, which is usually a small inflation, but it is wrong in principle and severe if any supervised selection (chi2, top-k by label) was done before splitting. Refit inside each fold.\n5) Drift: new products and vocabulary; compare OOV rate and length distributions, and evaluate on the most recent weeks.",
+  "key_concepts": [
+   "data leakage",
+   "train/serve skew",
+   "near-duplicate leakage",
+   "group split",
+   "time-based split",
+   "feature leakage",
+   "vectorizer fit inside fold",
+   "preprocessing parity"
+  ],
+  "interview_style_note": "Prioritises hypotheses by likelihood and cost, gives a test for each, and distinguishes small unsupervised leakage from severe supervised leakage.",
+  "common_mistakes": [
+   "Blaming only 'overfitting' and adding regularisation",
+   "Treating fit-on-all-data TF-IDF as the sole cause",
+   "Not checking whether the features exist at prediction time"
+  ],
+  "change_notes": "New question.",
+  "confidence": "high",
+  "code": null,
+  "sources": [],
+  "status": "ok",
+  "id": "smi-gen-nlp-03",
+  "domain": "NLP"
+ },
+ {
+  "plan_id": "P-NLP-04",
+  "question_type": "concept",
+  "difficulty": "Medium",
+  "question": "In word2vec skip-gram with negative sampling (SGNS), write the loss for one (centre, context) pair, explain why it is used instead of a full softmax and what the noise distribution and k control, and explain why 'bank' in 'river bank' and 'bank account' ends up with a single vector.",
+  "answer": "For centre word w and observed context c, SGNS maximises log σ(u_c·v_w) + Σ_{i=1..k} E_{n~P_n}[log σ(−u_n·v_w)], with separate input vectors v and output vectors u. It is a binary task: real pairs against k sampled fake pairs. A full softmax needs a normaliser over the whole vocabulary V for every pair, cost O(|V|·d); negative sampling touches only k+1 output vectors, O(k·d). The noise distribution is the unigram distribution raised to the 3/4 power (it works better than plain unigram or uniform, per the original paper), which boosts rarer words relative to frequent ones. The paper suggests k of 5-20 for small corpora and 2-5 for large ones; more negatives give a stronger signal per pair at higher cost. Frequent-word subsampling is a separate speed/quality trick.\nVectors capture distributional similarity: words used in similar contexts get similar vectors. The model is type-level and context-independent, so 'bank' gets one vector that is a blend of its senses, weighted by corpus frequency. Contextual encoders (ELMo, BERT) assign token-level vectors instead.",
+  "key_concepts": [
+   "skip-gram",
+   "negative sampling",
+   "noise distribution",
+   "softmax normalisation cost",
+   "polysemy",
+   "distributional hypothesis",
+   "subsampling frequent words"
+  ],
+  "interview_style_note": "Writes the objective correctly, explains the cost argument concretely, and knows the single-vector limitation and how contextual models differ.",
+  "common_mistakes": [
+   "Saying negative sampling computes the exact softmax faster",
+   "Sampling negatives uniformly or from the raw unigram without mentioning the 3/4 power",
+   "Claiming word2vec gives different vectors per sense"
+  ],
+  "sources": [
+   {
+    "title": "Distributed Representations of Words and Phrases and their Compositionality (Mikolov et al., 2013)",
+    "url": "https://arxiv.org/pdf/1310.4546",
+    "supports": "The NEG objective is log sigma(v'_O . v_I) + sum over k noise words of log sigma(-v'_i . v_I); the noise distribution is unigram^(3/4); k of 5-20 is suggested for small datasets and 2-5 for large ones."
+   }
+  ],
+  "change_notes": "New question.",
+  "confidence": "high",
+  "code": null,
+  "status": "ok",
+  "id": "smi-gen-nlp-04",
+  "domain": "NLP"
+ },
+ {
+  "plan_id": "P-NLP-05",
+  "question_type": "coding",
+  "difficulty": "Medium",
+  "question": "Write perplexity(token_probs) that returns the perplexity of a language model on one sequence from its per-token probabilities. A colleague then reports 'our new subword model has perplexity 2.2 on the validation set, much better than the old word-level model's 10, so we are shipping it'. Is the conclusion justified, and how would you compare them fairly?",
+  "answer": "Perplexity is the exponential of the average negative log-probability per token: PPL = exp(−(1/N) Σ ln p(token_i | context)). Lower is better; it is the weighted effective branching factor (a uniform model over V tokens has PPL = V). Zero-probability tokens give infinity, so smoothing is needed.\n```python\nimport math\n\ndef perplexity(token_probs):\n    \"\"\"exp of the mean negative natural-log probability per token.\"\"\"\n    if not token_probs:\n        raise ValueError(\"empty sequence\")\n    nll = -sum(math.log(p) for p in token_probs)\n    return math.exp(nll / len(token_probs))\n\ndef per_unit_perplexity(token_probs, n_units):\n    \"\"\"Same total log-likelihood, normalised by a tokeniser-independent unit\n    (words, characters or bytes of the original text).\"\"\"\n    nll = -sum(math.log(p) for p in token_probs)\n    return math.exp(nll / n_units)\n```\nWhy the comparison is invalid: the average is over tokens, and the number of tokens depends on the tokeniser. Test case: a sentence of 4 words with total probability 1e-4 has PPL 10 when the model scores 4 word tokens, but the same joint probability scored as 12 subword tokens gives PPL about 2.15. Same text, same information, very different numbers. To compare models with different vocabularies, normalise the same total log-likelihood by a tokeniser-independent unit (per word, per character or bits-per-byte) on identical text, as per_unit_perplexity does.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import math\n\ndef perplexity(token_probs):\n    \"\"\"exp of the mean negative natural-log probability per token.\"\"\"\n    if not token_probs:\n        raise ValueError(\"empty sequence\")\n    nll = -sum(math.log(p) for p in token_probs)\n    return math.exp(nll / len(token_probs))\n\ndef per_unit_perplexity(token_probs, n_units):\n    \"\"\"Same total log-likelihood, normalised by a tokeniser-independent unit\n    (words, characters or bytes of the original text).\"\"\"\n    nll = -sum(math.log(p) for p in token_probs)\n    return math.exp(nll / n_units)",
+   "test": "import math\n\ndef perplexity(token_probs):\n    \"\"\"exp of the mean negative natural-log probability per token.\"\"\"\n    if not token_probs:\n        raise ValueError(\"empty sequence\")\n    nll = -sum(math.log(p) for p in token_probs)\n    return math.exp(nll / len(token_probs))\n\ndef per_unit_perplexity(token_probs, n_units):\n    \"\"\"Same total log-likelihood, normalised by a tokeniser-independent unit\n    (words, characters or bytes of the original text).\"\"\"\n    nll = -sum(math.log(p) for p in token_probs)\n    return math.exp(nll / n_units)\n\nimport math\nassert abs(perplexity([0.25]*10)-4.0)<1e-9\nassert abs(perplexity([1.0,1.0])-1.0)<1e-12\n# mixture: geometric mean of inverse probs\nassert abs(perplexity([0.5,0.125]) - (1/(0.5*0.125))**0.5)<1e-9\n# same text, same total probability, two tokenisations\ntext_words = 4\ncoarse = [0.1,0.2,0.05,0.1]            # 4 tokens\ntotal = math.prod(coarse)\nfine = [total**(1/12)]*12               # 12 tokens, identical joint probability\npc, pf = perplexity(coarse), perplexity(fine)\nprint(pc, pf)\nassert pf < pc\nassert abs(per_unit_perplexity(coarse, text_words)-per_unit_perplexity(fine, text_words))<1e-9\nassert abs(per_unit_perplexity(coarse, text_words)-pc)<1e-9\ntry:\n    perplexity([]); raise SystemExit(\"no error\")\nexcept ValueError: pass\nprint(\"ok\")",
+   "expected": []
+  },
+  "key_concepts": [
+   "perplexity",
+   "cross-entropy",
+   "negative log-likelihood",
+   "tokeniser dependence",
+   "bits per byte",
+   "smoothing"
+  ],
+  "interview_style_note": "Computes via mean log-prob (not product), interprets it, and spots that per-token metrics depend on tokenisation.",
+  "common_mistakes": [
+   "Multiplying raw probabilities (underflow) instead of summing logs",
+   "Comparing perplexities across different tokenisers or vocabularies",
+   "Averaging per-sentence perplexities instead of pooling log-likelihood over tokens"
+  ],
+  "change_notes": "New question. Test executed; the 10.0 vs 2.154 example is computed.",
+  "confidence": "high",
+  "sources": [],
+  "status": "ok",
+  "id": "smi-gen-nlp-05",
+  "domain": "NLP"
+ },
+ {
+  "plan_id": "P-NLP-06",
+  "question_type": "coding",
+  "difficulty": "Medium",
+  "question": "Implement single-head scaled dot-product attention with a causal mask in NumPy for one sequence: Q and K of shape (T, d_k), V of shape (T, d_v), returning the outputs and the (T, T) weight matrix. Explain why scores are divided by sqrt(d_k), and list the properties you would assert in tests.",
+  "answer": "Dividing by sqrt(d_k) keeps the score variance near 1. If query and key components are independent with zero mean and unit variance, q·k has variance d_k, so scores grow in magnitude with d_k, the softmax saturates to near one-hot, and gradients through it become tiny. A quick simulation confirms variance about 4, 64 and 1024 unscaled for d_k = 4, 64, 1024, and about 1 after scaling. The causal mask sets future positions (above the diagonal) to −inf before the softmax so they get exactly zero weight.\n```python\nimport numpy as np\n\ndef causal_attention(Q, K, V):\n    \"\"\"Q, K: (T, d_k); V: (T, d_v). Returns (output (T, d_v), weights (T, T)).\"\"\"\n    d_k = Q.shape[-1]\n    scores = Q @ K.T / np.sqrt(d_k)\n    T = scores.shape[0]\n    mask = np.triu(np.ones((T, T), dtype=bool), k=1)   # True above the diagonal = future\n    scores = np.where(mask, -np.inf, scores)\n    scores = scores - scores.max(axis=-1, keepdims=True)  # stability\n    w = np.exp(scores)\n    w = w / w.sum(axis=-1, keepdims=True)\n    return w @ V, w\n```\nThe test checks output/weight shapes, that each weight row sums to 1, that the upper triangle is exactly zero, that token 0 attends only to itself, that perturbing future keys/values leaves earlier outputs unchanged, and that very large scores stay finite thanks to the max-subtraction. Pitfalls: masking after the softmax without renormalising, masking with 0 instead of −inf, and scaling by sqrt(T) instead of sqrt(d_k).",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\ndef causal_attention(Q, K, V):\n    \"\"\"Q, K: (T, d_k); V: (T, d_v). Returns (output (T, d_v), weights (T, T)).\"\"\"\n    d_k = Q.shape[-1]\n    scores = Q @ K.T / np.sqrt(d_k)\n    T = scores.shape[0]\n    mask = np.triu(np.ones((T, T), dtype=bool), k=1)   # True above the diagonal = future\n    scores = np.where(mask, -np.inf, scores)\n    scores = scores - scores.max(axis=-1, keepdims=True)  # stability\n    w = np.exp(scores)\n    w = w / w.sum(axis=-1, keepdims=True)\n    return w @ V, w",
+   "test": "import numpy as np\n\ndef causal_attention(Q, K, V):\n    \"\"\"Q, K: (T, d_k); V: (T, d_v). Returns (output (T, d_v), weights (T, T)).\"\"\"\n    d_k = Q.shape[-1]\n    scores = Q @ K.T / np.sqrt(d_k)\n    T = scores.shape[0]\n    mask = np.triu(np.ones((T, T), dtype=bool), k=1)   # True above the diagonal = future\n    scores = np.where(mask, -np.inf, scores)\n    scores = scores - scores.max(axis=-1, keepdims=True)  # stability\n    w = np.exp(scores)\n    w = w / w.sum(axis=-1, keepdims=True)\n    return w @ V, w\n\nimport numpy as np\nrng=np.random.default_rng(0)\nT,dk,dv=5,8,3\nQ=rng.normal(size=(T,dk));K=rng.normal(size=(T,dk));V=rng.normal(size=(T,dv))\nout,w=causal_attention(Q,K,V)\nassert out.shape==(T,dv) and w.shape==(T,T)\nassert np.allclose(w.sum(-1),1.0)\nassert np.all(w[np.triu_indices(T,1)]==0)\nassert np.allclose(out[0],V[0])           # first token can only attend to itself\n# changing future tokens must not change earlier outputs\nK2=K.copy();V2=V.copy();K2[3:]+=10;V2[3:]+=10\nout2,_=causal_attention(Q,K2,V2)\nassert np.allclose(out[:3],out2[:3]) and not np.allclose(out[3:],out2[3:])\n# large scores don't overflow\no,_=causal_attention(Q*1e3,K*1e3,V); assert np.isfinite(o).all()\n# variance of unscaled dot product grows with d_k\nfor d in (4,64,1024):\n    q=rng.normal(size=(20000,d));k=rng.normal(size=(20000,d))\n    dots=(q*k).sum(1); print(d, round(dots.var(),1), round((dots/np.sqrt(d)).var(),2))\nprint(\"ok\")",
+   "expected": []
+  },
+  "key_concepts": [
+   "scaled dot-product attention",
+   "sqrt(d_k) scaling",
+   "causal mask",
+   "softmax saturation",
+   "numerically stable softmax",
+   "autoregressive property"
+  ],
+  "interview_style_note": "Justifies the scaling via variance of dot products, masks before softmax, and writes behavioural tests such as no future leakage.",
+  "common_mistakes": [
+   "Applying the mask after softmax without renormalising",
+   "Using a large finite or zero fill value instead of -inf (or forgetting the stable softmax)",
+   "Scaling by sqrt(sequence length) or transposing the wrong matrix"
+  ],
+  "sources": [
+   {
+    "title": "Attention Is All You Need (Vaswani et al., 2017)",
+    "url": "https://arxiv.org/pdf/1706.03762",
+    "supports": "For unit-variance independent components the dot product has variance d_k, large magnitudes push softmax into small-gradient regions, and decoder masking sets illegal connections to -inf before the softmax."
+   }
+  ],
+  "change_notes": "New question. Test executed, including a variance simulation.",
+  "confidence": "high",
+  "status": "ok",
+  "id": "smi-gen-nlp-06",
+  "domain": "NLP"
+ },
+ {
+  "plan_id": "P-NLP-07",
+  "question_type": "design",
+  "difficulty": "Medium",
+  "question": "You have three tasks: (a) route support emails into 12 queues using about 2,000 labelled examples, on CPU-only servers with a 50 ms budget, (b) pull invoice number, date and total from OCR text as exact character spans, (c) draft a reply to a customer. For each, would you reach for a BERT-style encoder or a GPT-style decoder (or something else), and why? How does the answer change with zero labelled data?",
+  "answer": "BERT-style encoders are trained with masked language modelling: roughly 15% of tokens are masked and predicted from both left and right context. GPT-style decoders are trained to predict the next token from the left context only, using a causal mask, so they can generate text autoregressively. Encoders give strong bidirectional token representations; they cannot natively generate free text.\n(a) Classification: fine-tune a small encoder with a classification head. It is cheap, fast on CPU, and works well with a few thousand labels.\n(b) Extraction: use an encoder for token classification (BIO tags), which gives spans with character offsets and no hallucination. A decoder can output JSON, but values may not align to the source unless constrained or verified.\n(c) Generation: a decoder (or encoder-decoder such as T5) is the natural fit.\nWith zero labels, a large instruction-following decoder with a prompt or few-shot examples can do (a) and (b) without training, trading higher latency, cost and less controllable outputs; then bootstrap labels from it and distil into a small encoder. Choose by labels available, latency, cost and need for generation.",
+  "key_concepts": [
+   "masked language modelling",
+   "causal language modelling",
+   "bidirectional context",
+   "token classification",
+   "autoregressive generation",
+   "encoder-decoder",
+   "few-shot prompting"
+  ],
+  "interview_style_note": "Links objective to capability, picks per task with constraints in mind, and acknowledges that large decoders can do encoder tasks at a cost.",
+  "common_mistakes": [
+   "Saying encoders cannot be used for anything but classification",
+   "Claiming decoders are strictly better because they are larger",
+   "Ignoring latency and labelled-data constraints"
+  ],
+  "change_notes": "New question.",
+  "confidence": "high",
+  "code": null,
+  "sources": [],
+  "status": "ok",
+  "id": "smi-gen-nlp-07",
+  "domain": "NLP"
+ },
+ {
+  "plan_id": "P-NLP-08",
+  "question_type": "coding",
+  "difficulty": "Medium",
+  "question": "A NER model outputs BIO tags and reports 90% token accuracy, yet users say it misses most organisations. Write extract_entities(tags) that turns a BIO sequence into (type, start, end) spans, and entity_prf(gold_seqs, pred_seqs) that returns entity-level micro precision, recall and F1. Explain why token accuracy misleads, and say how your code treats an I- tag that does not follow a matching B-/I- tag.",
+  "answer": "Entity-level evaluation counts an entity as correct only if both its type and its exact span match. Token accuracy rewards the dominant 'O' class and partial matches: in the test example (20 tokens, 3 gold entities) the prediction truncates the ORG span and misses the LOC, yet token accuracy is 0.90, and an all-'O' predictor gets 0.70 while finding nothing. Entity-level scores for the same example are precision 0.5, recall 1/3, F1 0.4. A boundary error counts as one false positive and one false negative.\n```python\ndef extract_entities(tags):\n    \"\"\"BIO tags -> set of (type, start, end_exclusive).\n    An I-X that does not continue an open entity of type X starts a new entity\n    (conlleval-style leniency).\"\"\"\n    ents, start, etype = set(), None, None\n    for i, tag in enumerate(list(tags) + [\"O\"]):      # sentinel closes the last span\n        if tag == \"O\":\n            prefix, typ = \"O\", None\n        else:\n            prefix, typ = tag.split(\"-\", 1)\n        if etype is not None and (prefix in (\"O\", \"B\") or typ != etype):\n            ents.add((etype, start, i))\n            etype = None\n        if prefix == \"B\" or (prefix == \"I\" and etype is None):\n            start, etype = i, typ\n    return ents\n\ndef entity_prf(gold_seqs, pred_seqs):\n    tp = fp = fn = 0\n    for g, p in zip(gold_seqs, pred_seqs):\n        assert len(g) == len(p)\n        G, P = extract_entities(g), extract_entities(p)\n        tp += len(G & P); fp += len(P - G); fn += len(G - P)\n    prec = tp / (tp + fp) if tp + fp else 0.0\n    rec = tp / (tp + fn) if tp + fn else 0.0\n    f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0\n    return prec, rec, f1\n```\nDesign choices: a stray I-X (after O, or after a different type) starts a new entity here, which is the lenient convention used by the CoNLL evaluation script; a strict evaluator could instead drop or penalise invalid sequences, so state which you use. Counts are pooled across sentences (micro-averaged); report per-type scores as well when classes are imbalanced.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "def extract_entities(tags):\n    \"\"\"BIO tags -> set of (type, start, end_exclusive).\n    An I-X that does not continue an open entity of type X starts a new entity\n    (conlleval-style leniency).\"\"\"\n    ents, start, etype = set(), None, None\n    for i, tag in enumerate(list(tags) + [\"O\"]):      # sentinel closes the last span\n        if tag == \"O\":\n            prefix, typ = \"O\", None\n        else:\n            prefix, typ = tag.split(\"-\", 1)\n        if etype is not None and (prefix in (\"O\", \"B\") or typ != etype):\n            ents.add((etype, start, i))\n            etype = None\n        if prefix == \"B\" or (prefix == \"I\" and etype is None):\n            start, etype = i, typ\n    return ents\n\ndef entity_prf(gold_seqs, pred_seqs):\n    tp = fp = fn = 0\n    for g, p in zip(gold_seqs, pred_seqs):\n        assert len(g) == len(p)\n        G, P = extract_entities(g), extract_entities(p)\n        tp += len(G & P); fp += len(P - G); fn += len(G - P)\n    prec = tp / (tp + fp) if tp + fp else 0.0\n    rec = tp / (tp + fn) if tp + fn else 0.0\n    f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0\n    return prec, rec, f1",
+   "test": "def extract_entities(tags):\n    \"\"\"BIO tags -> set of (type, start, end_exclusive).\n    An I-X that does not continue an open entity of type X starts a new entity\n    (conlleval-style leniency).\"\"\"\n    ents, start, etype = set(), None, None\n    for i, tag in enumerate(list(tags) + [\"O\"]):      # sentinel closes the last span\n        if tag == \"O\":\n            prefix, typ = \"O\", None\n        else:\n            prefix, typ = tag.split(\"-\", 1)\n        if etype is not None and (prefix in (\"O\", \"B\") or typ != etype):\n            ents.add((etype, start, i))\n            etype = None\n        if prefix == \"B\" or (prefix == \"I\" and etype is None):\n            start, etype = i, typ\n    return ents\n\ndef entity_prf(gold_seqs, pred_seqs):\n    tp = fp = fn = 0\n    for g, p in zip(gold_seqs, pred_seqs):\n        assert len(g) == len(p)\n        G, P = extract_entities(g), extract_entities(p)\n        tp += len(G & P); fp += len(P - G); fn += len(G - P)\n    prec = tp / (tp + fp) if tp + fp else 0.0\n    rec = tp / (tp + fn) if tp + fn else 0.0\n    f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0\n    return prec, rec, f1\n\nassert extract_entities([\"B-PER\",\"I-PER\",\"O\",\"B-LOC\"])=={(\"PER\",0,2),(\"LOC\",3,4)}\nassert extract_entities([\"B-PER\",\"B-PER\"])=={(\"PER\",0,1),(\"PER\",1,2)}\nassert extract_entities([\"B-PER\",\"I-LOC\"])=={(\"PER\",0,1),(\"LOC\",1,2)}\nassert extract_entities([\"O\",\"I-ORG\",\"I-ORG\"])=={(\"ORG\",1,3)}\nassert extract_entities([])==set()\npad=[\"O\"]*11\ngold=[[\"B-PER\",\"I-PER\",\"O\",\"O\",\"B-ORG\",\"I-ORG\",\"I-ORG\",\"O\",\"B-LOC\"]+pad]\npred=[[\"B-PER\",\"I-PER\",\"O\",\"O\",\"B-ORG\",\"I-ORG\",\"O\",\"O\",\"O\"]+pad]\np,r,f=entity_prf(gold,pred); print(p,r,f)\nassert (p,r)==(0.5,1/3) and abs(f-0.4)<1e-12\nacc=lambda g,q: sum(a==b for a,b in zip(g,q))/len(g)\nprint(acc(gold[0],pred[0]), acc(gold[0],[\"O\"]*20))\nassert abs(acc(gold[0],pred[0])-0.9)<1e-12 and abs(acc(gold[0],[\"O\"]*20)-0.7)<1e-12\nassert entity_prf(gold,gold)==(1.0,1.0,1.0)\nassert entity_prf([[\"O\",\"O\"]],[[\"O\",\"O\"]])==(0.0,0.0,0.0)\nassert entity_prf([[\"B-PER\",\"I-PER\",\"O\"]],[[\"B-PER\",\"O\",\"O\"]])==(0,0,0)\nprint(\"ok\")",
+   "expected": []
+  },
+  "key_concepts": [
+   "BIO tagging",
+   "entity-level F1",
+   "exact span match",
+   "token accuracy",
+   "class imbalance",
+   "micro-averaging",
+   "invalid tag sequences"
+  ],
+  "interview_style_note": "Evaluates on spans not tokens, handles edge cases explicitly, and can show a concrete case where accuracy is high but F1 is low.",
+  "common_mistakes": [
+   "Computing F1 over tokens and excluding O",
+   "Giving partial credit to boundary errors without saying so",
+   "Mishandling a sequence ending in an entity or B-X B-X adjacency"
+  ],
+  "change_notes": "New question. Test executed.",
+  "confidence": "high",
+  "sources": [],
+  "status": "ok",
+  "id": "smi-gen-nlp-08",
+  "domain": "NLP"
+ },
+ {
+  "plan_id": "P-NLP-09",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "You are classifying comments as toxic or not; about 2% are toxic. A first model reports 98% accuracy and 0.97 ROC-AUC, but moderators say the flagged queue is mostly clean comments. How do you evaluate, set the decision threshold, and use class weights or resampling here, and what do you monitor after launch?",
+  "answer": "98% accuracy is what a model that flags nothing gets. ROC-AUC can also mislead because the false-positive rate is divided by the huge negative class. Example: 10,000 comments, 200 toxic. At 90% TPR and 5% FPR the model flags 180 true and 490 false positives, so precision is about 27% and the queue is mostly clean, despite a good-looking ROC. Use the precision-recall curve and average precision, plus precision and recall at the operating point, and per-slice scores.\nThreshold: do not use 0.5. Pick it on a validation set with natural prevalence from the PR curve, driven by cost and moderator capacity (e.g. maximise recall subject to precision >= X, or fixed review volume). Calibrate if probabilities are consumed downstream.\nClass weights mostly shift the decision boundary, much like moving the threshold; resampling is done only inside the training fold, never before the split (duplicates leak), and validation/test keep natural prevalence. Oversampling can overfit duplicates; undersampling discards data; SMOTE on sparse TF-IDF is questionable.\nMonitor prevalence drift, precision via sampled human audits, recall via audits of unflagged comments, and false-positive rates across dialects and identity terms.",
+  "key_concepts": [
+   "precision-recall curve",
+   "average precision",
+   "ROC-AUC limitations",
+   "threshold selection",
+   "class weights",
+   "resampling inside folds",
+   "calibration",
+   "prevalence drift"
+  ],
+  "interview_style_note": "Shows with arithmetic why ROC-AUC hides poor precision, ties threshold to operational cost, and keeps evaluation data at natural prevalence.",
+  "common_mistakes": [
+   "Resampling before the train/test split",
+   "Reporting accuracy or ROC-AUC alone",
+   "Leaving the threshold at 0.5 after reweighting"
+  ],
+  "change_notes": "New question. Arithmetic example (180 TP, 490 FP, 26.9% precision) computed by script.",
+  "confidence": "high",
+  "code": null,
+  "sources": [],
+  "status": "ok",
+  "id": "smi-gen-nlp-09",
+  "domain": "NLP"
+ },
+ {
+  "plan_id": "P-NLP-10",
+  "question_type": "design",
+  "difficulty": "Hard",
+  "question": "Design semantic search over a company's help-centre (about 8,000 articles, edited daily, several locales). Cover how you chunk and embed, how you index and retrieve, whether and where to re-rank, how you evaluate offline and online, and how you keep the index fresh. State the trade-offs of each choice.",
+  "answer": "Ingestion: split articles on their heading structure into chunks of a few hundred tokens with small overlap (tune size on the eval set), prepend the title/section, and store metadata: article ID, URL, locale, updated_at, content hash.\nRetrieval: a bi-encoder embeds chunks offline and queries online with the same model (respect any query/document prefix the model needs); use normalised vectors with cosine/inner product. At this scale (tens of thousands of chunks) exact search may already meet latency; use an ANN index (e.g. HNSW or IVF) when it does not, trading recall, memory and build time. Add BM25 and fuse the rankings (e.g. reciprocal rank fusion) because dense models can miss exact error codes and product names. Filter by locale/permissions as metadata; collapse chunks to unique articles.\nRe-ranking: a cross-encoder scores the query with each top-50 candidate jointly, which is more accurate but costs per-query compute and latency; apply it only to the shortlist.\nEvaluation: build labelled query-to-article judgments (from search logs plus reviewer labels); measure recall@k for the retriever, and MRR/nDCG for the final ranking; ablate chunk size, hybrid and re-ranker. Online: click-through, reformulation rate, zero-result rate, 'was this helpful'.\nFreshness: on each edit re-chunk and re-embed only changed articles (content hash), delete removed chunks, and re-embed everything if the embedding model changes.",
+  "key_concepts": [
+   "chunking",
+   "bi-encoder",
+   "approximate nearest neighbour",
+   "hybrid retrieval",
+   "cross-encoder re-ranking",
+   "recall@k",
+   "MRR",
+   "incremental indexing"
+  ],
+  "interview_style_note": "Covers the full pipeline with justified trade-offs, includes hybrid lexical retrieval and a measurable evaluation plan, and handles index freshness and model changes.",
+  "common_mistakes": [
+   "Assuming an ANN index is always needed at small scale",
+   "Evaluating only the end-to-end result and not retrieval recall",
+   "Forgetting to re-embed everything when the embedding model changes"
+  ],
+  "change_notes": "New question. No vendor-specific claims.",
+  "confidence": "high",
+  "code": null,
+  "sources": [],
+  "status": "ok",
+  "id": "smi-gen-nlp-10",
+  "domain": "NLP"
+ },
+ {
+  "plan_id": "P-NLP-11",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "A company wants a QA assistant answering from internal policy documents (about 20,000 pages, changing weekly, with per-team access rules). Compare plain prompting, retrieval-augmented generation (RAG) and fine-tuning for this, state the main failure modes of your choice and how you would test for them, and say where a hybrid makes sense.",
+  "answer": "RAG is the primary fit: knowledge lives outside the model, so updating is re-indexing a changed document, answers can cite sources, and access control can be enforced at retrieval time (filter chunks the user may not see before they reach the prompt).\nPlain prompting only works if the whole corpus (or a small relevant slice) fits in context and is cheap to resend; 20,000 pages does not, and long contexts raise cost and latency and models can use them unevenly.\nFine-tuning is poor for facts that change weekly: it is slow to refresh, unreliable at recall of specific passages, cannot cite, and cannot easily unlearn removed or restricted documents. It suits style, format, terminology and behaviours (e.g. answering only from context, abstaining).\nRAG failure modes: retrieval misses (the answer is never fetched), chunks stripped of context, stale or conflicting document versions, the model ignoring or contradicting context, prompt injection in documents, and permission leaks. Test retrieval (recall@k) and generation (faithfulness to retrieved text, abstention when unsupported) separately, with an access-control test suite.\nHybrid: RAG plus a light fine-tune for output format and grounded behaviour, or a fine-tuned embedder/re-ranker on domain pairs.",
+  "key_concepts": [
+   "retrieval-augmented generation",
+   "fine-tuning",
+   "context window",
+   "access control at retrieval",
+   "faithfulness",
+   "prompt injection",
+   "abstention",
+   "re-ranker fine-tuning"
+  ],
+  "interview_style_note": "Matches each approach to what it is good at (knowledge vs behaviour), names concrete failure modes with tests, and keeps security in the design.",
+  "common_mistakes": [
+   "Proposing fine-tuning to inject frequently changing facts",
+   "Evaluating only final answers and not retrieval separately",
+   "Ignoring per-user permissions"
+  ],
+  "change_notes": "New question.",
+  "confidence": "high",
+  "code": null,
+  "sources": [],
+  "status": "ok",
+  "id": "smi-gen-nlp-11",
+  "domain": "NLP"
+ },
+ {
+  "plan_id": "P-NLP-12",
+  "question_type": "coding",
+  "difficulty": "Medium",
+  "question": "Implement clipped_precision(candidate, references, n) returning (clipped matches, total candidate n-grams) for token lists with multiple references, plus brevity_penalty(cand_len, ref_lens). Use them to explain how BLEU is computed, why a candidate 'the the the the the the the' does not score high, and what BLEU cannot tell you.",
+  "answer": "BLEU combines modified (clipped) n-gram precisions p_1..p_4 with a brevity penalty: BLEU = BP · exp(Σ w_n ln p_n), usually w_n = 1/4. Clipping caps each candidate n-gram's count at the maximum count in any single reference, so repeating 'the' 7 times against references containing it at most twice scores 2/7, not 7/7. BP = 1 if the candidate is longer than the (closest) reference length r, else exp(1 − r/c), since precision alone rewards very short outputs.\n```python\nimport math\nfrom collections import Counter\n\ndef ngrams(tokens, n):\n    return Counter(tuple(tokens[i:i + n]) for i in range(len(tokens) - n + 1))\n\ndef clipped_precision(candidate, references, n):\n    \"\"\"Returns (clipped_matches, total_candidate_ngrams).\"\"\"\n    cand = ngrams(candidate, n)\n    max_ref = Counter()\n    for ref in references:\n        for g, c in ngrams(ref, n).items():\n            max_ref[g] = max(max_ref[g], c)\n    clipped = sum(min(c, max_ref[g]) for g, c in cand.items())\n    return clipped, sum(cand.values())\n\ndef brevity_penalty(cand_len, ref_lens):\n    r = min(ref_lens, key=lambda l: (abs(l - cand_len), l))   # closest reference length\n    if cand_len == 0:\n        return 0.0\n    return 1.0 if cand_len > r else math.exp(1 - r / cand_len)\n```\nThe test checks the classic repeated-'the' case (2/7), unigram 5/7 and bigram 4/6 on a two-reference example, a candidate shorter than n (0/0), brevity-penalty values, and agreement with NLTK's modified_precision. Note the geometric mean means any zero p_n gives BLEU 0 for a sentence, so use smoothing at sentence level or aggregate counts over a whole corpus first.\nLimitations: it counts surface n-gram overlap, so synonyms and valid paraphrases are penalised, word order beyond n-grams is weakly captured, sentence-level scores are noisy, and scores depend on tokenisation and reference choice, so report the tokeniser/tool settings (e.g. via sacreBLEU).",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import math\nfrom collections import Counter\n\ndef ngrams(tokens, n):\n    return Counter(tuple(tokens[i:i + n]) for i in range(len(tokens) - n + 1))\n\ndef clipped_precision(candidate, references, n):\n    \"\"\"Returns (clipped_matches, total_candidate_ngrams).\"\"\"\n    cand = ngrams(candidate, n)\n    max_ref = Counter()\n    for ref in references:\n        for g, c in ngrams(ref, n).items():\n            max_ref[g] = max(max_ref[g], c)\n    clipped = sum(min(c, max_ref[g]) for g, c in cand.items())\n    return clipped, sum(cand.values())\n\ndef brevity_penalty(cand_len, ref_lens):\n    r = min(ref_lens, key=lambda l: (abs(l - cand_len), l))   # closest reference length\n    if cand_len == 0:\n        return 0.0\n    return 1.0 if cand_len > r else math.exp(1 - r / cand_len)",
+   "test": "import math\nfrom collections import Counter\n\ndef ngrams(tokens, n):\n    return Counter(tuple(tokens[i:i + n]) for i in range(len(tokens) - n + 1))\n\ndef clipped_precision(candidate, references, n):\n    \"\"\"Returns (clipped_matches, total_candidate_ngrams).\"\"\"\n    cand = ngrams(candidate, n)\n    max_ref = Counter()\n    for ref in references:\n        for g, c in ngrams(ref, n).items():\n            max_ref[g] = max(max_ref[g], c)\n    clipped = sum(min(c, max_ref[g]) for g, c in cand.items())\n    return clipped, sum(cand.values())\n\ndef brevity_penalty(cand_len, ref_lens):\n    r = min(ref_lens, key=lambda l: (abs(l - cand_len), l))   # closest reference length\n    if cand_len == 0:\n        return 0.0\n    return 1.0 if cand_len > r else math.exp(1 - r / cand_len)\n\nfrom fractions import Fraction\nimport math\nc=\"the the the the the the the\".split()\nr1=\"the cat is on the mat\".split(); r2=\"there is a cat on the mat\".split()\nm,t=clipped_precision(c,[r1,r2],1); assert (m,t)==(2,7)\nc2=\"the cat the cat on the mat\".split()\nassert clipped_precision(c2,[r1,r2],1)==(5,7)\nassert clipped_precision(c2,[r1,r2],2)==(4,6)\nprint(clipped_precision(c2,[r1,r2],1),clipped_precision(c2,[r1,r2],2))\nassert clipped_precision([\"a\"],[[\"b\"]],2)==(0,0)    # candidate shorter than n\nassert brevity_penalty(7,[6,7])==1.0\nassert abs(brevity_penalty(3,[6])-math.exp(1-2))<1e-12\nassert brevity_penalty(8,[6])==1.0\n# agreement with nltk\nfrom nltk.translate.bleu_score import modified_precision\nfor n in (1,2):\n    f=modified_precision([r1,r2],c2,n); m,t=clipped_precision(c2,[r1,r2],n)\n    assert f==Fraction(m,t),(f,m,t)\nf=modified_precision([r1,r2],c,1); assert f==Fraction(2,7)\nprint(\"ok\")",
+   "expected": []
+  },
+  "key_concepts": [
+   "modified n-gram precision",
+   "clipping",
+   "brevity penalty",
+   "geometric mean",
+   "smoothing",
+   "corpus-level BLEU",
+   "tokenisation sensitivity"
+  ],
+  "interview_style_note": "Understands clipping against the max reference count, knows why brevity penalty exists, and states BLEU's limits and zero-precision problem.",
+  "common_mistakes": [
+   "Clipping against the sum of counts across references rather than the max",
+   "Forgetting the brevity penalty so short outputs win",
+   "Using BLEU sentence scores without smoothing, getting zeros"
+  ],
+  "change_notes": "New question. Test executed and cross-checked with nltk.translate.bleu_score.modified_precision.",
+  "confidence": "high",
+  "sources": [],
+  "status": "ok",
+  "id": "smi-gen-nlp-12",
+  "domain": "NLP"
+ },
+ {
+  "plan_id": "P-NLP-13",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "You fit LDA with 20 topics on 50k news articles. Many topics are dominated by words like 'said' and 'would', and rerunning with another random seed gives noticeably different topics. Explain the generative model, what the inputs and outputs are, why you see this behaviour, and how you would choose the number of topics and make the results more reliable.",
+  "answer": "LDA's generative story: for each topic k draw a word distribution φ_k ~ Dirichlet(β); for each document draw topic proportions θ_d ~ Dirichlet(α); for each word position draw a topic z ~ Categorical(θ_d), then the word w ~ Categorical(φ_z). Input is a document-term count matrix (word order ignored). Outputs are θ (document-topic) and φ (topic-word), found by posterior inference such as variational Bayes or collapsed Gibbs sampling.\nFrequent function-like words ('said', 'would') appear in nearly every document, so they carry a lot of probability mass in some topics; remove stop words and use document-frequency pruning (min_df/max_df), lemmatisation and corpus-specific stop lists. The seed dependence arises because the posterior is non-convex, so inference lands in different local optima. Run several seeds and compare or align topics, use more iterations, and keep topics that recur.\nChoosing K: scan several values and combine a topic coherence measure (e.g. NPMI) with held-out likelihood or perplexity on unseen documents, plus manual inspection of top words. Held-out likelihood does not always track human-judged interpretability. Priors matter: smaller α gives sparser document-topic mixtures (scikit-learn defaults both priors to 1/n_components).",
+  "key_concepts": [
+   "generative model",
+   "Dirichlet prior",
+   "bag of words",
+   "topic coherence",
+   "held-out perplexity",
+   "local optima",
+   "document-frequency pruning"
+  ],
+  "interview_style_note": "States the generative process correctly, explains seed instability as non-convex inference, and does not rely on a single metric for K.",
+  "common_mistakes": [
+   "Treating topics as deterministic clusters",
+   "Choosing K by training perplexity alone",
+   "Feeding TF-IDF-weighted or order-aware text without noting LDA expects counts"
+  ],
+  "sources": [
+   {
+    "title": "scikit-learn LatentDirichletAllocation",
+    "url": "https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.LatentDirichletAllocation.html",
+    "supports": "Priors doc_topic_prior and topic_word_prior default to 1/n_components, and perplexity is defined as exp(-log-likelihood per word) using an approximate bound."
+   }
+  ],
+  "change_notes": "New question.",
+  "confidence": "medium",
+  "code": null,
+  "status": "ok",
+  "id": "smi-gen-nlp-13",
+  "domain": "NLP"
+ },
+ {
+  "plan_id": "P-NLP-14",
+  "question_type": "debugging",
+  "difficulty": "Medium",
+  "question": "Your sentiment classifier (CountVectorizer + logistic regression) mislabels reviews like 'not good' and 'not bad'. The vectorizer is CountVectorizer(stop_words='english'). Demonstrate the root cause in code, fix it, and explain what you would do instead of aggressive text cleaning.",
+  "answer": "Cause: scikit-learn's built-in english stop-word list contains negators such as not, no, never, nor and cannot (asserted in the test), so with stop_words='english' the texts 'good' and 'not good' become the same feature vector, as do 'bad' and 'not bad'. The model cannot represent negation, and the opposite sentiments collide. The default tokenizer also drops single-character tokens and punctuation, so emoticons and '!' disappear.\n```python\nfrom sklearn.feature_extraction.text import CountVectorizer, ENGLISH_STOP_WORDS\nfrom sklearn.linear_model import LogisticRegression\n\ndef fit_predict(vec, train_texts, train_y, test_texts):\n    X = vec.fit_transform(train_texts)\n    clf = LogisticRegression(C=10, max_iter=1000).fit(X, train_y)\n    return clf.predict(vec.transform(test_texts))\n\ndef broken_vec():\n    return CountVectorizer(stop_words=\"english\")                  # drops \"not\", \"no\", \"never\", \"very\"...\n\ndef fixed_vec():\n    return CountVectorizer(ngram_range=(1, 2))                    # keeps negators; bigram \"not good\" is a feature\n```\nThe test shows the two vectors are identical under broken_vec, differ under fixed_vec, and that the broken pipeline gives the same prediction for 'good' and 'not good' (and for 'bad' and 'not bad') while the fixed one separates 'not good' (0) from 'not bad' (1) on this toy data. The toy corpus is only a demonstration, not a quality claim.\nWhat to do instead: do not blanket-remove stop words for sentiment; if you do, use a custom list that keeps negators and intensifiers. Add word bigrams, or mark negation scope (prefix tokens after a negator until punctuation). Keep case or punctuation features if they help. Decide by ablation on validation data; transformer models should not get stop-word removal at all.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "from sklearn.feature_extraction.text import CountVectorizer, ENGLISH_STOP_WORDS\nfrom sklearn.linear_model import LogisticRegression\n\ndef fit_predict(vec, train_texts, train_y, test_texts):\n    X = vec.fit_transform(train_texts)\n    clf = LogisticRegression(C=10, max_iter=1000).fit(X, train_y)\n    return clf.predict(vec.transform(test_texts))\n\ndef broken_vec():\n    return CountVectorizer(stop_words=\"english\")                  # drops \"not\", \"no\", \"never\", \"very\"...\n\ndef fixed_vec():\n    return CountVectorizer(ngram_range=(1, 2))                    # keeps negators; bigram \"not good\" is a feature",
+   "test": "from sklearn.feature_extraction.text import CountVectorizer, ENGLISH_STOP_WORDS\nfrom sklearn.linear_model import LogisticRegression\n\ndef fit_predict(vec, train_texts, train_y, test_texts):\n    X = vec.fit_transform(train_texts)\n    clf = LogisticRegression(C=10, max_iter=1000).fit(X, train_y)\n    return clf.predict(vec.transform(test_texts))\n\ndef broken_vec():\n    return CountVectorizer(stop_words=\"english\")                  # drops \"not\", \"no\", \"never\", \"very\"...\n\ndef fixed_vec():\n    return CountVectorizer(ngram_range=(1, 2))                    # keeps negators; bigram \"not good\" is a feature\n\nfrom sklearn.feature_extraction.text import ENGLISH_STOP_WORDS\nfor w in [\"not\", \"no\", \"never\", \"nor\", \"cannot\"]:\n    assert w in ENGLISH_STOP_WORDS\ntx = [\"the food was good\", \"the service was good\", \"really good value\", \"not good at all\",\n      \"the room was not good\", \"good but not clean\", \"bad and rude\", \"the food was bad\",\n      \"not bad at all, quite nice\", \"not bad, enjoyed it\", \"never disappointing, great\",\n      \"great and not boring\"]\ny = [1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1]\nv = broken_vec().fit(tx)\na = v.transform([\"good\", \"not good\"]).toarray()\nassert (a[0] == a[1]).all()                      # negation is invisible to the model\nv2 = fixed_vec().fit(tx)\nb = v2.transform([\"good\", \"not good\"]).toarray()\nassert not (b[0] == b[1]).all()\nq = [\"good\", \"not good\", \"bad\", \"not bad\"]\npb = list(fit_predict(broken_vec(), tx, y, q))\npf = list(fit_predict(fixed_vec(), tx, y, q))\nprint(pb, pf)\nassert pb[0] == pb[1] and pb[2] == pb[3]         # broken: \"not X\" == \"X\"\nassert pf[1] == 0 and pf[3] == 1                 # fixed: negation handled\nprint(\"ok\")",
+   "expected": []
+  },
+  "key_concepts": [
+   "stop-word removal",
+   "negation handling",
+   "word bigrams",
+   "CountVectorizer",
+   "token pattern",
+   "ablation",
+   "feature collision"
+  ],
+  "interview_style_note": "Reproduces the bug in a test, fixes it with minimal change, and recommends validating preprocessing choices by ablation rather than habit.",
+  "common_mistakes": [
+   "Believing stop-word removal is always safe or helpful",
+   "Fixing only by adding more training data",
+   "Using bigrams but still removing 'not' via stop words"
+  ],
+  "sources": [
+   {
+    "title": "scikit-learn: Feature extraction (text)",
+    "url": "https://scikit-learn.org/stable/modules/feature_extraction.html",
+    "supports": "CountVectorizer's default tokenizer keeps words of at least 2 characters, and the built-in 'english' stop-word list has known issues and may include informative words."
+   }
+  ],
+  "change_notes": "New question. Test executed against scikit-learn 1.9.1.",
+  "confidence": "high",
+  "status": "ok",
+  "id": "smi-gen-nlp-14",
+  "domain": "NLP"
+ }
+]

@@ -1,0 +1,419 @@
+[
+ {
+  "id": "P2-PY-01",
+  "verdict": "pass",
+  "reasons": [
+   "Accurate, specific, answers all three asks."
+  ],
+  "parts_answered": {
+   "why state leaks": true,
+   "fix add_tag": true,
+   "sentinel pattern for get_option": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Dataclasses reject mutable defaults",
+    "problem": "Only list/dict/set (unhashable defaults) are rejected; fine as a brief aside.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Definition-time evaluation plus a sentinel design for a legit-None default; more than recall, less than design with trade-offs.",
+  "key_concepts_findings": "All six concepts are discussed (__defaults__, definition time, None sentinel, private sentinel, default_factory).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close (nearest smi-0441)",
+   "same_intent": false
+  },
+  "code_findings": "Extra edges: get_option({'a':None},'a') -> None (present key wins); add_tag('x', ()) raises AttributeError (caller error, fine); tests cover empty caller list identity, None as supplied default, 0 default. Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-PY-02",
+  "verdict": "pass",
+  "reasons": [
+   "Correct late-binding explanation; three fixes implemented; downside stated."
+  ],
+  "parts_answered": {
+   "why last value": true,
+   "make_default_arg": true,
+   "make_partial": true,
+   "make_factory": true,
+   "one downside": true
+  },
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Closure/scoping mechanism plus three implementations; no trade-off design.",
+  "key_concepts_findings": "All concepts discussed; 'variable scope' covered by the comprehension-scope remark. Claim that all lambdas share one i cell is correct (also under 3.12 inlined comprehensions).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close (nearest smi-0440)",
+   "same_intent": false
+  },
+  "code_findings": "Extra: maker(0)==[] tested; make_default_arg(2)[0](99)==99 and factory raising TypeError verified; nested def loop also [2,2,2]. Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-PY-03",
+  "verdict": "correct",
+  "reasons": [
+   "Code is correct and tested; one inaccurate explanatory sentence."
+  ],
+  "parts_answered": {
+   "class Transaction": true,
+   "@contextmanager transaction": true,
+   "yield resource": true,
+   "rollback on body error, never swallow": true,
+   "commit failure -> rollback + propagate": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "forgetting the re-raise in a @contextmanager makes the generator finish without raising, which can turn a with-body failure into a RuntimeError or silent success",
+    "problem": "If the generator catches and finishes normally, contextmanager.__exit__ gets StopIteration and returns True, i.e. the exception is silently suppressed. RuntimeError (\"generator didn't stop after throw()\") only occurs if the generator yields again. Verified from CPython contextlib behaviour.",
+    "replacement": "forgetting the re-raise in a @contextmanager makes the generator finish normally, so the with statement silently suppresses the body's exception (a RuntimeError appears only if the generator yields a second time)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short code with exception-flow semantics in two idioms.",
+  "key_concepts_findings": "Concepts are all discussed. 'BaseException' is justified in the text.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "code_findings": "Extra edges via tests: KeyboardInterrupt rolls back and propagates; rollback failure chains original as __context__; commit failure then rollback. Both idioms behave identically. Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-PY-04",
+  "verdict": "correct",
+  "reasons": [
+   "Code verified; one pitfall sentence is vague/wrong for sequences."
+  ],
+  "parts_answered": {
+   "batched": true,
+   "sliding_window": true,
+   "lazy until first next": true,
+   "O(n) memory": true,
+   "eager ValueError": true,
+   "short iterable yields no window": true,
+   "memory difference vs slicing": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Pitfall: calling list(it) or islice on the original iterable twice would silently skip items; only one iterator must be shared.",
+    "problem": "Unclear: it is true only for one-shot iterators, and the real pitfall is creating more than one iterator. Rewrite to be precise.",
+    "replacement": "Pitfall: create the iterator once with iter(iterable) and share it between all islice calls; calling islice(iterable, n) directly on a re-iterable such as a list would restart from the beginning every time and never advance."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short generator utilities with a subtle eager-validation requirement.",
+  "key_concepts_findings": "All concepts discussed; 'iterator protocol' only implicit.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0467",
+   "same_intent": false
+  },
+  "code_findings": "Extra: batched('ab',1), window shorter than n -> [], sliding_window over count() (infinite) works; batched(range(5),2.0) raises ValueError from islice only at first next (non-int n not specified, fine); batched(None,2) fails at first next with TypeError (not eager; not required). Pull counts verified (lazy, one new item per window). Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution. itertools.batched facts (3.12, yields tuples) are from my knowledge of the docs; not re-fetched.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-PY-05",
+  "verdict": "pass",
+  "reasons": [
+   "Spec-exact implementation; off-by-one handled; claims accurate."
+  ],
+  "parts_answered": {
+   "decorator factory signature": true,
+   "times semantic and >=1": true,
+   "only listed exceptions retried": true,
+   "delay*backoff**k, no sleep after last": true,
+   "re-raise last": true,
+   "functools.wraps": true,
+   "injectable sleep": true
+  },
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Decorator-with-arguments plus off-by-one care; short.",
+  "key_concepts_findings": "All concepts discussed; 'dependency injection' covered by the sleep parameter.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0440",
+   "same_intent": false
+  },
+  "code_findings": "Extra: delay=.5,backoff=3,times=3 sleeps [0.5,1.5] then raises OSError; times=2.5 accepted silently (not specified); exceptions=ValueError (bare class, not tuple) raises TypeError at decoration (tuple() of a class) - spec says tuple, minor. Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-PY-06",
+  "verdict": "pass",
+  "reasons": [
+   "Correct; semaphore + gather(return_exceptions=True); GIL/event-loop explanation hedged properly."
+  ],
+  "parts_answered": {
+   "bounded_gather with limit": true,
+   "order preserved": true,
+   "exceptions kept in slots, siblings finish": true,
+   "limit<1 ValueError": true,
+   "why asyncio not for CPU-bound": true,
+   "what to use instead": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "gather returns results in argument order regardless of completion order",
+    "problem": "True; but note a BaseException (KeyboardInterrupt) raised in a job is not captured by return_exceptions and propagates (verified). Not required by the question.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Concurrency pattern plus conceptual GIL/event loop explanation.",
+  "key_concepts_findings": "All concepts discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0466",
+   "same_intent": false
+  },
+  "code_findings": "Extra: limit larger than jobs, limit=1 serialises, empty funcs -> [], limit=1.5 accepted, generator of funcs works. In-flight max asserted == limit with varied durations. Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution. asyncio.TaskGroup 3.11+ claim matches my knowledge of the docs.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-PY-07",
+  "verdict": "correct",
+  "reasons": [
+   "Code correct; two wording overstatements."
+  ],
+  "parts_answered": {
+   "vectorised expansion": true,
+   "never negative": true,
+   "broadcast version": true,
+   "memory trade-off": true,
+   "numerical issue": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "The broadcast form is exact and simplest for small inputs",
+    "problem": "Floating-point subtraction/sum is not 'exact'; it is just numerically well-conditioned compared with the expansion.",
+    "replacement": "The broadcast form is numerically accurate (no cancellation between large norms) and simplest for small inputs"
+   },
+   {
+    "severity": "minor",
+    "claim": "the broadcast version materialises an (n, m, d) temporary, e.g. 5,000 x 5,000 x 128 float64 is about 25.6 GB",
+    "problem": "25.6 GB is correct per array but diff**2 creates a second same-size temporary, so peak is roughly double.",
+    "replacement": "the broadcast version materialises an (n, m, d) temporary (and diff ** 2 a second one), e.g. 5,000 x 5,000 x 128 float64 is about 25.6 GB each"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Vectorisation identity with numerical-stability reasoning; short code.",
+  "key_concepts_findings": "All discussed (clipping, cancellation, BLAS, temporaries).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0462",
+   "same_intent": false
+  },
+  "code_findings": "Extra: zero-row A -> shape (0,m); both empty gives shape (0,0) plus RuntimeWarning 'Mean of empty slice'; NaN input propagates; dim mismatch ValueError; 1-D input raises (spec says 2-D); offset 1e8 vs broadcast max abs err 1.4e-14 (centering works). Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-PY-08",
+  "verdict": "pass",
+  "reasons": [
+   "Correct diagnosis and fix; works on pandas 2.3.3 and 3.0 (tests ok under both)."
+  ],
+  "parts_answered": {
+   "explain why 6 rows": true,
+   "attach_price returns (result, n_unmatched)": true,
+   "one row per order, original order": true,
+   "latest price, NaN if none": true,
+   "validate=": true,
+   "indicator=": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "(not stated)",
+    "problem": "Unspecified edge: a NaT effective_date sorts last, so that row wins as 'latest' (verified); orders already having a 'price' column yield price_x/price_y; null product_id on both sides matches (pandas merges NaN keys); equal-date ties keep the last input row. None is required by the question.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism diagnosis plus short application of merge options.",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close (nearest smi-0461)",
+   "same_intent": false
+  },
+  "code_findings": "Extra: empty prices -> all NaN, n_unmatched=len(orders); empty orders -> empty frame, 0; non-default orders index is reset to RangeIndex (fine); unsorted prices handled. Verified on pandas 3.0 (sandbox) and 2.3.3 (v310/v311). Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-PY-09",
+  "verdict": "pass",
+  "reasons": [
+   "Correct, tie policy fully specified, deterministic output; tested on pandas 2.3.3 and 3.0."
+  ],
+  "parts_answered": {
+   "named aggregation": true,
+   "transform share over whole category": true,
+   "top 2 with tie policies": true,
+   "output columns/sort/RangeIndex": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "(not stated)",
+    "problem": "Unspecified edges: NaN category rows are dropped by groupby; category total 0 gives NaN shares; negative revenue gives inf shares. Not part of the question.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Standard groupby/rank/transform application with tie-handling.",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close (nearest smi-0021 unrelated)",
+   "same_intent": false
+  },
+  "code_findings": "Extra: 4-way tie with keep_ties=False -> exactly 2 rows by name; keep_ties=True -> all 4; empty df -> (0,4); single-product category share 1.0. Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-PY-10",
+  "verdict": "correct",
+  "reasons": [
+   "Answer omits the requested counting wrapper and its results (only present in the test); an O(1)-space claim is wrong for CPython sorting."
+  ],
+  "parts_answered": {
+   "rewrite has_duplicates O(n)": true,
+   "has_duplicates_sorted": true,
+   "counting wrapper class and demonstration of counts": false,
+   "when sorting beats hashing": true
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "Prove the complexity claim ... write a wrapper class that counts __eq__ calls (question) / answer text has no counting class or numbers",
+    "problem": "The question asks to write the counting wrapper and show the counts; the answer text and fenced code never include it (only the hidden test does).",
+    "replacement": "Counting wrapper (for the demonstration, not part of the solutions):\n```python\nclass Counted:\n    eq_calls = hash_calls = lt_calls = 0\n    def __init__(self, v):\n        self.v = v\n    def __eq__(self, other):\n        Counted.eq_calls += 1\n        return self.v == other.v\n    def __hash__(self):\n        Counted.hash_calls += 1\n        return hash(self.v)\n    def __lt__(self, other):\n        Counted.lt_calls += 1\n        return self.v < other.v\n```\nWith 200 unique Counted items: has_duplicates_quadratic makes exactly 200*199/2 = 19,900 __eq__ calls; has_duplicates makes 200 __hash__ calls and 0 __eq__ calls (equality is consulted only when full hashes collide); has_duplicates_sorted makes about 1,270 __lt__ calls on shuffled input (roughly n log2 n)."
+   },
+   {
+    "severity": "major",
+    "claim": "when memory is tight (an in-place sort of data you may reorder needs O(1) extra space versus the set's O(n))",
+    "problem": "CPython's list.sort (Timsort) may allocate up to ~n/2 temporary slots, so it is not O(1) extra space; and the shown has_duplicates_sorted uses sorted(), which copies (O(n)).",
+    "replacement": "when memory is tight and you may reorder the data (list.sort() in place avoids the set and the copy that sorted() makes, though CPython's Timsort can still use up to about n/2 temporary slots, so this saves a constant factor rather than reaching O(1) extra space)"
+   },
+   {
+    "severity": "minor",
+    "claim": "(not stated)",
+    "problem": "Versions disagree on NaN: for one shared nan object, quadratic -> False, sorted -> False, but has_duplicates -> True (set uses identity before ==). Worth one sentence on 'equal by ==' vs identity.",
+    "replacement": "Caveat: the set version first checks identity, so the same float('nan') object counted twice is reported as a duplicate even though nan != nan; the quadratic and sorted versions say False."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Complexity comparison with operation counting; implementation is short.",
+  "key_concepts_findings": "Concepts fine; 'operation counting' is listed but not shown in the answer (fixed by replacement).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0449",
+   "same_intent": false
+  },
+  "code_findings": "Counts independently verified: quadratic eq=19900, hash version hash=200 eq=0, sorted lt=1273 (<=1600). Extra: [nan,nan] inconsistent as above; sorted([1,'a']) TypeError; sets (partial order) give a wrong False for sorted version; generator input fails for quadratic (len) but works for hash. Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-PY-11",
+  "verdict": "correct",
+  "reasons": [
+   "Regex uses \\d, which matches non-ASCII Unicode digits, violating the stated 'YYYY-MM-DD' and 'digits only' rules."
+  ],
+  "parts_answered": {
+   "parse_log returns (records, n_malformed)": true,
+   "to_jsonl": true,
+   "timestamp/level validation": true,
+   "quoted escapes": true,
+   "int conversion rules (bare only)": true,
+   "last wins": true,
+   "blank vs malformed": true,
+   "compiled regex with named groups": true
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "r\"^(?P<ts>\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z)\"  and  INT_RE = re.compile(r\"-?\\d+\")",
+    "problem": "In Python 3 str patterns \\d matches any Unicode decimal digit: 'k=٣' is parsed as int 3 and a timestamp '٢٠٢٦-03-01T12:00:05Z' is accepted (both verified), contradicting 'digits only' and 'YYYY-MM-DD...'. Fix in answer text AND code.solution (tests still pass).",
+    "replacement": "Use r\"^(?P<ts>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)\" and INT_RE = re.compile(r\"-?[0-9]+\")"
+   },
+   {
+    "severity": "minor",
+    "claim": "\\s+ / \\s separators",
+    "problem": "\\s also matches \\x0b, \\x0c and U+2028 etc., so 'a=\"x\"\\u2028b=1' parses as two pairs although the spec says space-separated. Acceptable but undocumented.",
+    "replacement": null
+   },
+   {
+    "severity": "minor",
+    "claim": "json.dumps(r, sort_keys=True, ensure_ascii=False)",
+    "problem": "With ensure_ascii=False a U+2028 in a value stays raw and str.splitlines() would split the line (verified); split('\\n') is safe. Consider ensure_ascii=True or note it.",
+    "replacement": null
+   },
+   {
+    "severity": "minor",
+    "claim": "(not stated)",
+    "problem": "Timestamp ranges are not validated ('2026-13-45T99:99:99Z' accepted) - consistent with 'ISO-like' but should be stated; unknown escapes like \\n are kept literally.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Many interacting rules, whole-line validation vs finditer, escape handling, malformed accounting.",
+  "key_concepts_findings": "All concepts present and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close",
+   "same_intent": false
+  },
+  "code_findings": "Extra edges run: empty value k= malformed; k=\"\" ok; leading zeros 007->7, -0->0, +5 and 1_0 stay str; unterminated/odd escape \"x\\\" malformed; a=b\"c malformed; lowercase level malformed; tabs as separators accepted; 20k-backslash line returns quickly (no catastrophic backtracking); non-str element raises AttributeError (not specified). Unicode-digit bug confirmed on 3.10 and 3.13. Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-PY-12",
+  "verdict": "pass",
+  "reasons": [
+   "Correct on every sub-part; compound question but each part answered."
+  ],
+  "parts_answered": {
+   "what .copy() did": true,
+   "make_config": true,
+   "[[0]*3]*3 problem and fix": true,
+   "== vs is": true,
+   "deepcopy shared refs and cycles": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "def make_config(defaults, **overrides)",
+    "problem": "A key literally named 'defaults' cannot be overridden (TypeError multiple values for argument) - inherent to the requested signature; positional-only `defaults, /` would avoid it.",
+    "replacement": null
+   },
+   {
+    "severity": "minor",
+    "claim": "question wording",
+    "problem": "Question bundles four loosely related topics (shallow copy, grid aliasing, ==/is, deepcopy internals); fine for a written check but long for a live interview.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism explanation of aliasing and copying plus short code; several recall parts.",
+  "key_concepts_findings": "All discussed (memo/cycles included).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0441",
+   "same_intent": false
+  },
+  "code_findings": "Extra: make_grid(0,3)==[]; make_grid with mutable fill aliases (as the answer warns); deepcopy of a Lock raises TypeError (as claimed); cycle and shared-reference preservation tested. Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution. The 'is vs ==' part overlaps smi-0441 but this record is broader (copy semantics).",
+  "sources_findings": []
+ }
+]

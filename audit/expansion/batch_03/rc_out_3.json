@@ -1,0 +1,664 @@
+[
+ {
+  "plan_id": "B3-MLO-06-4",
+  "verdict": "correct",
+  "reasons": [
+   "Core deadlock diagnosis and arithmetic verified; applied 8-minute rollback fix is right (4 x (90+30) = 480 s) and consistent with minReadySeconds 30 in the YAML.",
+   "Two minor overstatements remain."
+  ],
+  "parts_answered": {
+   "why it deadlocks": true,
+   "options": true,
+   "cost of each": true,
+   "90 s load assumption used": true
+  },
+  "evidence": [
+   {
+    "claim": "maxSurge 1 + maxUnavailable 0 with 4/4 GPUs used leaves surge pod Pending, old pods cannot be removed",
+    "method": "derivation",
+    "evidence": "Surge pod needs 1 GPU, 0 free; maxUnavailable 0 forbids removing an old pod until a new one is available. Deadlock."
+   },
+   {
+    "claim": "maxSurge/maxUnavailable cannot both be 0; default 25%; revisionHistoryLimit default 10; minReadySeconds definition",
+    "method": "doc",
+    "evidence": "Deployment doc: 'The value cannot be 0 if .spec.strategy.rollingUpdate.maxSurge is 0.' ; 'By default, 10 old ReplicaSets will be kept'; minReadySeconds 'minimum number of seconds for which a newly created Pod should be ready without any of its containers crashing'."
+   },
+   {
+    "claim": "3/3.4 = 88%",
+    "method": "executed",
+    "evidence": "3/3.4=0.882"
+   },
+   {
+    "claim": "4x90=360 s=6 min; 4x120=480 s=8 min",
+    "method": "executed",
+    "evidence": "arithmetic"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "catches crash-on-first-request failures",
+    "problem": "minReadySeconds only requires the pod to stay up without container crashes for N seconds after becoming ready; it does not exercise requests.",
+    "replacement": "gives a window that catches pods which crash shortly after becoming ready"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(a pod that is still loading its model counts as unavailable)",
+    "problem": "True only if the readiness probe passes after model load; not stated.",
+    "replacement": "(a pod that is still loading its model counts as unavailable, provided readiness is gated on model load)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Needs the surge/unavailable mechanics, GPU capacity reasoning and cost trade-offs; no heavy computation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "diagnosis + three options with costs"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "capacity arithmetic, strategy YAML and rollback timing not in detailed"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "all discussed in the answer",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none (smi-0406 is Uber surge pricing, unrelated)",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+    "status": "supported",
+    "evidence": "'The value cannot be 0 if .spec.strategy.rollingUpdate.maxSurge is 0. The default value is 25%.'; 'By default, 10 old ReplicaSets will be kept'; minReadySeconds definition (WebFetch of raw page source; rendered page body not returned)."
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+    "status": "supported",
+    "evidence": "'The Pod remains in the PENDING state as long as the resource request cannot be satisfied.' (line 544 of page source) (opened via the kubernetes/website or feast/tfx repo source of the page; the rendered kubernetes.io/WebFetch view returned only navigation text)"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Termination grace period delays GPU release, so '6 minutes' is a lower bound (answer says 'at least')."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-06-5",
+  "verdict": "correct",
+  "reasons": [
+   "Whole-number / equal limit rules, per-node fragmentation and taint design all verified against docs.",
+   "Applied edit about gang scheduling is hedged but now out of date: current Kubernetes docs describe a feature-gated gang-scheduling feature in the core scheduler."
+  ],
+  "parts_answered": {
+   "GPU resource rules (0.5, requests1/limits2)": true,
+   "why 8-GPU job stuck": true,
+   "organising scheduling": true
+  },
+  "evidence": [
+   {
+    "claim": "GPU in limits; limit alone used as request; both must be equal; requests without limits not allowed",
+    "method": "doc",
+    "evidence": "scheduling-gpus: 'You can specify GPU limits without specifying requests...', 'these two values must be equal', 'You cannot specify GPU requests without specifying limits.'"
+   },
+   {
+    "claim": "extended resources whole numbers, no overcommit",
+    "method": "doc",
+    "evidence": "manage-resources: 'The API server restricts quantities of extended resources to whole numbers... 0.5 ... invalid'; 'Extended resources cannot be overcommitted, so request and limit must be equal'."
+   },
+   {
+    "claim": "taints dedicate GPU nodes; node selectors target GPU types",
+    "method": "doc",
+    "evidence": "taint page 'Nodes with Special Hardware' and 'Dedicated Nodes'; gpus page 'use Node Labels and Node Selectors to schedule pods to appropriate nodes'."
+   },
+   {
+    "claim": "priority/preemption are core",
+    "method": "doc",
+    "evidence": "pod-priority-preemption: 'preemptionPolicy defaults to PreemptLowerPriority'."
+   },
+   {
+    "claim": "gang scheduling is an add-on beyond the core scheduler",
+    "method": "doc",
+    "evidence": "Gang Scheduling page: 'Gang scheduling ensures that a group of Pods are scheduled on an all-or-nothing basis' with a GangScheduling scheduler plugin behind the GenericWorkload feature gate -> claim outdated as an absolute."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "and are add-ons beyond the core scheduler",
+    "problem": "Recent Kubernetes versions document feature-gated gang scheduling in the core scheduler (Workload/PodGroup APIs); 'add-ons' is no longer universally true.",
+    "replacement": "and have mostly been provided by add-ons beyond the core scheduler (recent Kubernetes versions are adding feature-gated gang scheduling to the core scheduler, so check your cluster version)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Several rules plus fragmentation reasoning; application level.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "77 words, interview-ready, consistent with detailed"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "rules, fragmentation, design"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "pool layout, YAML and verification test"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "all discussed in the answer",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close (smi-k0025 is QLoRA/GPU count)",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus/",
+    "status": "supported",
+    "evidence": "'GPUs are only supposed to be specified in the limits section... You can specify GPU in both limits and requests but these two values must be equal.' ; 'use Node Labels and Node Selectors' (opened via the kubernetes/website or feast/tfx repo source of the page; the rendered kubernetes.io/WebFetch view returned only navigation text)"
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+    "status": "supported",
+    "evidence": "'The API server restricts quantities of extended resources to whole numbers.' ; 'Extended resources cannot be overcommitted, so request and limit must be equal' (opened via the kubernetes/website or feast/tfx repo source of the page; the rendered kubernetes.io/WebFetch view returned only navigation text)"
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/",
+    "status": "supported",
+    "evidence": "'Dedicated Nodes ... add a taint ... then add a corresponding toleration' and 'Nodes with Special Hardware (for example GPUs)' (opened via the kubernetes/website or feast/tfx repo source of the page; the rendered kubernetes.io/WebFetch view returned only navigation text)"
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Kubernetes Docs: Gang Scheduling",
+    "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/gang-scheduling/",
+    "supports": "Gang scheduling (all-or-nothing placement of a pod group) is now a feature-gated capability of the Kubernetes scheduler.",
+    "quote": "Gang scheduling ensures that a group of Pods are scheduled on an \"all-or-nothing\" basis.",
+    "type": "official_doc"
+   },
+   {
+    "title": "Kubernetes Docs: Pod Priority and Preemption",
+    "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/",
+    "supports": "Pod priority and preemption are core scheduler features and allow higher-priority pods to preempt lower-priority ones.",
+    "quote": "preemptionPolicy defaults to PreemptLowerPriority, which will allow pods of that PriorityClass to preempt lower-priority pods",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Fractional GPU sharing via time-slicing/partitioning is vendor-specific (already hedged)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-06-6",
+  "verdict": "correct",
+  "reasons": [
+   "All three applied hedges are correct and consistent with the practical replay (retry with higher memory request; manifest).",
+   "One sentence over-paraphrases the Jobs doc."
+  ],
+  "parts_answered": {
+   "properties each step needs": true,
+   "passing artifacts": true,
+   "caching": true,
+   "retries": true
+  },
+  "evidence": [
+   {
+    "claim": "same Job program may sometimes be started twice",
+    "method": "doc",
+    "evidence": "Job page: 'even if you specify .spec.parallelism = 1 and .spec.completions = 1 and restartPolicy = Never, the same program may sometimes be started twice.'"
+   },
+   {
+    "claim": "idempotency-key registration yields one version on duplicate call",
+    "method": "derivation",
+    "evidence": "get-or-create on key hash(run, artifact) returns existing version; the practical replay is consistent."
+   },
+   {
+    "claim": "object stores lack atomic directory rename",
+    "method": "background_only",
+    "evidence": "General storage knowledge; answer now conditions the claim."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "and the application must cope with being restarted",
+    "problem": "The Jobs page says the program may be started twice and that pods must be tolerant of concurrency when parallelism>1; it does not say that sentence. 'At-least-once' is the answer's own framing.",
+    "replacement": "so a step must tolerate duplicate runs"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Applied pipeline-reliability design with several interacting mechanisms but no deep derivation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "properties, artifacts, caching, retries"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "replay of both incidents with ids and keys"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "all discussed in the answer",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0009 (agent refund retry/idempotency) - different context",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/concepts/workloads/controllers/job/",
+    "status": "partially",
+    "evidence": "'the same program may sometimes be started twice' supported; 'applications must handle being restarted' is not stated verbatim (opened via the kubernetes/website or feast/tfx repo source of the page; the rendered kubernetes.io/WebFetch view returned only navigation text)"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Atomic rename guarantees per filesystem / object store; idempotency-key and cache-key patterns are engineering practice (hedged)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-07-1",
+  "verdict": "pass",
+  "reasons": [
+   "Applied hedges ('usually', 'typically') are correct and keep concise (78 words) consistent with detailed.",
+   "TFDV skew/drift definitions verified."
+  ],
+  "parts_answered": {
+   "definition of skew": true,
+   "definition of drift": true,
+   "concrete example": true,
+   "how to tell which": true
+  },
+  "evidence": [
+   {
+    "claim": "TFDV: skew between training and serving data; drift between consecutive spans",
+    "method": "doc",
+    "evidence": "'TensorFlow Data Validation can detect distribution skew between training and serving data.' ; 'Drift detection is supported between consecutive spans of data (i.e., between span N and span N+1)'; drift as L-infinity distance."
+   },
+   {
+    "claim": "row-by-row comparison of raw events through both paths isolates skew",
+    "method": "derivation",
+    "evidence": "Same inputs, different outputs implies pipeline difference, independent of the world changing."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Concept comparison plus a diagnostic procedure; short.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "78 words"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "diagnostic tests beyond concise"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "all discussed in the answer",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0005",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://www.tensorflow.org/tfx/guide/tfdv",
+    "status": "supported",
+    "evidence": "quotes above (tfx repo source of the page)"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-07-2",
+  "verdict": "pass",
+  "reasons": [
+   "Code re-run on 3.13, 3.10, 3.11: shipped test and my extras pass; fenced code identical to code.solution.",
+   "Correction to the detailed text is accurate."
+  ],
+  "parts_answered": {
+   "what is wrong": true,
+   "implementation": true,
+   "tie treatment": true
+  },
+  "evidence": [
+   {
+    "claim": "naive join leaks future rows",
+    "method": "executed",
+    "evidence": "naive_latest_join gives 9 for all u1 events in the test."
+   },
+   {
+    "claim": "Feast PIT join scans backward up to TTL",
+    "method": "doc",
+    "evidence": "'Feast will scan backward in time from the entity dataframe timestamp up to a maximum of the TTL time specified.'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short as-of join with bisect, TTL boundary and tie rule; standard pattern.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "leakage explanation, design and tie convention"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "tested code plus naive contrast"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "all discussed in the answer",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0001/smi-i0002 (leakage concept)",
+   "same_intent": false
+  },
+  "code_findings": "Ran sol+test on /home/claude/work/dep/v/bin/python (3.13.16), v310 (3.10.20), v311 (3.11.17): all 'ok'. My extra edges (all passed on all three): single-row ttl=0 exact match; 3-way timestamp tie, last wins; future-only row -> None; negative timestamps; float ttl boundary inclusive; stored value None; generator input for feature_rows; randomized comparison against brute force for ttl 0/5/100 over 60 events. Only stdlib (bisect, collections, random in test); no 3.11+ features. Limitation: a stored None is indistinguishable from 'missing' (acceptable, not stated).",
+  "sources_findings": [
+   {
+    "url": "https://docs.feast.dev/getting-started/concepts/point-in-time-joins",
+    "status": "supported",
+    "evidence": "'Feast is able to join features ... onto an entity dataframe in a point-in-time correct way.' ; 'Feast will scan backward in time ... up to a maximum of the TTL time specified.'"
+   },
+   {
+    "url": "https://docs.feast.dev/getting-started/concepts/feature-view",
+    "status": "supported",
+    "evidence": "'a TTL, which limits how far back Feast will look when generating historical datasets'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-07-3",
+  "verdict": "pass",
+  "reasons": [
+   "Applied wording edits are fine (concise 74 words; key concept 'shared feature definitions' matches).",
+   "Reasoned 'not yet' with explicit triggers; Feast claims supported."
+  ],
+  "parts_answered": {
+   "problems solved": true,
+   "why two stores": true,
+   "adopt here?": true,
+   "what would change answer": true
+  },
+  "evidence": [
+   {
+    "claim": "Feast ingests values into online store for real-time low-latency serving",
+    "method": "doc",
+    "evidence": "'Feast uses a Push Model to ingest data ... and store feature values in the online store. This allows Feast to serve features in real-time with low latency.'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Trade-off judgement with conceptual explanation; no computation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "74 words, gives the verdict"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "full rationale and triggers"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "all discussed in the answer",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010 (unrelated semantic-search design)",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://docs.feast.dev/getting-started/concepts/point-in-time-joins",
+    "status": "supported",
+    "evidence": "PIT-correct join onto entity dataframe"
+   },
+   {
+    "url": "https://docs.feast.dev/getting-started/architecture/overview",
+    "status": "supported",
+    "evidence": "push model ingestion to online store for 'real-time with low latency'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'materialization' as a generic term (Feast uses it; acceptable)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-07-4",
+  "verdict": "correct",
+  "reasons": [
+   "Corrections (key_concepts, DST wording, Feast alpha hedge) are accurate; the 25-hour-day explanation is right.",
+   "Two minor wording points in new text."
+  ],
+  "parts_answered": {
+   "single definition": true,
+   "at least three approaches with trade-offs": true,
+   "parity proof before/after": true
+  },
+  "evidence": [
+   {
+    "claim": "On-demand feature views execute Python in both historical and online retrieval; labelled Alpha",
+    "method": "doc",
+    "evidence": "feature-view page: '## [Alpha] On demand feature views ... python transformation logic which is executed in both the historical retrieval and online retrieval paths.'"
+   },
+   {
+    "claim": "clock change adding an hour makes a 720-hour window start an hour later than a 30-calendar-day window",
+    "method": "derivation",
+    "evidence": "A fall-back day has 25 h, so 30 calendar days = 721 h; 720 h starts 1 h later and misses an order in that hour."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "the fix is to specify the window in UTC calendar days in the shared definition",
+    "problem": "Picks one semantics unconditionally; the business meaning may be local calendar days or fixed hours. The point is to state it once, explicitly.",
+    "replacement": "the fix is to state the window explicitly in the shared definition (for example 30 calendar days in a named timezone, or 720 hours if that is what is meant) and implement it once"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(as an alpha-stage feature at the time of checking)",
+    "problem": "'at the time of checking' is awkward in an interview answer.",
+    "replacement": "(documented as an alpha feature)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open design comparing five approaches plus a parity-test proof strategy.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Compute once, publish to offline and online",
+    "tradeoff": "No second implementation; not for request-time inputs; freshness bound by pipeline latency"
+   },
+   {
+    "decision": "One shared function/library executed in both paths",
+    "tradeoff": "Single definition; same runtime and pinned versions needed; per-request latency"
+   },
+   {
+    "decision": "Declarative spec compiled to SQL and code",
+    "tradeoff": "Language independent; DSL and generator to maintain"
+   },
+   {
+    "decision": "Two implementations with parity tests",
+    "tradeoff": "Cheapest; only as good as test coverage"
+   },
+   {
+    "decision": "Log served features and train on logs",
+    "tradeoff": "No skew for logged features; needs history, bakes in bugs"
+   },
+   {
+    "decision": "Pin explicit semantics (window/timezone, rounding, null/unknown defaults, knowledge time)",
+    "tradeoff": "Small spec effort removes silent differences"
+   },
+   {
+    "decision": "Replay-based parity test before and in CI after",
+    "tradeoff": "Needs fixtures and compute"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "approaches and parity"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "test procedure, thresholds, worked DST bug"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "all discussed in the answer",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://docs.feast.dev/getting-started/concepts/feature-view",
+    "status": "supported",
+    "evidence": "'On demand feature views ... python transformation logic which is executed in both the historical retrieval and online retrieval paths' under heading '[Alpha] On demand feature views'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Thresholds (50,000 sample, 1e-6) are labelled hypothetical."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-07-5",
+  "verdict": "correct",
+  "reasons": [
+   "Mechanism right; 1-0.97^4 = 11.5% and 0.97^4 = 88.5% recomputed; applied hedge on deleted orders is right.",
+   "One 'Hence' sentence ignores that deleted orders push the gap the other way."
+  ],
+  "parts_answered": {
+   "mechanism": true,
+   "repair of training data": true,
+   "repair of process": true
+  },
+  "evidence": [
+   {
+    "claim": "1-0.97^4 ~ 11.5%; 0.97^4 ~ 88.5% (Poisson mean 4: 88.7%)",
+    "method": "executed",
+    "evidence": "python: 1-0.97**4=0.1147; 0.97**4=0.8853; exp(-0.12)=0.8869"
+   },
+   {
+    "claim": "every late order in a 24 h window is invisible at transaction time",
+    "method": "derivation",
+    "evidence": "order at time >= T-24h with delay >= 24 h arrives after T."
+   },
+   {
+    "claim": "worked example 09:00 and 11:00 orders: online 1, backfill 2",
+    "method": "derivation",
+    "evidence": "11:00 order arrives next day 14:00, after the 12:00 scoring."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Hence the logged online values are lower (late orders missing)",
+    "problem": "The preceding sentence also says deleted orders are excluded from the backfill; that pushes online values higher than backfilled ones, so 'Hence ... lower' follows only for late arrivals, and the net sign depends on which effect dominates.",
+    "replacement": "Hence the logged online values are lower because of the late orders (deleted orders push the other way, since online counts them and the backfill does not; the observed systematic gap implies late arrivals dominate)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Needs bitemporal reasoning (event vs knowledge time), numerical reasoning and a repair plan.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "mechanism and repair"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked example, probability, audit procedure"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "all discussed in the answer",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0006 (delayed chargeback labels) - different",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://docs.feast.dev/getting-started/concepts/point-in-time-joins",
+    "status": "not_supported",
+    "evidence": "Page covers event-timestamp PIT joins and TTL only; the answer's key point (knowledge/ingestion time, bitemporal) is not stated there and no sentence in the answer relies on it. Attachment is topical, not supportive."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Knowledge-time (loaded_at) reconstruction is general data-engineering practice; no authoritative page opened."
+  ],
+  "code_patch": null
+ }
+]

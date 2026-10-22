@@ -1,0 +1,254 @@
+{
+ "NLP": [
+  [
+   "P-NLP-01",
+   "Subword tokenisation (BPE/WordPiece)",
+   "concept-with-reasoning",
+   "Why modern models use subword vocabularies instead of word-level vocab; how OOV words are handled; trade-offs of vocab size."
+  ],
+  [
+   "P-NLP-02",
+   "TF-IDF implementation",
+   "coding",
+   "Implement TF-IDF from scratch (sklearn-style smooth idf and l2 norm) and verify it matches sklearn TfidfVectorizer on a tiny corpus."
+  ],
+  [
+   "P-NLP-03",
+   "Train/serve skew and leakage in text pipelines",
+   "debugging scenario",
+   "Text classifier scores very high offline but poorly in production; candidate causes such as vectorizer fit on all data, preprocessing mismatch, label leakage via boilerplate/headers; how to diagnose."
+  ],
+  [
+   "P-NLP-04",
+   "word2vec skip-gram with negative sampling",
+   "concept-with-reasoning",
+   "Objective, why negative sampling instead of full softmax, what the learned vectors capture and what they cannot (polysemy)."
+  ],
+  [
+   "P-NLP-05",
+   "Language-model perplexity",
+   "coding + reasoning",
+   "Compute perplexity from token probabilities, interpretation, and why perplexities are not comparable across different tokenisers/vocabularies."
+  ],
+  [
+   "P-NLP-06",
+   "Scaled dot-product attention",
+   "coding",
+   "Why divide by sqrt(d_k); implement attention with a causal mask in numpy; tests for shape, row-sum of weights, and masking."
+  ],
+  [
+   "P-NLP-07",
+   "Encoder vs decoder models",
+   "comparison/decision",
+   "BERT-style masked LM vs GPT-style causal LM: objectives, what each is naturally good at, and how you'd choose for classification, extraction, generation."
+  ],
+  [
+   "P-NLP-08",
+   "NER evaluation",
+   "coding + reasoning",
+   "Entity-level vs token-level evaluation with BIO tags; why token accuracy misleads; implement entity-level precision/recall/F1 for BIO sequences with tests."
+  ],
+  [
+   "P-NLP-09",
+   "Imbalanced text classification",
+   "applied scenario",
+   "Toxic-comment style task with ~2% positives: metrics, thresholding, class weights, resampling cautions, PR vs ROC, monitoring."
+  ],
+  [
+   "P-NLP-10",
+   "Semantic search architecture",
+   "architecture/design",
+   "Design a semantic search over a company's help-centre articles: chunking, bi-encoder embeddings, ANN index, optional cross-encoder re-ranking, evaluation (recall@k, MRR), freshness. Trade-offs, no vendor claims."
+  ],
+  [
+   "P-NLP-11",
+   "Prompting vs RAG vs fine-tuning",
+   "decision scenario",
+   "Domain QA system where answers must reflect private, frequently changing documents: when each approach fits, failure modes, hybrid options."
+  ],
+  [
+   "P-NLP-12",
+   "BLEU",
+   "coding + reasoning",
+   "What BLEU measures: modified (clipped) n-gram precision and brevity penalty; implement clipped unigram/bigram precision with tests; limitations."
+  ],
+  [
+   "P-NLP-13",
+   "Topic modelling with LDA",
+   "concept-with-reasoning",
+   "Generative story, inputs/outputs, choosing number of topics (coherence vs held-out likelihood), pitfalls such as preprocessing sensitivity and instability."
+  ],
+  [
+   "P-NLP-14",
+   "Preprocessing can destroy signal",
+   "debugging scenario with code",
+   "Stop-word removal / lowercasing / punctuation stripping harming sentiment (negation, 'not good'); demonstrate with sklearn CountVectorizer and a test; what to do instead."
+  ]
+ ],
+ "Deep Learning": [
+  [
+   "P-DL-01",
+   "Backpropagation and gradient checking",
+   "coding",
+   "Derive gradients for a single sigmoid neuron with MSE loss and verify with a numerical gradient check in numpy; tests."
+  ],
+  [
+   "P-DL-02",
+   "Debugging NaN loss",
+   "debugging scenario",
+   "Loss becomes NaN after some steps: ordered diagnostic checklist (data, lr, log(0), softmax overflow, exploding gradients, mixed precision); implement numerically stable softmax/log-softmax with tests."
+  ],
+  [
+   "P-DL-03",
+   "Adam optimiser",
+   "coding + reasoning",
+   "Update rule, role of m and v, bias correction; implement one Adam step in numpy and test against a hand-computed first step; when SGD+momentum may generalise better (hedged)."
+  ],
+  [
+   "P-DL-04",
+   "Batch norm vs layer norm",
+   "comparison",
+   "Statistics computed over which axes, train vs inference behaviour (running averages), small-batch issues, why transformers use layer norm."
+  ],
+  [
+   "P-DL-05",
+   "Learning-curve diagnosis",
+   "applied scenario",
+   "Given described train/validation curves (e.g. val loss rises while train loss falls; both high and flat; noisy val), diagnose and prescribe actions in priority order."
+  ],
+  [
+   "P-DL-06",
+   "Softmax cross-entropy gradient",
+   "coding + reasoning",
+   "Why the gradient of the combined softmax+cross-entropy w.r.t. logits is p - y; verify numerically; why frameworks fuse them."
+  ],
+  [
+   "P-DL-07",
+   "Inverted dropout",
+   "coding",
+   "Implement inverted dropout (train vs eval), explain why scaling by 1/(1-p) at train time; test expectation preservation statistically with fixed seed."
+  ],
+  [
+   "P-DL-08",
+   "Residual connections",
+   "concept-with-reasoning",
+   "Why skip connections ease optimisation of deep networks (gradient path, identity mapping), what changes when dimensions differ, relation to degradation problem."
+  ],
+  [
+   "P-DL-09",
+   "Transfer learning strategy",
+   "applied scenario",
+   "Small labelled image dataset (about 2,000 images) in a specialised domain: choose feature extraction vs fine-tuning, which layers to unfreeze, learning rates, augmentation, how to validate."
+  ],
+  [
+   "P-DL-10",
+   "Convolution shapes and parameters",
+   "coding/calculation",
+   "Output size formula with padding/stride/dilation and parameter counts for conv layers; implement helper and test against worked examples."
+  ],
+  [
+   "P-DL-11",
+   "Embedding layers",
+   "coding + reasoning",
+   "An embedding lookup equals one-hot times a weight matrix; implement both in numpy and show equal; why lookup is used; how gradients flow only to used rows."
+  ],
+  [
+   "P-DL-12",
+   "Model compression for deployment",
+   "architecture/design",
+   "Inference too slow/large for target hardware: quantisation, pruning, distillation, architecture changes, batching; trade-offs and how to validate accuracy loss; no invented benchmark numbers."
+  ]
+ ],
+ "SQL": [
+  [
+   "P-SQL-01",
+   "Top-N per group",
+   "query writing",
+   "Top 3 highest-paid employees per department; show ROW_NUMBER vs RANK vs DENSE_RANK difference on ties with data and tested output."
+  ],
+  [
+   "P-SQL-02",
+   "De-duplication",
+   "query writing",
+   "Find duplicate rows (e.g. same email) and delete all but the earliest; tested before/after."
+  ],
+  [
+   "P-SQL-03",
+   "Running totals and moving averages",
+   "query writing",
+   "Cumulative revenue per day and 3-row/7-day moving average with window frames (ROWS vs RANGE caveat); tested."
+  ],
+  [
+   "P-SQL-04",
+   "Gaps and islands",
+   "query writing, hard",
+   "Longest consecutive-day login streak per user using the date-minus-row_number trick; tested."
+  ],
+  [
+   "P-SQL-05",
+   "NOT IN with NULLs",
+   "debugging",
+   "A NOT IN subquery returns no rows because the subquery contains NULL; explain three-valued logic; fix with NOT EXISTS / filtering NULLs; tested."
+  ],
+  [
+   "P-SQL-06",
+   "Anti-join",
+   "query writing",
+   "Customers with no orders: LEFT JOIN ... IS NULL vs NOT EXISTS; correctness and readability trade-offs; tested."
+  ],
+  [
+   "P-SQL-07",
+   "Conditional aggregation / pivot",
+   "query writing",
+   "Monthly revenue per product category as columns using SUM(CASE WHEN ...); tested."
+  ],
+  [
+   "P-SQL-08",
+   "Cohort retention",
+   "query writing, hard",
+   "Day-1 (or next-day) retention from an events table; define precisely, handle duplicates, tested with small data."
+  ],
+  [
+   "P-SQL-09",
+   "Nth highest value",
+   "query writing",
+   "Second-highest distinct salary returning NULL when it does not exist; compare approaches (subquery, DENSE_RANK, LIMIT/OFFSET); tested."
+  ],
+  [
+   "P-SQL-10",
+   "Recursive CTE",
+   "query writing, hard",
+   "Employee-manager hierarchy: list all reports under a manager with depth and path; guard against cycles or note the risk; tested."
+  ],
+  [
+   "P-SQL-11",
+   "Set operations",
+   "query writing",
+   "Users who bought in January but not February (EXCEPT), and in both (INTERSECT); UNION vs UNION ALL; tested."
+  ],
+  [
+   "P-SQL-12",
+   "Join fan-out double counting",
+   "debugging",
+   "Revenue total inflated after joining orders to order_items and payments; explain fan-out; fix via pre-aggregation or distinct keys; tested numbers."
+  ],
+  [
+   "P-SQL-13",
+   "Month-over-month growth",
+   "query writing",
+   "Monthly order counts and MoM % change using strftime and LAG; handle first month NULL and divide-by-zero; tested."
+  ],
+  [
+   "P-SQL-14",
+   "Schema design",
+   "design",
+   "Design normalised tables for orders/customers/products with PK/FK/CHECK/UNIQUE constraints; demonstrate that constraints reject bad rows in sqlite (foreign_keys pragma); indexing choices."
+  ],
+  [
+   "P-SQL-15",
+   "Sargable predicates and indexes",
+   "performance",
+   "Why WHERE date(created_at)='2024-01-05' or function-wrapped columns can't use an index; rewrite as range; show EXPLAIN QUERY PLAN SCAN vs SEARCH (assert substring only, plan text is version dependent)."
+  ]
+ ]
+}
