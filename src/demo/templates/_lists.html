@@ -5,7 +5,7 @@
     <td class="hide-sm">{{ short_date(d.created_at) }}</td>
     <td><a class="row-link" href="{{ url_for('demo.summary_page' if d.status == 'finished' else 'demo.interview_page', sid=d.id) }}">{{ d.role or (d.domains|length ~ ' chosen topics') }}</a><br><span class="muted small">{{ d.asked }} technical questions <span class="show-sm">· {{ short_date(d.created_at) }}</span></span></td>
     <td class="num hide-sm">{{ d.answered }}{% if d.skipped %}<span class="muted small"> +{{ d.skipped }} skipped</span>{% endif %}<span class="muted small"> / {{ d.asked }}</span></td>
-    <td class="num">{% if d.legacy_average is not none %}{{ '%.0f'|format(d.legacy_average) }}%{% else %}<span class="muted">—</span>{% endif %}</td>
+    <td class="num">{% if d.legacy_average is not none %}{{ d.legacy_average|sim }}{% else %}<span class="muted">—</span>{% endif %}</td>
     <td class="num hide-sm">{{ clock(d.seconds) }}</td>
     <td class="hide-sm">{% if d.modular_mode != 'off' %}<span class="tag exp">experimental: {{ d.modular_mode }}</span> {% endif %}{% if d.code_eval %}<span class="tag exp">code check</span> {% endif %}{% if d.modular_mode == 'off' and not d.code_eval %}<span class="tag on">interview report</span>{% endif %}</td>
     <td>{% if d.status == 'finished' %}<a href="{{ url_for('demo.summary_page', sid=d.id) }}">Review</a>{% else %}<a href="{{ url_for('demo.interview_page', sid=d.id) }}">Continue</a>{% endif %}</td>

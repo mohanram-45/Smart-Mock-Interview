@@ -109,9 +109,10 @@ def test_unfinished_interview_is_not_in_the_trend():
 
 
 def test_trend_geometry_axis_is_fixed_0_to_100():
+    """The axis still spans the full stored range 0-100; Stage 12 labels it 0-1 so it is not read as a percentage correct."""
     g = INS.trend_geometry([{"value": 0}, {"value": 100}, {"value": 50}])
     ys = [p["y"] for p in g["points"]]
-    assert ys[0] > ys[2] > ys[1] and [x["label"] for x in g["grid"]] == ["0", "25", "50", "75", "100"]
+    assert ys[0] > ys[2] > ys[1] and [x["label"] for x in g["grid"]] == ["0.00", "0.25", "0.50", "0.75", "1.00"]
 
 
 def test_concept_findings_only_when_the_evaluator_produced_verdicts():

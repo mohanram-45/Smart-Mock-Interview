@@ -11,14 +11,14 @@
 <section class="progress-grid" aria-label="Similarity over time">
   <section class="box" aria-labelledby="t-trend">
     <h3 id="t-trend">Similarity by finished interview</h3>
-    <p class="hint">Average Sentence-BERT similarity to the reference answers, oldest to newest. Scale 0–100. Similarity is not a technical grade.</p>
+    <p class="hint">Average Sentence-BERT similarity to the reference answers, oldest to newest. Scale 0 to 1. Similarity is resemblance to a reference answer, not a technical grade or a percentage correct.</p>
     {% if overview.trend_ready %}
     {% set g = trend_geometry(overview.trend) %}
     <svg class="trend" viewBox="0 0 {{ g.width }} {{ g.height }}" role="img" aria-label="Line chart of average similarity for your last {{ g.points|length }} finished interviews">
       {% for l in g.grid %}<line class="grid" x1="{{ g.pad_l }}" x2="{{ g.pad_r }}" y1="{{ l.y }}" y2="{{ l.y }}"/><text class="axis" x="{{ g.pad_l - 8 }}" y="{{ l.y + 4 }}" text-anchor="end">{{ l.label }}</text>{% endfor %}
       <path class="area" d="{{ g.area_d }}"/>
       <path class="ln" d="{{ g.path_d }}" pathLength="1"/>
-      {% for p in g.points %}<a href="{{ url_for('demo.summary_page', sid=p.id) }}"><circle class="pt" cx="{{ p.x }}" cy="{{ p.y }}" r="5.5"><title>Interview {{ p.number }}: {{ '%.0f'|format(p.value) }}% over {{ p.n }} scored answers ({{ p.label }})</title></circle></a><text class="axis" x="{{ p.x }}" y="{{ g.base }}" text-anchor="middle">{{ p.number }}</text>{% endfor %}
+      {% for p in g.points %}<a href="{{ url_for('demo.summary_page', sid=p.id) }}"><circle class="pt" cx="{{ p.x }}" cy="{{ p.y }}" r="5.5"><title>Interview {{ p.number }}: average similarity {{ p.value|sim }} (not a grade) over {{ p.n }} scored answers ({{ p.label }})</title></circle></a><text class="axis" x="{{ p.x }}" y="{{ g.base }}" text-anchor="middle">{{ p.number }}</text>{% endfor %}
     </svg>
     <p class="hint tight">Each point is the mean of that interview's scored answers. Interviews with only a few answers move the line a lot. Select a point to open that interview.</p>
     {% else %}
@@ -29,7 +29,7 @@
     <h3 id="t-dom">Similarity by topic</h3>
     <p class="hint">Average Sentence-BERT similarity per topic, lowest first, across all saved answers.</p>
     {% if overview.domains %}
-    <ul class="bars">{% for d in overview.domains %}<li><span class="name">{{ d.domain }}</span><svg class="track" viewBox="0 0 100 9" preserveAspectRatio="none" role="img" aria-label="{{ '%.0f'|format(d.average) }} out of 100"><rect class="back" width="100" height="9" rx="4.5"/><rect class="fill" width="{{ d.average }}" height="9" rx="4.5"/></svg><span class="val">{{ '%.0f'|format(d.average) }}%</span><span class="n">{{ d.answers }} scored answer{{ '' if d.answers == 1 else 's' }}{% if d.answers < 3 %} · too few to read much into{% endif %}</span></li>{% endfor %}</ul>
+    <ul class="bars">{% for d in overview.domains %}<li><span class="name">{{ d.domain }}</span><svg class="track" viewBox="0 0 100 9" preserveAspectRatio="none" role="img" aria-label="average similarity {{ d.average|sim }} (0 to 1)"><rect class="back" width="100" height="9" rx="4.5"/><rect class="fill" width="{{ d.average }}" height="9" rx="4.5"/></svg><span class="val">{{ d.average|sim }}</span><span class="n">{{ d.answers }} scored answer{{ '' if d.answers == 1 else 's' }}{% if d.answers < 3 %} · too few to read much into{% endif %}</span></li>{% endfor %}</ul>
     {% else %}<div class="empty"><strong>No scored answers yet</strong>Topic averages appear once answers have a similarity score.</div>{% endif %}
   </section>
 </section>

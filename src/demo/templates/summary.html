@@ -55,6 +55,21 @@
 
   {% endif %}
 
+  {% if assessments and assessments.rows %}{% set c = assessments.counts %}
+  <section class="card assess-overview" id="correctness" aria-labelledby="corr-h">
+    <div class="section-title"><h2 id="corr-h">Correctness check</h2><span class="muted">Per technical question. Separate from similarity, and not human-validated.</span></div>
+    {% if assessments.assessed %}
+    <dl class="figures small-figs">
+      <div><dt>Correct</dt><dd>{{ c.correct }}</dd></div><div><dt>Partially correct</dt><dd>{{ c.partially_correct }}</dd></div>
+      <div><dt>Incorrect</dt><dd>{{ c.incorrect }}</dd></div><div><dt>Uncertain</dt><dd>{{ c.uncertain }}</dd></div>
+      {% if c.unavailable %}<div><dt>Not assessed</dt><dd>{{ c.unavailable }}</dd></div>{% endif %}
+    </dl>{% else %}
+    <p>Correctness was not checked in this interview{% if c.pending %} yet (still running){% endif %}. It needs the local-model concept check, which is off by default. The similarity values below are not a substitute for it.</p>{% endif %}
+    <ul class="assess-rows">{% for r in assessments.rows %}<li><a href="#q{{ r.n }}">{{ r.n }}</a> {{ r.topic }}: <span class="verdict-badge badge-{{ {'correct': 'ok', 'partially_correct': 'adv', 'incorrect': 'bad', 'uncertain': 'warn'}.get(r.assessment.verdict, 'muted') }}">{{ r.assessment.label }}</span>{% if r.assessment.missing_concepts %} <span class="muted small">missing: {{ r.assessment.missing_concepts[:3]|join('; ') }}</span>{% endif %}</li>{% endfor %}</ul>
+    {% if assessments.misconceptions %}<h3>Statements to correct</h3><ul>{% for m in assessments.misconceptions %}<li><a href="#q{{ m.n }}">Question {{ m.n }}</a>: <q>{{ m.claim }}</q>{% if m.why %} — {{ m.why }}{% endif %}</li>{% endfor %}</ul>{% endif %}
+  </section>
+  {% endif %}
+
   <div class="section-title"><h2>The interview, turn by turn</h2><span class="muted">Questions, your answers and where each question came from</span></div>
   {% for it in items %}
   {% set q = it.q %}{% set a = it.a %}
@@ -90,14 +105,15 @@
     <p class="muted">Sentence-BERT (all-MiniLM-L6-v2) compares your answer with a reference answer. It measures resemblance of wording and meaning, <strong>not correctness</strong>, and has not been validated against human markers. It is secondary here: it never changes which questions you get or how this feedback is written.</p>
     <dl class="figures small-figs">
       <div><dt>Answers with a similarity score</dt><dd>{{ summary.legacy_scored }}</dd></div>
-      <div><dt>Average similarity</dt><dd>{{ '%.0f'|format(summary.legacy_average) ~ '%' if summary.legacy_average is not none else '—' }}</dd></div>
+      <div><dt>Average similarity</dt><dd>{{ summary.legacy_average|sim if summary.legacy_average is not none else '—' }}</dd></div>
     </dl>
-    {% if summary.legacy_by_level %}<p class="muted">By level: {% for k, v in summary.legacy_by_level.items() %}{{ k }} {{ '%.0f'|format(v) }}%{{ ', ' if not loop.last }}{% endfor %}.</p>{% endif %}
+    {% if summary.legacy_by_level %}<p class="muted">By level: {% for k, v in summary.legacy_by_level.items() %}{{ k }} {{ v|sim }}{{ ', ' if not loop.last }}{% endfor %}.</p>{% endif %}
     <div class="scroll"><table class="tbl overview" aria-label="Per-question overview">
-      <thead><tr><th>#</th><th>Question</th><th>Level</th><th>Time</th><th>Similarity</th><th>Experimental evaluation</th>{% if s.config.code_eval %}<th>Code check</th>{% endif %}</tr></thead>
+      <thead><tr><th>#</th><th>Question</th><th>Level</th><th>Time</th><th>Correctness check</th><th>Similarity (0–1)</th><th>Experimental evaluation</th>{% if s.config.code_eval %}<th>Code check</th>{% endif %}</tr></thead>
       <tbody>{% for it in tech %}{% set a = it.a %}<tr>
         <td><a href="#q{{ it.n }}">{{ it.n }}</a></td><td>{{ it.q.question|truncate(90) }}</td><td>{{ it.q.difficulty }}</td><td>{{ clock(rows[loop.index0].seconds) if a and not a.skipped else '—' }}</td>
-        <td>{% if a is none %}<span class="muted">not reached</span>{% elif a.skipped %}<span class="muted">skipped</span>{% elif a.legacy.status == 'scored' %}{{ '%.0f'|format(a.legacy.score) }}%{% else %}<span class="muted">unavailable</span>{% endif %}</td>
+        <td>{{ assess(a, it.q).label }}</td>
+        <td>{% if a is none %}<span class="muted">not reached</span>{% elif a.skipped %}<span class="muted">skipped</span>{% elif a.legacy.status == 'scored' %}{{ a.legacy.score|sim }}{% else %}<span class="muted">unavailable</span>{% endif %}</td>
         <td>{% if a is none or a.skipped %}<span class="muted">—</span>{% elif a.modular.mode == 'off' %}<span class="muted">off</span>{% elif a.modular.status == 'pending' %}<span class="muted">running…</span>{% elif a.modular.view %}{% set st = describe_state(a.modular.view) %}<span class="st st-{{ st.state }}">{{ st.title }}</span>{% else %}<span class="st st-unavailable">unavailable</span>{% endif %}</td>
         {% if s.config.code_eval %}<td>{% if a is none or a.skipped %}<span class="muted">—</span>{% elif a.code and a.code.requested %}{% if a.code.status == 'pending' %}<span class="muted">running…</span>{% elif a.code.report and a.code.report.status == 'assessed' %}{{ a.code.report.buckets.demonstrated|length }} found · {{ a.code.report.buckets.missing|length }} missing · {{ a.code.report.buckets.incorrect|length }} incorrect · {{ a.code.report.buckets.unverified|length }} unverified{% else %}<span class="muted">unavailable</span>{% endif %}{% else %}<span class="muted">n/a</span>{% endif %}</td>{% endif %}</tr>{% endfor %}</tbody></table></div>
     <div class="legend3" aria-label="What each kind of result means">

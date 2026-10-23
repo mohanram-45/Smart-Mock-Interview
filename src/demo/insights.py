@@ -120,7 +120,7 @@ def improvement_areas(session: Dict[str, Any]) -> List[Dict[str, Any]]:
         low = sorted(scored)[:3]
         out.append({"source": "legacy", "title": "Lowest similarity to the reference answer",
                     "note": "Similarity is closeness of wording and meaning, not correctness. Re-read these against your own answer.",
-                    "items": [{"n": i + 1, "text": qs[i]["topic"] or qs[i]["domain"], "detail": f"{s:.0f}%"} for s, i in low]})
+                    "items": [{"n": i + 1, "text": qs[i]["topic"] or qs[i]["domain"], "detail": f"similarity {s / 100:.2f}"} for s, i in low]})
     skipped = [i for i, a in enumerate(ans) if a and a.get("skipped") and I.is_question(qs[i])]
     unreached = [i for i, a in enumerate(ans) if a is None and I.is_question(qs[i])]
     if skipped or unreached:
@@ -208,7 +208,7 @@ def clock(seconds: Optional[float]) -> str:
 
 
 def trend_geometry(points: List[Dict[str, Any]], width: int = 680, height: int = 270, pad_l: int = 40, pad_r: int = 16, pad_t: int = 16, pad_b: int = 30) -> Dict[str, Any]:
-    """Coordinates for the dashboard line chart. The y axis is always 0-100 (a similarity percentage), so the line cannot exaggerate small changes."""
+    """Coordinates for the dashboard line chart. The y axis always spans the full similarity range (stored 0-100, labelled 0-1), so the line cannot exaggerate small changes."""
     n = len(points)
     iw, ih = width - pad_l - pad_r, height - pad_t - pad_b
     pts = []
@@ -216,7 +216,7 @@ def trend_geometry(points: List[Dict[str, Any]], width: int = 680, height: int =
         x = pad_l + (iw * i / (n - 1) if n > 1 else iw / 2)
         y = pad_t + ih * (1 - max(0.0, min(100.0, float(p["value"]))) / 100)
         pts.append({**p, "x": round(x, 1), "y": round(y, 1), "number": i + 1})
-    grid = [{"y": round(pad_t + ih * (1 - v / 100), 1), "label": str(v)} for v in (0, 25, 50, 75, 100)]
+    grid = [{"y": round(pad_t + ih * (1 - v / 100), 1), "label": f"{v / 100:.2f}"} for v in (0, 25, 50, 75, 100)]   # Stage 12: similarity is shown 0-1, never as a percentage
     floor = round(pad_t + ih, 1)
     d = " ".join(("M" if i == 0 else "L") + f"{p['x']},{p['y']}" for i, p in enumerate(pts))
     area = (d + f" L{pts[-1]['x']},{floor} L{pts[0]['x']},{floor} Z") if pts else ""

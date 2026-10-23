@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional
 
 from flask import Blueprint, abort, jsonify, make_response, redirect, render_template, request, url_for
 
-from . import behavioural as B, codeassess as CA, experimental as MA, grounded as G, insights as INS, interview as I, present as P
+from . import assessment as AS, behavioural as B, codeassess as CA, experimental as MA, grounded as G, insights as INS, interview as I, present as P
 from .engine import DemoEngine, DemoError
 
 logger = logging.getLogger(__name__)
@@ -124,6 +124,26 @@ def _grounded(a):
         return G.build(v, answer=(a or {}).get("answer") or "") if v else None
     except Exception:
         return None
+
+
+@demo_blueprint.app_template_global("assess")
+def _assess(a, q=None):
+    """Stage 12: the correctness assessment of one answer (never derived from similarity). Never raises."""
+    return AS.assess(a, q)
+
+
+@demo_blueprint.app_template_filter("sim")
+def _sim_filter(v):
+    """A stored similarity (0-100, kept that way for older sessions) shown as a 0-1 resemblance value. Stage 12: never as a percentage."""
+    try:
+        return f"{max(0.0, min(100.0, float(v))) / 100.0:.2f}"
+    except (TypeError, ValueError):
+        return "\u2014"
+
+
+@demo_blueprint.app_template_global("similarity_view")
+def _similarity_view(legacy):
+    return AS.similarity_view(legacy)
 
 
 @demo_blueprint.app_template_global("interview_progress")
@@ -258,10 +278,11 @@ def summary_page(sid):
         rec = eng.record(q["question_id"]) if (eng.expose_reference() and q.get("question_id") and I.is_scored(q)) else None
         items.append({"i": i, "n": i + 1, "q": q, "a": a, "reference": rec["canonical_answer"] if rec else None})
     digest = INS.digest(s)
+    assessments = AS.session_overview(s)
     return render_template("summary.html", s=s, summary=eng.summary(s), items=items, in_progress=False, expose_reference=eng.expose_reference(),
                            digest=digest, rows=INS.per_question(s), areas=INS.improvement_areas(s), coverage=I.coverage(s["questions"], s["answers"]),
                            observations=INS.observations(s), tech=[it for it in items if I.is_question(it["q"])],
-                           beh=(B.feedback(s) if (s.get("plan") or {}).get("type") in ("behavioural", "mixed") else None))
+                           beh=(B.feedback(s) if (s.get("plan") or {}).get("type") in ("behavioural", "mixed") else None), assessments=assessments)
 
 
 @demo_blueprint.route("/s/<sid>/export.json", methods=["GET"])
@@ -294,6 +315,7 @@ def export_json(sid):
             if c.get("requested"):
                 item["code_check"] = {"status": c.get("status"), "assessment_status": rep.get("status"), "executed": rep.get("executed"), "buckets": rep.get("buckets"), "summary": rep.get("summary"),
                                       "labels": rep.get("labels"), "human_validated": False, "score": None}
+        item["assessment"] = AS.assess(a, q) if I.is_question(q) else None       # Stage 12: correctness verdict, separate from similarity (similarity stays in legacy.score, 0-100 as stored)
         out["answers"].append(item)
     resp = make_response(jsonify(out), 200)
     resp.headers["Content-Disposition"] = f'attachment; filename="{s["id"]}.json"'
@@ -438,7 +460,8 @@ def api_answer(sid):
         a = eng.submit(sid, body.get("n"), body.get("answer"))
         s = eng.get(sid)
         return jsonify({"n": a["n"], "next_url": url_for("demo.interview_page" if s["status"] == "active" else "demo.summary_page", sid=sid),
-                        "html": _eval_fragment(s, a["n"]), "modular_status": a["modular"]["status"], "pending": _is_pending(a), **_next_payload(eng, s)}), 200
+                        "html": _eval_fragment(s, a["n"]), "modular_status": a["modular"]["status"], "pending": _is_pending(a),
+                        "assessment": AS.assess(s["answers"][a["n"] - 1], s["questions"][a["n"] - 1]), **_next_payload(eng, s)}), 200
     except DemoError as e:
         return _json_error(e)
 
@@ -482,7 +505,8 @@ def api_answer_fragment(sid, n):
         if not 1 <= n <= len(s["questions"]) or s["answers"][n - 1] is None:
             raise DemoError("No such answer.", 404)
         a = s["answers"][n - 1]
-        return jsonify({"n": n, "modular_status": a["modular"]["status"], "pending": _is_pending(a), "html": _eval_fragment(s, n, request.args.get("compact") == "1")}), 200
+        return jsonify({"n": n, "modular_status": a["modular"]["status"], "pending": _is_pending(a), "html": _eval_fragment(s, n, request.args.get("compact") == "1"),
+                        "assessment": AS.assess(a, s["questions"][n - 1])}), 200
     except DemoError as e:
         return _json_error(e)
 

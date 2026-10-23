@@ -24,8 +24,8 @@
 <section class="panel panel-legacy" aria-label="Similarity score">
   <header class="panel-head"><h4>Similarity score (Sentence-BERT)</h4><div><span class="chip chip-legacy">SENTENCE-BERT</span><span class="chip chip-nohv">NOT human-validated</span></div></header>
   {% if l.status == 'scored' %}
-    <p class="bigscore">{{ '%.1f'|format(l.score) }}<small>%</small> <span class="muted small">similarity to the reference answer</span></p>
-    <p class="not-grade">Resemblance to a reference answer. This is not a technical grade.</p>
+    <p class="simvalue"><span class="simnum">{{ l.score|sim }}</span> <span class="muted small">similarity to one reference answer, on a 0 to 1 scale</span></p>
+    <p class="not-grade">Resemblance, not correctness and not a percentage correct. Whether the answer is right is shown separately, under <em>Correctness check</em>.</p>
     {% if compact %}<details class="explain"><summary>What does this number mean?</summary>
     <p class="muted"><strong>What this number is:</strong> {{ SCORER_EXPLAIN.get(l.model, 'a similarity between your answer and a reference answer.') }} It measures resemblance, <strong>not correctness</strong>: a right answer in different words can score low, and an answer that borrows the reference's vocabulary can score high.</p>
     {% if kind in ('code', 'mixed') %}<p class="muted"><strong>For code:</strong> the scorer compares the <em>text</em> of your code with the text of a reference solution. It does not run your code, so it cannot tell whether yours works. A correct solution written differently can score low, and a similar-looking one with a bug can score high.</p>{% endif %}
@@ -33,7 +33,7 @@
     <p class="muted"><strong>What this number is:</strong> {{ SCORER_EXPLAIN.get(l.model, 'a similarity between your answer and a reference answer.') }} It measures resemblance, <strong>not correctness</strong>: a right answer in different words can score low, and an answer that borrows the reference's vocabulary can score high.</p>
     {% if kind in ('code', 'mixed') %}<p class="muted"><strong>For code:</strong> the scorer compares the <em>text</em> of your code with the text of a reference solution. It does not run your code, so it cannot tell whether yours works. A correct solution written differently can score low, and a similar-looking one with a bug can score high.</p>{% endif %}
     {% endif %}
-    {% if l.feedback %}<div class="autocomment"><span class="autolabel">Automatic comment, chosen only from the similarity score band</span><p>{{ l.feedback }}</p><p class="muted small">It is the same wording for any answer with a similar score. It does not look at what you wrote and is not a check that your answer is correct.</p></div>{% endif %}
+    {# Stage 12: the old band comment ("Excellent work - this answer is clear, accurate, and complete") was chosen from the similarity number alone and read as a correctness verdict; it is no longer shown in /demo. #}
   {% elif l.status == 'skipped' %}
     <p class="muted">Skipped: no score.</p>
   {% elif l.status == 'not_scored' %}
@@ -171,4 +171,22 @@
   <p class="muted small">Flags: {{ (view.flags + view.uncertainty_flags)|join(', ') }}</p>
   {% endif %}
 </section>
+{% endmacro %}
+
+{% macro assessment_panel(r) %}
+{% set CSS = {'correct': 'ok', 'partially_correct': 'adv', 'incorrect': 'bad', 'uncertain': 'warn', 'unavailable': 'muted', 'pending': 'muted', 'not_applicable': 'muted'} %}
+{% set BASIS = {'local_model_concept_check': 'LOCAL MODEL CONCEPT CHECK', 'mock_verifier': 'MOCK VERIFIER', 'rules': 'RULE: NO ATTEMPT', 'none': 'NOT ASSESSED'} %}
+{% if r.verdict != 'not_applicable' %}
+<section class="panel panel-assess verdict-{{ r.verdict }}" aria-label="Correctness check" data-verdict="{{ r.verdict }}" data-basis="{{ r.basis }}">
+  <header class="panel-head"><h4>Correctness check</h4><div><span class="chip chip-{{ 'mock' if r.basis == 'mock_verifier' else 'legacy' }}">{{ BASIS.get(r.basis, r.basis|upper) }}</span><span class="chip chip-nohv">NOT human-validated</span></div></header>
+  <p class="verdict"><span class="verdict-badge badge-{{ CSS.get(r.verdict, 'muted') }}">{{ r.label }}</span>
+  {% if r.verdict == 'pending' %}<span class="muted small">The local model is still checking this answer.</span>{% endif %}</p>
+  {% if r.correct_concepts %}<p><b>Correct concepts identified:</b> {{ r.correct_concepts|join('; ') }}</p>{% endif %}
+  {% if r.missing_concepts %}<p><b>Missing concepts:</b> {{ r.missing_concepts|join('; ') }}</p>{% endif %}
+  {% if r.misconceptions %}<div class="misconceptions"><p><b>Misconceptions or contradictions:</b></p><ul>{% for mc in r.misconceptions %}<li><q>{{ mc.claim }}</q>{% if mc.why %} — {{ mc.why }}{% endif %}{% if mc.reference_says %}<br><span class="muted small">The reference says: <q>{{ mc.reference_says }}</q></span>{% endif %}</li>{% endfor %}</ul></div>{% endif %}
+  {% if r.unverified_concepts and r.verdict in ('uncertain', 'partially_correct') %}<p class="muted small">Could not be decided automatically: {{ r.unverified_concepts|join('; ') }}. That is not a judgement that they are wrong.</p>{% endif %}
+  {% if r.feedback %}<ul class="assess-feedback">{% for f in r.feedback %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
+  <p class="muted small">The verdict comes from the concept check and the check for wrong statements, never from the similarity value. Both compare your answer with an AI-written reference, which can itself be wrong.</p>
+</section>
+{% endif %}
 {% endmacro %}

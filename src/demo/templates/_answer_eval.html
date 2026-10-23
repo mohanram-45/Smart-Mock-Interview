@@ -1,5 +1,6 @@
-{% from "_macros.html" import legacy_card, modular_panel, code_panel, grounded_panel %}
+{% from "_macros.html" import legacy_card, modular_panel, code_panel, grounded_panel, assessment_panel %}
 <div class="evals" data-n="{{ a.n }}" data-modular-status="{{ a.modular.status }}">
+  {{ assessment_panel(assess(a, q)) }}
   {{ legacy_card(a.legacy, answer_kind(a.answer) if a.answer else None, compact|default(false)) }}
   {% if a.code and a.code.requested %}{{ code_panel(a.code) }}{% endif %}
   {% if a.skipped or a.legacy.status == 'not_scored' %}

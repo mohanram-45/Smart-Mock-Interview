@@ -125,10 +125,28 @@ def _unavailable_view(mode: str, answer: str, code: str, message: str) -> Dict[s
             "source": {"kind": "UNAVAILABLE", "tags": ["UNAVAILABLE"], "text": "The experimental evaluator could not run.", "human": "NOT human-validated", "caveat": ""},
             "dimensions": [], "verdicts": [], "claims": [], "outcomes": [], "flags": [], "uncertainty_flags": [], "abstain_reasons": [], "feedback": None,
             "taxonomy": {"primary": "provider_failure", "blockers": []}, "consistency": "not applicable (not human-verified)", "requirements": None, "variant": None, "engine": None,
-            "reliability": None}
+            "reliability": None, "contradictions": {"status": "not_checked", "items": [], "rejected": [], "reason": "evaluator_did_not_run"}}
 
 
-def evaluate(mode: str, record: Dict[str, Any], answer: str, *, verifier=None) -> Dict[str, Any]:
+def _contradiction_pass(mode: str, v: Any, record: Dict[str, Any], view: Dict[str, Any], provider: Any = None) -> Dict[str, Any]:
+    """Stage 12: one evidence-checked contradiction call (src/evaluation/modular/contradictions.py) over the claims the evaluator already split. Live mode reuses the
+    verifier's own local-model provider; the mock verifier is a word-overlap test double, so it is never asked. Never raises."""
+    from src.evaluation.modular import contradictions as CX
+    try:
+        if view.get("status") in ("provider_error", "invalid_response", "scope_unavailable", "not_gradable"):
+            return CX.not_checked("evaluator_did_not_run")
+        if (view.get("safeguards") or {}).get("applied"):
+            return CX.not_checked("answer_safeguard_applied")
+        claims = [{"id": c["id"], "text": c["text"]} for c in (view.get("claims") or []) if c.get("id") and c.get("text")]
+        prov = provider if provider is not None else (getattr(v, "provider", None) if mode == "live" else None)
+        if prov is None:
+            return CX.not_checked("mock_verifier" if mode == "mock" else "no_model")
+        return CX.check(prov, record["question"], record.get("canonical_answer") or "", claims)
+    except Exception as e:                                           # the evaluation view stays valid without it
+        return {**CX.not_checked("contradiction_pass_failed"), "status": "error", "error": type(e).__name__}
+
+
+def evaluate(mode: str, record: Dict[str, Any], answer: str, *, verifier=None, contradiction_provider=None) -> Dict[str, Any]:
     """Run ONE answer through the 3c4.0 variant and return a plain, JSON-serialisable view. Never raises: a failure is returned as an 'unavailable' view with no score.
 
     Stage 8B: invisible characters are removed first (the displayed answer is that cleaned text; spaces, newlines and code formatting are untouched); a score is withheld
@@ -158,6 +176,7 @@ def evaluate(mode: str, record: Dict[str, Any], answer: str, *, verifier=None) -
         for reason in view["safeguards"]["applied"]:
             if res.status.value == "abstained" and reason in res.abstain_reasons:
                 view["taxonomy"] = {**(view.get("taxonomy") or {}), "primary": reason}
+        view["contradictions"] = _contradiction_pass(mode, v, record, view, contradiction_provider)
         if live:
             _breaker.record(res.status.value != "provider_error")
         return view

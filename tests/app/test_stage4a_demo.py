@@ -278,7 +278,8 @@ def test_mock_result_is_labelled_mock_and_advisory_question_has_no_number(c, eng
     v = eng.get(s["id"])["answers"][1]["modular"]["view"]
     assert v["status"] == "advisory_only" and v["score"] is None and v["score_range"] is None
     assert "MOCK VERIFIER" in a["html"] and "ADVISORY ONLY" in a["html"] and "NOT human-validated" in a["html"] and "no score by design" in a["html"]
-    assert 'class="bigscore"' in a["html"] and a["html"].count('class="bigscore"') == 1     # only the legacy score has a big number
+    # Stage 12: similarity is shown as a 0-1 value (class simnum), never as a big percentage; the advisory mock result still has no number of its own
+    assert 'class="bigscore"' not in a["html"] and a["html"].count('class="simnum"') == 1 and "%</small>" not in a["html"]
 
 
 def test_abstention_shows_a_reason_and_no_fabricated_score(c, eng):
@@ -288,7 +289,7 @@ def test_abstention_shows_a_reason_and_no_fabricated_score(c, eng):
     v = eng.get(s["id"])["answers"][1]["modular"]["view"]
     assert v["status"] == "abstained" and v["score"] is None
     assert "No score: the evaluator abstained" in a["html"] and "mock verifier" in a["html"] and "Why there is no score" in a["html"]
-    assert a["html"].count('class="bigscore"') == 1
+    assert a["html"].count('class="simnum"') == 1 and 'class="bigscore"' not in a["html"]        # Stage 12: similarity is shown as a 0-1 value (class simnum), never as a big percentage
 
 
 def test_scored_result_shows_evidence_rubric_and_labels(tmp_path, app_module):

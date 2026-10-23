@@ -76,7 +76,9 @@ def test_stored_answer_is_byte_identical_and_stable_after_refresh(c, eng):
 def test_legacy_card_labels_automatic_comment_and_never_claims_correctness(c, eng):
     r, sid = start(c, size=1)
     html = answer(c, sid, 1, GOOD).json["html"]
-    assert "Automatic comment" in html and "not a check that your answer is correct" in html
+    # Stage 12: the similarity-band comment ("Excellent work - ... accurate, and complete") read as a correctness verdict and is no longer shown in /demo;
+    # the card says what similarity is, and correctness has its own panel.
+    assert "Automatic comment" not in html and "Excellent work" not in html and "not a percentage correct" in html and "Correctness check" in html
     assert "NOT correctness" in html or "not correctness" in html.lower()
     assert "<strong>For code:</strong>" not in html, "prose answers get no code note"
     code_html = None

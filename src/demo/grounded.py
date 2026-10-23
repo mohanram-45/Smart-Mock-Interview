@@ -74,6 +74,9 @@ def build(view: Optional[Dict[str, Any]], *, answer: str = "", reference: Option
             continue
         uncertain.append({"id": None, "concept": item.get("concept") or item.get("claim") or "a statement", "tier": "", "your_words": [item.get("your_words")] if isinstance(item.get("your_words"), str) else list(item.get("your_words") or [])[:2],
                           "reason": item.get("reason") or "Could not be checked against the curated material."})
+    for cx in (view.get("contradictions") or {}).get("items") or []:          # Stage 12: verified contradictions belong in the same box, so the two panels never disagree
+        errors.append({"id": None, "concept": "a statement in your answer", "tier": "", "your_words": [cx.get("claim")], "reference_says": cx.get("reference_quote"), "why": cx.get("why") or "",
+                       "label": "possible technical error found by the contradiction check, evidence shown; check it against your own knowledge"})
     abstained = view.get("status") == "abstained"
     total = len(outcome_by_req) or len(verdicts)
     if abstained:

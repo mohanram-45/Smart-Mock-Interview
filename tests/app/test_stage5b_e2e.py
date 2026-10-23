@@ -73,7 +73,8 @@ def test_five_question_interview_start_to_finish_with_results_display(c, eng):
         asked.append(q["question_id"])
         r = ans(c, sid, n, GOOD + f" (answer {n})")
         assert r.status_code == 200 and r.json["pending"] is False
-        assert "Similarity score (Sentence-BERT)" in r.json["html"] and "Automatic comment" in r.json["html"] and "Experimental code check" not in r.json["html"]
+        assert "Similarity score (Sentence-BERT)" in r.json["html"] and "Automatic comment" not in r.json["html"] and "Experimental code check" not in r.json["html"]   # Stage 12: no band comment
+        assert "Correctness check" in r.json["html"] and r.json["assessment"]["verdict"] in ("unavailable", "incorrect")       # concept check off: never a fabricated verdict
     assert len(set(asked)) == 5, "no repeated questions"
     assert c.get(f"/demo/s/{sid}", follow_redirects=False).status_code == 302
     html = c.get(f"/demo/s/{sid}/summary").data.decode()
@@ -148,7 +149,7 @@ def test_unverified_and_advisory_findings_are_never_presented_as_confirmed(c, en
     assert "None." in verified and "passed" not in verified
     assert "not proof" in h or "NOT verified" in h or "not verified" in h.lower()
     legacy = h.split("panel-code")[0]
-    assert "not a check that your answer is correct" in legacy and "accurate response" not in legacy
+    assert "not a percentage correct" in legacy and "accurate response" not in legacy and "Excellent work" not in legacy     # Stage 12 wording of the same caveat
 
 
 # ------------------------------------------------------------------ persistence, restart, resume, expiry, deletion
