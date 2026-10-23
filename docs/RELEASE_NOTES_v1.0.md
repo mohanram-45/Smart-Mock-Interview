@@ -24,7 +24,7 @@ A local, single-user mock-interview application. `/demo` is the product; the ori
 | Full /demo journey (setup, answer, skip, resume, history, export, PDF) | tested with a stand-in scorer and in a real Chromium run |
 | Dependency audit of the three hashed/pinned locks (`pip-audit`, 23 Oct 2026) | no known vulnerabilities |
 | ML Docker image builds and scores with real Sentence-BERT | **not yet run**: `heavy.yml` (GitHub, manual) or `verify_docker_ml.bat` (Docker Desktop) |
-| Correctness check with the real local model | **not yet run**: `verify_ollama_stage12.bat` |
+| Correctness check with the real local model | **failed once (0/3, 23 Oct 2026); corrected in code, re-run not yet done**: `verify_ollama_stage12.bat` (9 answers). **NOT READY to be enabled by default; stays opt-in and labelled advisory** |
 | Accuracy of any verdict or similarity against human judgement | **never measured** |
 
 ## Known limitations

@@ -14,7 +14,11 @@ Honesty rules, in order of precedence:
   * no evaluator result (off, failed, timed out, interrupted)        -> unavailable, nothing is invented;
   * evaluator ran but the evidence is incomplete or suspect           -> uncertain, with what WAS found listed;
   * "correct" needs every essential requirement demonstrated AND a contradiction pass that actually ran and found nothing;
-  * a verified misconception caps the verdict at partially_correct (incorrect if nothing essential was demonstrated);
+  * a verified misconception caps the verdict at partially_correct (incorrect if nothing essential was demonstrated, or if the wrong statements outnumber the right ideas);
+  * Stage 12 live correction (22 Oct 2026): (a) a requirement that only restates the question's own subject ("What is an autoencoder?" -> "autoencoder") cannot block a
+    verdict when the answer is worded differently; it still counts when satisfied. (b) A group credit ("any of clustering / dimensionality reduction / ...") stands only if a
+    credited member is actually named in the answer; otherwise it is undetermined, never satisfied. Abstract single concepts are left to the model: a paraphrase must not lose
+    credit for different wording;
   * the mock verifier is a word-overlap test double: its results are labelled as such and can never produce "correct".
 Pure function, no model call, no I/O: it is computed from what the session already stores, so older sessions get it too.
 """
@@ -57,6 +61,42 @@ def no_attempt(answer: str, terms: Optional[Dict[str, Any]] = None) -> bool:
         return False
     content = [w for w in re.findall(r"[a-z][a-z'\-]+", text.lower()) if w not in _FILLER and len(w) > 2]
     return len(content) <= 1
+
+
+_W = re.compile(r"[a-z0-9]+")
+_STOPW = frozenset("a an the and or but of to in on at for with by from as is are was were be it its this that these those there their can could would should may might will do does did not no "
+                   "into about between through what how why where which who when if also only just very more most each any all some other another same one two".split())
+
+
+def _stems(text: str) -> set:
+    """Content-word stems (first six letters) of a text. Local on purpose: the default /demo path must not import the optional evaluator package."""
+    return {w[:6] for w in _W.findall((text or "").lower()) if len(w) > 2 and w not in _STOPW}
+
+
+def _grounded(member: str, answer: str) -> bool:
+    ms = _stems(member)
+    if not ms:
+        return False
+    have = _stems(answer)
+    need = len(ms) if len(ms) < 3 else -(-4 * len(ms) // 5)
+    return len(ms & have) >= need
+
+
+def _adjust_outcomes(outcomes: List[Dict[str, Any]], question: str, answer: str) -> List[Dict[str, Any]]:
+    """Two evidence rules applied to the evaluator's outcomes (see the module docstring). Returns copies; nothing stored is modified."""
+    qs, out = _stems(question), []
+    for o in outcomes:
+        o = dict(o)
+        det = o.get("detail") or {}
+        if o.get("kind") == "group" and o.get("status") == "satisfied" and "correct_members" in det:
+            if not any(_grounded(m, answer) for m in det.get("correct_members") or []):
+                o["status"], o["downgrade"] = "undetermined", "group_member_not_named_in_answer"
+        if o.get("tier") == "essential" and o.get("kind") != "group" and o.get("status") != "satisfied":
+            ls = _stems(o.get("label") or "")
+            if ls and ls <= qs:
+                o["topic_only"] = True
+        out.append(o)
+    return out
 
 
 def _base(verdict: str, reason: str, basis: str, similarity: Dict[str, Any], **extra) -> Dict[str, Any]:
@@ -117,29 +157,33 @@ def _assess(a: Optional[Dict[str, Any]], q: Optional[Dict[str, Any]]) -> Dict[st
     if ((view.get("taxonomy") or {}).get("primary")) == "off_topic_confirmed":
         return _base("incorrect", "off_topic", basis, sim, feedback=["The answer does not address the question that was asked."])
 
-    outcomes = view.get("outcomes") or []
+    outcomes = _adjust_outcomes(view.get("outcomes") or [], (q or {}).get("question") or "", a.get("answer") or "")
     fb = view.get("feedback") or {}
-    ess = [o for o in outcomes if o.get("tier") == "essential"]
+    ess = [o for o in outcomes if o.get("tier") == "essential" and not o.get("topic_only")]
     sup = [o for o in outcomes if o.get("tier") != "essential"]
     sat = [o["label"] for o in ess if o.get("status") == "satisfied"]
     miss = [o["label"] for o in ess if o.get("status") == "missing"]
     known = ("satisfied", "missing", "not_demonstrated", "incorrect")
-    und = [o.get("label", "?") for o in outcomes if o.get("status") not in known]            # an unknown or absent status counts as undetermined, never as missing
+    und = [o.get("label", "?") for o in outcomes if o.get("status") not in known and not o.get("topic_only")]            # an unknown or absent status counts as undetermined, never as missing
     correct = sat + [o["label"] for o in sup if o.get("status") == "satisfied"]
     optional_missing = [o["label"] for o in sup if o.get("status") == "not_demonstrated"]
     errs = [{"claim": (e.get("your_words") or [None])[0], "why": e.get("why_wrong"), "reference_says": e.get("reference_says"), "concept": e.get("concept"), "source": "concept_check"}
             for e in (fb.get("factual_errors") or [])]
     cx_items, cx_status = _contradiction_misconceptions(view)
-    seen = {e["claim"] for e in errs}
-    misconceptions = errs + [c for c in cx_items if c["claim"] not in seen]
+    misconceptions, seen = [], set()
+    for m in errs + cx_items:                                                                  # one wrong statement is one misconception, however many checks found it
+        if m["claim"] not in seen:
+            seen.add(m["claim"])
+            misconceptions.append(m)
     extra = dict(correct_concepts=correct, missing_concepts=miss, optional_missing=optional_missing, unverified_concepts=und, misconceptions=misconceptions,
                  contradiction_check=cx_status)
 
     if not ess:
         verdict, reason = "uncertain", "no_curated_requirements"
     elif misconceptions:
-        # A verified wrong statement caps the verdict. When the wrong statements are at least as many as the essential ideas demonstrated, the answer is mostly wrong.
-        verdict, reason = ("incorrect", "misconceptions_outweigh_correct_content") if len(misconceptions) >= len(sat) else ("partially_correct", "misconception")
+        # A verified wrong statement caps the verdict. Only when the wrong statements outnumber the essential ideas demonstrated is the answer mostly wrong (one false claim
+        # next to a right core definition is a partly right answer).
+        verdict, reason = ("incorrect", "misconceptions_outweigh_correct_content") if len(misconceptions) > len(sat) else ("partially_correct", "misconception")
     elif len(sat) == len(ess):
         if cx_status != "checked":
             verdict, reason = "uncertain", "requirements_met_but_errors_not_checked"

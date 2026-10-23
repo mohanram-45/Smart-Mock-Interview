@@ -58,8 +58,8 @@ CASES = [
      "contradictions": {"contradictions": []}},
     {"id": "hypothesis_false", "qid": "smi-0170", "kind": "factual error, reference vocabulary", "source": "written for Stage 12", "expected": "incorrect",
      "answer": "Hypothesis testing uses sample data to prove whether the null hypothesis is true. If the p-value is above the significance level, the null hypothesis is proven true and the alternative hypothesis is false.",
-     "script": {"hypothesis testing": ("states_correctly", "text:uses sample data"), "null hypothesis": ("states_incorrectly", "text:proven true", "Failing to reject H0 does not prove it is true.", "which is not proof that H0 is true", "major"),
-                "alternative hypothesis": ("states_incorrectly", "text:alternative hypothesis is false", "Not rejecting H0 does not show H1 is false.", "otherwise fail to reject H0", "major")},
+     "script": {"hypothesis testing": ("states_correctly", "text:uses sample data"), "null hypothesis": ("states_incorrectly", "text:proven true", "H0 is never proven by a p-value above alpha; the evidence is only insufficient.", "which is not proof that H0 is true", "major"),
+                "alternative hypothesis": ("states_incorrectly", "text:alternative hypothesis is false", "A failure to reject H0 is not a refutation of H1.", "otherwise fail to reject H0", "major")},
      "contradictions": {"contradictions": [{"claim_id": "c1", "reference_quote": "which is not proof that H0 is true", "why": "A test can fail to reject H0; it never proves H0 true."}]}},
     {"id": "unrelated", "qid": "smi-0153", "kind": "unrelated", "source": "written for Stage 12", "expected": "incorrect",
      "answer": "I usually cook pasta on Sundays and I enjoy hiking with my friends in the mountains.", "script": {}, "on_topic": "off_topic", "contradictions": {"contradictions": []}},
@@ -72,6 +72,27 @@ CASES = [
 ]
 
 
+# A small INDEPENDENT set (Stage 12 live correction): answers written after the three failures were analysed, other wording, never used to tune a rule. They are LIVE-ONLY:
+# a scripted stand-in would only echo what its author wrote. `expected` is again the author's judgement, not a human-rated label.
+INDEPENDENT = [
+    {"id": "ind_ae_paraphrase", "qid": "smi-0054", "kind": "independent: correct paraphrase", "source": "written for the Stage 12 correction", "expected": "correct",
+     "answer": "A neural net that learns to rebuild its own inputs. An encoder squeezes each input into a small latent vector and a decoder reconstructs it, so no labelled data is needed."},
+    {"id": "ind_ae_wrong", "qid": "smi-0054", "kind": "independent: wrong answer", "source": "written for the Stage 12 correction", "expected": "incorrect",
+     "answer": "An autoencoder is a supervised classifier that predicts class labels for images using labelled examples."},
+    {"id": "ind_unsup_correct", "qid": "smi-0153", "kind": "independent: correct, own words", "source": "written for the Stage 12 correction", "expected": "correct",
+     "answer": "Learning from data that has no labels, for instance grouping customers with k-means or reducing dimensions with PCA. With no ground truth you judge it with internal measures such as the silhouette score."},
+    {"id": "ind_unsup_wrong", "qid": "smi-0153", "kind": "independent: wrong answer", "source": "written for the Stage 12 correction", "expected": "incorrect",
+     "answer": "Unsupervised learning trains on labelled examples so the model can predict a label for new inputs, for instance spam detection."},
+    {"id": "ind_hyp_paraphrase", "qid": "smi-0170", "kind": "independent: correct paraphrase", "source": "written for the Stage 12 correction", "expected": "correct",
+     "answer": "You assume a default claim, the null, and check whether the sample gives enough evidence to reject it. If the p-value is below the significance level alpha you reject H0, otherwise you only fail to reject it."},
+    {"id": "ind_hyp_partial", "qid": "smi-0170", "kind": "independent: one wrong rule", "source": "written for the Stage 12 correction", "expected": "partially_correct",
+     "answer": "Hypothesis testing uses sample data to decide about a claim. You state a null and an alternative hypothesis, then you reject the null if the p-value is larger than alpha."},
+]
+for _c in INDEPENDENT:
+    _c.update(script={}, contradictions={"contradictions": []}, live_only=True)
+CASES += INDEPENDENT
+
+
 class _Scripted:
     """A contradiction 'provider' that returns the reply written in the case. Stand-in only."""
     model, is_mock, paid, response_schema = "scripted", True, False, None
@@ -81,6 +102,9 @@ class _Scripted:
 
     def generate(self, system, user):
         from src.evaluation.providers.base import ProviderResponse
+        from src.evaluation.modular import contradictions as CX
+        if system == CX.CONFIRM_SYSTEM:                                       # the second-opinion call: a stand-in that confirms whatever the case script proposed
+            return ProviderResponse(json.dumps({"verdict": "contradicts"}), self.model, 1.0, {})
         return ProviderResponse(json.dumps(self.reply), self.model, 1.0, {})
 
 
@@ -102,6 +126,8 @@ def run(live: bool, only=None) -> dict:
     for case in CASES:
         if only and case["id"] not in only:
             continue
+        if case.get("live_only") and not live:
+            continue
         rec = eng.record(case["qid"])
         before = _before(case, rec)
         sim = {"status": "scored", "score": before["similarity_pct"]} if before.get("similarity_pct") is not None else {"status": "unavailable"}
@@ -120,25 +146,26 @@ def run(live: bool, only=None) -> dict:
         ms = round((time.perf_counter() - t0) * 1000, 1)
         a = {"answer": case["answer"], "skipped": False, "legacy": sim, "terms": terms,
              "modular": {"mode": "live" if mode in ("live", "scripted") else mode, "status": "done", "view": view}}
-        r = A.assess(a, {"stage": "core"})
+        r = A.assess(a, {"stage": "core", "question": rec["question"]})
         rows.append({"id": case["id"], "question": rec["question"], "kind": case["kind"], "source": case["source"], "expected_by_author": case["expected"],
                      "before": before, "after": {k: r[k] for k in ("verdict", "label", "reason", "basis", "correct_concepts", "missing_concepts", "misconceptions", "unverified_concepts",
                                                                      "feedback", "contradiction_check")},
-                     "similarity_shown_now": r["similarity"]["display"], "match_expected": r["verdict"] == case["expected"], "latency_ms": ms,
+                     "similarity_shown_now": r["similarity"]["display"], "match_expected": r["verdict"] == case["expected"], "outcome": ("match" if r["verdict"] == case["expected"] else "uncertain" if r["verdict"] == "uncertain" else "mismatch"), "latency_ms": ms,
                      "evaluator_status": (view or {}).get("status"), "evidence": "real_local_model" if live else "scripted_stand_in"})
     return {"evidence": "REAL local-model run (qwen2.5:7b via Ollama)" if live else "SCRIPTED stand-in: proves the code path only, says nothing about model quality",
-            "expected_labels": "author judgement, not human-rated", "n": len(rows), "matches": sum(r["match_expected"] for r in rows), "rows": rows}
+            "expected_labels": "author judgement, not human-rated", "n": len(rows), "matches": sum(r["match_expected"] for r in rows),
+            "uncertain": sum(r["outcome"] == "uncertain" for r in rows), "mismatches": sum(r["outcome"] == "mismatch" for r in rows), "rows": rows}
 
 
 def markdown(res: dict) -> str:
-    out = [f"# Stage 12 answer assessment: {res['evidence']}", "", f"Expected verdicts are the author's judgement ({res['expected_labels']}). Matches: {res['matches']}/{res['n']}.", "",
+    out = [f"# Stage 12 answer assessment: {res['evidence']}", "", f"Expected verdicts are the author's judgement ({res['expected_labels']}). Exact matches: {res['matches']}/{res['n']}; honest 'Uncertain' (NOT a match): {res['uncertain']}; wrong verdicts: {res['mismatches']}.", "",
            "| case | kind | BEFORE (similarity % + band comment) | AFTER verdict | misconceptions found | missing | expected |", "|---|---|---|---|---|---|---|"]
     for r in res["rows"]:
         b = r["before"]
         before = f"{b['similarity_pct']:.1f}% — “{b['comment']}”" if b.get("similarity_pct") is not None else b["source"]
         mis = "; ".join(f"“{m['claim']}”" for m in r["after"]["misconceptions"]) or "—"
         out.append(f"| {r['id']} | {r['kind']} | {before} | **{r['after']['label']}** ({r['after']['reason']}); similarity now shown as {r['similarity_shown_now']} | {mis} | "
-                   f"{'; '.join(r['after']['missing_concepts']) or '—'} | {r['expected_by_author']}{' ✓' if r['match_expected'] else ' ✗'} |")
+                   f"{'; '.join(r['after']['missing_concepts']) or '—'} | {r['expected_by_author']}{' ✓' if r['match_expected'] else (' (uncertain)' if r['outcome'] == 'uncertain' else ' ✗')} |")
     return "\n".join(out) + "\n"
 
 

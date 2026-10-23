@@ -29,11 +29,13 @@ def eng():
 class Reply:
     model, is_mock, paid = "scripted", True, False
 
-    def __init__(self, reply=None, raise_=None, text=None):
-        self.reply, self.raise_, self.text, self.response_schema, self.calls = reply, raise_, text, "original", []
+    def __init__(self, reply=None, raise_=None, text=None, confirm="contradicts"):
+        self.reply, self.raise_, self.text, self.response_schema, self.calls, self.confirm = reply, raise_, text, "original", [], confirm
 
     def generate(self, system, user):
         self.calls.append((system, user, self.response_schema))
+        if system == CX.CONFIRM_SYSTEM:                                    # the second-opinion call
+            return ProviderResponse(json.dumps({"verdict": self.confirm}), self.model, 1.0, {})
         if self.raise_:
             raise self.raise_
         return ProviderResponse(self.text if self.text is not None else json.dumps(self.reply), self.model, 1.0, {})
@@ -69,7 +71,8 @@ CXI = {"status": "checked", "items": [{"claim_id": "c2", "claim": "a false state
     (stored([E_OK, E_UND]), "uncertain", "evidence_incomplete"),
     (stored([E_UND]), "uncertain", "evidence_incomplete"),
     (stored([E_OK, outcome("b2", "essential", "satisfied")], cx=CXI), "partially_correct", "misconception"),
-    (stored([E_OK], cx=CXI), "incorrect", "misconceptions_outweigh_correct_content"),
+    (stored([E_OK], cx=CXI), "partially_correct", "misconception"),                       # one false claim next to one right idea: partly right (Stage 12 live correction)
+    (stored([E_OK], cx={"status": "checked", "items": CXI["items"] + [{**CXI["items"][0], "claim": "another false statement"}]}), "incorrect", "misconceptions_outweigh_correct_content"),
     (stored([E_MISS], errors=[ERR]), "incorrect", "misconceptions_outweigh_correct_content"),
     (stored([]), "uncertain", "no_curated_requirements"),
     (stored([E_OK], vstatus="abstained", taxonomy={"primary": "off_topic_confirmed"}), "incorrect", "off_topic"),
@@ -208,7 +211,7 @@ def test_representative_cases_scripted_run():
     spec.loader.exec_module(m)
     res = m.run(live=False)
     got = {r["id"]: r["after"]["verdict"] for r in res["rows"]}
-    assert got == {"autoencoder_misconception": "partially_correct", "autoencoder_paraphrase": "uncertain", "unsupervised_short": "partially_correct",
+    assert got == {"autoencoder_misconception": "partially_correct", "autoencoder_paraphrase": "correct", "unsupervised_short": "partially_correct",
                    "unsupervised_complete": "correct", "fourier_no_attempt": "incorrect", "hypothesis_real": "correct", "hypothesis_false": "incorrect",
                    "unrelated": "incorrect", "empty": "incorrect", "mocking_real": "partially_correct"}
     assert all(r["evidence"] == "scripted_stand_in" for r in res["rows"])

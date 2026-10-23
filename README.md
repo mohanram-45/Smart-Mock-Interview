@@ -35,7 +35,7 @@ A local practice tool for **technical interviews** (machine learning, deep learn
 | DVC `build_index` | yes | yes with the offline stand-in embedder; not with the real MiniLM model | no remote configured |
 | Docker / Compose (lean image) | yes | built, started and health-checked by CI on GitHub; non-root, read-only | no: no public deployment |
 | Docker image with ML extras (`INSTALL_ML=1`) | yes | **not yet verified**: `heavy.yml` (manual) builds it and runs `scripts/verify_ml_scoring.py` for real Sentence-BERT scoring; no run recorded yet | no |
-| Correctness check (Stage 12) and PDF report (Stage 14) | yes | deterministic tests with scripted evaluator replies; **no live-model run yet** (`verify_ollama_stage12.bat`) | no |
+| Correctness check (Stage 12) and PDF report (Stage 14) | yes | deterministic tests with scripted evaluator replies; **two real-model runs (23 Oct 2026): original 0/3 matches; corrected 1/3 matches, 1 Uncertain, 1 wrong. Correctness evaluation remains experimental and off by default** (`verify_ollama_stage12.bat`) | no |
 | GitHub Actions CI | yes | runs on the `Update` branch (lint, security audit, integrity, tests on Python 3.12 and 3.13, MLflow, Windows smoke, Docker build and health); the latest run is reported green by the maintainer | no |
 | Windows scripts | yes | run on Linux (PowerShell 7) only; **not run on Windows** | no |
 
@@ -55,12 +55,13 @@ Taken from the running app. The correctness verdicts shown are **illustrative**:
 
 | What | Number | Kind of evidence |
 |---|---|---|
-| Automated tests (`tests/`) | 1,801 passed, 9 skipped, 0 failed (one unexplained single failure seen once in four runs, not reproduced) (Linux, Python 3.12) | real test runs; CI also runs Python 3.13 and a Windows smoke job |
+| Automated tests (`tests/`) | 1,831 passed, 9 skipped, 0 failed (Linux, Python 3.12) | real test runs; CI also runs Python 3.13 and a Windows smoke job |
 | Retrieval success@1 on answerable queries | 0.71 dev, 0.63 frozen challenge (stored MiniLM rankings) | AI-pooled labels, not human ground truth |
 | Modular concept evaluator abstain rate | 0.45 against a limit of 0.40: **failed its frozen gate** | recorded real run, 20 answers |
 | Follow-up questions, automatic acceptance (Stage 11U baseline, 22 Oct real run) | 17/23 accepted; technical 11/12; grounded memory 2/7; no detected fabricated references | automatic rules, **not human-rated** |
 | Same rules after the final repair, replayed without a model | 14 of 25 model-called rows accepted, below the 80 % target | replay of recorded text, not a score |
-| Correctness check, 10 representative answers | 9/10 matched the author's expected verdict | **scripted evaluator replies**, not a model; live run pending |
+| Correctness check, 10 representative answers | 9/10 matched the author's expected verdict | **scripted evaluator replies**, not a model |
+| Correctness check, 3 answers, real `qwen2.5:7b` (23 Oct 2026, before the correction) | **0/3** matched: a correct paraphrase was called Incorrect (two invented contradictions), a partly-right answer Incorrect, a partial answer Correct | **real model**, author-judged labels, not human-rated. Likely causes addressed afterwards (see `docs/ARCHITECTURE.md`); **corrected live rerun: 1/3 matches, 1 Uncertain, 1 wrong; six independent cases not run** (9 answers) |
 
 Limitations: the question bank and every rubric are AI-written and not human-reviewed; no score or verdict has been validated against human markers; the correctness check is off by default and depends on a small local model that abstains often (expect many *Uncertain*); a correct paraphrase that avoids a concept's own wording is usually *Uncertain*, not *Correct*; the experimental code check reads code and never runs it unless you set up Docker sandboxing yourself; this is a local single-user tool, not a hardened public service (no accounts, no TLS).
 
