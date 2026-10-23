@@ -1,0 +1,286 @@
+{
+ "NLP": [
+  [
+   "P2-NLP-01",
+   "Seq2seq, decoding and beam search",
+   "coding + reasoning",
+   "Encoder-decoder translation: teacher forcing vs exposure bias, greedy vs beam search; implement beam search over a given next-token log-prob function with length handling and tests."
+  ],
+  [
+   "P2-NLP-02",
+   "LLM sampling strategies",
+   "coding",
+   "Temperature, top-k and top-p (nucleus) sampling: effect on the distribution; implement a numpy top-p filter that handles ties/edge cases and test it."
+  ],
+  [
+   "P2-NLP-03",
+   "RAG hallucination triage",
+   "debugging scenario",
+   "A retrieval-augmented QA assistant gives confident wrong answers: separate retrieval failures from generation failures, design diagnostics and metrics (context recall, faithfulness/groundedness, answer relevance), and decide fixes."
+  ],
+  [
+   "P2-NLP-04",
+   "Parameter-efficient fine-tuning",
+   "coding + reasoning",
+   "LoRA: low-rank update W + (alpha/r)BA; count trainable parameters vs full fine-tune for given shapes; implement the merged weight and show equivalence; when it helps and its limits (hedged)."
+  ],
+  [
+   "P2-NLP-05",
+   "ROUGE for summarisation",
+   "coding",
+   "Implement ROUGE-N recall/precision/F1 and ROUGE-L via LCS with tests; explain what ROUGE rewards and misses for abstractive summaries."
+  ],
+  [
+   "P2-NLP-06",
+   "Extractive question answering",
+   "coding + reasoning",
+   "Span prediction with start/end logits: pick the best span subject to max length and start<=end; handling unanswerable questions and long contexts via sliding windows; implement span selection with tests."
+  ],
+  [
+   "P2-NLP-07",
+   "OOV, typos and multilingual text",
+   "coding + reasoning",
+   "fastText-style character n-gram representations vs word-level vectors for misspellings and code-mixed text; implement boundary-marked char n-gram extraction and hashing into buckets; limits."
+  ],
+  [
+   "P2-NLP-08",
+   "Choosing a model for a small labelled text dataset",
+   "applied scenario",
+   "About 5,000 labelled product reviews, 5 classes, latency budget: baseline first, error analysis, label noise, when a pretrained transformer fine-tune is justified, what to measure."
+  ],
+  [
+   "P2-NLP-09",
+   "Embedding similarity pitfalls",
+   "coding + reasoning",
+   "Cosine vs dot product vs Euclidean for embeddings; normalisation; implement vectorised top-k cosine search and show equivalence with a normalised dot product; hubness / anisotropy as caveats (hedged)."
+  ],
+  [
+   "P2-NLP-10",
+   "Retrieval evaluation metrics",
+   "coding",
+   "Implement recall@k, MRR and nDCG@k (binary and graded relevance) with tests and edge cases (no relevant docs, ties); what each metric hides."
+  ],
+  [
+   "P2-NLP-11",
+   "Tokenizer/model mismatch and padding bugs",
+   "debugging scenario",
+   "A fine-tuned model degrades after a tokenizer or batching change: vocabulary/special-token mismatch, truncation, padding side and attention mask errors; ordered diagnostic checklist; no framework code unless you run it."
+  ],
+  [
+   "P2-NLP-12",
+   "Evaluation contamination",
+   "coding + reasoning",
+   "Benchmark/test-set contamination in LLM evaluation: detect n-gram overlap between training text and test items; implement an n-gram overlap contamination check with tests; limits of the method."
+  ]
+ ],
+ "Deep Learning": [
+  [
+   "P2-DL-01",
+   "Reverse-mode autodiff from scratch",
+   "coding, hard",
+   "Implement a minimal scalar autodiff engine (add, mul, pow, tanh/relu, backward with topological order) and test gradients against numerical differentiation, including a node used twice."
+  ],
+  [
+   "P2-DL-02",
+   "LSTM cell",
+   "coding + reasoning",
+   "Implement one LSTM step in numpy (gate equations, shapes) and test against a hand-computed case; why gating eases vanishing gradients; forget-gate bias initialisation (hedged)."
+  ],
+  [
+   "P2-DL-03",
+   "Mixed precision and loss scaling",
+   "coding + reasoning",
+   "fp16 underflow/overflow range vs bf16; why loss scaling is used; demonstrate underflow of small gradients in numpy float16 and how scaling fixes it; what stays in fp32."
+  ],
+  [
+   "P2-DL-04",
+   "Positional encodings",
+   "coding",
+   "Why self-attention needs positional information; implement sinusoidal encodings and test properties (shape, bounded values, relative-offset linear structure for a fixed offset); alternatives named without unsupported claims."
+  ],
+  [
+   "P2-DL-05",
+   "KV cache for autoregressive decoding",
+   "coding, hard",
+   "Why caching keys/values makes generation cheaper per step; implement single-head attention decoding with and without a cache and prove equal outputs; memory growth with sequence length."
+  ],
+  [
+   "P2-DL-06",
+   "Diffusion forward process",
+   "coding + reasoning",
+   "Forward noising closed form q(x_t | x_0) with a beta schedule; implement alpha-bar and sampling x_t, test mean/variance numerically; what the denoising network is trained to predict (state the epsilon-prediction convention)."
+  ],
+  [
+   "P2-DL-07",
+   "Scaling training across GPUs",
+   "applied scenario",
+   "Moving from batch 256 on 1 GPU to batch 2048 on 8 GPUs: learning-rate scaling heuristics, warmup, what changes in BatchNorm statistics, gradient accumulation as an alternative, and how to verify equivalence."
+  ],
+  [
+   "P2-DL-08",
+   "Classifier predicts one class",
+   "debugging scenario",
+   "A CNN outputs the same class for every input: ordered checklist (labels, class imbalance, input normalisation, dead ReLUs, learning rate, softmax over the wrong axis); include a small numpy demonstration of the wrong-axis softmax bug."
+  ],
+  [
+   "P2-DL-09",
+   "Residual block parameter counts",
+   "coding/calculation",
+   "Parameter and FLOP-free counts for basic vs bottleneck residual blocks and the projection shortcut; implement a helper and test with worked examples; why bottlenecks are used."
+  ],
+  [
+   "P2-DL-10",
+   "Contrastive loss",
+   "coding + reasoning",
+   "InfoNCE with temperature over in-batch negatives: implement stably in numpy, test against a brute-force computation, discuss temperature and false negatives."
+  ]
+ ],
+ "Python": [
+  [
+   "P2-PY-01",
+   "Mutable default argument",
+   "debugging",
+   "A function with a list default accumulates state across calls; explain why (defaults evaluated at definition), fix, and a safe sentinel pattern; tests."
+  ],
+  [
+   "P2-PY-02",
+   "Late-binding closures",
+   "debugging",
+   "Callbacks created in a loop all use the last value; explain late binding and give three fixes (default arg, functools.partial, factory); tests."
+  ],
+  [
+   "P2-PY-03",
+   "Context managers",
+   "coding",
+   "Write a context manager (class-based and contextlib) for a transactional resource that commits on success and rolls back on exception while never swallowing errors incorrectly; tests with a fake resource."
+  ],
+  [
+   "P2-PY-04",
+   "Lazy iteration and batching",
+   "coding",
+   "Implement batched(iterable, n) and a sliding_window generator that work with any iterable including generators, stay lazy, and handle edge cases; compare memory behaviour; tests (must run on Python 3.10)."
+  ],
+  [
+   "P2-PY-05",
+   "Decorator with arguments",
+   "coding",
+   "Implement retry(times, delay, exceptions) with exponential backoff using functools.wraps; inject a fake sleep so tests are instant; preserve metadata; test failure after max attempts."
+  ],
+  [
+   "P2-PY-06",
+   "Bounded asyncio concurrency",
+   "coding",
+   "Run many coroutines with at most N in flight using asyncio.Semaphore and gather with return_exceptions; deterministic tests that assert the maximum concurrency and result order; contrast with threads/GIL for CPU-bound work."
+  ],
+  [
+   "P2-PY-07",
+   "NumPy broadcasting",
+   "coding",
+   "Pairwise squared Euclidean distance matrix without Python loops using broadcasting and the (a-b)^2 expansion; test against a naive loop; numerical issues (negative tiny values) and memory trade-offs."
+  ],
+  [
+   "P2-PY-08",
+   "pandas merge pitfalls",
+   "coding/debugging",
+   "A left merge unexpectedly multiplies rows because of duplicate keys; detect with validate= and indicator=, fix, and test row counts; must work on pandas 2.x and 3.x."
+  ],
+  [
+   "P2-PY-09",
+   "pandas groupby patterns",
+   "coding",
+   "Top-2 products by revenue per category with ties handled explicitly, plus a per-group share-of-total column using transform; named aggregation; tests on pandas 2.x and 3.x."
+  ],
+  [
+   "P2-PY-10",
+   "Algorithmic performance",
+   "coding",
+   "A duplicate-detection function is O(n^2); rewrite in O(n) and prove it by counting basic operations with an instrumented input (no wall-clock timing in tests); discuss when sorting is better than hashing."
+  ],
+  [
+   "P2-PY-11",
+   "Parsing logs with regex and JSON",
+   "coding",
+   "Parse semi-structured log lines into dicts with a compiled regex with named groups, skip and count malformed lines, and serialise to JSON lines; tests with edge cases (missing fields, quotes)."
+  ],
+  [
+   "P2-PY-12",
+   "Copy semantics",
+   "debugging/concept",
+   "Shallow vs deep copy of nested lists/dicts, aliasing bugs, == vs is, and why mutating through a copy affects the original; tests that assert identities; avoid relying on CPython-specific caching."
+  ]
+ ],
+ "Data Analysis": [
+  [
+   "P2-DA-01",
+   "A/B test sample size",
+   "coding",
+   "Per-group sample size for a two-sided two-proportion test (baseline 10 percent, absolute MDE 1 point, alpha 0.05, power 0.8) using statistics.NormalDist; tests with a computed reference value; how MDE, baseline and power move n."
+  ],
+  [
+   "P2-DA-02",
+   "Peeking and optional stopping",
+   "coding + reasoning",
+   "Simulate an A/A test checked daily and stopped at the first p<0.05: false-positive inflation vs a single fixed-horizon test (seeded numpy default_rng, tolerance bands); remedies (fixed horizon, sequential methods) named without overclaiming."
+  ],
+  [
+   "P2-DA-03",
+   "Sample ratio mismatch",
+   "coding + debugging",
+   "Experiment intended 50/50 shows 50,000 vs 51,200 users: chi-square goodness-of-fit with df=1 implemented via math.erfc, interpretation, plausible causes (bot filtering, redirects, logging loss) and what to do with results."
+  ],
+  [
+   "P2-DA-04",
+   "Simpson's paradox",
+   "coding",
+   "Construct or analyse a dataset where the pooled conversion rate favours variant A but each segment favours B; compute with pandas, explain via segment mix, and say which comparison to trust and why."
+  ],
+  [
+   "P2-DA-05",
+   "Outlier detection on skewed data",
+   "coding",
+   "Revenue per order is heavily right-skewed: compare z-score, IQR fences and MAD-based modified z-score; implement the MAD method with tests; what to do with flagged points."
+  ],
+  [
+   "P2-DA-06",
+   "Bootstrap confidence interval",
+   "coding",
+   "Percentile bootstrap CI for a median with a seeded rng; coverage caveats, small samples, what the interval does and does not mean; tests with deterministic checks."
+  ],
+  [
+   "P2-DA-07",
+   "Multiple comparisons",
+   "coding",
+   "20 metrics tested at alpha 0.05: expected false positives; implement Bonferroni and Benjamini-Hochberg with tests on a small p-value list; when to prefer each."
+  ],
+  [
+   "P2-DA-08",
+   "Cohort retention table",
+   "coding",
+   "From an events log build a weekly signup-cohort retention matrix with pandas; define retention precisely (active in week k after signup); tests on a small frame; must run on pandas 2.x and 3.x."
+  ],
+  [
+   "P2-DA-09",
+   "Explaining a conversion drop",
+   "applied scenario with code",
+   "Overall checkout conversion fell from 3.0 to 2.7 percent: decompose the change into mix effect and within-segment rate effect (device segments) with a worked pandas/numpy example; next diagnostic steps."
+  ],
+  [
+   "P2-DA-10",
+   "Non-response bias",
+   "coding + reasoning",
+   "A satisfaction survey is answered mostly by happy long-term customers: what bias, how to check, and post-stratification reweighting on a worked example with tests; limits of reweighting."
+  ],
+  [
+   "P2-DA-11",
+   "Seasonal decomposition",
+   "coding",
+   "Additive decomposition of monthly data: centred moving-average trend, seasonal indices, residual; implement with pandas/numpy, test on a synthetic series with known components; when multiplicative is better."
+  ],
+  [
+   "P2-DA-12",
+   "Correlation, confounding and causal tests",
+   "scenario/design",
+   "Pages with more images show higher conversion on a dashboard; why this is not causal, possible confounders, how to test causally (randomised experiment, what to randomise) and observational fallbacks with their assumptions."
+  ]
+ ]
+}

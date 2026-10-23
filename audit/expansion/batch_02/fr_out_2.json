@@ -1,0 +1,405 @@
+[
+ {
+  "plan_id": "B2-GEN-13-1",
+  "verdict": "pass",
+  "reasons": [
+   "Recorded code, fenced code and asserted numbers all verified; applied edit only rewords 'checked by the tests' to 'asserted in the recorded tests' (accurate)."
+  ],
+  "parts_answered": "all parts answered",
+  "evidence": [
+   {
+    "claim": "fenced code == code.solution",
+    "method": "executed",
+    "evidence": "string equality True"
+   },
+   {
+    "claim": "recorded test passes on 3.13, 3.10, 3.11",
+    "method": "executed",
+    "evidence": "printed ok on all three"
+   },
+   {
+    "claim": "my extra edges: exact fit =1, one byte short =0, weights+reserve==total ->0, total_bytes=0 ValueError, bool total TypeError, seq_len=0 ValueError, bool reserve TypeError, float batch TypeError, reserve 0 accepted",
+    "method": "executed",
+    "evidence": "extra ok on all three interpreters"
+   },
+   {
+    "claim": "524,288 B/token; 2 GiB/seq; usable 60.96 GiB; 30 / 121 / 487 / 243; 14e9 B=13.04 GiB",
+    "method": "executed",
+    "evidence": "recomputed: 60.9615 GiB, 30, 121, 243 (bytes_per_elem=1), 487 (1024 tokens), 131072 B/token for 8 heads"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short arithmetic helper with validation plus interpretation; no subtle algorithm.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "formula, derivation, interpretation, pitfalls"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "code plus scenario values; the 8-bit variant is not in detailed"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "specific and each discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0017",
+   "same_intent": false
+  },
+  "code_findings": "stdlib only, no 3.11+ features; consistent with spec (bool/float TypeError, non-positive ValueError, reserve 0 ok, 0 returned when none fit, ValueError when weights+reserve exceed total).",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2305.13245",
+    "status": "supported",
+    "evidence": "Abstract: MQA 'only uses a single key-value head, drastically speeds up decoder inference'; GQA uses 'an intermediate ... number of key-value heads'; 'uptrained GQA achieves quality close to multi-head attention with comparable speed to MQA'. Matches the answer sentence; source is used."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Cache-size formula is derived arithmetic (no source needed)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-14-1",
+  "verdict": "pass",
+  "reasons": [
+   "Applied edit is a grammar clarification; no number or claim changed. All claims supported or hedged."
+  ],
+  "parts_answered": "all parts answered",
+  "evidence": [
+   {
+    "claim": "hallucination as binary-classification errors; benchmarks reward guessing; propose changing scoring of existing benchmarks",
+    "method": "paper",
+    "evidence": "abstract page: 'originate simply as errors in binary classification'; 'optimized to be good test-takers, and guessing when uncertain improves test performance'"
+   },
+   {
+    "claim": "base models can be fairly calibrated",
+    "method": "paper",
+    "evidence": "Sec 3.1: 'base models are often found to be calibrated, in contrast to post-trained models'"
+   },
+   {
+    "claim": "facts seen once are hard / floor on error",
+    "method": "paper",
+    "evidence": "Sec 1.1: hallucination rate 'should be at least the fraction of training facts that appear once'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism explanation citing a recent paper; no computation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single-answer concept; fine"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "specific and each discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0003",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2509.04664",
+    "status": "supported",
+    "evidence": "binary classification, test-taker guessing, changing benchmark scoring all present in abstract"
+   },
+   {
+    "url": "https://arxiv.org/pdf/2509.04664",
+    "status": "supported",
+    "evidence": "singleton-rate statement in Sec 1.1 supports 'facts that appear once... hardest'; 'never' is a mild extension (arbitrary facts with no signal) but acceptable"
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Language Models (Mostly) Know What They Know",
+    "url": "https://arxiv.org/abs/2207.05221",
+    "supports": "Self-assessment is reasonably reliable in some settings (multiple-choice/true-false, right format) but less reliable when predicting whether the model knows the answer on new tasks.",
+    "quote": "Models can be trained to predict whether they know the answer; this partly transfers to new tasks but is less reliable there (opened abstract page; paraphrase, abstract exceeds quote limit)",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [
+   "Retrieval limits (irrelevant/outdated passages mislead; blends prior with evidence) are background knowledge; hedged with 'can'/'may'.",
+   "The 'self-assessment is decent in some settings and weaker on unfamiliar questions' parenthetical has no source attached in the record; Kadavath et al. (added) covers it."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-14-4",
+  "verdict": "pass",
+  "reasons": [
+   "Both applied edits are accurate and better hedged. 26% figure recomputed: 1-(5*.8^4*.2+.8^5)=26.3%."
+  ],
+  "parts_answered": "all parts answered",
+  "evidence": [
+   {
+    "claim": "about 26% flagged when each sample is right 80% of the time",
+    "method": "executed",
+    "evidence": "P(>=4 of 5)=0.7373, flagged 0.2627 (treats agreement as correctness; 'about' is fair)"
+   },
+   {
+    "claim": "larger models' confidence on MC/TF reliable with right format; self-rating works fairly well; P(IK) struggles on new tasks",
+    "method": "paper",
+    "evidence": "Kadavath abstract page opened: matches; edit 'struggled with calibration on new tasks' consistent"
+   },
+   {
+    "claim": "post-trained models less calibrated than base",
+    "method": "paper",
+    "evidence": "Kalai et al. Sec 3.1 quote verified"
+   },
+   {
+    "claim": "samples are similar when model has knowledge",
+    "method": "paper",
+    "evidence": "SelfCheckGPT abstract: 'if an LLM has knowledge of a given concept, sampled responses are likely to be similar and contain consistent facts'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Compare two signals, failure modes, and an evaluation plan; one small binomial calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single scenario answer, 339 words, covers both signals and deployment decision"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "specific and each discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0027",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2207.05221",
+    "status": "supported",
+    "evidence": "Every present sentence is supported. The 'improves with several samples' clause in the record's supports text is not used in the answer; trim that clause from `supports`."
+   },
+   {
+    "url": "https://arxiv.org/abs/2303.08896",
+    "status": "supported",
+    "evidence": "quote verified on the abstract page"
+   },
+   {
+    "url": "https://arxiv.org/pdf/2509.04664",
+    "status": "supported",
+    "evidence": "Sec 3.1 quote verified"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'Average dominated by filler tokens', 'consistent errors yield 5/5 agreement', 'collapse at low temperature' are reasoning/background; hedged enough."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-15-1",
+  "verdict": "correct",
+  "reasons": [
+   "Recomputed: Wilson 1380/1500 = 90.52% to 93.27% (record says 90.5 to 93.3 OK); 1350/1500 = 88.38% to 91.42% (88.4 OK); 12,000/30*20% = 80/day, *45% = 36/day OK; P(Binomial(100,0.92) <= 87) = 5.59% so 'about 6%' OK. The earlier '3 days' defect is gone and no remaining number is wrong.",
+   "Two minor operational gaps remain in the live-stage plan (below). Rubric has only 3 points for an open-ended business case."
+  ],
+  "parts_answered": "all parts answered",
+  "evidence": [
+   {
+    "claim": "Wilson intervals 90.5-93.3 and 88.4-91.4",
+    "method": "executed",
+    "evidence": "computed 0.9052-0.9327 and 0.8838-0.9142"
+   },
+   {
+    "claim": "100-window false alarm about 6%",
+    "method": "executed",
+    "evidence": "exact binomial 5.59%"
+   },
+   {
+    "claim": "80/day and 36/day",
+    "method": "derivation",
+    "evidence": "400/day*0.2=80; *0.45=36"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "so set the review rate to fill the window in a few days",
+    "problem": "At 5% traffic there are only about 20 conversations a day (about 9 in scope), so a 100-conversation window takes about 11 days, longer than the 5% stage in a two-week live phase; the rule cannot operate at that stage as written.",
+    "replacement": "so set the review rate to fill the window in a few days (at 5% traffic it would take about 11 days, so judge that stage on severity-1 errors and apply the rolling rule from the 20% stage)"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "re-contact within 7 days not worse than the human baseline by more than 3 points.",
+    "problem": "A 7-day re-contact gate cannot be evaluated at the week-8 decision for conversations from the last week of the pilot.",
+    "replacement": "re-contact within 7 days not worse than the human baseline by more than 3 points (measured only on pilot conversations old enough to have a full 7-day window)."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open-ended multi-part launch design with quantitative gate and rollout logic.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Scope to the ten high-volume, low-risk intents",
+    "tradeoff": "Safer and measurable vs a ceiling of about 45% of volume"
+   },
+   {
+    "decision": "Visible, always-available human route with context handoff",
+    "tradeoff": "Lower containment vs customer trust and fewer silent failures"
+   },
+   {
+    "decision": "Resolution (no 7-day re-contact) plus satisfaction and severity-weighted errors instead of containment alone",
+    "tradeoff": "Honest outcome measure vs lag that does not fit an 8-week schedule"
+   },
+   {
+    "decision": "Shadow mode then randomised 5% then 20% with human fallback",
+    "tradeoff": "Safety and causal comparison vs less time and less data per stage"
+   },
+   {
+    "decision": "Go/no-go on a Wilson lower bound over human-reviewed drafts, zero severity-1 errors, rollback rule",
+    "tradeoff": "Statistical confidence vs review cost and sample size"
+   },
+   {
+    "decision": "Grounding in approved policy and live order data, logs/versioning, kill switch, legal review",
+    "tradeoff": "Reduced legal exposure and auditability vs engineering and review effort"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "71 words, genuinely shorter, no numbers to conflict"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "scope, metrics, rollout, legal"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "gate numbers and rollback rule; not in detailed"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "specific and each discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0010",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Legal/regulatory statement is generic and hedged ('differ by jurisdiction, involve counsel'); no source needed."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-15-2",
+  "verdict": "pass",
+  "reasons": [
+   "Applied edit is correct: 281/300 gives Wilson lower bound 90.32% (280 gives 89.93%), so a lower-bound-above-90% rule alone needs 281; 285/300 (95%) is binding. 285 -> 91.9% to 96.9% (96.95 upper), 270 -> 86.1% to 92.9% verified; 54/60 = 90%."
+  ],
+  "parts_answered": "all parts answered",
+  "evidence": [
+   {
+    "claim": "Wilson intervals and 281 threshold",
+    "method": "executed",
+    "evidence": "285:(91.92,96.95); 270:(86.08,92.91); 281:90.32; 280:89.93"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Scenario with a policy/evaluation gate; one Wilson interval calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "promise, citations, ACL, evaluation"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "numeric gate list not in detailed"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "specific and each discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0019",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-15-3",
+  "verdict": "pass",
+  "reasons": [
+   "Recomputed all numbers: 27.28% vs 30.81% net (3.5 pt); contained n=1,550/1,950; re-contact counts 186/410 (409.5); pooled z=7.04 (unpooled 7.27) 'about 7'; containment z=8.4 'about 8'; conversation-level net z=3.89 'about 3.9'; Wilson 10.5-13.7 and 19.3-22.9 match. Both applied edits fix a real conditioning caveat and are accurate."
+  ],
+  "parts_answered": "all parts answered",
+  "evidence": [
+   {
+    "claim": "z values and intervals",
+    "method": "executed",
+    "evidence": "7.04, 8.39, 3.89, (10.48,13.71), (19.27,22.89)"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Numeric interpretation with causal-inference caveat; recompute proportions and z-tests.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer, 328 words"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "specific and each discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0035",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Survey-response bias statement ('very happy and very unhappy users answer more') is a common-knowledge generalisation; acceptable as a hedged tendency."
+  ],
+  "code_patch": null
+ }
+]

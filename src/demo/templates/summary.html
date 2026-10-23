@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% from "_macros.html" import answer_view %}
+{% block title %}Interview feedback · SMART Mock Interview{% endblock %}
+{% block page %}summary{% endblock %}
+{% block body %}
+<div id="summary" data-sid="{{ s.id }}" data-pending="{{ summary.modular_pending }}">
+{% if in_progress %}
+  <section class="card narrow"><h1>Interview in progress</h1><p>This interview is not finished yet ({{ s.current }} of {{ s.questions|length }} turns so far).</p>
+    <p><a class="btn primary" href="{{ url_for('demo.interview_page', sid=s.id) }}">Continue</a> <button class="btn" id="finish-btn" data-sid="{{ s.id }}">End it now and see the feedback</button></p></section>
+{% else %}
+  <div class="page-head"><div><h1>Your interview feedback</h1>
+    <p>{{ s.config.role or 'Custom topics' }}{% if s.finished_at %} · finished {{ short_date(s.finished_at) }}{% endif %}{% if s.restored_from_disk %} (restored from a saved session){% endif %}</p></div>
+    <a class="btn primary" href="{{ url_for('demo.setup_page') }}">Start another interview</a></div>
+
+  <article class="turn turn-ai wrap-card" aria-label="Closing message"><div class="av" aria-hidden="true"><svg viewBox="0 0 30 30" width="26" height="26"><path d="M8 10h14M8 15h9" stroke="#04150b" stroke-width="2.4" stroke-linecap="round"/><rect x="19" y="13" width="2.8" height="9" rx="1.4" fill="#04150b"/></svg></div>
+    <div class="bubble"><p class="who"><span>Interviewer</span><span class="stagechip st-wrap_up">Wrap-up</span></p><p class="ask">{{ wrapup_message(s) }}</p></div></article>
+
+  <dl class="figures" aria-label="Interview at a glance">
+    {% if summary.asked %}<div><dt>Technical questions answered</dt><dd>{{ summary.answered }}<small>of {{ summary.asked }} asked</small></dd></div>
+    <div><dt>Topics covered</dt><dd>{{ coverage|length }}</dd></div>{% endif %}
+    {% if beh and beh.available %}<div><dt>Behavioural questions answered</dt><dd>{{ beh.competencies|selectattr('answered')|list|length }}<small>of {{ beh.competencies|length }} asked</small></dd></div>{% endif %}
+    <div><dt>Follow-ups answered</dt><dd>{{ summary.followups }}</dd></div>
+    <div><dt>Time spent</dt><dd>{{ clock(digest.seconds) }}{% if digest.timed_answers %}<small>{{ clock(digest.seconds / digest.timed_answers) }} per answer</small>{% endif %}</dd></div>
+    <div><dt>Skipped or not reached</dt><dd>{{ summary.skipped + summary.unanswered }}</dd></div>
+  </dl>
+  {% if s.plan and s.plan.ended_reason == 'consecutive_skips' %}<div class="banner banner-adv"><strong>The interview stopped early</strong><span>Several technical questions in a row were skipped, so the interview ended there.</span></div>{% elif s.plan and s.plan.ended_reason == 'ended_by_candidate' %}<div class="banner banner-adv"><strong>You ended this interview early</strong><span>Questions that were not reached are listed as such.</span></div>{% endif %}
+  {% if s.legacy.available == false %}<div class="banner banner-warn"><strong>Sentence-BERT similarity was unavailable</strong><span>{{ s.legacy.reason }} No other scorer was used instead; the report below does not depend on it.</span></div>{% endif %}
+  {% set pend = summary.modular_pending + (summary.code_pending or 0) %}{% if pend %}<div class="banner banner-adv" id="pending-banner"><strong>Experimental evaluation still running</strong><span>{{ pend }} result(s) will appear below when ready.</span></div>{% endif %}
+
+  {% if beh and beh.available %}
+  <div class="section-title"><h2>Behavioural feedback</h2><span class="muted">Read from your own words, separate from the technical feedback</span></div>
+  <p class="muted small">{{ beh.notice }}</p>
+  <div class="areas" id="behavioural-feedback">{% for c in beh.competencies %}<section class="area beh"><h3>{{ c.competency }}</h3>
+    {% if not c.answered %}<p>This question was skipped or not reached, so there is nothing to read.</p>{% else %}
+    {% if c.observations %}<p><b>What I found in your answer</b></p><ul>{% for o in c.observations %}<li><b>{{ o.element|capitalize }}:</b> <q>{{ o.quote }}</q></li>{% endfor %}</ul>{% endif %}
+    {% if c.not_found %}<p class="muted small">Not found in the text as written: {{ c.not_found|join(', ') }}. That does not mean it did not happen; it means the interviewer could not see it in what you wrote.</p>{% endif %}
+    {% if c.suggestion %}<p><b>To practise:</b> {{ c.suggestion }}</p>{% endif %}{% endif %}</section>{% endfor %}</div>
+  {% if beh.practice %}<p class="muted small">Method: {{ beh.method }}</p>{% endif %}
+  {% endif %}
+
+  {% if summary.asked %}
+  <div class="section-title"><h2>Topics covered</h2><span class="muted">From the curated question bank</span></div>
+  <ul class="cov2">{% for c in coverage %}<li><span class="n"><b>{{ c.topic }}</b><small>{{ c.domain }}</small></span><span class="c">{% if c.answered %}{{ c.answered }} answered{% endif %}{% if c.skipped %}{{ ' · ' if c.answered }}{{ c.skipped }} skipped{% endif %}{% if c.not_reached %}{{ ' · ' if c.answered or c.skipped }}{{ c.not_reached }} not reached{% endif %}</span></li>{% endfor %}</ul>
+
+  <div class="section-title"><h2>What I noticed in your answers</h2><span class="muted">Read from your own words</span></div>
+  {% if observations %}
+  <div class="obs">{% for o in observations %}<p><a href="#q{{ o.n }}" class="obs-n">{{ o.n }}</a><span><b>{{ o.topic }}.</b> {{ o.text }}</span></p>{% endfor %}</div>
+  <p class="muted small">These are plain facts about what you wrote (length, and exact key terms from the curated answer notes). A term not found may still be covered in other words, and a term found does not prove understanding. Nothing here is a judgement of correctness.</p>
+  {% else %}<div class="empty"><strong>Nothing to report yet</strong>There were no technical answers to read. This is not a statement about your skills.</div>{% endif %}
+
+  <div class="section-title"><h2>Areas for future practice</h2><span class="muted">From this interview only</span></div>
+  {% if areas %}<div class="areas">{% for ar in areas %}<section class="area {{ ar.source }}"><h3>{{ ar.title }}{% if ar.source in ('experimental', 'code') %} <span class="tag exp">experimental</span>{% endif %}</h3><p>{{ ar.note }}</p>
+    <ul>{% for it in ar['items'] %}<li><b>{{ it.n }}.</b> <a href="#q{{ it.n }}">{{ it.text }}</a> <span class="d">{{ it.detail }}</span></li>{% endfor %}</ul></section>{% endfor %}</div>
+  {% else %}<div class="empty"><strong>Nothing to flag</strong>There were too few answers to compare and no skipped questions. This is not a statement that every answer was right.</div>{% endif %}
+
+  {% endif %}
+
+  {% if assessments and assessments.rows %}{% set c = assessments.counts %}
+  <section class="card assess-overview" id="correctness" aria-labelledby="corr-h">
+    <div class="section-title"><h2 id="corr-h">Correctness check</h2><span class="muted">Per technical question. Separate from similarity, and not human-validated.</span></div>
+    {% if assessments.assessed %}
+    <dl class="figures small-figs">
+      <div><dt>Correct</dt><dd>{{ c.correct }}</dd></div><div><dt>Partially correct</dt><dd>{{ c.partially_correct }}</dd></div>
+      <div><dt>Incorrect</dt><dd>{{ c.incorrect }}</dd></div><div><dt>Uncertain</dt><dd>{{ c.uncertain }}</dd></div>
+      {% if c.unavailable %}<div><dt>Not assessed</dt><dd>{{ c.unavailable }}</dd></div>{% endif %}
+    </dl>{% else %}
+    <p>Correctness was not checked in this interview{% if c.pending %} yet (still running){% endif %}. It needs the local-model concept check, which is off by default. The similarity values below are not a substitute for it.</p>{% endif %}
+    <ul class="assess-rows">{% for r in assessments.rows %}<li><a href="#q{{ r.n }}">{{ r.n }}</a> {{ r.topic }}: <span class="verdict-badge badge-{{ {'correct': 'ok', 'partially_correct': 'adv', 'incorrect': 'bad', 'uncertain': 'warn'}.get(r.assessment.verdict, 'muted') }}">{{ r.assessment.label }}</span>{% if r.assessment.missing_concepts %} <span class="muted small">missing: {{ r.assessment.missing_concepts[:3]|join('; ') }}</span>{% endif %}</li>{% endfor %}</ul>
+    {% if assessments.misconceptions %}<h3>Statements to correct</h3><ul>{% for m in assessments.misconceptions %}<li><a href="#q{{ m.n }}">Question {{ m.n }}</a>: <q>{{ m.claim }}</q>{% if m.why %} — {{ m.why }}{% endif %}</li>{% endfor %}</ul>{% endif %}
+  </section>
+  {% endif %}
+
+  <div class="section-title"><h2>The interview, turn by turn</h2><span class="muted">Questions, your answers and where each question came from</span></div>
+  {% for it in items %}
+  {% set q = it.q %}{% set a = it.a %}
+  <article class="card item" id="q{{ it.n }}">
+    <header><span class="num-badge">{{ it.n }}</span>
+      <div><div class="meta"><span class="stagechip st-{{ q.stage or 'core' }}">{{ stage_label(q) }}</span>{% if q.stage in ('core', 'practical') %}<span class="chip">{{ q.domain }}</span><span class="chip chip-diff-{{ q.difficulty|lower }}">{{ q.difficulty }}</span><span class="chip">{{ q.topic }}</span>{% endif %}</div>
+      <h3>{{ q.question }}</h3></div></header>
+    {% if a is none %}
+      <p class="muted">Not reached.</p>
+    {% elif a.skipped %}
+      <p class="muted">Skipped.</p>
+    {% else %}
+      <h4>Your answer</h4>{{ answer_view(a.answer) }}
+      {% if a.terms and (a.terms.found or a.terms.missing) %}<div class="terms"><span class="tl">Key terms (exact words)</span>{% for t in a.terms.found %}<span class="tm yes" title="found in your answer">✓ {{ t }}</span>{% endfor %}{% for t in a.terms.missing %}<span class="tm no" title="not found as written">○ {{ t }}</span>{% endfor %}</div>{% endif %}
+      {% if q.stage in ('core', 'practical') or (a.code and a.code.requested) %}<details class="tech"><summary>Technical details for this answer</summary>
+        {% set compact = true %}<div class="eval-slot" data-n="{{ a.n }}">{% include "_answer_eval.html" %}</div></details>{% endif %}
+    {% endif %}
+    {% if it.reference %}<details><summary>Reference answer (shown because SMART_RETRIEVAL_EXPOSE_REFERENCE=1)</summary><pre class="plain">{{ it.reference }}</pre></details>{% endif %}
+    {% if q.provenance %}<details class="prov"><summary>Where this came from</summary><dl>
+      <div><dt>Origin</dt><dd>{{ origin_label(q) }}</dd></div>
+      {% if q.provenance.record_id %}<div><dt>Curated record</dt><dd><code>{{ q.provenance.record_id }}</code> ({{ q.provenance.source }})</dd></div>{% endif %}
+      {% if q.provenance.slot %}<div><dt>Plan slot</dt><dd>{{ q.provenance.slot }}</dd></div>{% endif %}
+      {% if q.provenance.selected_by %}<div><dt>Chosen by</dt><dd>{{ q.provenance.selected_by }}</dd></div>{% endif %}
+      {% if q.provenance.method %}<div><dt>Method</dt><dd>{{ q.provenance.method }}{% if q.provenance.llm is defined and not q.provenance.llm %}; no language model was used{% endif %}</dd></div>{% endif %}
+      {% if q.provenance.matched_terms %}<div><dt>Job-description terms matched</dt><dd>{{ q.provenance.matched_terms|join(', ') }}</dd></div>{% endif %}
+      {% if q.provenance.retrieval_mode and q.provenance.retrieval_mode != 'none' %}<div><dt>Retrieval ranking</dt><dd>{{ q.provenance.retrieval_mode|replace('_', ' ') }}{% if q.provenance.retrieval_rank %}, rank {{ q.provenance.retrieval_rank }}{% endif %} (orders candidates only; it is not a judgement of you)</dd></div>{% endif %}
+    </dl></details>{% endif %}
+  </article>
+  {% endfor %}
+  {% if not expose_reference %}<p class="muted small">Reference answers are hidden by default (the retrieval layer redacts them); set <code>SMART_RETRIEVAL_EXPOSE_REFERENCE=1</code> to show them here.</p>{% endif %}
+
+  <details class="card subtle tech-all"><summary>Optional technical details: similarity scores</summary>
+    <p class="muted">Sentence-BERT (all-MiniLM-L6-v2) compares your answer with a reference answer. It measures resemblance of wording and meaning, <strong>not correctness</strong>, and has not been validated against human markers. It is secondary here: it never changes which questions you get or how this feedback is written.</p>
+    <dl class="figures small-figs">
+      <div><dt>Answers with a similarity score</dt><dd>{{ summary.legacy_scored }}</dd></div>
+      <div><dt>Average similarity</dt><dd>{{ summary.legacy_average|sim if summary.legacy_average is not none else '—' }}</dd></div>
+    </dl>
+    {% if summary.legacy_by_level %}<p class="muted">By level: {% for k, v in summary.legacy_by_level.items() %}{{ k }} {{ v|sim }}{{ ', ' if not loop.last }}{% endfor %}.</p>{% endif %}
+    <div class="scroll"><table class="tbl overview" aria-label="Per-question overview">
+      <thead><tr><th>#</th><th>Question</th><th>Level</th><th>Time</th><th>Correctness check</th><th>Similarity (0–1)</th><th>Experimental evaluation</th>{% if s.config.code_eval %}<th>Code check</th>{% endif %}</tr></thead>
+      <tbody>{% for it in tech %}{% set a = it.a %}<tr>
+        <td><a href="#q{{ it.n }}">{{ it.n }}</a></td><td>{{ it.q.question|truncate(90) }}</td><td>{{ it.q.difficulty }}</td><td>{{ clock(rows[loop.index0].seconds) if a and not a.skipped else '—' }}</td>
+        <td>{{ assess(a, it.q).label }}</td>
+        <td>{% if a is none %}<span class="muted">not reached</span>{% elif a.skipped %}<span class="muted">skipped</span>{% elif a.legacy.status == 'scored' %}{{ a.legacy.score|sim }}{% else %}<span class="muted">unavailable</span>{% endif %}</td>
+        <td>{% if a is none or a.skipped %}<span class="muted">—</span>{% elif a.modular.mode == 'off' %}<span class="muted">off</span>{% elif a.modular.status == 'pending' %}<span class="muted">running…</span>{% elif a.modular.view %}{% set st = describe_state(a.modular.view) %}<span class="st st-{{ st.state }}">{{ st.title }}</span>{% else %}<span class="st st-unavailable">unavailable</span>{% endif %}</td>
+        {% if s.config.code_eval %}<td>{% if a is none or a.skipped %}<span class="muted">—</span>{% elif a.code and a.code.requested %}{% if a.code.status == 'pending' %}<span class="muted">running…</span>{% elif a.code.report and a.code.report.status == 'assessed' %}{{ a.code.report.buckets.demonstrated|length }} found · {{ a.code.report.buckets.missing|length }} missing · {{ a.code.report.buckets.incorrect|length }} incorrect · {{ a.code.report.buckets.unverified|length }} unverified{% else %}<span class="muted">unavailable</span>{% endif %}{% else %}<span class="muted">n/a</span>{% endif %}</td>{% endif %}</tr>{% endfor %}</tbody></table></div>
+    <div class="legend3" aria-label="What each kind of result means">
+      <div><strong>Similarity score</strong>Resemblance to a reference answer. Not correctness, not a grade.</div>
+      <div><strong>Modular evaluation{% if s.config.modular_mode == 'off' %} (off){% endif %}</strong>Experimental concept check. A number only where allowed; otherwise findings. Not validated.</div>
+      <div><strong>Code check{% if not s.config.code_eval %} (off){% endif %}</strong>Experimental, read-only. Nothing is "verified" unless tests ran in a sandbox.</div>
+    </div>
+    {% if s.plan and s.plan.retrieval %}<p class="muted small">Question ranking used: {{ s.plan.retrieval.mode|replace('_', ' ') }}{% if s.plan.retrieval.reason %} ({{ s.plan.retrieval.reason }}){% endif %}.{% if s.plan.jd %} A job description guided topic choice ({{ s.plan.jd.matched_terms|length }} matching terms); its text was not stored.{% endif %}</p>{% endif %}
+  </details>
+
+  <div class="actions">
+    <a class="btn" href="{{ url_for('demo.setup_page') }}">Start another interview</a>
+    <a class="btn" href="{{ url_for('demo.history_page') }}">All interviews</a>
+    <a class="btn primary" id="pdf-btn" href="{{ url_for('demo.report_pdf', sid=s.id) }}">Download PDF report</a>
+    <a class="btn" href="{{ url_for('demo.export_json', sid=s.id) }}">Download my results (JSON)</a>
+    <button class="btn ghost" id="delete-btn" type="button">Delete this interview's data</button>
+  </div>
+  <p class="muted small">Your answers are saved only on this computer (<code>results/demo_sessions</code>) so this page survives a refresh or restart, and are removed automatically after 14 days by default.</p>
+{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,74 @@
+id,origin,claim,note
+smi-h0003,v4 re-verification,Mid-context evidence use degrades (Lost in the Middle),already hedged in text as empirical and model-dependent
+smi-h0004,v4 re-verification,alpha/r scaling reduces retuning when varying r,LoRA paper (arXiv 2106.09685) could not be opened here (egress blocked); text already hedges 'empirical'
+smi-h0006,v4 re-verification,Null decision null_score - best > threshold; min null score across windows is an implementation choice,matches HF/SQuAD-v2 convention from memory; text hedges 'differs between implementations'
+smi-h0008,v4 re-verification,"Protocol (dedupe/group, macro-F1, QWK/MAE, bootstrap CI, learning curve, paired seeds) is standard",standard evaluation practice; no numeric claim beyond arithmetic
+smi-h0008,v4 re-verification,TF-IDF+LR latency few ms; base encoder marginal on one core,"hedged in text ('normally', 'confirm with the latency check', 'can be marginal')"
+smi-h0009,v4 re-verification,Anisotropy / hubness caveats,hedged in text as empirical
+smi-h0011,v4 re-verification,Pad==EOS and loss masking by token id stops EOS learning,well-known pitfall (e.g. HF collators set labels=-100 where id==pad_id); stated as a conditional in the text
+smi-h0011,v4 re-verification,Left padding needs mask-derived position ids,hedged ('implementation-dependent')
+smi-h0012,v4 re-verification,GPT-3 paper used 13-gram overlap,hedged in text ('often cited'); source not opened
+smi-h0019,v4 re-verification,Square-root scaling for Adam-type optimisers is often used,"Goyal reports sqrt scaling performs worse than linear for SGD at 8k; Adam-sqrt support is from Malladi et al. 2022 (not opened). Text is hedged ('often used', 'tuned value')"
+smi-h0022,v4 re-verification,0.05-0.5 temperature starting range,hedged in text ('common starting points ... tune it')
+smi-h0032,v4 re-verification,Timsort may use ~n/2 temporary slots,CPython listsort.txt (fetch blocked); text hedged with 'up to about n/2' and 'constant factor'
+smi-h0037,v4 re-verification,0.001 is a common SRM alarm threshold (convention),"WebFetch of papers was not permitted in this sandbox (permission prompt unanswered); answer already hedges it as 'a convention, not a law'"
+smi-h0037,v4 re-verification,Typical causes / do not reweight or drop users to force 50/50,"Standard A/B-testing practice (Kohavi et al., Fabijan et al. 2019); presented as typical causes/advice, hedged enough"
+smi-h0038,v4 re-verification,"Which-to-trust reasoning (randomisation check, pre-treatment confounder, post-treatment segment)","Standard causal-inference guidance; answer frames it conditionally ('depends on why the mix differs'), acceptable"
+smi-h0040,v4 re-verification,Bootstrap can be inconsistent for max/min and for the mean under infinite variance,"Known results (Bickel & Freedman 1981; Athreya 1987); could not open the papers here; stated as 'can be', acceptable"
+smi-h0041,v4 re-verification,BH controls FDR under independence/positive dependence; BY for arbitrary dependence; Holm uniformly more powerful with same FWER,"Benjamini-Hochberg 1995, Benjamini-Yekutieli 2001, Holm 1979 - textbook theorems; could not open sources (fetch permission unanswered)"
+smi-h0044,v4 re-verification,"Limits of reweighting (MAR within strata, weight variance, measurement bias)",Standard survey-methodology caveats; hedged as conditions
+smi-h0046,v4 re-verification,Randomise at product level => cluster-robust errors; DiD parallel trends; overlap/no unmeasured confounding,"Standard causal inference/experimentation guidance; hedged ('only if an experiment is impossible', 'cannot rule out unmeasured confounders')"
+smi-i0004,v5 recheck,"Positive-count heuristic (60 vs 6,000 positives)","Explicitly labelled in the text as the author's own heuristic, not documented; hedge is adequate."
+smi-i0004,v5 recheck,Option B: compare by cross-validated log loss/Brier; repeated/nested CV for option A,Reasonable practice; not from a cited source. Brier/log loss as proper scores verified in docs.
+smi-i0006,v5 recheck,"PSI cut-offs 0.1 / 0.25 are an industry convention, PSI depends on binning and sample size","Not opened a primary source; text already frames it as convention and tells reader to check sensitivity, so hedge is adequate."
+smi-i0006,v5 recheck,Threshold setting from historical variation + two consecutive windows; retrain triggers; shadow validation,"Standard MLOps practice, presented as examples/design choices, trade-offs stated."
+smi-i0009,v5 recheck,"Skew causes 1-4 (feature code path, staleness/point-in-time, missing values, encodings) and isolation steps via logged serving features",Standard training-serving skew taxonomy and practice (e.g. Google ML rules); not opened a source; stated as suspects/procedure rather than documented facts.
+smi-i0011,v5 recheck,'stricter databases' enforce type compatibility; UNION typically needs sort/hash/temp index and may need to consume input,"Not opened in an engine doc; already hedged in text ('typically', 'usually')."
+smi-i0013,v5 recheck,IS NOT DISTINCT FROM in standard SQL/PostgreSQL; IS in SQLite,"SQLite 3.37.2 rejects IS NOT DISTINCT FROM (syntax error), consistent with text saying 'IS in SQLite'. PostgreSQL doc fetch was blocked by the permission system; claim is background_only."
+smi-i0015,v5 recheck,"Alternatives (self-join, LIMIT/OFFSET)","Mentioned only as alternatives, not executed."
+smi-i0017,v5 recheck,"(user_id, event_ts) index advice",Not tested; reasonable and hedged as advice.
+smi-i0018,v5 recheck,'other databases error' on division by zero,"Not opened; widely true (e.g. PostgreSQL), left as is."
+smi-i0020,v5 recheck,PostgreSQL sorts NULLs first for DESC by default; most other DBs reject/do not guarantee the bare-column query,"PostgreSQL docs fetch blocked by permission system; widely known, not verified here."
+smi-i0022,v5 recheck,expandvars/commonpath have no Path equivalent; most stdlib accepts PathLike,PurePath has no expandvars/commonpath methods (not exhaustively checked); os.PathLike acceptance from background knowledge.
+smi-i0022,v5 recheck,sources,"sources list is empty, so there were no URLs to open. WebFetch was refused (permission request unanswered), so no online doc was opened; doc-type claims were checked against the local CPython language-reference text (pydoc_data) or executed."
+smi-i0025,v5 recheck,TYPE_CHECKING / local import / sys.modules debugging advice,"standard practice, not executed"
+smi-i0025,v5 recheck,sources,"sources list is empty, so there were no URLs to open. WebFetch was refused (permission request unanswered), so no online doc was opened; doc-type claims were checked against the local CPython language-reference text (pydoc_data) or executed."
+smi-i0026,v5 recheck,sources,"sources list is empty, so there were no URLs to open. WebFetch was refused (permission request unanswered), so no online doc was opened; doc-type claims were checked against the local CPython language-reference text (pydoc_data) or executed."
+smi-i0027,v5 recheck,Library: abstract ranges; application: lock file with hashes via pip-compile/uv/poetry,"standard practice; pip-compile --generate-hashes, uv and poetry hash support from background knowledge"
+smi-i0027,v5 recheck,sources,"sources list is empty, so there were no URLs to open. WebFetch was refused (permission request unanswered), so no online doc was opened; doc-type claims were checked against the local CPython language-reference text (pydoc_data) or executed."
+smi-i0028,v5 recheck,Bare except catches KeyboardInterrupt/SystemExit (BaseException),"exception hierarchy from background knowledge, not run"
+smi-i0028,v5 recheck,Python 3.14 emits SyntaxWarning for return in finally (PEP 765),no 3.14 available and PEP page could not be opened
+smi-i0028,v5 recheck,sources,"sources list is empty, so there were no URLs to open. WebFetch was refused (permission request unanswered), so no online doc was opened; doc-type claims were checked against the local CPython language-reference text (pydoc_data) or executed."
+smi-i0029,v5 recheck,sources,"sources list is empty, so there were no URLs to open. WebFetch was refused (permission request unanswered), so no online doc was opened; doc-type claims were checked against the local CPython language-reference text (pydoc_data) or executed."
+smi-i0033,v5 recheck,MCAR/MAR/MNAR definitions and examples,"Rubin (1976) taxonomy, textbook; I did not open a source this run. Definitions in the text are the standard ones."
+smi-i0034,v5 recheck,"SRM, user-level randomisation, novelty effect, peeking inflates false positives, sequential methods","Standard A/B testing practice (Kohavi et al.); not opened this run, stated generally without numeric claims."
+smi-i0003,v5 recheck (limitation),"ECE definition (sample-weighted mean abs gap over bins) is standard but binning-dependent, which the text states.",
+smi-i0003,v5 recheck (limitation),Use-case list for when calibration matters is background_only (judgement).,
+smi-i0004,v5 recheck (limitation),"Minor: with CalibratedClassifierCV(ensemble=True) the averaged per-fold sigmoids need not keep ranking exactly; the 'sigmoid keeps ranking' claim holds for a single fitted sigmoid, which is what the answer describes.",
+smi-i0005,v5 recheck (limitation),sources list is empty; claims rest on standard definitions plus Lipton 2018 which I opened. Consider adding it to sources.,
+smi-i0005,v5 recheck (limitation),Difficulty Easy is borderline (three definitions + examples + detectability) but acceptable.,
+smi-i0006,v5 recheck (limitation),"No sources; operational guidance is practitioner judgement (background_only), appropriately hedged.",
+smi-i0009,v5 recheck (limitation),Item 6 'A/B assignment itself' as a population shift is loosely phrased (randomised assignment should not shift population unless broken); the later SRM check covers it. Not worth a change.,
+smi-i0009,v5 recheck (limitation),No sources; guidance is practitioner knowledge.,
+smi-i0011,v5 recheck (limitation),Cost and cross-database type-strictness statements are background_only (hedged).,
+smi-i0013,v5 recheck (limitation),IS NOT DISTINCT FROM in standard SQL/PostgreSQL is background_only (PG docs could not be opened).,
+smi-i0013,v5 recheck (limitation),The b/c aliases in the NOT EXISTS sentence are never defined in the answer (fixed below).,
+smi-i0015,v5 recheck (limitation),Source list contains only the window-functions page; the MEDIAN-availability claim is supported by changes.html which is not listed in sources (add it).,
+smi-i0017,v5 recheck (limitation),Index advice is background_only.,
+smi-i0017,v5 recheck (limitation),Tie-order non-determinism is documented only by absence of a guarantee; could not be triggered in SQLite.,
+smi-i0018,v5 recheck (limitation),Other-database division-by-zero behaviour is background_only.,
+smi-i0020,v5 recheck (limitation),PostgreSQL NULL-ordering and cross-database bare-column claims are background_only.,
+smi-i0020,v5 recheck (limitation),"Source 1 title says 'compound select operators' but the cited bare-column/NULL-order content is in other sections of the same lang_select page; title is loose, content supported.",
+smi-i0022,v5 recheck (limitation),sources empty; doc statements not checked against online pathlib docs,
+smi-i0022,v5 recheck (limitation),WindowsPath-on-Linux behaviour verified only via Pure* classes,
+smi-i0025,v5 recheck (limitation),"The question quotes the 'partially initialized' wording, which varies by Python version/path (earlier reviewer saw a different message on one 3.13 build); here 3.13.16 printed the same text, so no change needed",
+smi-i0025,v5 recheck (limitation),sources empty,
+smi-i0026,v5 recheck (limitation),sources empty,
+smi-i0027,v5 recheck (limitation),Could not open packaging.python.org or PEP 668 (WebFetch refused); spec and lock-tool claims rest on background knowledge,
+smi-i0027,v5 recheck (limitation),sources empty; consider adding the PyPA pyproject.toml spec and PEP 668 URLs once checkable,
+smi-i0027,v5 recheck (limitation),"[build-system] is only needed for the library/installable project, a pure application may omit it (minor, not an error)",
+smi-i0028,v5 recheck (limitation),3.14 SyntaxWarning not verified,
+smi-i0029,v5 recheck (limitation),"UnicodeDecodeError from a non-UTF-8 file escapes the hierarchy; the docstring says 'missing or unreadable', so the caveat sentence should list it",
+smi-i0029,v5 recheck (limitation),Lenient int() parsing accepts ' 80 ' and '1_000',
+smi-i0033,v5 recheck (limitation),"No sources; textbook claims, mark as background_only if provenance is required.",
+smi-i0034,v5 recheck (limitation),No sources; non-numeric guidance is practitioner knowledge.,

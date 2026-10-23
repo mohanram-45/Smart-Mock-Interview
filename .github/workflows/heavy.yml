@@ -1,0 +1,71 @@
+name: Heavy checks (manual / weekly)
+
+# Not part of normal pull-request checks. Downloads the ~90 MB MiniLM sentence-transformer and a CPU PyTorch build, installs Playwright's Chromium and builds the
+# image WITH the optional ML extras. Still: no GPU, no live Ollama, no paid API, no candidate data, and no Qwen benchmark is ever run.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: heavy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  OLLAMA_HOST: "http://127.0.0.1:9"
+  SMART_LLM_PROVIDER: none
+  SMART_LLM_ALLOW_PAID: "0"
+  SMART_CODEEVAL_EXEC: ""
+
+jobs:
+  rag-and-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - run: |
+          pip install --require-hashes -r requirements-ci-mlops.lock
+          pip install --extra-index-url https://download.pytorch.org/whl/cpu torch sentence-transformers playwright
+          python -m playwright install --with-deps chromium
+      - name: Retrieval and Flask tests with the real embedding model available (downloads all-MiniLM-L6-v2)
+        run: python -m pytest tests/retrieval tests/app -q -rs
+      - name: Real-browser journeys (Chromium) against the stand-in-scorer demo server
+        run: |
+          SMART_DEMO_CODE_EVAL=1 python scripts/stage4a_demo_server.py --port 5058 > /tmp/demo_server.log 2>&1 &
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:5058/demo/ > /dev/null && break; sleep 1; done
+          python scripts/stage6a_browser_journey.py --base http://127.0.0.1:5058 --out "$RUNNER_TEMP/shots"
+  docker-ml-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Build the image with the optional ML extras
+        run: docker build --build-arg INSTALL_ML=1 -t smart-mock-interview:ml .
+      - name: Fill the model cache once (downloads the public all-MiniLM-L6-v2, about 90 MB; no private data, no credentials)
+        timeout-minutes: 10
+        run: |
+          docker volume create smart-hf
+          docker run --rm -v smart-hf:/hf-cache -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 smart-mock-interview:ml python -c "from sentence_transformers import SentenceTransformer as S; S('sentence-transformers/all-MiniLM-L6-v2'); print('model cached')"
+      - name: Real Sentence-BERT scoring inside the ML container (no network, read-only filesystem; not just /healthz)
+        timeout-minutes: 10
+        run: |
+          docker run --rm --network none -v smart-hf:/hf-cache --read-only --tmpfs /tmp --tmpfs /app/results:uid=10001,gid=10001 --cap-drop ALL --security-opt no-new-privileges -e HF_HUB_OFFLINE=1 -e TRANSFORMERS_OFFLINE=1 -e SMART_DEMO_RETENTION_DAYS=1 smart-mock-interview:ml python scripts/verify_ml_scoring.py
+      - name: The ML image starts, is healthy and reports ready
+        timeout-minutes: 5
+        run: |
+          docker run -d --name smart-ml -p 127.0.0.1:5000:5000 -v smart-hf:/hf-cache --read-only --tmpfs /tmp --tmpfs /app/results:uid=10001,gid=10001 --cap-drop ALL --security-opt no-new-privileges -e HF_HUB_OFFLINE=1 -e TRANSFORMERS_OFFLINE=1 smart-mock-interview:ml
+          for i in $(seq 1 40); do python scripts/healthcheck.py --ready && break; sleep 3; done
+          python scripts/healthcheck.py --ready
+      - if: always()
+        run: docker logs smart-ml 2>&1 | tail -30 || true

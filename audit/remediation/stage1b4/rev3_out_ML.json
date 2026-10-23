@@ -1,0 +1,389 @@
+[
+ {
+  "id": "P3-ML-01",
+  "verdict": "pass",
+  "reasons": [
+   "Self-contained, specific (two named teammate claims), definitions, examples, inflation mechanism and fixes all present and accurate.",
+   "Closing note that authors use 'leakage' for both is honest hedging."
+  ],
+  "parts_answered": {
+   "define target leakage": true,
+   "define train-test contamination": true,
+   "example of each": true,
+   "how each inflates offline metrics": true
+  },
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Contrasting two related concepts with mechanism; not a single-fact recall.",
+  "key_concepts_findings": "All six concepts appear in the answer; 'data leakage' is generic but acceptable.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0003",
+   "same_intent": false
+  },
+  "code_findings": "No code field; nothing to run. Docs-only record.",
+  "sources_findings": [
+   {
+    "url": "https://scikit-learn.org/stable/common_pitfalls.html",
+    "status": "supported",
+    "evidence": "'Data leakage occurs when information that would not be available at prediction time is used when building the model'; 'The general rule is to never call fit on the test data'; SelectKBest on all data gave 0.76 accuracy on random targets; Pipeline recommended for CV."
+   }
+  ]
+ },
+ {
+  "id": "P3-ML-02",
+  "verdict": "pass",
+  "reasons": [
+   "Five distinct, setup-specific leakage mechanisms (random split of customer-month rows is the key one) each with a runnable check; ends with out-of-time validation.",
+   "Minor: the shuffled-label check only exposes label-using pipeline leakage (target encoding, selection), not time-of-availability leakage; acceptable as stated ('pipeline itself leaks'). The 'near 0.8' figure is clearly tied to the prior model, so illustrative."
+  ],
+  "parts_answered": {
+   "list likely leakage sources": true,
+   "concrete check for each": true
+  },
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Structured diagnosis list; each item is standard, no multi-step derivation or trade-off design.",
+  "key_concepts_findings": "All eight concepts are discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0003",
+   "same_intent": false
+  },
+  "code_findings": "No code field; nothing to run.",
+  "sources_findings": [
+   {
+    "url": "https://scikit-learn.org/stable/common_pitfalls.html",
+    "status": "supported",
+    "evidence": "Preprocessing/feature selection fitted before split inflates scores (0.76 vs 0.5 on random data); Pipeline prevents it."
+   },
+   {
+    "url": "https://scikit-learn.org/stable/modules/cross_validation.html",
+    "status": "supported",
+    "evidence": "'GroupKFold ... ensures that the same group is not represented in both testing and training sets'; 'The i.i.d. assumption is broken if the underlying generative process yields groups of dependent samples.'"
+   }
+  ]
+ },
+ {
+  "id": "P3-ML-03",
+  "verdict": "correct",
+  "reasons": [
+   "The simulation figures are stated as fact but are not reproducible: I re-ran a 200,000-row perfectly calibrated score (true logit ~ N(-1.5,1.5), seeds 0-3, 10 equal-width bins): AUC 0.817-0.819 (unchanged by tripling the logit), ECE 0.0018-0.0025 before and 0.1245-0.127 after, versus the record's 0.8314 / 0.001 / 0.07. Direction and AUC invariance are right; the numbers depend on the unstated score distribution and binning."
+  ],
+  "parts_answered": {
+   "what calibrated means": true,
+   "reliability diagram": true,
+   "ECE": true,
+   "why high AUC does not imply right probabilities": true,
+   "when calibration matters": true
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "Illustration (seeded simulation, 200,000 rows): taking a perfectly calibrated score and tripling its logit leaves AUC at 0.8314 but raises ECE from about 0.001 to about 0.07, because the ordering is identical while the probabilities are badly stretched.",
+    "problem": "Numbers not reproducible; seed and score distribution not given; my reproduction gives AUC about 0.82 and ECE about 0.002 -> 0.13.",
+    "replacement": "Illustration (my own simulation, 200,000 rows, true logit drawn from Normal(-1.5, 1.5), 10 equal-width bins; exact values depend on the score distribution and binning): taking a perfectly calibrated score and tripling its logit leaves AUC at about 0.82 but raises ECE from about 0.002 to about 0.13, because the ordering is identical while the probabilities are badly stretched."
+   },
+   {
+    "severity": "minor",
+    "claim": "means the model is overconfident in that region",
+    "problem": "Predicting 0.30 where 12% default is overestimation of risk; 'overconfident' usually means too extreme/sharp and is ambiguous here.",
+    "replacement": "means the model overestimates default risk in that region"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Definition plus mechanism (rank-only metric) and application; no multi-step design.",
+  "key_concepts_findings": "All seven concepts discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0178",
+   "same_intent": false
+  },
+  "code_findings": "No code field. I ran my own numpy/sklearn simulation (sklearn 1.9.1) to check the numbers.",
+  "sources_findings": [
+   {
+    "url": "https://scikit-learn.org/stable/modules/calibration.html",
+    "status": "supported",
+    "evidence": "'calibration_curve ... per bin average predicted probabilities and fraction of positives'; 'It is generally expected that calibration does not affect ranking metrics such as ROC-AUC.'"
+   }
+  ]
+ },
+ {
+  "id": "P3-ML-04",
+  "verdict": "correct",
+  "reasons": [
+   "Technically sound and matches the docs; minor hedging/wording fixes only.",
+   "Option A (about 60 positives) leaves no room for a third evaluation set; answer says 'yet another set' without a small-data alternative.",
+   "'what really matters is the number of positives' is the author's heuristic, not documented."
+  ],
+  "parts_answered": {
+   "Platt vs isotonic for option A": true,
+   "Platt vs isotonic for option B": true,
+   "why not fit on training data": true,
+   "effect on ROC-AUC": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "That figure is a rule of thumb; what really matters is the number of positives, since each step needs enough of them.",
+    "problem": "Presented as fact; docs only give '~1000 samples'. Positive-count reasoning is a reasonable but undocumented heuristic.",
+    "replacement": "That figure is a rule of thumb for total samples; with imbalanced data I would look at the number of positives rather than total rows, since each isotonic step needs enough of them (this is my own heuristic, not a documented threshold)."
+   },
+   {
+    "severity": "minor",
+    "claim": "Then evaluate calibration on yet another set, because the calibration set cannot grade itself.",
+    "problem": "Infeasible as a third split for option A.",
+    "replacement": "Then evaluate calibration on yet another set, because the calibration set cannot grade itself; with only about 60 positives in option A, use repeated or nested cross-validation instead of carving out a third set."
+   },
+   {
+    "severity": "minor",
+    "claim": "Isotonic produces ties, so AUC can change slightly, usually by a small amount.",
+    "problem": "Redundant and 'usually' unsupported; docs only say metrics 'might differ'.",
+    "replacement": "Isotonic produces ties, so ROC-AUC can differ slightly from the uncalibrated value; sigmoid is strictly monotonic and keeps the ranking."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Comparison with a data-size decision rule and mechanism; short of multi-step design.",
+  "key_concepts_findings": "All seven discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0009",
+   "same_intent": false
+  },
+  "code_findings": "No code field; nothing to run.",
+  "sources_findings": [
+   {
+    "url": "https://scikit-learn.org/stable/modules/calibration.html",
+    "status": "supported",
+    "evidence": "'isotonic will perform as well as or better than sigmoid when there is enough data (greater than ~ 1000 samples)'; 'more prone to overfitting, especially on small datasets'; 'biased calibrator that maps to probabilities closer to 0 and 1 than it should'; isotonic 'introduces ties'; sigmoid 'strictly monotonic'. Imbalance sentence: 'can be a problem for highly imbalanced classification problems, where outputs do not have equal variance' (answer paraphrase 'errors are not symmetric' is close enough). Note: recommending Platt for the 3%-positive option A sits slightly against that caveat; the answer's 'report the uncertainty' partly covers it."
+   }
+  ]
+ },
+ {
+  "id": "P3-ML-05",
+  "verdict": "correct",
+  "reasons": [
+   "Definitions correct. Two accuracy issues: the recession example is arguably concept drift (same profiles default more) so 'defaulters still look like past defaulters' is a stretch; and 'directly detect covariate drift' glosses that a P(X) change is also produced by label shift, so label-free monitoring detects input drift, not the type.",
+   "'label delay' is listed as a key concept but not discussed."
+  ],
+  "parts_answered": {
+   "define covariate drift": true,
+   "define label drift": true,
+   "define concept drift": true,
+   "credit-risk example for each": true,
+   "which detectable without labels": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Example: a recession lifts the default rate from 3% to 6%, while defaulters still look like past defaulters.",
+    "problem": "Recessions usually also change P(y|X); example is only pure label drift under a strong assumption.",
+    "replacement": "Example: a recession lifts the default rate from 3% to 6%; this is pure label drift only if defaulters still look like past defaulters, which rarely holds exactly, so real cases are often a mix of label and concept drift."
+   },
+   {
+    "severity": "minor",
+    "claim": "you can directly detect covariate drift, by comparing feature distributions between a reference and a recent window (PSI, KS).",
+    "problem": "A P(X) shift cannot by itself show P(y|X) is unchanged, nor distinguish covariate from label shift (P(X) moves when P(y) moves).",
+    "replacement": "you can directly detect a change in the input distribution P(X), by comparing feature distributions between a reference and a recent window (PSI, KS); this flags input drift but cannot on its own show whether P(y|X) is unchanged or whether the cause is covariate or label shift."
+   }
+  ],
+  "difficulty_blind": "Easy",
+  "difficulty_rationale": "Definitions of three standard terms with examples; the label-free question is a short recall item.",
+  "key_concepts_findings": "'label delay' is not discussed in the answer; others are.",
+  "suggested_key_concepts": [
+   "covariate shift",
+   "prior probability (label) shift",
+   "concept drift",
+   "P(y|X)",
+   "PSI",
+   "KS test",
+   "drift detection without labels"
+  ],
+  "nearest_existing": {
+   "id": "smi-g0009",
+   "same_intent": false
+  },
+  "code_findings": "No code field; nothing to run. No sources; definitions are standard (background knowledge, not verified against a cited page).",
+  "sources_findings": []
+ },
+ {
+  "id": "P3-ML-06",
+  "verdict": "correct",
+  "reasons": [
+   "Strong tiered design, but 'alert thresholds' is only thinly answered (PSI conventions, 'floor') with no way of setting them, and the proxy-bias statement and flag-rate heuristic miss points (review outcomes are a precision proxy and are biased mostly for recall; precision also falls when fraud prevalence falls).",
+   "PSI 0.1/0.25 correctly hedged as convention. No sources; remaining claims are standard practice."
+  ],
+  "parts_answered": {
+   "input checks": true,
+   "score checks": true,
+   "proxy metrics": true,
+   "delayed-label evaluation": true,
+   "alert thresholds": "partial",
+   "retraining triggers": true,
+   "trade-offs": true
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "Trade-offs: tight thresholds catch problems early but cause alert fatigue;",
+    "problem": "Question requires alert thresholds with trade-offs; no method for setting them is given.",
+    "replacement": "Trade-offs: set alert thresholds from each metric's historical week-to-week variation (for example a 'watch' level and a 'page' level, firing only if breached in two consecutive windows) rather than from one fixed number; tight thresholds catch problems early but cause alert fatigue;"
+   },
+   {
+    "severity": "minor",
+    "claim": "These are faster but biased, because only flagged items are reviewed; keep a small random sample of unflagged or low-score traffic for unbiased review.",
+    "problem": "Reviewed-and-confirmed rate among flagged items is a direct (if noisy) precision proxy; selection mainly hurts recall/missed-fraud estimates.",
+    "replacement": "These are faster but incomplete and noisy: analyst confirmation can disagree with eventual chargebacks, and because only flagged items are reviewed they say little about recall or missed fraud; keep a small random sample of unflagged or low-score traffic for unbiased review."
+   },
+   {
+    "severity": "minor",
+    "claim": "A stable flag rate with falling precision suggests concept change; a rising one suggests input drift or fraudster adaptation.",
+    "problem": "Omits the prevalence explanation: precision falls when the fraud rate falls even with an unchanged model.",
+    "replacement": "A stable flag rate with falling precision suggests concept change or a falling fraud rate (precision depends on prevalence, so also track the confirmed-fraud rate); a rising flag rate suggests input drift or fraudster adaptation."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open-ended design with latency tiers, bias and trade-offs.",
+  "key_concepts_findings": "All eight discussed (shadow mode only briefly).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0009",
+   "same_intent": false
+  },
+  "code_findings": "No code field; nothing to run.",
+  "sources_findings": []
+ },
+ {
+  "id": "P3-ML-07",
+  "verdict": "pass",
+  "reasons": [
+   "Arithmetic verified: 0.8*1000=800 TP, 0.05*99000=4950 FP, precision 800/5750=13.9%, 5/105=0.0476. TPR 0.80/FPR 0.05 is consistent with AUC about 0.96 under a binormal model (d'=2.5), so the example is realistic.",
+   "Threshold derivation correct with stated calibration and zero-cost-for-correct-decisions assumptions; capacity override noted.",
+   "Question wording leaves the daily volume unstated (are 100,000 transactions per day?); answer handles it with '(or per day's volume)'. Not worth a change."
+  ],
+  "parts_answered": {
+   "why PR-AUC more informative": true,
+   "why precision@k more informative": true,
+   "cost-based threshold": true
+  },
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Worked arithmetic plus application of a decision rule; no subtle design.",
+  "key_concepts_findings": "All eight discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0009",
+   "same_intent": false
+  },
+  "code_findings": "No code. Arithmetic recomputed in Python.",
+  "sources_findings": [
+   {
+    "url": "https://scikit-learn.org/stable/modules/model_evaluation.html",
+    "status": "supported",
+    "evidence": "'With random predictions, the AP is the fraction of positive samples.'"
+   }
+  ]
+ },
+ {
+  "id": "P3-ML-08",
+  "verdict": "pass",
+  "reasons": [
+   "Each scheme's leakage correctly identified; deployment-matching choice and label-horizon gap are right; reporting advice (untouched final test, customer-level bootstrap) is sound. 'usually' hedges the optimism claim.",
+   "Minor unstated assumption about the unit of prediction (event vs customer snapshot) does not change the answer."
+  ],
+  "parts_answered": {
+   "what leaks in random k-fold": true,
+   "what leaks in GroupKFold": true,
+   "what leaks in time split": true,
+   "which fits": true,
+   "how to report": true
+  },
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-factor design with trade-offs tied to deployment and honest reporting.",
+  "key_concepts_findings": "All eight discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0202",
+   "same_intent": false
+  },
+  "code_findings": "No code field; nothing to run.",
+  "sources_findings": [
+   {
+    "url": "https://scikit-learn.org/stable/modules/cross_validation.html",
+    "status": "supported",
+    "evidence": "'classical cross-validation techniques such as KFold and ShuffleSplit assume the samples are independent and identically distributed, and would result in unreasonable correlation between training and testing instances (yielding poor estimates of generalization error) on time series data'; GroupKFold keeps groups out of both sets; TimeSeriesSplit successive training sets are supersets."
+   }
+  ]
+ },
+ {
+  "id": "P3-ML-09",
+  "verdict": "correct",
+  "reasons": [
+   "Question wording is garbled: 'beats the old one by the same margin ... (same AUC ...)' contradicts itself.",
+   "Answer assumes training-serving skew is the cause; it omits the most important alternative for a retention-uplift outcome (churn AUC does not measure response to the intervention) and A/B validity, so 'whichever step first reveals a gap names the cause' can falsely imply a gap must exist."
+  ],
+  "parts_answered": {
+   "causes of training-serving skew": true,
+   "how to isolate": true
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "beats the old one by the same margin in offline evaluation (same AUC on a held-out month)",
+    "problem": "Self-contradictory/ambiguous (beats vs same AUC).",
+    "replacement": "beats the old one in offline evaluation (higher AUC on a held-out month)"
+   },
+   {
+    "severity": "major",
+    "claim": "Whichever step first reveals a gap names the cause.",
+    "problem": "If steps (a)-(d) show no feature/score gap the procedure ends without a cause; objective mismatch and experiment validity are not covered.",
+    "replacement": "Whichever step first reveals a gap names the cause. If (a)-(d) show no feature or score gap, suspect the objective rather than skew: churn AUC measures who will leave, not who will respond to the retention offer, so a model that ranks churn risk equally well can still give lower uplift; also check A/B validity (sample-ratio mismatch, sample size, novelty effects)."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Debugging with several competing hypotheses and an evidence-producing isolation plan.",
+  "key_concepts_findings": "All eight discussed ('label delay' and 'population shift' as items 5 and 6).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0003",
+   "same_intent": false
+  },
+  "code_findings": "No code field; nothing to run. No sources; content is standard MLOps practice (background knowledge).",
+  "sources_findings": []
+ },
+ {
+  "id": "P3-ML-10",
+  "verdict": "pass",
+  "reasons": [
+   "Recomputed in numpy: precisions 0.972/0.588/0.333, recalls 0.956/0.625/0.500, F1 0.9636/0.6061/0.4000, macro 0.6565 (0.657), weighted 0.9237 (0.924), micro = accuracy 0.92. Row sums 900/80/20 and total 1000 match the question.",
+   "Metric choices for (a) and (b) are justified and caveated (small-support volatility)."
+  ],
+  "parts_answered": {
+   "per-class F1": true,
+   "macro-F1": true,
+   "weighted-F1": true,
+   "micro-F1": true,
+   "why they differ": true,
+   "choice for (a)": true,
+   "choice for (b)": true
+  },
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Straightforward computation plus metric selection; one concept family.",
+  "key_concepts_findings": "All seven discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0205",
+   "same_intent": false
+  },
+  "code_findings": "No code field; numbers recomputed in Python (matches).",
+  "sources_findings": [
+   {
+    "url": "https://scikit-learn.org/stable/modules/model_evaluation.html",
+    "status": "supported",
+    "evidence": "'If all labels are included, \"micro\"-averaging in a multiclass setting will produce precision, recall and F that are all identical to accuracy.'; macro 'giving equal weight to each class'; weighted 'weighted by its presence in the true data sample'."
+   }
+  ]
+ }
+]

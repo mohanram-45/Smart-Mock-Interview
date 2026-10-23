@@ -1,0 +1,158 @@
+[
+ {
+  "id": "smi-g0028",
+  "domain": "SQL",
+  "question_type": "sql_exercise",
+  "question": "Table contacts(id INTEGER PRIMARY KEY, email TEXT, name TEXT, created_at TEXT NOT NULL) was loaded from several imports and now contains duplicates. Sample rows (id, email, created_at):\n1 'sam@example.com' 2024-01-03 09:00:00\n2 'Sam@Example.com' 2024-01-01 12:30:00\n3 'lee@example.com' 2024-01-05 10:00:00\n4 'sam@example.com ' (trailing space) 2024-02-01 08:00:00\n5 'lee@example.com' 2024-01-05 10:00:00\n6 NULL 2024-01-02 00:00:00\n7 NULL 2024-01-04 00:00:00\n8 'kai@example.com' 2024-03-01 00:00:00\n(a) Write a query listing the duplicated emails and how many copies each has, treating emails as duplicates when they match after trim and lower-casing. (b) Write the DELETE that keeps only the earliest row (by created_at, then lowest id) per email and leaves rows with NULL email alone. Show which ids survive.",
+  "answer": "(a) Group on the normalised email and keep groups with more than one row, excluding NULLs:\n\n```sql\nSELECT lower(trim(email)) AS norm_email, COUNT(*) AS copies\nFROM contacts WHERE email IS NOT NULL\nGROUP BY lower(trim(email)) HAVING COUNT(*) > 1 ORDER BY norm_email;\n```\nOn the sample this returns lee@example.com with 2 and sam@example.com with 3.\n\n(b) Number the rows inside each normalised-email group with ROW_NUMBER, earliest first with id as tiebreaker, and delete everything numbered above 1:\n\n```sql\nDELETE FROM contacts\nWHERE id IN (\n  SELECT id\n  FROM (\n    SELECT id,\n           ROW_NUMBER() OVER (PARTITION BY lower(trim(email))\n                              ORDER BY created_at, id) AS rn\n    FROM contacts\n    WHERE email IS NOT NULL\n  )\n  WHERE rn > 1\n);\nSELECT id, email, created_at FROM contacts ORDER BY id;\n```\n\nSurviving ids are 2 (the 2024-01-01 Sam row, the earliest even though its id is not the lowest), 3 (Lee: tie on created_at with id 5, the lower id wins), 6 and 7 (NULL emails, untouched) and 8. Ids 1, 4 and 5 are deleted.\n\nDetails that matter: the WHERE email IS NOT NULL inside the subquery is essential, because PARTITION BY puts all NULLs into one partition and rows 6 and 7 would otherwise count as duplicates of each other. The ORDER BY must include a unique tiebreaker so the survivor is deterministic. Before running a delete like this in production, run the subquery as a SELECT first to review the doomed rows, and do the delete inside a transaction. Afterwards add a unique index on the normalised email so duplicates cannot come back.",
+  "key_concepts": [
+   "ROW_NUMBER",
+   "PARTITION BY",
+   "de-duplication",
+   "DELETE with subquery",
+   "NULL grouping",
+   "email normalisation",
+   "deterministic tiebreaker"
+  ],
+  "common_mistakes": [
+   "Grouping on raw email so 'Sam@Example.com' and 'sam@example.com ' are not seen as duplicates",
+   "Letting NULL-email rows fall into one partition and deleting all but one",
+   "Using MIN(id) as 'earliest' when created_at order differs from id order"
+  ],
+  "interview_style_note": "Strong candidate normalises case/whitespace, protects NULL rows, chooses a deterministic survivor, and previews with a SELECT before deleting.",
+  "sources": [],
+  "code": null,
+  "topic": "Query patterns"
+ },
+ {
+  "id": "smi-g0032",
+  "domain": "SQL",
+  "question_type": "debugging",
+  "question": "Tables: customers(id, name) = (1,'Asha'), (2,'Bruno'), (3,'Chloe'), (4,'Dev'); orders(id, customer_id, order_date, total) = (1,1,'2024-02-10',50), (2,1,'2023-11-01',20), (3,2,'2023-06-15',80), (4,3,'2024-07-04',30), (5,3,'2024-08-09',45).\nReturn customers who placed no order during calendar year 2024 (expect Bruno and Dev), columns id, name, ordered by id. A colleague wrote customers LEFT JOIN orders ... WHERE o.id IS NULL AND o.order_date >= '2024-01-01' AND o.order_date < '2025-01-01' and got no rows; another dropped the date test and got only Dev. Explain both mistakes and compare NOT EXISTS with LEFT JOIN ... IS NULL.",
+  "answer": "```sql\nSELECT c.id, c.name\nFROM customers AS c\nWHERE NOT EXISTS (\n  SELECT 1\n  FROM orders AS o\n  WHERE o.customer_id = c.id\n    AND o.order_date >= '2024-01-01'\n    AND o.order_date <  '2025-01-01'\n)\nORDER BY c.id;\n```\n\nThis returns Bruno (only a 2023 order) and Dev (no orders).\n\nColleague 1: after a LEFT JOIN, unmatched customers have NULL in every o column. A WHERE condition requiring o.id IS NULL and also o.order_date >= '2024-01-01' can never both be true on the same row (the date is NULL when o.id is NULL, and NULL >= x is UNKNOWN), so zero rows come back. Filtering the right-hand table in WHERE is the classic way to accidentally cancel a left join; the year condition belongs in the ON clause.\n\nColleague 2: dropping the date test answers a different question, customers who never ordered at all, so Bruno (ordered in 2023) is wrongly excluded.\n\nThe LEFT JOIN form that is correct puts the year range in ON and keeps only IS NULL in WHERE:\n\n```sql\nSELECT c.id, c.name FROM customers AS c\nLEFT JOIN orders AS o ON o.customer_id = c.id\n AND o.order_date >= '2024-01-01' AND o.order_date < '2025-01-01'\nWHERE o.id IS NULL ORDER BY c.id;\n```\nIt returns the same two rows. Trade-offs: NOT EXISTS states the intent directly, cannot multiply customer rows, and is safe if the tested column is nullable (with the LEFT JOIN form you must test a column that is NOT NULL in orders, such as the primary key). LEFT JOIN anti-joins are common and fine, but the placement of the condition is easier to get wrong. Performance depends on the engine and the plan, so compare plans on your own data rather than assuming one form is faster. The half-open date range also keeps the predicate index-friendly.",
+  "key_concepts": [
+   "anti-join",
+   "NOT EXISTS",
+   "LEFT JOIN IS NULL",
+   "ON vs WHERE",
+   "correlated subquery",
+   "half-open date range"
+  ],
+  "common_mistakes": [
+   "Filtering right-table columns in WHERE after a LEFT JOIN",
+   "Testing a nullable column for IS NULL instead of the key",
+   "Using NOT IN on a nullable column"
+  ],
+  "interview_style_note": "Strong candidate explains why a right-table filter in WHERE turns the outer join into an inner join, and puts the date range in ON or inside NOT EXISTS.",
+  "sources": [],
+  "code": null,
+  "topic": "Joins"
+ },
+ {
+  "id": "smi-g0033",
+  "domain": "SQL",
+  "question_type": "sql_exercise",
+  "question": "Table sales(id INTEGER PRIMARY KEY, sold_on TEXT, category TEXT, amount INTEGER) with rows (sold_on, category, amount): 2024-01-05 Sunglasses 120; 2024-01-18 Sunglasses 80; 2024-01-20 Frames 200; 2024-02-02 Sunglasses 95; 2024-02-14 Accessories 15; 2024-02-15 Accessories 25; 2024-03-01 Frames 150; 2024-03-09 Sunglasses 60; 2024-03-30 Frames 50.\nProduce one row per month (YYYY-MM) with separate columns sunglasses, frames, accessories and a total column, using conditional aggregation. A category with no sales in a month must show 0, not NULL. Order by month. Why is this approach preferred over three separate queries, and what is its limitation?",
+  "answer": "```sql\nSELECT strftime('%Y-%m', sold_on) AS month,\n       COALESCE(SUM(CASE WHEN category = 'Sunglasses'  THEN amount END), 0) AS sunglasses,\n       COALESCE(SUM(CASE WHEN category = 'Frames'      THEN amount END), 0) AS frames,\n       COALESCE(SUM(CASE WHEN category = 'Accessories' THEN amount END), 0) AS accessories,\n       SUM(amount) AS total\nFROM sales\nGROUP BY strftime('%Y-%m', sold_on)\nORDER BY month;\n```\n\nResult: 2024-01 has 200 sunglasses, 200 frames, 0 accessories (total 400); 2024-02 has 95, 0, 40 (total 135); 2024-03 has 60, 200, 0 (total 260).\n\nHow it works: GROUP BY month yields one row per month; inside each group, CASE WHEN category = 'X' THEN amount END returns the amount for matching rows and NULL otherwise, and SUM ignores NULLs, so each column sums only its own category. The total column is a plain SUM(amount) over the whole group. If a month has no row for a category, SUM over only-NULL inputs is NULL, not 0 (for example frames in 2024-02 would be NULL), hence the COALESCE wrapper.\n\nWhy it is preferred: one pass over the table instead of one scan per category, and a single consistent grouping. Limitations: the output columns are hard-coded, so a new category needs a query change (for dynamic pivots you generate the SQL text in application code or use an engine-specific PIVOT feature); and categories spelled differently (case, trailing spaces) will silently fall out of every column, so total can exceed the sum of the three columns. A cheap check is to compare total with the sum of the columns.",
+  "key_concepts": [
+   "conditional aggregation",
+   "SUM(CASE WHEN)",
+   "pivot",
+   "COALESCE",
+   "NULL in aggregates",
+   "GROUP BY month",
+   "strftime"
+  ],
+  "common_mistakes": [
+   "Using COUNT(CASE ...) instead of SUM, counting rows rather than amounts",
+   "Leaving NULL instead of 0 for empty cells",
+   "Using ELSE 0 and then dividing or averaging, which changes AVG semantics"
+  ],
+  "interview_style_note": "Strong candidate knows SUM skips NULLs, wraps with COALESCE for missing cells, and states the static-columns limitation.",
+  "sources": [],
+  "code": null,
+  "topic": "Aggregation and pivoting"
+ },
+ {
+  "id": "smi-g0035",
+  "domain": "SQL",
+  "question_type": "sql_exercise",
+  "question": "employees(id INTEGER PRIMARY KEY, name TEXT, salary INTEGER) has rows (name, salary): Ana 100, Ben 300, Cy 300, Dee 200, Eli 200.\nReturn a single column second_highest_salary containing the second-highest distinct salary (here 200). The query must return one row containing NULL, not zero rows, when no second-highest value exists (empty table, one employee, or everyone on the same salary). Show a LIMIT/OFFSET approach, and compare it with a MAX-based and a DENSE_RANK approach. What goes wrong with a naive ORDER BY salary DESC LIMIT 1 OFFSET 1?",
+  "answer": "```sql\nSELECT (\n  SELECT salary\n  FROM (SELECT DISTINCT salary FROM employees)\n  ORDER BY salary DESC\n  LIMIT 1 OFFSET 1\n) AS second_highest_salary;\n```\n\nThis returns 200. The inner SELECT DISTINCT collapses ties first, so the two 300s count once, and the outer query orders those distinct values and skips the first. I put DISTINCT in a derived table on purpose: the more compact form SELECT (SELECT DISTINCT salary ... ORDER BY salary DESC LIMIT 1 OFFSET 1) returned 100 instead of NULL when every employee had the same salary on SQLite 3.37.2 (it was correct on 3.45.1; I did not investigate the cause), so this form is the safer one. Wrapping it in an outer SELECT ( ... ) turns it into a scalar subquery, and a scalar subquery that yields no row evaluates to NULL, so the single outer row always exists.\n\nThe naive form SELECT salary FROM employees ORDER BY salary DESC LIMIT 1 OFFSET 1 has two bugs. Without DISTINCT it returns 300 here (the second row is Cy's 300), and when fewer than two rows qualify it returns zero rows rather than NULL; the same zero-row problem remains for SELECT DISTINCT ... OFFSET 1 without the scalar wrapper.\n\nAlternatives, both of which also return NULL naturally because aggregates over no rows give NULL:\n\n```sql\nSELECT MAX(salary) AS second_highest_salary\nFROM employees WHERE salary < (SELECT MAX(salary) FROM employees);\n\nSELECT MAX(salary) AS second_highest_salary\nFROM (SELECT salary, DENSE_RANK() OVER (ORDER BY salary DESC) AS r FROM employees)\nWHERE r = 2;\n```\nThe MAX form is simple but does not generalise to Nth. DENSE_RANK generalises (change 2 to N) and handles ties correctly; RANK would skip numbers after ties and ROW_NUMBER would count duplicates, both wrong for 'distinct'. LIMIT/OFFSET also generalises (OFFSET N-1). I checked all three against the empty, one-row and all-equal cases and each returns a single NULL row. If salary were nullable, add WHERE salary IS NOT NULL, because NULL would otherwise count as a distinct value that sorts last.",
+  "key_concepts": [
+   "second highest distinct",
+   "LIMIT OFFSET",
+   "scalar subquery",
+   "DENSE_RANK",
+   "aggregate over empty set",
+   "DISTINCT before LIMIT"
+  ],
+  "common_mistakes": [
+   "Forgetting DISTINCT so ties return the maximum again",
+   "Returning zero rows instead of NULL when fewer than two distinct salaries exist",
+   "Using RANK or ROW_NUMBER instead of DENSE_RANK"
+  ],
+  "interview_style_note": "Strong candidate handles duplicates and the empty-result-to-NULL requirement, and can generalise to Nth with DENSE_RANK or OFFSET N-1.",
+  "sources": [],
+  "code": null,
+  "topic": "Query patterns"
+ },
+ {
+  "id": "smi-g0037",
+  "domain": "SQL",
+  "question_type": "sql_exercise",
+  "question": "purchases(id INTEGER PRIMARY KEY, user_id INTEGER, purchased_on TEXT) holds: user 10: 2024-01-04, 2024-01-20, 2024-02-11; user 11: 2024-01-15; user 12: 2024-02-03, 2024-02-25; user 13: 2024-01-30, 2024-02-01; user 14: 2024-01-09, 2024-01-10; user 15: 2024-03-05.\nUsing set operators (not joins), return in one result set: segment 'jan_not_feb' with users who bought in January 2024 but not in February 2024, and segment 'both' with users who bought in both months. Output columns segment, user_id; order by segment, user_id. Then explain EXCEPT / INTERSECT versus UNION / UNION ALL, using the January and February user lists to show the difference in row counts.",
+  "answer": "```sql\nWITH jan AS (\n  SELECT user_id FROM purchases WHERE purchased_on >= '2024-01-01' AND purchased_on < '2024-02-01'\n),\nfeb AS (\n  SELECT user_id FROM purchases WHERE purchased_on >= '2024-02-01' AND purchased_on < '2024-03-01'\n)\nSELECT 'jan_not_feb' AS segment, user_id FROM (SELECT user_id FROM jan EXCEPT SELECT user_id FROM feb)\nUNION ALL\nSELECT 'both', user_id FROM (SELECT user_id FROM jan INTERSECT SELECT user_id FROM feb)\nORDER BY segment, user_id;\n```\n\nResult: both = users 10 and 13; jan_not_feb = users 11 and 14. User 12 bought only in February and user 15 only in March, so neither appears.\n\nEXCEPT returns the distinct rows of the left query that do not appear in the right one; INTERSECT returns the distinct rows present in both. Both remove duplicates, which is why user 10 (two January purchases) and user 14 appear once. Both sides must have the same number of columns with compatible types. These operators compare whole rows and treat NULLs as equal, unlike = comparisons in a join, which is convenient for 'rows that differ' checks. In SQLite the compound select cannot be parenthesised, so I wrapped each in a subquery to combine them.\n\nUNION vs UNION ALL: UNION removes duplicates (needs a sort or hash step), UNION ALL simply appends. On the raw user_id lists for this data, January has 6 rows and February has 4 rows (10 total): UNION ALL returns 10 rows, UNION returns 5 distinct users (10, 11, 12, 13, 14). I used UNION ALL between my two segments because they cannot overlap (the label differs and the sets are disjoint) so the dedupe work would be wasted. Use UNION ALL by default, UNION only when duplicates are actually possible and unwanted.\n\nThe same logic can be written with NOT EXISTS / EXISTS; set operators read more declaratively but only work on whole rows and dedupe implicitly.",
+  "key_concepts": [
+   "EXCEPT",
+   "INTERSECT",
+   "UNION vs UNION ALL",
+   "set operations",
+   "duplicate elimination",
+   "compound select",
+   "NULL equality in set operators"
+  ],
+  "common_mistakes": [
+   "Using UNION where UNION ALL is correct, paying for needless dedupe",
+   "Expecting EXCEPT to keep duplicates",
+   "Not restricting to month boundaries with a half-open range"
+  ],
+  "interview_style_note": "Strong candidate knows set operators dedupe and compare whole rows, picks UNION ALL when sets are disjoint, and can phrase the same logic with EXISTS.",
+  "sources": [],
+  "code": null,
+  "topic": "Set operations"
+ },
+ {
+  "id": "smi-g0039",
+  "domain": "SQL",
+  "question_type": "sql_exercise",
+  "question": "orders(id INTEGER PRIMARY KEY, created_at TEXT) holds timestamps 'YYYY-MM-DD HH:MM:SS' in 2024: January has 4 orders, February 6, March none, April 3, May 5.\nWrite a query returning month (YYYY-MM), orders, prev_orders and mom_pct (month-over-month % change rounded to 1 decimal) for every month from the first to the last order month, including March with 0 orders. mom_pct must be NULL for the first month and whenever the previous month has 0 orders (no division by zero). Order by month. Explain why you generate the month list instead of only grouping the orders table.",
+  "answer": "```sql\nWITH RECURSIVE months(m) AS (\n  SELECT strftime('%Y-%m', MIN(created_at)) FROM orders\n  UNION ALL\n  SELECT strftime('%Y-%m', date(m || '-01', '+1 month'))\n  FROM months\n  WHERE m < (SELECT strftime('%Y-%m', MAX(created_at)) FROM orders)\n),\nmonthly AS (\n  SELECT m.m AS month, COUNT(o.id) AS orders\n  FROM months AS m\n  LEFT JOIN orders AS o ON strftime('%Y-%m', o.created_at) = m.m\n  GROUP BY m.m\n),\nwith_prev AS (\n  SELECT month, orders, LAG(orders) OVER (ORDER BY month) AS prev_orders\n  FROM monthly\n)\nSELECT month, orders, prev_orders,\n       ROUND(100.0 * (orders - prev_orders) / NULLIF(prev_orders, 0), 1) AS mom_pct\nFROM with_prev\nORDER BY month;\n```\n\nResult: 2024-01: 4 orders, no previous, NULL; 2024-02: 6 vs 4, +50.0; 2024-03: 0 vs 6, -100.0; 2024-04: 3 vs 0, NULL; 2024-05: 5 vs 3, +66.7.\n\nWhy generate months: a plain GROUP BY strftime('%Y-%m', created_at) emits no row for March, so LAG would compare April with February and report +50% growth for April, silently wrong. The recursive CTE builds every month between the first and last order month (stepping with date(m || '-01', '+1 month')), and LEFT JOIN with COUNT(o.id) gives 0 for empty months. COUNT of a column from the outer-joined table counts only real orders; COUNT(*) would count 1 for March.\n\nLAG(orders) OVER (ORDER BY month) fetches the previous row's value; the first row has no predecessor so it is NULL, and any arithmetic with NULL stays NULL. Division by zero is avoided with NULLIF(prev_orders, 0): dividing by NULL yields NULL (SQLite also returns NULL for division by zero, but relying on that is not portable, because some engines raise an error). Growth from 0 is mathematically undefined, so NULL is the honest answer; do not substitute 0 or 100.\n\nThe strftime('%Y-%m', ...) month bucket is SQLite-specific; other engines have their own date-truncation or formatting functions. Beware that comparing months as text works only because the format is zero-padded and ordered by year first.",
+  "key_concepts": [
+   "LAG",
+   "month-over-month growth",
+   "calendar generation",
+   "recursive CTE",
+   "NULLIF",
+   "division by zero",
+   "strftime",
+   "LEFT JOIN with COUNT(column)"
+  ],
+  "common_mistakes": [
+   "Grouping only existing months, so LAG compares non-adjacent months",
+   "Using COUNT(*) after a LEFT JOIN so empty months show 1",
+   "Dividing by prev_orders without NULLIF or reporting 0% growth from a zero base"
+  ],
+  "interview_style_note": "Strong candidate notices that missing months break LAG, generates a calendar, and uses NULLIF to return NULL rather than a fake percentage.",
+  "sources": [
+   {
+    "title": "SQLite: WITH clause (recursive CTEs)",
+    "url": "https://www.sqlite.org/lang_with.html",
+    "supports": "Recursive CTE syntax and processing used to generate the month series.",
+    "verification": "independent_reviewer_supported"
+   }
+  ],
+  "code": null,
+  "topic": "Window functions"
+ }
+]

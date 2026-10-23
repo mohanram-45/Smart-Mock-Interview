@@ -1,0 +1,143 @@
+[
+ {
+  "id": "smi-g0016",
+  "domain": "Deep Learning",
+  "topic": "Training diagnostics and debugging",
+  "question_type": "debugging",
+  "question": "A classifier trains normally for a few hundred steps and then the printed loss becomes nan and stays nan. Give the order in which you would investigate (data, learning rate, log(0), softmax overflow, exploding gradients, mixed precision), and implement a numerically stable softmax and cross-entropy-from-logits in numpy that survives logits such as [1000, 1001, 1002] and a logit gap of 800.",
+  "answer": "Investigate in order of cheapness and likelihood. (1) Find the first step where something becomes non-finite: log loss and gradient norm every step, and check whether inputs, labels or activations were already nan/inf. Bad data is common: nan/inf features, labels outside the class range, an empty batch averaged to 0/0, or a zero-variance feature in a custom normalisation. (2) If the loss was finite but the gradient norm climbed first, it is exploding gradients or too large a learning rate: lower the rate, add warmup, add gradient clipping. (3) Look at the loss code: log(0) from probabilities that underflow to 0, and softmax overflow because exp(1000) is inf in float64 so inf/inf is nan. Fix by computing from logits with the max-subtraction and log-sum-exp trick, not by adding ad hoc epsilons everywhere. Also watch sqrt(0), division by zero in custom layers. (4) Mixed precision: float16 overflows above 65504 (exp overflows beyond roughly 11), so use loss scaling with skipped steps on overflow, or bfloat16, and keep the softmax/loss reductions in float32. Fix the root cause, not just the symptom.\n\n```python\nimport numpy as np\n\ndef softmax(z):\n    z = z - np.max(z, axis=-1, keepdims=True)      # shift: largest exponent becomes 0\n    e = np.exp(z)\n    return e / e.sum(axis=-1, keepdims=True)\n\ndef log_softmax(z):\n    z = z - np.max(z, axis=-1, keepdims=True)\n    return z - np.log(np.exp(z).sum(axis=-1, keepdims=True))   # log-sum-exp trick\n\ndef cross_entropy_from_logits(z, y_idx):\n    ls = log_softmax(z)\n    return -ls[np.arange(len(y_idx)), y_idx].mean()\n\ndef naive_softmax(z):\n    e = np.exp(z)\n    return e / e.sum(axis=-1, keepdims=True)\n```\n\nSubtracting the row max leaves softmax unchanged and makes the largest exponent exp(0) = 1. For a logit gap of 800, log(softmax) gives -inf while log_softmax returns -800 exactly, so the loss for a confidently wrong prediction is large but finite.",
+  "key_concepts": [
+   "nan diagnosis order",
+   "softmax overflow",
+   "log-sum-exp trick",
+   "log(0)",
+   "gradient clipping",
+   "float16 range and loss scaling",
+   "learning rate warmup"
+  ],
+  "common_mistakes": [
+   "Adding a small epsilon inside log everywhere instead of using log-softmax from logits",
+   "Only lowering the learning rate without checking data for nan/inf or bad labels",
+   "Computing softmax first and then taking the log"
+  ],
+  "interview_style_note": "Gives a prioritised, evidence-driven checklist (locate the first non-finite value) and fixes numerical issues at the source with log-sum-exp.",
+  "sources": [],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\ndef softmax(z):\n    z = z - np.max(z, axis=-1, keepdims=True)      # shift: largest exponent becomes 0\n    e = np.exp(z)\n    return e / e.sum(axis=-1, keepdims=True)\n\ndef log_softmax(z):\n    z = z - np.max(z, axis=-1, keepdims=True)\n    return z - np.log(np.exp(z).sum(axis=-1, keepdims=True))   # log-sum-exp trick\n\ndef cross_entropy_from_logits(z, y_idx):\n    ls = log_softmax(z)\n    return -ls[np.arange(len(y_idx)), y_idx].mean()\n\ndef naive_softmax(z):\n    e = np.exp(z)\n    return e / e.sum(axis=-1, keepdims=True)",
+   "test": "import warnings\nz = np.array([[1000.0, 1001.0, 1002.0]])\nwith warnings.catch_warnings():\n    warnings.simplefilter(\"ignore\")\n    assert np.isnan(naive_softmax(z)).all()          # inf/inf\n    assert np.isinf(np.log(naive_softmax(np.array([[0.0, -800.0]])))[0, 1])  # log(0)\np = softmax(z)\nassert np.isfinite(p).all() and abs(p.sum() - 1) < 1e-12\nassert np.allclose(p, softmax(z - 1000.0))           # shift invariance\n# extreme logit gap: log-softmax stays finite and exact, log(softmax) gives -inf\nz2 = np.array([[0.0, -800.0]])\nls = log_softmax(z2)\nassert np.isfinite(ls).all() and abs(ls[0, 1] - (-800.0)) < 1e-9\nwith warnings.catch_warnings():\n    warnings.simplefilter(\"ignore\")\n    assert np.isinf(np.log(softmax(z2))[0, 1])\n# loss for a confidently wrong prediction is large but finite\nloss = cross_entropy_from_logits(z2, np.array([1]))\nassert np.isfinite(loss) and abs(loss - 800.0) < 1e-9\nprint(\"p =\", p, \"loss =\", loss)",
+   "expected": []
+  }
+ },
+ {
+  "id": "smi-g0020",
+  "domain": "Deep Learning",
+  "topic": "Loss functions",
+  "question_type": "coding",
+  "question": "For a classifier with softmax followed by cross-entropy, show that the gradient of the loss with respect to the logits is p - y. Verify it numerically in numpy against finite differences, and explain why frameworks offer a fused cross-entropy-from-logits function instead of softmax followed by log.",
+  "answer": "Let p = softmax(z) and L = -sum_k y_k log p_k. The softmax Jacobian is dp_k/dz_j = p_k (delta_kj - p_j). Then dL/dz_j = -sum_k y_k (1/p_k) p_k (delta_kj - p_j) = -(y_j - p_j sum_k y_k) = p_j - y_j, using sum_k y_k = 1 (one-hot or any label distribution). For a batch mean over N examples the gradient is (p - y)/N. It is simple: the error is predicted probability minus target, and each row sums to zero.\n\n```python\nimport numpy as np\n\ndef softmax(z):\n    z = z - z.max(axis=1, keepdims=True)\n    e = np.exp(z)\n    return e / e.sum(axis=1, keepdims=True)\n\ndef ce_loss(z, y_onehot):\n    zs = z - z.max(axis=1, keepdims=True)\n    log_p = zs - np.log(np.exp(zs).sum(axis=1, keepdims=True))\n    return -(y_onehot * log_p).sum(axis=1).mean()\n\ndef ce_grad(z, y_onehot):\n    \"\"\"dLoss/dlogits for the batch-mean loss: (p - y) / N.\"\"\"\n    return (softmax(z) - y_onehot) / z.shape[0]\n\ndef numeric_grad(z, y_onehot, eps=1e-6):\n    g = np.zeros_like(z)\n    for idx in np.ndindex(*z.shape):\n        zp, zm = z.copy(), z.copy()\n        zp[idx] += eps\n        zm[idx] -= eps\n        g[idx] = (ce_loss(zp, y_onehot) - ce_loss(zm, y_onehot)) / (2 * eps)\n    return g\n```\n\nThe test compares this against central differences (max difference about 1.6e-10 in the run) and checks the row sums.\n\nWhy fuse: (1) numerical stability - computing log(softmax(z)) separately can give -inf (probability underflows to 0), whereas the fused form uses log-softmax via log-sum-exp and stays finite, as the logit-gap-of-800 test shows; (2) the backward pass is the cheap p - y instead of multiplying through the full softmax Jacobian and 1/p, which also avoids dividing by tiny probabilities; (3) the forward loss never needs the explicit probabilities, only log-softmax (the backward pass recomputes or reuses p).",
+  "key_concepts": [
+   "softmax Jacobian",
+   "cross-entropy gradient p - y",
+   "finite-difference gradient check",
+   "log-sum-exp stability",
+   "fused loss op",
+   "batch mean scaling 1/N"
+  ],
+  "common_mistakes": [
+   "Forgetting the 1/N factor when the loss is a batch mean",
+   "Applying softmax before a loss that already expects logits",
+   "Giving the gradient as p - y only for hard labels and not noting it holds when y sums to 1"
+  ],
+  "interview_style_note": "Derives p - y cleanly, handles the batch mean factor, and explains fusion in terms of stability and a simpler backward pass.",
+  "sources": [],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\ndef softmax(z):\n    z = z - z.max(axis=1, keepdims=True)\n    e = np.exp(z)\n    return e / e.sum(axis=1, keepdims=True)\n\ndef ce_loss(z, y_onehot):\n    zs = z - z.max(axis=1, keepdims=True)\n    log_p = zs - np.log(np.exp(zs).sum(axis=1, keepdims=True))\n    return -(y_onehot * log_p).sum(axis=1).mean()\n\ndef ce_grad(z, y_onehot):\n    \"\"\"dLoss/dlogits for the batch-mean loss: (p - y) / N.\"\"\"\n    return (softmax(z) - y_onehot) / z.shape[0]\n\ndef numeric_grad(z, y_onehot, eps=1e-6):\n    g = np.zeros_like(z)\n    for idx in np.ndindex(*z.shape):\n        zp, zm = z.copy(), z.copy()\n        zp[idx] += eps\n        zm[idx] -= eps\n        g[idx] = (ce_loss(zp, y_onehot) - ce_loss(zm, y_onehot)) / (2 * eps)\n    return g",
+   "test": "rng = np.random.default_rng(1)\nz = rng.normal(size=(5, 4)) * 3\ny = np.eye(4)[rng.integers(0, 4, size=5)]\ng = ce_grad(z, y)\nassert np.allclose(g, numeric_grad(z, y), atol=1e-8)\nassert np.allclose(g.sum(axis=1), 0, atol=1e-12)     # each row of p - y sums to 0\n# naive pipeline: separate softmax then log -> -inf/nan on extreme logits; fused loss stays finite\nz_ext = np.array([[0.0, -800.0]]); y_ext = np.array([[0.0, 1.0]])\nimport warnings\nwith warnings.catch_warnings():\n    warnings.simplefilter(\"ignore\")\n    naive = -(y_ext * np.log(softmax(z_ext))).sum()\nassert np.isinf(naive) or np.isnan(naive)\nassert np.isfinite(ce_loss(z_ext, y_ext)) and np.allclose(ce_grad(z_ext, y_ext), [[1.0, -1.0]], atol=1e-12)\nprint(\"max abs diff analytic vs numeric:\", np.abs(g - numeric_grad(z, y)).max())",
+   "expected": []
+  }
+ },
+ {
+  "id": "smi-g0021",
+  "domain": "Deep Learning",
+  "topic": "Regularisation and hyperparameters",
+  "question_type": "coding",
+  "question": "Implement inverted dropout in numpy with separate training and evaluation behaviour, including the backward pass. Why do we scale by 1/(1-p) during training rather than at test time? Write a test with a fixed seed that checks the expectation of the activations is preserved.",
+  "answer": "In inverted dropout, p is the probability of dropping a unit. During training each unit is kept with probability 1-p and the kept values are multiplied by 1/(1-p), so E[out] = (1-p) * x/(1-p) = x. At evaluation the layer is the identity. Scaling at train time means the test-time network needs no change and no extra multiplication; the alternative (scale by 1-p at test) works but puts the correction in every deployed model. The backward pass multiplies the upstream gradient by the same mask (including the 1/(1-p) factor) and a fresh mask must be drawn on every forward pass.\n\n```python\nimport numpy as np\n\ndef dropout_forward(x, p, training, rng):\n    \"\"\"Inverted dropout. p = probability of dropping a unit. Returns (out, mask).\"\"\"\n    if not training or p == 0.0:\n        return x, None\n    if not 0.0 <= p < 1.0:\n        raise ValueError(\"p must be in [0, 1)\")\n    mask = (rng.random(x.shape) >= p) / (1.0 - p)   # 0 or 1/(1-p)\n    return x * mask, mask\n\ndef dropout_backward(dout, mask):\n    return dout if mask is None else dout * mask\n```\n\nThe test uses one million ones with seed 42 and p = 0.3: the mean after dropout is 1.0002 (standard error about 0.0007, tolerance 0.005), the dropped fraction is 0.2999, and the unscaled variant has mean 0.6998, showing what goes wrong without scaling. Pitfalls: some libraries parameterise by drop probability and others by keep probability, so check the convention; and forgetting to switch to eval mode makes predictions stochastic and noisy (the expectation is preserved, but individual outputs are perturbed).",
+  "key_concepts": [
+   "inverted dropout",
+   "drop vs keep probability",
+   "1/(1-p) scaling",
+   "expectation preservation",
+   "train vs eval mode",
+   "dropout mask in backward pass"
+  ],
+  "common_mistakes": [
+   "Scaling by 1/p instead of 1/(1-p) when p is the drop probability",
+   "Leaving dropout active at evaluation",
+   "Reusing one mask across steps or using a different mask in backward"
+  ],
+  "interview_style_note": "Implements the mask/scaling correctly, links scaling to expectation preservation, and writes a statistical test with a justified tolerance.",
+  "sources": [],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\ndef dropout_forward(x, p, training, rng):\n    \"\"\"Inverted dropout. p = probability of dropping a unit. Returns (out, mask).\"\"\"\n    if not training or p == 0.0:\n        return x, None\n    if not 0.0 <= p < 1.0:\n        raise ValueError(\"p must be in [0, 1)\")\n    mask = (rng.random(x.shape) >= p) / (1.0 - p)   # 0 or 1/(1-p)\n    return x * mask, mask\n\ndef dropout_backward(dout, mask):\n    return dout if mask is None else dout * mask",
+   "test": "rng = np.random.default_rng(42)\nx = np.ones(1_000_000)\np = 0.3\nout, mask = dropout_forward(x, p, True, rng)\n# expectation preserved: E[out] = x\nassert abs(out.mean() - 1.0) < 0.005, out.mean()\nassert abs((out == 0).mean() - p) < 0.005\nassert set(np.unique(out)) == {0.0, 1.0 / 0.7}\n# eval mode: identity, no scaling needed\nout_eval, m_eval = dropout_forward(x, p, False, rng)\nassert out_eval is x and m_eval is None\n# non-inverted dropout (no scaling) would shrink the mean to 1-p at train time\nplain = x * (rng.random(x.shape) >= p)\nassert abs(plain.mean() - (1 - p)) < 0.005\n# backward uses the same mask\nd = dropout_backward(np.ones_like(x), mask)\nassert np.array_equal(d, mask)\nprint(\"train mean:\", out.mean(), \"drop fraction:\", (out == 0).mean(), \"plain mean:\", plain.mean())",
+   "expected": []
+  }
+ },
+ {
+  "id": "smi-g0023",
+  "domain": "Deep Learning",
+  "topic": "Transfer learning",
+  "question_type": "scenario",
+  "question": "You have about 2,000 labelled images from a specialised domain (for example industrial surface defects or microscopy) and a CNN pretrained on a large natural-image dataset. Describe how you would decide between feature extraction and fine-tuning, which layers to unfreeze, what learning rates to start with, what augmentation to use, and how you would validate the result.",
+  "answer": "Start with a cheap baseline: freeze the backbone, extract features (or train only a new classification head). With 2,000 images this is fast, low-variance and gives a number any fine-tuning must beat. Then fine-tune, since a specialised domain often differs from natural images: unfreeze gradually from the top (last block first, then more blocks) while comparing validation results; the further the domain is from the pretraining data, the more layers usually need to adapt, while early layers (edges, textures) transfer most readily. Use the pretraining input normalisation and resolution.\n\nLearning rates (starting points to tune, not rules): head around 1e-3 and backbone 10 to 100 times smaller (about 1e-4 to 1e-5 with AdamW), or SGD with momentum 0.9 around 1e-2 for the head and 1e-3 for the backbone, with warmup and a decay schedule. Keep weight decay modest. With small batches consider keeping batch-norm layers in eval mode (frozen statistics) because noisy batch statistics can hurt.\n\nAugmentation must preserve the label: flips/rotations only if the class is invariant to them, colour jitter only if colour is not the signal; crops, mild scale and noise are usual. Validation: with 2,000 images use stratified k-fold or a fixed hold-out, split by the unit that can leak (patient, part, session, scene) rather than by image, keep a test set untouched until the end, and report per-class metrics against the frozen-feature baseline and a majority-class baseline. If domain gap is large, consider domain-specific or self-supervised pretrained weights.",
+  "key_concepts": [
+   "feature extraction versus fine-tuning",
+   "gradual unfreezing",
+   "discriminative learning rates",
+   "domain gap",
+   "label-preserving augmentation",
+   "group-aware validation split",
+   "frozen batch norm statistics"
+  ],
+  "common_mistakes": [
+   "Fine-tuning every layer at a high learning rate and destroying pretrained features",
+   "Random image-level splits when images from the same patient/part appear in both train and validation",
+   "Applying augmentations that change the label"
+  ],
+  "interview_style_note": "Builds from a cheap baseline, justifies unfreezing and learning-rate choices, and explicitly protects against leakage in validation.",
+  "sources": [],
+  "code": null
+ },
+ {
+  "id": "smi-g0026",
+  "domain": "Deep Learning",
+  "topic": "Model compression and deployment",
+  "question_type": "design",
+  "question": "A trained model is too slow and too large for its target hardware (say a mid-range phone or a small CPU-only server). Walk through how you would shrink and speed it up using quantisation, pruning, distillation, architecture changes and batching, what the trade-offs are, and how you would validate that accuracy loss is acceptable.",
+  "answer": "First define the target: latency percentile, memory budget, throughput, and an agreed accuracy budget; then profile on the real hardware to see whether the bottleneck is compute, memory bandwidth, preprocessing or the runtime. Go from cheap to costly.\n\n1. Engineering: export to an optimised inference runtime, fuse operators, use half precision where supported, and batch or dynamically batch requests when throughput matters (batching raises throughput but can raise per-request latency).\n2. Post-training quantisation, e.g. int8: weights take a quarter of the memory of float32, and speedups depend on hardware int8 support. Use representative calibration data; if accuracy drops, use quantisation-aware training or keep sensitive layers in higher precision.\n3. Pruning: unstructured sparsity shrinks the stored model but gives little speed on dense hardware without sparse kernels; structured pruning (channels, heads, layers) gives real speedups but usually needs fine-tuning.\n4. Distillation: train a smaller student on the teacher's soft outputs (plus labels); costs a training run but changes the architecture freely.\n5. Architecture changes: efficient blocks such as depthwise separable convolutions, a smaller backbone or lower input resolution.\n\nValidation: a frozen held-out set matching production, compare the compressed model against the original on the overall metric and on important slices and classes, check calibration, measure latency on the target device with warm-up and report p50/p95/p99, then run shadow or canary traffic before rollout. Expect trade-offs to be task- and hardware-specific; measure rather than assume.",
+  "key_concepts": [
+   "post-training quantisation",
+   "quantisation-aware training",
+   "structured versus unstructured pruning",
+   "knowledge distillation",
+   "profiling on target hardware",
+   "dynamic batching",
+   "accuracy regression validation"
+  ],
+  "common_mistakes": [
+   "Pruning weights unstructured and expecting a latency win on dense hardware",
+   "Measuring latency on a development GPU instead of the target device",
+   "Checking only aggregate accuracy and missing regressions on important classes"
+  ],
+  "interview_style_note": "Starts from requirements and profiling, orders techniques by cost, distinguishes size from speed gains, and validates on target hardware with slice-level accuracy checks.",
+  "sources": [],
+  "code": null
+ }
+]

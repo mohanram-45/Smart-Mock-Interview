@@ -22,7 +22,8 @@ EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
 def validate_email(address: str) -> bool:
-    return bool(address and len(address) <= 254 and EMAIL_PATTERN.fullmatch(address))
+    from src.security.local_guard import valid_recipient   # one mailbox only: no list, display name or header injection
+    return bool(address and len(address) <= 254 and EMAIL_PATTERN.fullmatch(address) and valid_recipient(address))
 
 
 def _html(report: Dict[str, Any]) -> str:

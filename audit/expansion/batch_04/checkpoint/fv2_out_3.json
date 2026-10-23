@@ -1,0 +1,641 @@
+[
+ {
+  "plan_id": "B4-MLO-08-7",
+  "verdict": "correct",
+  "reasons": [
+   "Arithmetic and noise-floor figures all recompute; edits (ID-independence caveat, simulation remark, security sign-off) are accurate.",
+   "Minor internal tension: item 1 already streams exact per-slice histograms over 100% of traffic, yet the sizing paragraph implies the slice needs 100% raw capture to support hourly PSI."
+  ],
+  "parts_answered": {
+   "what to log": true,
+   "how to sample": true,
+   "show sample big enough (daily PSI, hourly 0.5% slice)": true,
+   "label join weeks later": true,
+   "privacy/retention": true
+  },
+  "evidence": [
+   {
+    "claim": "1% of 2M = 20,000 rows/day, 80 MB at 4 KB vs 8 GB",
+    "method": "executed",
+    "evidence": "2e6*.01*4KB=80MB; 2e6*4KB=8GB"
+   },
+   {
+    "claim": "PSI floor (B-1)(1/n+1/m): 5.4e-4 (100k vs 20k), 0.180 (100k vs 50), 0.0217 (100k vs 417), 0.0396 (500 vs 417)",
+    "method": "executed",
+    "evidence": "Monte Carlo, 10 quantile bins, N(0,1), no drift: mean PSI 0.000546, 0.244, 0.0217, 0.0402 (medians 0.0005, 0.183, 0.0203, 0.0376); the \"simulation gave about 0.24\" remark matches the MEAN (median is 0.18); eps=1e-6 clipping of empty bins"
+   },
+   {
+    "claim": "Formula derivation",
+    "method": "derivation",
+    "evidence": "PSI ~ sum (dp)^2/p, Var(dp)=p(1-p)(1/n+1/m), summed over bins gives (B-1)(1/n+1/m) independent of bin probabilities"
+   },
+   {
+    "claim": "100 rows/day (4.2/h) and 10,000 rows/day (416.7/h) for the 0.5% slice",
+    "method": "executed",
+    "evidence": "2e6*.005=10,000; *0.01=100"
+   },
+   {
+    "claim": "Sample-vs-full PSI near a few 0.0001s",
+    "method": "derivation",
+    "evidence": "9/20,000=4.5e-4 (sample is a subset of the full data so the expectation is slightly lower)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "So the slice should be captured at 100%, which is 10,000 rows a day",
+    "problem": "Item 1 already computes exact per-slice histograms over all traffic, so hourly slice PSI does not require raw capture; the 100% raw capture is for investigation and weighted analysis. As worded it implies raw capture is needed for the PSI. The noise floor of ~0.02 applies either way because it is set by the 417 rows an hour that exist.",
+    "replacement": "So the slice should be covered at 100%, either by its streamed per-slice histograms (item 1) or by raw capture when rows are needed for investigation, which is 10,000 rows a day"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-part design with sampling theory, PSI noise-floor derivation, slice power, weights and label-join retention.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Stream exact aggregates (counters, histograms on frozen edges) over all traffic, no raw rows",
+    "tradeoff": "Tiny storage and exactness vs no raw values for ad-hoc tests"
+   },
+   {
+    "decision": "Deterministic hash-of-request-ID sampling stored with the sampling weight",
+    "tradeoff": "Reproducible, label-joinable and coordination-free vs possible correlation with ID structure (validate it)"
+   },
+   {
+    "decision": "Size samples with the PSI noise floor (B-1)(1/n+1/m) per slice and window",
+    "tradeoff": "Quantifies adequacy vs rough approximation at few rows per bin"
+   },
+   {
+    "decision": "Oversample (100% capture) rare slices, errors and low-confidence scores, with weights",
+    "tradeoff": "Adequate slice power vs more stored data and privacy exposure"
+   },
+   {
+    "decision": "Minimise and pseudonymise logged data, set retention",
+    "tradeoff": "Security/privacy vs debugging depth and label-join keys"
+   },
+   {
+    "decision": "Validate the sampler against full logging for a few days",
+    "tradeoff": "Short-term extra storage vs detecting a biased sampling key"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Policy rationale and sizing arithmetic; 398 words (<=450)."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete per-tier policy, weights, retention and a validation procedure not in the detailed answer; numbers (1%, 100x weight, 0.0001s) agree with the detailed answer."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All 7 are discussed (label join key in both fields; privacy minimisation in final paragraph). Rubric points are each covered in the text.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0026",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/pdf/2303.01227",
+    "status": "supported",
+    "evidence": "Paper attributes the 0.1/0.25 PSI rule of thumb to Lewis and (citing Du Pisanie & Visagie) states the PSI critical value decreases with sample size, with equal proportions; it does not state the noise-floor formula, and the answer correctly does not claim it does (formula is derived and simulated)."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "The (B-1)(1/n+1/m) floor is a derivation and was checked by simulation, not by a cited source; \"typical 0.1 line\" is covered by the attached paper."
+  ],
+  "contradictions_with_prior": "None. Consistent with smi-l0026 (1% feature-payload sample, request-id join) and smi-i0005/i0006 (PSI/KS for input drift).",
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-10-1",
+  "verdict": "correct",
+  "reasons": [
+   "Patched code re-run on 3.13.16, 3.10.20 and 3.11.17: all asserts pass and printed rates identical; fenced code equals code.solution exactly.",
+   "Only a minor wording gap: the practical text says \"A final assertion\" although the test has several, and omits the in-place-mutation assertion."
+  ],
+  "parts_answered": {
+   "invariance_failures": true,
+   "directional_failures": true,
+   "behavioural_report": true,
+   "how to set tolerances": true,
+   "why strict monotonicity may not hold for tree ensembles": true
+  },
+  "evidence": [
+   {
+    "claim": "Rates: clean model 0/0/0; flipped sign 1.0 directional, invariance 0.0; leaky postcode 0.524, hash 0.0",
+    "method": "executed",
+    "evidence": "3 interpreters, identical output {postcode_invariance: 0.524, more_missed_not_safer: 1.0}"
+   },
+   {
+    "claim": "Edge: list input, direction=-1, negative col, bool matrix, float16, inf-inf=NaN counts as failure, scalar broadcast perturb, tol equality",
+    "method": "executed",
+    "evidence": "all behave as documented; a float perturbation c+0.01 with tol=0.01 fails by float noise (1+0.01-1 = 0.010000000000000009), consistent with the advice to set tol above float noise"
+   },
+   {
+    "claim": "Edge: behavioural_report with empty X raises ZeroDivisionError; missing key in max_fail_rate raises KeyError",
+    "method": "executed",
+    "evidence": "not claimed in the answer; acceptable for a reference implementation"
+   },
+   {
+    "claim": "No 3.11+ features, stdlib+numpy only",
+    "method": "executed",
+    "evidence": "runs on 3.10"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "A final assertion checks that integer-typed matrices are perturbed correctly (they are cast to float first), float32 input stays float32 (no cast noise), and a NaN score counts as a failure rather than a silent pass.",
+    "problem": "Test has several further assertions, not one; the in-place-mutation guard (perturb that mutates its argument cannot corrupt X or hide the failure) is tested but not described.",
+    "replacement": "Further assertions check that integer-typed matrices are perturbed correctly (they are cast to float first), float32 input stays float32 (no cast noise), a NaN score counts as a failure rather than a silent pass, and a perturb function that mutates its argument in place can neither corrupt X nor hide the failure."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Three functions plus subtle dtype/NaN/aliasing handling and tolerance-design reasoning; borderline Medium-Hard.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Design reasoning, 377 words."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Executed code and results; the 0.524/1.0/0.0 numbers agree with the run."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All 7 discussed (regression against production model = comparing candidate failure rate with production; identifier leakage in invariance paragraph).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0010",
+   "same_intent": false
+  },
+  "code_findings": "Re-run clean on 3.13/3.10/3.11; fence == solution; edits (X[:, col].copy(), \"typically set at or near zero\") introduce no inconsistency. Own edge cases reported in evidence.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/pdf/2005.04118",
+    "status": "supported",
+    "evidence": "CheckList: MFT \"a collection of simple examples (and labels) to check a behavior\"; INV \"label-preserving perturbations ... expect the model prediction to remain the same\"; DIR \"label is expected to change in a certain way\"."
+   },
+   {
+    "url": "https://xgboost.readthedocs.io/en/stable/tutorials/monotonic.html",
+    "status": "supported",
+    "evidence": "\"XGBoost has the ability to enforce monotonicity constraints on any features used in a boosted model.\""
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Practice claims about tolerance calibration and typically-zero invariance failure rate are engineering advice (hedged with \"typically\"); CheckList itself reports failure rates and uses a 0.1 probability-change threshold."
+  ],
+  "contradictions_with_prior": "None. Consistent with smi-l0010 (invariance and directional tests).",
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-11-3",
+  "verdict": "correct",
+  "reasons": [
+   "Edit introduced a specific attribution to the Secret Sharer paper; the early-training and rare-sequence parts are supported, \"increasing with model size\" rests only on an appendix table caption and the main text stresses that even small models memorise."
+  ],
+  "parts_answered": {
+   "what to delete": true,
+   "what can/cannot be said about trained models": true,
+   "design to make promise cheap": true,
+   "legal threshold left to counsel": true
+  },
+  "evidence": [
+   {
+    "claim": "Secret Sharer: memorisation \"not due to overtraining: it occurs early during training\"",
+    "method": "paper",
+    "evidence": "arXiv 1802.08232 intro"
+   },
+   {
+    "claim": "\"Larger batch sizes, and larger models, both increase the amount of memorization\"",
+    "method": "paper",
+    "evidence": "Appendix A.2 Table 5 caption; main text says memorisation occurs even when the model is much smaller than the training data"
+   },
+   {
+    "claim": "Machine unlearning is \"notoriously difficult\"; SISA reduces retraining cost",
+    "method": "paper",
+    "evidence": "arXiv 1912.03817 abstract"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "and increasing with model size)",
+    "problem": "Supported only by an appendix experiment caption; stated as a general finding of the study it is stronger than the paper's main text, which stresses memorisation even in small models.",
+    "replacement": "and, in its appendix experiments, increasing with model size and batch size)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Scenario applying lineage, retraining and honest-claims reasoning; no calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single field, 351 words, covers all parts."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All 7 discussed, incl. memorisation, backup expiry, model version retention (retired per retention policy).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0030",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/1912.03817",
+    "status": "supported",
+    "evidence": "Abstract: \"having models unlearn is notoriously difficult\"; SISA expedites unlearning and reduces overhead vs retraining from scratch. Answer says approximate methods are model-dependent/research-grade: consistent."
+   },
+   {
+    "url": "https://arxiv.org/abs/1802.08232",
+    "status": "partially",
+    "evidence": "Early memorisation and rare/canary sequences in generative sequence models are supported (paper PDF 1802.08232); model-size increase appears only in Appendix A.2 caption."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "\"For most model types there is no general, exact operation ... short of retraining\" is a widely accepted position (hedged \"most\") with SISA/unlearning abstract as background."
+  ],
+  "contradictions_with_prior": "None. Consistent with smi-k0030 (deletion must reach logs/caches/fine-tuning sets; backups weakest).",
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-4",
+  "verdict": "correct",
+  "reasons": [
+   "ML Test Score quote and SRE postmortem-trigger claim verified verbatim.",
+   "Two edit-adjacent points: recovery baseline conflicts with the earlier answer smi-l0013, and the flag-off advice needs the default-value caveat that smi-l0032 demonstrates."
+  ],
+  "parts_answered": {
+   "how to decide rollback vs roll-forward": true,
+   "what you need to know": true,
+   "first five minutes": true
+  },
+  "evidence": [
+   {
+    "claim": "ML Test Score Infra 7: 'Models can be quickly and safely rolled back to a previous serving version'; 'operators should practice doing it normally, when not in emergency conditions'",
+    "method": "paper",
+    "evidence": "Breck et al. PDF, opened"
+   },
+   {
+    "claim": "SRE Book postmortem triggers include \"On-call engineer intervention (release rollback, rerouting of traffic, etc.)\"",
+    "method": "doc",
+    "evidence": "sre.google postmortem-culture, opened"
+   },
+   {
+    "claim": "Timing: 25 min roll-forward vs 40 min since rollout vs 30 min of new-feature data",
+    "method": "derivation",
+    "evidence": "consistent with question; example values (5 min rollback, 2 min replay) are labelled as example values"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "and confirm recovery against the same hour a week earlier, not a feeling.",
+    "problem": "Contradicts smi-l0013 (which says compare against a concurrent control rather than last week, because of seasonality and concurrent changes). Same-hour-last-week is a fallback baseline, not the best one. Smi-l0013 is right.",
+    "replacement": "and confirm recovery against a concurrent control if one exists, otherwise against the same hour a week earlier, not a feeling."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(so the feature takes its default)",
+    "problem": "Flipping the flag only helps if the model handles the default; smi-l0032 shows a model collapsing to near-default predictions when an input is defaulted. The practical answer covers this but the first-five-minutes list does not.",
+    "replacement": "(so the feature takes its default, which is safe only if the model was trained to handle that default)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Decision framework under uncertainty; no calculation, but several interacting considerations.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "401 words (<=450); decision inputs and five-minute plan."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Scoring grid and decision rule; the 5/25-minute figures agree with the detailed answer and question."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All 8 discussed (\"postmortem trigger\" and \"rehearsed rollback\" appear; \"incident lead\", \"harm per minute\" in detailed). Note \"same-hour baseline\" concept in common_mistakes remains valid after the suggested edit.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0013",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Infra 7 title and \"operators should practice doing it normally, when not in emergency conditions\" match the edited sentence."
+   },
+   {
+    "url": "https://sre.google/sre-book/postmortem-culture/",
+    "status": "supported",
+    "evidence": "Trigger list includes on-call intervention (release rollback, rerouting of traffic)."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "contradictions_with_prior": "smi-l0013 \"Compare against a concurrent control ... rather than against last week\" vs this record \"confirm recovery against the same hour a week earlier\"; smi-l0013 is right as the primary baseline (fix given). No contradiction with smi-l0032 (expand-contract) or l0031.",
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-8",
+  "verdict": "correct",
+  "reasons": [
+   "All cost figures recompute and code (fence == solution) passes on 3.13/3.10/3.11; assumed-profile disclosure is accurate and does not alter the profile-independent today figure.",
+   "One wrong verb: \"the cache adds only 36 units over (b)\" when the cache removes 36 units (612 -> 576).",
+   "Detailed answer is 444 words; any fix must not add words."
+  ],
+  "parts_answered": {
+   "cost/1,000 today": true,
+   "(a) autoscale floor 2 @70%": true,
+   "(b) 1.6x throughput": true,
+   "(c) 20% cache": true,
+   "what to report": true,
+   "what to verify": true
+  },
+  "evidence": [
+   {
+    "claim": "Today: 4 x 24 x 12 = 1,152 units; 0.268 per 1,000 (1152/4,302 and also 1152/4,300=0.2679)",
+    "method": "executed",
+    "evidence": "independent of the assumed hourly shape"
+   },
+   {
+    "claim": "Profile sums to 4,302,000; peak 100 at 19:00; overnight 5-8 (hours 0-4), 10 at 05:00",
+    "method": "executed",
+    "evidence": "sum(profile)*3600"
+   },
+   {
+    "claim": "(a) 792 units, 0.1841; (b) 612, 0.1423; (c) 576, 0.1339 (exactly the 2-replica floor, 2x24x12; = 50.0% of today)",
+    "method": "executed",
+    "evidence": "3 interpreters identical"
+   },
+   {
+    "claim": "Average 49.8 rps vs 160 capacity = 31.1% loaded; 100/28 = 3.57 -> 4",
+    "method": "executed",
+    "evidence": "4,302,000/86,400=49.79"
+   },
+   {
+    "claim": "Savings: (a) 31.25% vs today; (b) 46.9%; (c) 50%",
+    "method": "executed",
+    "evidence": "1-792/1152 etc."
+   },
+   {
+    "claim": "Own edge cases: floor 3 -> 936 (raises autoscaled cost, as claimed); floor 1 -> 684; 100% cache hit -> floor only; target util 1.0 -> 648; zero traffic raises ZeroDivisionError (not claimed)",
+    "method": "executed",
+    "evidence": "daily_cost variants"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "detailed_answer",
+    "claim": "the cache adds only 36 units over (b)",
+    "problem": "Sign reversed: the cache lowers cost from 612 to 576, a saving of 36 units; \"adds\" says the opposite and a grader could teach that caching costs more.",
+    "replacement": "the cache saves only 36 units compared with (b)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Multi-step arithmetic with a short model and a verification checklist.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Results, caveats, what to verify; 444 words, within limit but near it."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Executable model; figures match detailed answer."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All 7 discussed (sized for the peak, target utilisation, autoscaling floor, quantisation throughput, cache hit rate, utilisation vs capacity).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0037",
+   "same_intent": false
+  },
+  "code_findings": "Fence equals code.solution; asserts pass on all three interpreters; stdlib only.",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "The hourly profile and the 1.6x quantisation throughput are assumptions; the disclosure now says so (\"1.6x is an assumption\"; profile \"an illustration, not data from the question\"). Residual nuance: (a)-(c) depend on the profile, today's 0.268 does not."
+  ],
+  "contradictions_with_prior": "None found (smi-g0026/k0037 discuss quantisation quality checks, consistent).",
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-13-3",
+  "verdict": "correct",
+  "reasons": [
+   "All arithmetic recomputes; new OpenAI quote verified verbatim (\"Cache reuse requires the entire rendered prefix to match\").",
+   "Minor missing condition: the 30% implied rise in cost per request assumes unchanged unit prices; concise answer says it \"must have risen\" with the same assumption."
+  ],
+  "parts_answered": {
+   "baseline cost per request": true,
+   "80% prefix-cache saving": true,
+   "half traffic to 0.25x model": true,
+   "attribution": true,
+   "budget and alerting": true,
+   "release checks": true,
+   "why bill grew 40% vs 8% traffic": true
+  },
+  "evidence": [
+   {
+    "claim": "Baseline 3.2 + 1.4 = 4.6; 1.38M units/day",
+    "method": "executed",
+    "evidence": "python arithmetic"
+   },
+   {
+    "claim": "Cached: 2.4*(0.8*0.5+0.2)=1.44, total 3.64 (-20.9%)",
+    "method": "executed",
+    "evidence": ""
+   },
+   {
+    "claim": "Routing + cache 0.5*3.64+0.5*0.25*3.64 = 2.275 (-50.5%); routing alone 2.875 (-37.5%)",
+    "method": "executed",
+    "evidence": ""
+   },
+   {
+    "claim": "1.40/1.08 = 1.296; tenant 800->2400 variable tokens: 4.6->6.2 (+34.8%); share needed 0.30/0.35 = 85.7%; 20% share gives 4.92 (+6.96%)",
+    "method": "executed",
+    "evidence": ""
+   },
+   {
+    "claim": "Concise answer 78 words",
+    "method": "executed",
+    "evidence": ""
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "cost per request must have risen by about 30% (1.40 / 1.08 = 1.30)",
+    "problem": "Holds only at unchanged unit prices/discounts; a price or model change would also move the bill.",
+    "replacement": "cost per request must have risen by about 30% at unchanged prices (1.40 / 1.08 = 1.30)"
+   },
+   {
+    "severity": "minor",
+    "field": "concise_answer",
+    "claim": "Cost per request must have risen about 30% (1.40/1.08)",
+    "problem": "Same unchanged-price condition (the replacement keeps the concise answer at 79 words).",
+    "replacement": "At fixed prices, cost per request rose about 30% (1.40/1.08)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Unit arithmetic plus operational controls; no subtle derivation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "78 words (<=80); numbers match detailed."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "382 words; full derivation."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Operational controls and gates not in the detailed answer."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "All 7 discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0038",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://developers.openai.com/api/docs/guides/prompt-caching",
+    "status": "supported",
+    "evidence": "\"Cache reuse requires the entire rendered prefix to match\"; stable content first, timestamps/user-specific content later; usage reports cached_tokens; cache writes priced above uncached input (supports the \"cache-write surcharge\" hedge)."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "\"an edit to the fixed prefix invalidates the cache from the edited point onward\" follows from the exact-prefix-match statement; the 14-day median, 1.5x and 5% canary figures are illustrative."
+  ],
+  "contradictions_with_prior": "None (consistent with smi-k0003/k0008 on prompt caching and smi-k0038 on caches).",
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-4",
+  "verdict": "pass",
+  "reasons": [
+   "Edit (adds Sculley et al. second mitigation) matches the paper: \"using some amount of randomization ... or by isolating certain parts of data from being influenced by a given model\".",
+   "Rules 29 and 37, and the Joachims et al. deterministic-logger/propensity statements, verified; 434 words (<=450)."
+  ],
+  "parts_answered": {
+   "explanations specific to logged-data evaluation": true,
+   "order of checks": true,
+   "how to change offline evaluation": true
+  },
+  "evidence": [
+   {
+    "claim": "Direct feedback loops and mitigation by randomisation/isolating data",
+    "method": "paper",
+    "evidence": "NeurIPS 2015 section 4"
+   },
+   {
+    "claim": "Rule 29 save serving-time features; Rule 37 measure training/serving skew",
+    "method": "doc",
+    "evidence": "Rules of ML page"
+   },
+   {
+    "claim": "IPS position-bias propensities estimated from a small swap experiment; system can be deterministic; unbiased if propensity > 0",
+    "method": "paper",
+    "evidence": "arXiv 1608.04468"
+   },
+   {
+    "claim": "Observed lift 3.10 vs 3.09 is 0.32% relative, below the 1% detectable",
+    "method": "derivation",
+    "evidence": "consistent with question"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Needs knowledge of exposure/position bias, off-policy evaluation and ranking metrics, ordered diagnosis.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single field, 434 words."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All 7 discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0009",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "supported",
+    "evidence": "\"A model may directly influence the selection of its own future training data\" ... \"randomization\" ... \"isolating certain parts of data from being influenced by a given model\"."
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule 29 \"save the set of features used at serving time\"; Rule 37 \"Measure Training/Serving Skew\"."
+   },
+   {
+    "url": "https://arxiv.org/pdf/1608.04468",
+    "status": "supported",
+    "evidence": "\"the system can be deterministic\"; swap intervention \"only needs to be applied on a small subset of the data\"."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Pooled-AUC and clickbait remarks are standard background, unsourced but hedged."
+  ],
+  "contradictions_with_prior": "None (smi-i0009 covers training-serving skew; this record is about logged-data bias).",
+  "code_patch": null
+ }
+]

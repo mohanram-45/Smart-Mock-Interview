@@ -1,0 +1,494 @@
+[
+ {
+  "plan_id": "B1-GEN-01-1",
+  "verdict": "pass",
+  "reasons": [
+   "Applied correction (stale-centroid clause) is correct and consistent with the drift advice in practical. Minor omission only: sharded HNSW implies query fan-out to all shards; not wrong, so left as is."
+  ],
+  "parts_answered": {
+   "all_question_parts_covered": true
+  },
+  "evidence": [
+   {
+    "claim": "50M x 768 x 4 B = 153.6 GB; PQ 96 B x 50M = 4.8 GB (32x vs 3072 B); HNSW M=32: 64 links x 4 B = 256 B -> 12.8 GB; 166.4 GB -> 3 nodes; 1M/day = 11.6/s; sqrt(50M)=7071, 30k-100k = 4.2x-14x",
+    "method": "executed",
+    "evidence": "python arithmetic, all match"
+   },
+   {
+    "claim": "HNSW best latency at high recall; IVF-PQ recall ceiling fixed by re-ranking; centroids go stale; tombstone deletes implementation-dependent",
+    "method": "background_only",
+    "evidence": "standard ANN literature/FAISS practice, hedged in text"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-constraint design: sizing arithmetic, four index families, update/delete behaviour, selection procedure.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Do the memory arithmetic first (153.6 GB raw vs 64 GB/node)",
+    "tradeoff": "Rules out any full-vector in-RAM index on one node before debating recall; forces sharding, compression or disk"
+   },
+   {
+    "decision": "Compress with PQ (about 96 B/vector) and keep full vectors on NVMe for re-ranking",
+    "tradeoff": "Memory 32x smaller and fits one node, paid for with extra I/O and re-rank latency, and a recall ceiling without re-ranking"
+   },
+   {
+    "decision": "Set re-rank depth (top 100-200 by PQ distance) as a tunable",
+    "tradeoff": "Deeper re-rank raises recall@10 toward 0.95 but adds random reads against the 50 ms p95 budget"
+   },
+   {
+    "decision": "Alternative: HNSW sharded across >=3 nodes (or on compressed vectors)",
+    "tradeoff": "Best latency/recall per query and incremental inserts, but about 166 GB RAM, slow build and tombstone churn"
+   },
+   {
+    "decision": "Plan for 1M inserts/day and few deletes: IVF assigns to centroids cheaply; tombstones plus periodic rebuild",
+    "tradeoff": "Cheap updates vs centroid drift and graph degradation over time; needs a retrain/rebuild schedule"
+   },
+   {
+    "decision": "Choose by measured recall-vs-p95 curves on a 2-5M sample with held-out queries and exact ground truth",
+    "tradeoff": "Costs an experiment up front but avoids picking by reputation; re-check after a month of ingestion"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Genuinely shorter (77 words), consistent with detailed (153.6 GB, 32x)."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanism and trade-offs per family."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked sizing and selection procedure; numbers consistent with concise and detailed."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "All concepts are discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0009",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-01-2",
+  "verdict": "pass",
+  "reasons": [
+   "Applied signature reorder (seed before iters) now matches the question's ToyIVF(base, nlist, seed) and the test call; the tie caveat is correct. Code edge cases on all 3 interpreters: nlist=1 -> 1.0; k>n pads with -1; duplicate base rows and float32 input -> 1.0 at full probe; nprobe>nlist OK. Stdlib+numpy only, no 3.11+ features."
+  ],
+  "parts_answered": {
+   "all_question_parts_covered": true
+  },
+  "evidence": [
+   {
+    "claim": "recall list 0.665, 0.8775, 0.9625, 0.995, 1.0",
+    "method": "executed",
+    "evidence": "identical on 3.13, 3.10, 3.11 (float repr 0.8775000000000001, 0.9949999999999999)"
+   },
+   {
+    "claim": "recall non-decreasing in nprobe, 1.0 at nprobe=nlist",
+    "method": "executed",
+    "evidence": "30 random seeds/sizes: zero violations; plus derivation (probe sets nested, exact rank inside)"
+   },
+   {
+    "claim": "-1 padding counts as miss",
+    "method": "executed",
+    "evidence": "recall([[1,2,3,4]],[[1,-1,-1,-1]])=0.25"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Non-trivial implementation (k-means IVF, padded recall metric) plus evaluation methodology.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Method and IVF logic."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Runnable code; fenced code equals code.solution exactly (checked)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All concepts are discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0022",
+   "same_intent": false
+  },
+  "code_findings": "Rerun 3.13/3.10/3.11 identical; test passes; fenced==solution.",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-01-3",
+  "verdict": "correct",
+  "reasons": [
+   "Both applied changes are correct and consistent (hedge on norms; squared-L2 conversion). Overlaps with smi-h0009 on norm bias but intent differs (metric-flag migration, rebuild, threshold vs. code + metric relations). One leftover unverified claim: 'IVF, which clusters by L2'."
+  ],
+  "parts_answered": {
+   "all_question_parts_covered": true
+  },
+  "evidence": [
+   {
+    "claim": "dot products 0.9, 3.0, 2.0; cosines 0.9939, 0.7071, 0.9997",
+    "method": "derivation",
+    "evidence": "recomputed: 0.9/sqrt(0.82)=0.9939, 3/sqrt(18)... =0.7071, 2/sqrt(4.0025)=0.99969"
+   },
+   {
+    "claim": "||a-b||^2 = 2-2cos on unit vectors; FAISS returns squared L2",
+    "method": "derivation",
+    "evidence": "algebra; FAISS IndexFlatL2 returns squared distances (background)"
+   },
+   {
+    "claim": "generic chunks boosted by larger norms",
+    "method": "background_only",
+    "evidence": "now correctly hedged as encoder-dependent"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "(IVF, which clusters by L2)",
+    "problem": "Library-specific and not reliably true: in FAISS an IVF index with the inner-product metric trains its coarse quantiser through an IP quantiser, so 'clusters by L2' is wrong or unverified as a general statement.",
+    "replacement": "(IVF)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Diagnosis with a small derivation and an index-rebuild decision.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer, all parts (diagnosis, fix, existing index) covered."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All concepts are discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0009",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-01-4",
+  "verdict": "correct",
+  "reasons": [
+   "Applied hedge is correct and consistent. Two small imprecisions remain (valid B-vs-B scoring of new docs; 'the only case')."
+  ],
+  "parts_answered": {
+   "all_question_parts_covered": true
+  },
+  "evidence": [
+   {
+    "claim": "Same dimension does not imply shared space",
+    "method": "background_only",
+    "evidence": "standard; hedge about deliberately compatible models now present"
+   },
+   {
+    "claim": "Linear map between embedding spaces is a lossy bridge",
+    "method": "background_only",
+    "evidence": "hedged in text"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "while new documents look artificially strong or weak depending on score distributions",
+    "problem": "Imprecise: model-B queries against model-B documents are a valid comparison; the problem is that their scores are not comparable with the meaningless scores of old documents when merged in one ranking.",
+    "replacement": "while new documents are scored sensibly against model-B queries but their scores are not comparable with the meaningless scores of old documents, so new content tends to dominate or vanish depending on score distributions"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "are the only case where",
+    "problem": "Unsupported universal ('the only case').",
+    "replacement": "are a case where"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Scenario judgement: failure mode plus migration plan, no heavy calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Covers is-it-safe, what happens, rollout."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All concepts are discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close (max token Jaccard 0.17)",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-01-5",
+  "verdict": "correct",
+  "reasons": [
+   "Applied seed-range text is accurate and its 'ordering' claim verified. Edge: relative_contrast returns nan if the query equals a data point (min distance 0); not claimed in the answer."
+  ],
+  "parts_answered": {
+   "all_question_parts_covered": true
+  },
+  "evidence": [
+   {
+    "claim": "contrasts 266.6, 4.22, 0.484, 0.115 and 36.0",
+    "method": "executed",
+    "evidence": "identical on 3.13/3.10/3.11"
+   },
+   {
+    "claim": "seeds 0-9: 2-d range about 38 to 267, low-intrinsic about 21 to 47; ordering held for all ten",
+    "method": "executed",
+    "evidence": "min/max 38.34..266.64 and 21.13..47.18; for every seed uniform contrast strictly decreases across 2,10,100,1000, and low-rank > 10x uniform-1000, and < uniform-2d"
+   },
+   {
+    "claim": "hubness reported in high dimensions",
+    "method": "background_only",
+    "evidence": "Radovanovic et al. 2010; hedged"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Learned embeddings occupy a much lower-dimensional region",
+    "problem": "Empirical, data- and model-dependent claim stated as universal.",
+    "replacement": "Learned embeddings typically occupy a much lower-dimensional region"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Conceptual evaluation backed by a small experiment.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "71 words, consistent."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Theory and scope."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Experiment; fenced code equals code.solution."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "All concepts are discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0162",
+   "same_intent": false
+  },
+  "code_findings": "Rerun on all three interpreters identical; fenced==solution.",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-01-6",
+  "verdict": "correct",
+  "reasons": [
+   "Applied rewrite of the fits list is numerically correct and consistent with the 45-50 GB usable figure, but it now duplicates the exclusions in the next sentence (minor issue given)."
+  ],
+  "parts_answered": {
+   "all_question_parts_covered": true
+  },
+  "evidence": [
+   {
+    "claim": "raw: 30.72/61.44/81.92 GB; HNSW links 2.56 GB; totals f32 33.28/64.00/84.48, f16 17.92/33.28/43.52, int8 10.24/17.92/23.04",
+    "method": "executed",
+    "evidence": "python arithmetic; all stated roundings correct"
+   },
+   {
+    "claim": "float16 usually near-lossless; truncation only where documented",
+    "method": "background_only",
+    "evidence": "hedged"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": " The 768-d float32 index (about 64 GB) leaves no headroom, and 1,024-d float32 does not fit.",
+    "problem": "Exact repeat of the exclusions already stated two sentences earlier in the same paragraph (introduced by the correction).",
+    "replacement": ""
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Straight arithmetic across a grid plus judgement on headroom and compression.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Covers arithmetic, fit, beyond-arithmetic decision."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All concepts are discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close (max token Jaccard 0.17)",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-01-7",
+  "verdict": "correct",
+  "reasons": [
+   "The applied parenthetical contradicts 'a few cells' and states a recall mechanism as certain; replacement given. Otherwise diagnosis (stale quantiser), retraining, full re-add, PQ retrain, blue/green and monitoring are right."
+  ],
+  "parts_answered": {
+   "all_question_parts_covered": true
+  },
+  "evidence": [
+   {
+    "claim": "30M/4096 = 7,324 per list",
+    "method": "executed",
+    "evidence": "arithmetic"
+   },
+   {
+    "claim": "Skewed stale cells raise recall at fixed nprobe unless the new region spans more oversized cells than nprobe",
+    "method": "executed",
+    "evidence": "faiss IVFFlat sim, stale vs fresh: nprobe=4 recall 0.985 stale vs 0.881 fresh; 2 lists >5x mean, max/mean 71"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "answer",
+    "claim": "The new product line is therefore squeezed into a few cells, which become huge (that explains the 100x lists and the latency jump: probing a big cell scans far more vectors), while queries in that region still probe only 16 lists, so many true neighbours sit in cells that are not probed (the new content is cut into more oversized cells than nprobe = 16 covers, along boundaries that were fit to the old data).",
+    "problem": "The correction created an internal contradiction: new content is 'squeezed into a few cells' yet also 'cut into more oversized cells than nprobe = 16 covers'. Executed check (faiss IVFFlat, 64-d, stale centroids trained on old data, new data added): when a few cells absorb the new content, recall at fixed nprobe goes UP (0.985 vs 0.881 for a freshly trained index at nprobe=4) while latency suffers. A recall drop needs the new region to span more oversized cells than nprobe probes, with old centroid boundaries cutting through new neighbourhoods. So the recall mechanism is stated as certain but is only true in that case.",
+    "replacement": "The new product line is therefore squeezed into a comparatively small set of old cells, which become huge (that explains the 100x lists and the latency jump: probing a big cell scans far more vectors). Recall falls when that region spans more oversized cells than nprobe = 16 can probe and the old centroid boundaries cut through the new neighbourhoods, so true neighbours end up in cells that are not probed; if only a few giant cells held the new content, skew alone would usually raise recall and cost latency, so measure recall per content type to see which case you are in."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Subtle debugging: reconcile recall drop with latency rise and imbalance; fix/monitor.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Covers cause, diagnosis, fix, prevention."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All concepts are discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close (max token Jaccard 0.17)",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-03-2",
+  "verdict": "pass",
+  "reasons": [
+   "Applied hedge is supported by the paper and keeps the 'safe default' recommendation consistent. type debugging is acceptable."
+  ],
+  "parts_answered": {
+   "all_question_parts_covered": true
+  },
+  "evidence": [
+   {
+    "claim": "Convex combination beats RRF and RRF is sensitive to its parameters (Bruch et al.)",
+    "method": "paper",
+    "evidence": "arXiv 2210.11934 abstract: 'we find RRF to be sensitive to its parameters' and 'CC outperforms RRF in in-domain and out-of-domain settings'"
+   },
+   {
+    "claim": "BM25 gaps of several points vs cosine hundredths",
+    "method": "derivation",
+    "evidence": "4.4 and 6.7 vs 0.02 and 0.05"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Comparison of fusion methods with trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Why wrong plus four options with trade-offs and a default."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All concepts are discussed in the answer; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close (max token Jaccard 0.17)",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2210.11934",
+    "status": "supported",
+    "evidence": "Abstract: 'we find RRF to be sensitive to its parameters'; 'CC outperforms RRF in in-domain and out-of-domain settings'."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "An Analysis of Fusion Functions for Hybrid Retrieval",
+    "url": "https://arxiv.org/abs/2210.11934",
+    "supports": "convex combination vs RRF and RRF parameter sensitivity"
+   }
+  ],
+  "code_patch": null
+ }
+]

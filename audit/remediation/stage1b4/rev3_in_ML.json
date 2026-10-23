@@ -1,0 +1,298 @@
+[
+ {
+  "id": "P3-ML-01",
+  "domain": "Machine Learning",
+  "question_type": "concept",
+  "question": "Two teammates both say their model 'has leakage'. One means a feature in the training table that is only populated after a customer cancels; the other means the scaler was fitted on the whole dataset before the split. Define target leakage and train-test contamination, give a concrete example of each, and explain how each inflates offline metrics.",
+  "answer": "Target leakage means a feature contains information that would not be available at prediction time, usually because it is recorded after, or caused by, the outcome. Example: predicting churn with \"cancellation_reason\", which is only filled in once the customer has left. The model learns a near-copy of the label, so evaluation looks excellent even with a clean split, because the flaw is in the feature definition; in production the feature is empty. Fix: audit when each feature becomes known.\n\nTrain-test contamination means information from the evaluation data influences model building: a scaler, imputer or feature selector fitted on all rows before splitting, repeated tuning on the test set, or duplicate rows on both sides. The test score is optimistically biased. scikit-learn's guide gives the rule \"never call fit on the test data\". Fix: split first and fit every data-dependent step on training data only (a Pipeline does this inside cross-validation).\n\nSome authors use \"leakage\" for both; the useful distinction is whether the flaw is in the feature or in the evaluation procedure.",
+  "key_concepts": [
+   "target leakage",
+   "train-test contamination",
+   "prediction-time availability",
+   "fit on training data only",
+   "data leakage",
+   "optimistic offline metrics"
+  ],
+  "common_mistakes": [
+   "Treating the two as the same thing with one fix",
+   "Saying leakage only happens when the label column is literally a feature",
+   "Believing a correct train/test split removes target leakage"
+  ],
+  "interview_style_note": "Separates a flaw in the feature definition from a flaw in the evaluation procedure, gives a realistic example of each, and names the remedy for each (time-of-availability audit vs split-first/Pipeline).",
+  "sources": [
+   {
+    "title": "scikit-learn: Common pitfalls and recommended practices",
+    "url": "https://scikit-learn.org/stable/common_pitfalls.html",
+    "supports": "Leakage is use of information unavailable at prediction time; never call fit on test data; fitting feature selection before the split gives over-optimistic scores on random data."
+   }
+  ],
+  "code": null
+ },
+ {
+  "id": "P3-ML-02",
+  "domain": "Machine Learning",
+  "question_type": "scenario",
+  "question": "A churn model trained on 400,000 customer-month rows reaches 0.99 AUC on a random 80/20 validation split; the previous model scored about 0.78. Before celebrating, list the most likely leakage sources in this setup and, for each, give a concrete check you would run.",
+  "answer": "A jump from 0.78 to 0.99 is a reason to investigate, not proof of a bug, but these are the usual suspects, each with a check.\n\n1. A feature computed from information after the label date (for example \"support_tickets_total\" or \"days_since_last_login\" computed at export time rather than as of the prediction date). Check: train a model on each feature alone and look at single-feature AUC and the top feature importances; a feature with near-perfect AUC is suspect. Then audit every feature's timestamp against the prediction date and rebuild the table with point-in-time joins.\n2. The same customer in train and validation. With one row per customer-month, a random split puts a customer's January row in training and February row in validation, and the model memorises customer-specific values. Check: count customer IDs that appear on both sides, then re-evaluate with GroupKFold on customer ID.\n3. Preprocessing fitted on all data (scaler, imputer, target encoding, feature selection, PCA). Check: move every step into a Pipeline fitted on the training fold only and compare the score. Target encoding without out-of-fold computation is the worst offender.\n4. Duplicated rows or near-duplicates. Check: hash rows (excluding the ID) and count overlaps across the split; drop or group them.\n5. Label-window overlap: features built from a window that overlaps the churn window. Check: confirm the feature window ends strictly before the label window starts.\n\nFinal sanity check: evaluate on a later time period with unseen and seen customers. If the score falls back near 0.8, one of the above was inflating it. Also run the model with shuffled labels; anything well above 0.5 AUC means the pipeline itself leaks.",
+  "key_concepts": [
+   "target leakage",
+   "point-in-time features",
+   "GroupKFold",
+   "target encoding leakage",
+   "duplicate rows",
+   "label window",
+   "time-based holdout",
+   "single-feature AUC"
+  ],
+  "common_mistakes": [
+   "Only suggesting regularisation or a simpler model",
+   "Checking for the label column but not for time-of-availability",
+   "Re-running the same random split with a different seed as the check"
+  ],
+  "interview_style_note": "Produces a structured list of distinct leakage mechanisms, each paired with a concrete diagnostic, and ends with an out-of-time validation to confirm the diagnosis.",
+  "sources": [
+   {
+    "title": "scikit-learn: Common pitfalls and recommended practices",
+    "url": "https://scikit-learn.org/stable/common_pitfalls.html",
+    "supports": "Preprocessing and feature selection fitted before the split leak test information; Pipeline keeps fitting inside the training fold."
+   },
+   {
+    "title": "scikit-learn: Cross-validation",
+    "url": "https://scikit-learn.org/stable/modules/cross_validation.html",
+    "supports": "GroupKFold keeps the same group out of both train and test; the i.i.d. assumption fails when samples form groups."
+   }
+  ],
+  "code": null
+ },
+ {
+  "id": "P3-ML-03",
+  "domain": "Machine Learning",
+  "question_type": "concept",
+  "question": "A gradient-boosted classifier for loan default has 0.88 ROC-AUC, but when it outputs 0.30 for a group of applicants, roughly 12% of them actually default. What does it mean for a model to be calibrated, how would you measure it with a reliability diagram and expected calibration error, why does the high AUC not tell you the probabilities are right, and when does calibration matter?",
+  "answer": "A model is calibrated if, among cases given predicted probability p, about a fraction p are positive. Here the 0.30 group defaulting at 12% means the model is overconfident in that region.\n\nReliability diagram: bin predictions (equal-width or equal-frequency bins), plot mean predicted probability on x against observed positive fraction on y; a calibrated model lies on the diagonal. scikit-learn's calibration_curve does exactly this binning. Expected calibration error (ECE) summarises it as the sample-weighted average of |mean predicted - observed rate| over bins. ECE depends on binning choices and on bin counts, is noisy when bins hold few positives, and only measures calibration, not discrimination; log loss or the Brier score are proper scoring rules that combine both.\n\nAUC measures only ranking: it is unchanged by any strictly increasing transformation of the scores. Illustration (seeded simulation, 200,000 rows): taking a perfectly calibrated score and tripling its logit leaves AUC at 0.8314 but raises ECE from about 0.001 to about 0.07, because the ordering is identical while the probabilities are badly stretched.\n\nCalibration matters when the probability itself is used: expected-loss or pricing calculations, thresholds derived from costs, combining model outputs, or showing risk to humans. If you only rank cases or pick the top k, calibration is mostly irrelevant. Evaluate calibration on data not used to fit the model or the calibrator.",
+  "key_concepts": [
+   "calibration",
+   "reliability diagram",
+   "expected calibration error",
+   "AUC invariance to monotone transforms",
+   "Brier score",
+   "log loss",
+   "proper scoring rule"
+  ],
+  "common_mistakes": [
+   "Saying a high-AUC model must give accurate probabilities",
+   "Reporting ECE without mentioning binning sensitivity",
+   "Claiming calibration improves ranking quality"
+  ],
+  "interview_style_note": "Defines calibration precisely, knows ECE's limits, and can explain with a mechanism (rank-only metric) why high AUC does not imply calibrated probabilities, plus when it matters.",
+  "sources": [
+   {
+    "title": "scikit-learn: Probability calibration",
+    "url": "https://scikit-learn.org/stable/modules/calibration.html",
+    "supports": "calibration_curve bins predictions and plots mean predicted probability against fraction of positives (reliability diagram); calibration is generally expected not to affect ranking metrics such as ROC-AUC."
+   }
+  ],
+  "code": null
+ },
+ {
+  "id": "P3-ML-04",
+  "domain": "Machine Learning",
+  "question_type": "scenario",
+  "question": "You must calibrate a fraud classifier's probabilities. Option A has only 2,000 labelled validation rows (about 60 positives); option B has 200,000 (about 6,000 positives). Compare Platt scaling and isotonic regression for each case, explain why the calibrator must not be fitted on the training data, and say what calibration does to ROC-AUC.",
+  "answer": "Platt scaling (method=\"sigmoid\") fits a two-parameter logistic map on the model's score. It is low variance, so it suits small samples, but it can only fix distortions of that shape; scikit-learn's docs note it can struggle with highly imbalanced problems where errors are not symmetric. Isotonic regression fits any non-decreasing step function, so it can correct arbitrary monotone distortion but is more prone to overfitting on small data. The docs say isotonic performs as well as or better than sigmoid with more than roughly 1,000 samples. That figure is a rule of thumb; what really matters is the number of positives, since each step needs enough of them.\n\nOption A: about 60 positives, so I would use Platt scaling (isotonic would produce a jagged, unstable staircase) and report the uncertainty of the reliability curve. Option B: 6,000 positives, so isotonic is reasonable; compare both by cross-validated log loss or Brier score and keep the simpler one if they are close.\n\nFit the calibrator on data the classifier did not train on. On its own training data the classifier is usually more confident than on new data, so a calibrator fitted there learns a map toward 0 and 1 that is too extreme. Options: a held-out calibration set, or CalibratedClassifierCV with cross-validation, or wrapping an already-fitted model so the calibrator sees only disjoint data. Then evaluate calibration on yet another set, because the calibration set cannot grade itself.\n\nRanking: a strictly increasing map (sigmoid with positive slope) leaves ROC-AUC unchanged. Isotonic produces ties, so AUC can change slightly, usually by a small amount.",
+  "key_concepts": [
+   "Platt scaling",
+   "isotonic regression",
+   "calibration set",
+   "overfitting calibrator",
+   "CalibratedClassifierCV",
+   "ties in scores",
+   "number of positives"
+  ],
+  "common_mistakes": [
+   "Calibrating on the training set",
+   "Choosing isotonic purely because it is more flexible",
+   "Saying calibration always leaves AUC identical",
+   "Evaluating calibration on the same data used to fit the calibrator"
+  ],
+  "interview_style_note": "Chooses the calibrator by the number of positives rather than by habit, explains the held-out requirement mechanistically, and knows isotonic can create ties that affect ranking metrics.",
+  "sources": [
+   {
+    "title": "scikit-learn: Probability calibration",
+    "url": "https://scikit-learn.org/stable/modules/calibration.html",
+    "supports": "Sigmoid suits small samples, isotonic is more flexible but overfits small data and does as well or better above roughly 1000 samples; calibrator should be fit on data independent of classifier training; isotonic can introduce ties and change ROC-AUC while sigmoid preserves ranking."
+   }
+  ],
+  "code": null
+ },
+ {
+  "id": "P3-ML-05",
+  "domain": "Machine Learning",
+  "question_type": "concept",
+  "question": "Your team's dashboards mention 'covariate drift', 'label drift' and 'concept drift' as if they were the same thing. Define each, give one example each for a credit-risk model, and say which of the three you can detect without waiting for ground-truth labels.",
+  "answer": "Covariate drift: the input distribution P(X) changes while P(y|X) stays the same. Credit example: marketing shifts toward younger applicants, but a given profile is as risky as before.\n\nLabel (prior) drift: P(y) changes, with P(X|y) assumed stable. Example: a recession lifts the default rate from 3% to 6%, while defaulters still look like past defaulters.\n\nConcept drift: P(y|X) itself changes. Example: new fraud tactics or regulation mean applicants with the same features now default at a different rate.\n\nWithout labels you can directly detect covariate drift, by comparing feature distributions between a reference and a recent window (PSI, KS). Label drift cannot be observed directly, though it can be estimated from predictions under the stable-P(X|y) assumption. Concept drift cannot be confirmed without labels; score-distribution changes or business proxies are only hints. In practice the types often occur together.",
+  "key_concepts": [
+   "covariate shift",
+   "prior probability shift",
+   "concept drift",
+   "P(y|X)",
+   "PSI",
+   "KS test",
+   "label delay"
+  ],
+  "common_mistakes": [
+   "Using 'concept drift' for any change in the data",
+   "Claiming covariate drift always degrades accuracy",
+   "Saying all three are detectable without labels"
+  ],
+  "interview_style_note": "Gives precise probabilistic definitions, one realistic example each, and correctly states that only input drift is directly label-free to detect.",
+  "sources": [],
+  "code": null
+ },
+ {
+  "id": "P3-ML-06",
+  "domain": "Machine Learning",
+  "question_type": "design",
+  "question": "A card-fraud model flags transactions for manual review. Analysts feel precision has been falling for a month, but chargeback labels take 30-60 days to arrive, so the weekly precision report is always stale. Design a monitoring plan that can warn you earlier, covering input checks, score checks, proxy metrics, delayed-label evaluation, alert thresholds and retraining triggers, and say what trade-offs each choice brings.",
+  "answer": "Layer the monitoring by how quickly each signal is available.\n\n1. Inputs (hours): per-feature drift versus a fixed reference window (the training or last-good period) using PSI for binned numeric and categorical features and KS for continuous ones, plus data-quality checks (null rates, new categories, range violations, volume). With many features, alert on the top-importance features and on data-quality breaks. PSI cut-offs of about 0.1 (watch) and 0.25 (act) are an industry convention, not statistical thresholds; check sensitivity on your data, because PSI depends on binning and sample size and with large volumes tiny shifts become 'significant' in a KS test.\n2. Scores (daily): compare the score distribution and the flag rate at the live threshold with the reference. A stable flag rate with falling precision suggests concept change; a rising one suggests input drift or fraudster adaptation.\n3. Proxies (days): analyst review outcomes (reviewed-and-confirmed rate), customer disputes and early-reported fraud, and manual-review queue stats. These are faster but biased, because only flagged items are reviewed; keep a small random sample of unflagged or low-score traffic for unbiased review.\n4. Delayed labels (weeks): evaluate by cohort on the transaction date once labels mature, with a maturity window (for example only count transactions older than 60 days) so recent cohorts are not understated, and track precision and recall at the live threshold with confidence intervals.\n\nRetraining triggers: scheduled retraining as a baseline, plus event triggers (sustained drift on key features, flag-rate break, matured-cohort precision below a floor). Trade-offs: tight thresholds catch problems early but cause alert fatigue; retraining on fresh data helps adaptation but recent labels are immature and biased by the previous model's decisions, so validate a challenger on matured data or in shadow mode before promotion.",
+  "key_concepts": [
+   "PSI",
+   "KS test",
+   "score distribution monitoring",
+   "delayed labels",
+   "label maturity window",
+   "proxy metrics",
+   "retraining triggers",
+   "shadow mode"
+  ],
+  "common_mistakes": [
+   "Waiting for chargebacks before monitoring anything",
+   "Treating PSI 0.25 as a universal law",
+   "Computing precision on recent cohorts with immature labels",
+   "Retraining automatically on the newest data without validation"
+  ],
+  "interview_style_note": "Builds a tiered monitoring plan by label latency, notes limits of PSI/KS thresholds, addresses selection bias in proxy metrics and immature labels, and ties retraining to evidence with a safe promotion path.",
+  "sources": [],
+  "code": null
+ },
+ {
+  "id": "P3-ML-07",
+  "domain": "Machine Learning",
+  "question_type": "scenario",
+  "question": "In a fraud problem only 1% of 100,000 transactions are fraudulent. Model X has ROC-AUC 0.96 and the team is happy; the investigators, who can review 500 alerts a day, are not. Explain why PR-AUC and precision@k are more informative than ROC-AUC here, and how you would choose the operating threshold if a missed fraud costs about 100 and a false alert costs about 5.",
+  "answer": "ROC-AUC compares true positive rate with false positive rate. FPR divides false positives by the huge number of negatives (99,000), so a seemingly small FPR still means a lot of false alerts. Worked example (illustrative arithmetic): at TPR 0.80 and FPR 0.05, there are 800 true positives and 4,950 false positives, so precision is 800/5,750 = 13.9%, i.e. about 6 of 7 alerts are wasted, even though the ROC curve looks excellent. Precision-recall curves put precision on the axis, which is directly sensitive to false positive counts. Average precision's baseline for a random scorer is the positive rate (about 0.01 here, per scikit-learn's docs), so values must be read relative to prevalence and are not comparable across datasets with different prevalence. ROC-AUC is not wrong, just insensitive to the region (the top of the ranking) you care about.\n\nPrecision@k matches the real constraint: if investigators can review 500 alerts, report precision and recall at k=500 (or per day's volume), together with the confidence interval, because with 1,000 positives total the estimate is noisy.\n\nThreshold from costs: if the probabilities are calibrated and correct decisions cost nothing, flag when p >= C_FP/(C_FP + C_FN) = 5/105, about 0.048. If probabilities are not calibrated, calibrate first or pick the threshold directly by minimising total cost on a validation set. Then check the resulting alert volume against review capacity; if it exceeds 500/day, capacity, not cost, sets the threshold.",
+  "key_concepts": [
+   "ROC-AUC",
+   "PR-AUC",
+   "average precision",
+   "precision@k",
+   "class imbalance",
+   "cost-sensitive threshold",
+   "calibrated probabilities",
+   "false positive rate"
+  ],
+  "common_mistakes": [
+   "Saying ROC-AUC is invalid for imbalanced data",
+   "Using 0.5 as the threshold by default",
+   "Comparing PR-AUC across datasets with different prevalence as if it were scale-free",
+   "Ignoring review capacity"
+  ],
+  "interview_style_note": "Explains with arithmetic why FPR hides false-alert load, links precision@k to the capacity constraint, and derives the cost-based threshold while noting its calibration assumption.",
+  "sources": [
+   {
+    "title": "scikit-learn: Metrics and scoring",
+    "url": "https://scikit-learn.org/stable/modules/model_evaluation.html",
+    "supports": "With random predictions the average precision equals the fraction of positive samples, so its baseline depends on prevalence."
+   }
+  ],
+  "code": null
+ },
+ {
+  "id": "P3-ML-08",
+  "domain": "Machine Learning",
+  "question_type": "scenario",
+  "question": "You have two years of event data (about 3 million rows) from 80,000 customers, each with many events over time, and you want to predict whether a customer will upgrade in the next 30 days. A colleague proposes shuffled 5-fold cross-validation. Compare random k-fold, GroupKFold by customer, and a time-based split: what leaks in each, which fits this problem, and how should you report the final performance estimate?",
+  "answer": "Random k-fold: leaks in two ways. The same customer appears in both training and validation, so a flexible model can memorise customer-specific patterns, and later events train a model that is validated on earlier ones, which is impossible in production. It usually gives the most optimistic number.\n\nGroupKFold by customer: stops identity leakage (a customer's rows are on one side only), but still mixes time, so training folds contain periods after the validation rows. Features, labels or seasonal effects shared across customers can still leak, and it tests generalisation to new customers rather than to the future.\n\nTime-based split (train on earlier periods, validate on later ones, for example expanding-window): removes look-ahead and mimics deployment. It does allow the same customers on both sides; that is realistic if production scores existing customers, and unrealistic if it scores brand-new ones. Add a gap between train end and validation start at least as long as the label horizon (30 days here) so labels built from future events do not overlap.\n\nChoice: match the deployment. Scoring existing customers going forward means a time-based split. If you also care about new customers, combine both: train on earlier time and validate on later time with a customer-disjoint slice, and report the two separately.\n\nReporting: use time-ordered folds for model selection, keep the most recent period as a final untouched test set used once, report that figure with a confidence interval (bootstrap by customer, since rows are not independent) and the spread across folds, then refit on all data for deployment. Do not report the best tuned CV score as the final estimate.",
+  "key_concepts": [
+   "GroupKFold",
+   "time-based split",
+   "identity leakage",
+   "look-ahead bias",
+   "expanding window",
+   "gap between train and validation",
+   "untouched final test set",
+   "customer-level bootstrap"
+  ],
+  "common_mistakes": [
+   "Using GroupKFold and assuming time leakage is gone",
+   "Using a time split and ignoring the label horizon overlap",
+   "Reporting the tuned CV score as the final estimate",
+   "Treating rows as independent when computing intervals"
+  ],
+  "interview_style_note": "Ties the split to the deployment scenario, identifies what each scheme leaks, adds a gap for the label horizon, and separates model-selection folds from a once-used final test set.",
+  "sources": [
+   {
+    "title": "scikit-learn: Cross-validation: evaluating estimator performance",
+    "url": "https://scikit-learn.org/stable/modules/cross_validation.html",
+    "supports": "GroupKFold keeps groups out of both train and test; KFold/ShuffleSplit on time-dependent data give poor generalisation estimates; TimeSeriesSplit trains on past and tests on later data with growing training sets."
+   }
+  ],
+  "code": null
+ },
+ {
+  "id": "P3-ML-09",
+  "domain": "Machine Learning",
+  "question_type": "debugging",
+  "question": "A new churn model beats the old one by the same margin in offline evaluation (same AUC on a held-out month), but in an online A/B test its retention uplift is clearly worse than the old model's. Give the causes of training-serving skew you would suspect, and describe how you would isolate which one is responsible.",
+  "answer": "When offline looks fine and online does not, the model code is rarely the problem; usually the data it sees at serving time differs from what it trained on. Suspects:\n\n1. Feature computed differently online (different code path, time zone, rounding, aggregation window, join key, library version) than in the training pipeline.\n2. Stale or late features: online feature store values lag the event time, or batch features refresh daily while training used point-in-time-correct values; or the opposite, training used features that were fresher than serving can provide.\n3. Missing-value handling: nulls, defaults or imputers differ, or an upstream outage fills a column with a constant.\n4. Categorical encodings or vocabularies out of sync (unknown category mapping, different ordering, scaling parameters not shipped with the model).\n5. Label delay and evaluation mismatch: the online metric is read on immature labels or a different definition of churn or retention window.\n6. Population shift: online traffic differs from the held-out month (new customer segment, seasonality, the A/B assignment itself, or feedback loops from earlier model actions).\n\nIsolation: (a) log the exact feature vector and score at serving time. (b) Recompute the same features offline for the same entities and timestamps and compare per feature (mean, null rate, exact-match rate); mismatches pinpoint skew in 1-4. (c) Score the logged online features with the model offline and score offline-recomputed features, then compare AUC and score distributions. (d) Compare score distributions online vs offline and slice by segment, missingness and time to separate population shift. (e) Check metric definitions and label maturity for both arms. (f) Shadow-run the new model on live traffic to confirm. Whichever step first reveals a gap names the cause.",
+  "key_concepts": [
+   "training-serving skew",
+   "feature parity",
+   "point-in-time correctness",
+   "feature store staleness",
+   "missing-value handling",
+   "shadow deployment",
+   "label delay",
+   "population shift"
+  ],
+  "common_mistakes": [
+   "Blaming overfitting when the offline score was fine on a held-out month",
+   "Retraining without comparing logged serving features to offline features",
+   "Ignoring metric-definition and label-maturity differences between offline and online"
+  ],
+  "interview_style_note": "Lists distinct skew mechanisms and gives an ordered, evidence-producing isolation procedure (log serving features, recompute offline, cross-score) rather than guessing.",
+  "sources": [],
+  "code": null
+ },
+ {
+  "id": "P3-ML-10",
+  "domain": "Machine Learning",
+  "question_type": "concept",
+  "question": "A 3-class support-ticket classifier is tested on 1,000 tickets: 900 are 'billing', 80 'outage' and 20 'legal'. The confusion matrix (rows true, columns predicted; order billing, outage, legal) is [[860, 30, 10], [20, 50, 10], [5, 5, 10]]. Compute per-class F1, macro-F1, weighted-F1 and micro-F1, explain why they differ so much, and say which you would report for (a) a leadership dashboard about overall correctness and (b) making sure the rare 'legal' tickets are handled well.",
+  "answer": "Per-class (computed from the matrix): billing precision 860/885 = 0.972, recall 860/900 = 0.956, F1 0.964. Outage precision 50/85 = 0.588, recall 50/80 = 0.625, F1 0.606. Legal precision 10/30 = 0.333, recall 10/20 = 0.500, F1 0.400.\n\nMacro-F1 is the unweighted mean of the three class F1s: (0.964 + 0.606 + 0.400)/3 = 0.657. Weighted-F1 weights each class F1 by its true support (900, 80, 20), giving 0.924. Micro-F1 pools all true positives, false positives and false negatives; in single-label multiclass it equals accuracy, 920/1000 = 0.92 (scikit-learn's docs state that micro-averaged precision, recall and F equal accuracy when all labels are included).\n\nThey differ because the classes are imbalanced: micro and weighted are dominated by 'billing', which is 90% of the data and is predicted well, while macro gives 'legal' (2% of tickets) one third of the weight, exposing its weak 0.40.\n\n(a) For overall correctness, report accuracy (micro-F1) or weighted-F1; they describe typical ticket handling. (b) For rare-class quality, report macro-F1 and, above all, per-class precision and recall (especially for legal), since that matches the goal. Macro can be volatile because the rare class has only 20 samples: its F1 changes a lot with a couple of tickets, so give confidence intervals. Never report a single averaged number without the per-class breakdown. The figures above are from this illustrative matrix.",
+  "key_concepts": [
+   "macro-F1",
+   "micro-F1",
+   "weighted-F1",
+   "per-class precision and recall",
+   "confusion matrix",
+   "class imbalance",
+   "micro-average equals accuracy"
+  ],
+  "common_mistakes": [
+   "Reporting accuracy only and hiding a poor rare-class result",
+   "Believing weighted-F1 is the same as macro-F1",
+   "Thinking micro-F1 differs from accuracy in single-label multiclass",
+   "Averaging precision and recall first and then computing F1 for macro"
+  ],
+  "interview_style_note": "Computes the averages from the confusion matrix, explains the gaps via class support, and chooses the metric to match the stated goal while insisting on per-class numbers.",
+  "sources": [
+   {
+    "title": "scikit-learn: Metrics and scoring",
+    "url": "https://scikit-learn.org/stable/modules/model_evaluation.html",
+    "supports": "Macro averages per-class scores with equal weight, weighted weights by true support, and micro-averaging in multiclass with all labels gives precision, recall and F equal to accuracy."
+   }
+  ],
+  "code": null
+ }
+]

@@ -1,0 +1,240 @@
+{
+ "name": "stage11s_correctness_pairs_v1",
+ "src": "holdout4",
+ "evidence": "author-written good/bad questions on four cases that are NOT in the benchmark and not paraphrases of the known failures; same author as the rules, so a sanity set, not independent evidence",
+ "note": "each bad question carries exactly one defect, named in `why`; the good ones must stay accepted",
+ "items": [
+  {
+   "id": "S4-01",
+   "topic": "Operating systems",
+   "question": "What is a deadlock?",
+   "answer": "Two threads each hold a lock the other needs, so neither can continue.",
+   "concepts": [
+    {
+     "id": "E1",
+     "label": "deadlock",
+     "tier": "essential",
+     "members": [
+      "deadlock"
+     ]
+    },
+    {
+     "id": "E2",
+     "label": "lock ordering",
+     "tier": "essential",
+     "members": [
+      "lock ordering"
+     ]
+    },
+    {
+     "id": "S1",
+     "label": "timeout",
+     "tier": "supporting",
+     "members": [
+      "timeout"
+     ]
+    }
+   ],
+   "reference": "A deadlock happens when threads wait on each other in a cycle. Lock ordering prevents it: every thread takes locks in the same agreed order, so no cycle can form. A timeout lets a thread give up and retry instead of waiting forever.",
+   "good": [
+    "How would taking the locks in the same order in every thread stop that cycle forming?",
+    "What would a timeout change for a thread that is already waiting on a held lock?"
+   ],
+   "bad": [
+    {
+     "q": "How does a locked lock behave when the lock is actually unlocked?",
+     "why": "contradictory premise"
+    },
+    {
+     "q": "How do deadlocks compare with those found in lock ordering?",
+     "why": "circular contrast: lock ordering is not a rival kind of deadlock"
+    },
+    {
+     "q": "How do two threads each hold a lock the other needs when neither can continue?",
+     "why": "repeats the answer phrase"
+    },
+    {
+     "q": "How would lock ordering help the threads that hold the longest locks?",
+     "why": "invented qualifier: no longest lock anywhere"
+    },
+    {
+     "q": "How would lock ordering help here, and what would a timeout change?",
+     "why": "two questions"
+    }
+   ],
+   "src": "holdout4"
+  },
+  {
+   "id": "S4-02",
+   "topic": "Web",
+   "question": "What does a cache-control header do?",
+   "answer": "It tells the browser how long it may reuse a response before asking again.",
+   "concepts": [
+    {
+     "id": "E1",
+     "label": "max-age",
+     "tier": "essential",
+     "members": [
+      "max-age"
+     ]
+    },
+    {
+     "id": "E2",
+     "label": "revalidation",
+     "tier": "essential",
+     "members": [
+      "revalidation"
+     ]
+    },
+    {
+     "id": "S1",
+     "label": "stale response",
+     "tier": "supporting",
+     "members": [
+      "stale response"
+     ]
+    }
+   ],
+   "reference": "max-age gives the number of seconds a response may be reused. Revalidation asks the server whether a stored copy is still good, usually with an ETag. A stale response is one kept past its lifetime, which a client may still use while it revalidates.",
+   "good": [
+    "How would a client check with the server that a stored copy is still good?",
+    "What would a browser do with a copy kept past its lifetime?"
+   ],
+   "bad": [
+    {
+     "q": "How does a fresh response behave once the response is stale?",
+     "why": "contradictory premise"
+    },
+    {
+     "q": "How does revalidation compare with those found in max-age?",
+     "why": "circular contrast"
+    },
+    {
+     "q": "How does it tell the browser how long it may reuse a response before asking again?",
+     "why": "repeats the answer phrase"
+    },
+    {
+     "q": "Which header would you set for the shortest possible response?",
+     "why": "invented qualifier"
+    }
+   ],
+   "src": "holdout4"
+  },
+  {
+   "id": "S4-03",
+   "topic": "Statistics",
+   "question": "What is a p-value?",
+   "answer": "It is the probability of seeing data at least this extreme if the null hypothesis holds.",
+   "concepts": [
+    {
+     "id": "E1",
+     "label": "significance level",
+     "tier": "essential",
+     "members": [
+      "significance level"
+     ]
+    },
+    {
+     "id": "E2",
+     "label": "multiple comparisons",
+     "tier": "essential",
+     "members": [
+      "multiple comparisons"
+     ]
+    },
+    {
+     "id": "S1",
+     "label": "effect size",
+     "tier": "supporting",
+     "members": [
+      "effect size"
+     ]
+    }
+   ],
+   "reference": "The significance level is the threshold chosen before the test, against which the p-value is compared. Multiple comparisons inflate the chance of a spurious result, because every extra test gets its own opportunity to look surprising. Effect size says how large the difference is, which a p-value alone never shows.",
+   "good": [
+    "How would running twenty tests change your reading of a single surprising result?",
+    "What would you still not know about a difference from its p-value alone?"
+   ],
+   "bad": [
+    {
+     "q": "How does a significant result behave when the result is insignificant?",
+     "why": "contradictory premise"
+    },
+    {
+     "q": "How does a p-value compare with those found in significance level?",
+     "why": "circular contrast"
+    },
+    {
+     "q": "How is it the probability of seeing data at least this extreme if the null hypothesis holds?",
+     "why": "repeats the answer phrase"
+    },
+    {
+     "q": "How would the effect size matter for the smallest observed difference?",
+     "why": "invented qualifier"
+    },
+    {
+     "q": "How would the threshold matter, and which effect size would worry you?",
+     "why": "two questions (not detected: the second interrogative is separated from its verb by a noun phrase; see the report)"
+    }
+   ],
+   "src": "holdout4"
+  },
+  {
+   "id": "S4-04",
+   "topic": "Version control",
+   "question": "What does git rebase do?",
+   "answer": "It replays your commits on top of another branch so the history stays linear.",
+   "concepts": [
+    {
+     "id": "E1",
+     "label": "merge commit",
+     "tier": "essential",
+     "members": [
+      "merge commit"
+     ]
+    },
+    {
+     "id": "E2",
+     "label": "rewritten history",
+     "tier": "essential",
+     "members": [
+      "rewritten history"
+     ]
+    },
+    {
+     "id": "S1",
+     "label": "shared branch",
+     "tier": "supporting",
+     "members": [
+      "shared branch"
+     ]
+    }
+   ],
+   "reference": "A merge commit keeps both lines of development and records where they joined. Rewritten history gives every replayed commit a new identifier, so anyone who already has the old ones sees a divergence. On a shared branch that divergence forces colleagues to reconcile their copies.",
+   "good": [
+    "What would a colleague who already pulled those commits see afterwards?",
+    "How would keeping the join point instead change what the history shows?"
+   ],
+   "bad": [
+    {
+     "q": "How does a shared branch behave when the branch is unshared?",
+     "why": "contradictory premise"
+    },
+    {
+     "q": "How does rebasing compare with those found in rewritten history?",
+     "why": "circular contrast"
+    },
+    {
+     "q": "How does it replay your commits on top of another branch so the history stays linear?",
+     "why": "repeats the answer phrase"
+    },
+    {
+     "q": "Which approach helps on the largest branch?",
+     "why": "invented qualifier"
+    }
+   ],
+   "src": "holdout4"
+  }
+ ]
+}

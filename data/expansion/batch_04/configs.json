@@ -1,0 +1,16 @@
+{
+ "smi-m0015": [
+  {
+   "content": "SELECT f.feature,\n       COUNT(*) AS n_rows,\n       SUM(CASE WHEN f.feature_ts > r.prediction_ts THEN 1 ELSE 0 END) AS rows_from_future,\n       ROUND(1.0 * SUM(CASE WHEN f.feature_ts > r.prediction_ts THEN 1 ELSE 0 END) / COUNT(*), 2) AS future_share,\n       ROUND(MAX((julianday(f.feature_ts) - julianday(r.prediction_ts)) * 24), 1) AS max_hours_ahead,\n       SUM(CASE WHEN f.feature_ts > r.label_ts THEN 1 ELSE 0 END) AS rows_after_label\nFROM training_rows AS r\nJOIN training_features AS f ON f.row_id = r.row_id\nGROUP BY f.feature\nHAVING rows_from_future > 0\nORDER BY future_share DESC, f.feature;",
+   "lang": "sql",
+   "note": "Per-feature point-in-time leakage audit over training_rows/training_features (SQLite dialect, tested with sqlite3)."
+  }
+ ],
+ "smi-m0039": [
+  {
+   "content": "\nSELECT strftime('%Y-%m-%d %H:00', s.served_at) AS hour,\n       s.feature,\n       COUNT(*) AS n,\n       SUM(CASE WHEN r.request_id IS NULL THEN 1 ELSE 0 END) AS not_recomputed,\n       SUM(CASE WHEN r.request_id IS NOT NULL AND (\n             (s.value IS NULL) <> (r.value IS NULL)\n             OR ABS(s.value - r.value) > t.abs_tol + t.rel_tol * ABS(r.value)\n           ) THEN 1 ELSE 0 END) AS mismatched\nFROM served s\nJOIN tolerances t ON t.feature = s.feature\nLEFT JOIN recomputed r ON r.request_id = s.request_id AND r.feature = s.feature\nGROUP BY hour, s.feature\nHAVING mismatched > 0 OR not_recomputed > 0\nORDER BY hour, s.feature;\n",
+   "lang": "sql",
+   "note": "Per-hour, per-feature served-vs-recomputed mismatch query (SQLite dialect), run against an in-memory dataset by the recorded test."
+  }
+ ]
+}

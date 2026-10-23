@@ -1,0 +1,380 @@
+[
+ {
+  "id": "smi-h0013",
+  "plan_id": "P2-DL-01",
+  "domain": "Deep Learning",
+  "difficulty": "Medium",
+  "question": "Implement a minimal scalar reverse-mode autodiff engine in pure Python: a class Value(data) that supports +, *, - and ** with a constant exponent, plus .tanh() and .relu(), and a .backward() method that fills .grad on every node feeding the result. Example: x = Value(3.0); y = x * x; y.backward() must give x.grad == 6.0 (and x = Value(3.0); (x + x).backward() gives 2.0). Explain why backward must visit nodes in topological order and why gradients are accumulated with += rather than assigned, and say how you would test the engine against numerical differentiation.",
+  "answer": "Each operation creates an output node that remembers its operands (the nodes it was computed from) and a closure that pushes out.grad back to them, multiplied by the local derivative. backward() builds a topological order with a DFS (a node is appended only after all of its operands), sets the output gradient to 1 and walks the list in reverse.\n\n```python\nimport math\n\n\nclass Value:\n    \"\"\"Scalar node in a computation graph with reverse-mode autodiff.\"\"\"\n\n    def __init__(self, data, children=()):\n        self.data = float(data)\n        self.grad = 0.0\n        self._prev = tuple(children)\n        self._backward = lambda: None\n\n    def __add__(self, other):\n        other = other if isinstance(other, Value) else Value(other)\n        out = Value(self.data + other.data, (self, other))\n\n        def _backward():\n            self.grad += out.grad          # accumulate (+=), never assign\n            other.grad += out.grad\n        out._backward = _backward\n        return out\n\n    def __mul__(self, other):\n        other = other if isinstance(other, Value) else Value(other)\n        out = Value(self.data * other.data, (self, other))\n\n        def _backward():\n            self.grad += other.data * out.grad\n            other.grad += self.data * out.grad\n        out._backward = _backward\n        return out\n\n    def __pow__(self, k):\n        assert isinstance(k, (int, float)), \"constant exponent only\"\n        out = Value(self.data ** k, (self,))\n\n        def _backward():\n            self.grad += k * self.data ** (k - 1) * out.grad\n        out._backward = _backward\n        return out\n\n    def tanh(self):\n        t = math.tanh(self.data)\n        out = Value(t, (self,))\n\n        def _backward():\n            self.grad += (1.0 - t * t) * out.grad\n        out._backward = _backward\n        return out\n\n    def relu(self):\n        out = Value(self.data if self.data > 0 else 0.0, (self,))\n\n        def _backward():\n            self.grad += (1.0 if out.data > 0 else 0.0) * out.grad\n        out._backward = _backward\n        return out\n\n    __radd__ = __add__\n    __rmul__ = __mul__\n\n    def __neg__(self):\n        return self * -1.0\n\n    def __sub__(self, other):\n        return self + (-other if isinstance(other, Value) else -other)\n\n    def backward(self):\n        topo, seen = [], set()\n\n        def build(v):                      # iterative DFS would avoid recursion limits\n            if id(v) not in seen:\n                seen.add(id(v))\n                for c in v._prev:\n                    build(c)\n                topo.append(v)             # children appended before parents\n        build(self)\n        self.grad = 1.0\n        for v in reversed(topo):\n            v._backward()\n```\n\nWhy topological order: a node can feed several consumers, and its own backward closure must run only after every consumer has added its contribution. In reverse topological order, all consumers of a node are processed before the node itself. A naive recursion from the output without ordering can propagate a half-finished gradient, or revisit shared sub-graphs exponentially often (the visited set prevents that).\n\nWhy +=: the multivariable chain rule sums over all paths from the output to a node. In x * x both parents are the same object, so the closure runs two updates on x; with = instead of += you would get 3.0 instead of 6.0. For the same reason, gradients must be zeroed before a second backward pass over the same graph, otherwise they accumulate across calls.\n\nTesting: write the same function with plain floats, compare each .grad with a central difference (f(x+h) - f(x-h)) / 2h, h around 1e-6; agreement should be ~1e-8 or better. Include a node used twice, a diamond-shaped graph, and keep test points away from the relu kink at 0 where the derivative is undefined (the code picks 0 there). The recursive DFS will hit Python's recursion limit on very deep graphs; use an explicit stack if that matters.",
+  "key_concepts": [
+   "reverse-mode autodiff",
+   "topological ordering",
+   "gradient accumulation",
+   "chain rule over multiple paths",
+   "computational graph",
+   "numerical gradient check"
+  ],
+  "common_mistakes": [
+   "Assigning (=) instead of accumulating (+=) the gradient, which breaks any node used more than once",
+   "Running backward() in an arbitrary or forward order so a node propagates before all its consumers have contributed",
+   "Checking gradients only on tree-shaped expressions where no node is shared, so the accumulation bug stays hidden"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import math\n\n\nclass Value:\n    \"\"\"Scalar node in a computation graph with reverse-mode autodiff.\"\"\"\n\n    def __init__(self, data, children=()):\n        self.data = float(data)\n        self.grad = 0.0\n        self._prev = tuple(children)\n        self._backward = lambda: None\n\n    def __add__(self, other):\n        other = other if isinstance(other, Value) else Value(other)\n        out = Value(self.data + other.data, (self, other))\n\n        def _backward():\n            self.grad += out.grad          # accumulate (+=), never assign\n            other.grad += out.grad\n        out._backward = _backward\n        return out\n\n    def __mul__(self, other):\n        other = other if isinstance(other, Value) else Value(other)\n        out = Value(self.data * other.data, (self, other))\n\n        def _backward():\n            self.grad += other.data * out.grad\n            other.grad += self.data * out.grad\n        out._backward = _backward\n        return out\n\n    def __pow__(self, k):\n        assert isinstance(k, (int, float)), \"constant exponent only\"\n        out = Value(self.data ** k, (self,))\n\n        def _backward():\n            self.grad += k * self.data ** (k - 1) * out.grad\n        out._backward = _backward\n        return out\n\n    def tanh(self):\n        t = math.tanh(self.data)\n        out = Value(t, (self,))\n\n        def _backward():\n            self.grad += (1.0 - t * t) * out.grad\n        out._backward = _backward\n        return out\n\n    def relu(self):\n        out = Value(self.data if self.data > 0 else 0.0, (self,))\n\n        def _backward():\n            self.grad += (1.0 if out.data > 0 else 0.0) * out.grad\n        out._backward = _backward\n        return out\n\n    __radd__ = __add__\n    __rmul__ = __mul__\n\n    def __neg__(self):\n        return self * -1.0\n\n    def __sub__(self, other):\n        return self + (-other if isinstance(other, Value) else -other)\n\n    def backward(self):\n        topo, seen = [], set()\n\n        def build(v):                      # iterative DFS would avoid recursion limits\n            if id(v) not in seen:\n                seen.add(id(v))\n                for c in v._prev:\n                    build(c)\n                topo.append(v)             # children appended before parents\n        build(self)\n        self.grad = 1.0\n        for v in reversed(topo):\n            v._backward()",
+   "test": "def f_value(x, y):\n    z = x * y\n    return (z + x ** 2).tanh() + z * z + x.relu() * 0.5\n\n\ndef f_float(x, y):\n    z = x * y\n    return math.tanh(z + x ** 2) + z * z + max(x, 0.0) * 0.5\n\n\ndef num_grad(fn, args, i, eps=1e-6):\n    hi, lo = list(args), list(args)\n    hi[i] += eps\n    lo[i] -= eps\n    return (fn(*hi) - fn(*lo)) / (2 * eps)\n\n\nfor args in [(0.7, -1.3), (-0.4, 0.9), (1.2, 0.5)]:\n    x, y = Value(args[0]), Value(args[1])\n    out = f_value(x, y)\n    out.backward()\n    assert abs(out.data - f_float(*args)) < 1e-12\n    for i, v in enumerate((x, y)):\n        assert abs(v.grad - num_grad(f_float, args, i)) < 1e-6, (args, i)\n\n# a node used twice: d(x*x)/dx = 2x, d(x + x)/dx = 2\nx = Value(3.0)\n(x * x).backward()\nassert x.grad == 6.0\nx = Value(3.0)\n(x + x).backward()\nassert x.grad == 2.0\n\n# diamond: out = (x*2) * (x*3) = 6 x^2 -> grad 12 x\nx = Value(1.5)\nout = (x * 2) * (x * 3)\nout.backward()\nassert abs(x.grad - 12 * 1.5) < 1e-12\n\n# a buggy \"assign instead of accumulate\" version would give 3.0 here, not 6.0\n# relu is flat for negative inputs\nx = Value(-2.0)\nx.relu().backward()\nassert x.grad == 0.0\nprint(\"ok\")",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "problem": "Terminology contradicts the code (where _prev entries are called 'children' and are the operands) and is hard to parse; 'parents' here means operands.",
+    "claim": "remembers its parents and a closure that pushes out.grad back to them, multiplied by the local derivative. backward() builds a topological order with a DFS (parents appended after all their children i"
+   },
+   {
+    "severity": "minor",
+    "problem": "2 - x (int minus Value) raises TypeError although the question says the engine supports '-'. Fix would need code+test change: def __rsub__(self, other): return (-self) + other (keep fence == solution).",
+    "claim": "__sub__ defined but no __rsub__"
+   }
+  ]
+ },
+ {
+  "id": "smi-h0019",
+  "plan_id": "P2-DL-07",
+  "domain": "Deep Learning",
+  "difficulty": "Hard",
+  "question": "A ResNet-style image classifier trains on 1 GPU with batch size 256, SGD with momentum, base learning rate 0.1, BatchNorm layers, and a step-decay schedule defined in epochs. You now have 8 GPUs and want global batch 2048 (256 per GPU, data parallel) with the same final accuracy. Give concrete values for the learning rate and warmup, explain what happens to BatchNorm statistics with and without synchronised BN, when gradient accumulation is the better option, and how you would verify that the new setup is equivalent. Include a small numpy check that the averaged per-GPU gradients equal the big-batch gradient, and that the usual accumulation mistakes break it.",
+  "answer": "Starting values to try, not guarantees: linear scaling rule, lr = 0.1 * 2048 / 256 = 0.8, with a linear warmup from about 0.1 up to 0.8 over the first 3 to 5 epochs (the usual choice at ImageNet scale; that is roughly 1,900 to 3,100 steps at batch 2048 on 1.28M images, so convert with your own dataset size) and then your usual decay. Convert any epoch-based milestones to steps correctly: the same number of epochs now means 8x fewer updates. Keep the loss as a mean, and keep weight decay and momentum as they were. The linear rule is an empirical heuristic for SGD that tends to hold up to some batch size and then degrades, and for Adam-type optimisers a square-root scaling (0.1 * sqrt(8) = 0.28 in the same arithmetic) or a tuned value is often used instead; expect to check by running.\n\n```python\nimport numpy as np\n\n\ndef scaled_lr(base_lr, base_batch, new_batch, rule=\"linear\"):\n    \"\"\"Linear rule (usual starting point for SGD+momentum) or square-root rule (often tried with Adam-type optimisers).\"\"\"\n    k = new_batch / base_batch\n    return base_lr * (k if rule == \"linear\" else k ** 0.5)\n\n\ndef warmup_lr(step, warmup_steps, peak_lr, start_lr=0.0):\n    \"\"\"Linear ramp from start_lr to peak_lr over warmup_steps, then constant (decay schedule would follow).\"\"\"\n    if step >= warmup_steps:\n        return peak_lr\n    return start_lr + (peak_lr - start_lr) * step / warmup_steps\n\n\ndef logistic_grad(w, X, y):\n    \"\"\"Gradient of the MEAN logistic loss over the rows of X.\"\"\"\n    p = 1.0 / (1.0 + np.exp(-(X @ w)))\n    return X.T @ (p - y) / len(y)\n\n\ndef accumulated_grad(w, X, y, micro):\n    \"\"\"Gradient accumulation: weight each micro-batch by its size so the result equals the full-batch mean.\"\"\"\n    total = np.zeros_like(w)\n    for s in range(0, len(y), micro):\n        Xb, yb = X[s:s + micro], y[s:s + micro]\n        total += logistic_grad(w, Xb, yb) * len(yb)       # undo the per-chunk mean ...\n    return total / len(y)                                   # ... and divide by the true total\n```\n\nExecuted check (2048 samples, 10 features, logistic loss): the mean of 8 shard gradients of 256 equals the full-batch gradient to 1e-12; accumulating 8 micro-batches of 256 on one GPU gives the same gradient; summing the shard gradients instead of averaging gives exactly 8x too large a step; and with 1000 samples in chunks of 256 (last chunk 232) an unweighted mean of chunk means is biased (largest coordinate error about 2e-3 against gradients of magnitude 5e-2), while the size-weighted accumulation matches.\n\nBatchNorm: with plain (unsynchronised) BN each GPU still normalises over its own 256 samples, so per-layer statistics and the regularising noise are the same as in the 1-GPU run. SyncBN would compute them over 2048, which is smoother but adds communication and changes the behaviour. If you instead split the old batch of 256 over 8 GPUs (32 each), per-GPU statistics get noisier. Gradient accumulation (8 micro-batches of 256 on one GPU) also keeps BN at 256 per forward pass, which is why it is the closest single-GPU stand-in; it costs wall-clock time, not accuracy, provided the micro-batch stays near 256. It is the better option when you do not have 8 GPUs or cannot fit a large per-GPU batch (for example 2 GPUs x 4 accumulation steps x 256 gives the same global 2048), when the all-reduce is the bottleneck (accumulate locally and synchronise once per optimiser step), or when you want a single-device reference run to debug the 8-GPU one. If memory forces micro-batches much smaller than 256, BN statistics become noisier than in the original run, so use SyncBN or GroupNorm or accept the difference.\n\nVerification: (1) unit-test gradient equivalence as above; (2) with fixed seeds and data order compare the first few hundred steps of 8-GPU and accumulate-on-1-GPU runs: losses should track closely, not bit-for-bit, because floating-point reduction order differs; (3) run the baseline with a few seeds to learn the seed-to-seed spread, then require validation accuracy versus epochs to fall inside it; (4) log lr per step, effective batch size and steps per epoch.",
+  "key_concepts": [
+   "linear learning-rate scaling",
+   "learning-rate warmup",
+   "gradient accumulation",
+   "data-parallel gradient averaging",
+   "BatchNorm per-device statistics",
+   "synchronised BatchNorm"
+  ],
+  "common_mistakes": [
+   "Scaling the batch size without scaling or warming up the learning rate (or scaling it without any warmup)",
+   "Summing per-GPU gradients or losses instead of averaging, or averaging unequal-size micro-batches without weighting",
+   "Assuming BatchNorm statistics are computed over the global batch by default"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\n\ndef scaled_lr(base_lr, base_batch, new_batch, rule=\"linear\"):\n    \"\"\"Linear rule (usual starting point for SGD+momentum) or square-root rule (often tried with Adam-type optimisers).\"\"\"\n    k = new_batch / base_batch\n    return base_lr * (k if rule == \"linear\" else k ** 0.5)\n\n\ndef warmup_lr(step, warmup_steps, peak_lr, start_lr=0.0):\n    \"\"\"Linear ramp from start_lr to peak_lr over warmup_steps, then constant (decay schedule would follow).\"\"\"\n    if step >= warmup_steps:\n        return peak_lr\n    return start_lr + (peak_lr - start_lr) * step / warmup_steps\n\n\ndef logistic_grad(w, X, y):\n    \"\"\"Gradient of the MEAN logistic loss over the rows of X.\"\"\"\n    p = 1.0 / (1.0 + np.exp(-(X @ w)))\n    return X.T @ (p - y) / len(y)\n\n\ndef accumulated_grad(w, X, y, micro):\n    \"\"\"Gradient accumulation: weight each micro-batch by its size so the result equals the full-batch mean.\"\"\"\n    total = np.zeros_like(w)\n    for s in range(0, len(y), micro):\n        Xb, yb = X[s:s + micro], y[s:s + micro]\n        total += logistic_grad(w, Xb, yb) * len(yb)       # undo the per-chunk mean ...\n    return total / len(y)                                   # ... and divide by the true total",
+   "test": "assert scaled_lr(0.1, 256, 2048) == 0.1 * 8\nassert abs(scaled_lr(0.1, 256, 2048, \"sqrt\") - 0.1 * 8 ** 0.5) < 1e-12\nassert warmup_lr(0, 500, 0.8, 0.1) == 0.1\nassert abs(warmup_lr(250, 500, 0.8, 0.1) - 0.45) < 1e-12\nassert warmup_lr(500, 500, 0.8, 0.1) == 0.8 and warmup_lr(10_000, 500, 0.8, 0.1) == 0.8\n\nrng = np.random.default_rng(0)\nN, D = 2048, 10\nX = rng.normal(size=(N, D))\ny = (rng.random(N) < 0.5).astype(float)\nw = rng.normal(size=D) * 0.1\n\nfull = logistic_grad(w, X, y)\n\n# 8 data-parallel workers each see 256 samples; all-reduce (mean) of their gradients == the big-batch gradient\nshards = [logistic_grad(w, X[i * 256:(i + 1) * 256], y[i * 256:(i + 1) * 256]) for i in range(8)]\nassert np.allclose(np.mean(shards, axis=0), full, atol=1e-12)\n\n# accumulating 8 micro-batches of 256 on one GPU is the same thing\nassert np.allclose(accumulated_grad(w, X, y, 256), full, atol=1e-12)\n\n# pitfall 1: summing instead of averaging the shard gradients gives an 8x larger step\nassert np.allclose(np.sum(shards, axis=0), 8 * full, atol=1e-12)\n\n# pitfall 2: a ragged last micro-batch. 1000 samples in chunks of 256 -> 256, 256, 256, 232\nXr, yr = X[:1000], y[:1000]\nnaive = np.mean([logistic_grad(w, Xr[s:s + 256], yr[s:s + 256]) for s in range(0, 1000, 256)], axis=0)\nassert np.abs(naive - logistic_grad(w, Xr, yr)).max() > 1e-4               # unweighted mean is biased\nassert np.allclose(accumulated_grad(w, Xr, yr, 256), logistic_grad(w, Xr, yr), atol=1e-12)\nprint(\"ok\")",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "major",
+    "problem": "Does not answer 'when is gradient accumulation the better option', and 'costs ... not accuracy' ignores that BN equivalence only holds if the micro-batch stays at 256.",
+    "claim": "Gradient accumulation (8 micro-batches of 256 on one GPU) also keeps BN at 256 per forward pass, which is why it is the closest single-GPU stand-in; it costs wall-clock time, not accuracy."
+   },
+   {
+    "severity": "major",
+    "problem": "Step range is not derivable from the epoch range; at ImageNet scale 3-5 epochs of batch 2048 is about 1,900-3,100 steps, and for smaller datasets it is far fewer. Dataset size is not given in the question.",
+    "claim": "over the first few epochs (say 3 to 5, or roughly 500 to 2000 steps)"
+   },
+   {
+    "severity": "minor",
+    "problem": "A base lr of 0.1 is not an Adam value; 'in the same arithmetic' flags it, but it could mislead. Optional.",
+    "claim": "for Adam-type optimisers a square-root scaling (0.1 * sqrt(8) = 0.28 in the same arithmetic)"
+   }
+  ]
+ },
+ {
+  "id": "smi-h0020",
+  "plan_id": "P2-DL-08",
+  "domain": "Deep Learning",
+  "difficulty": "Medium",
+  "question": "A CNN for a 10-class image problem reports about 10% validation accuracy, predicts class 0 for every image, and the training loss sits at about 2.30 (that is ln 10) from the first epoch. Give an ordered debugging checklist, with what you would look at and the fix for each item (labels, class imbalance, input normalisation, dead ReLUs, learning rate, softmax over the wrong axis). Then show in numpy how softmax over the wrong (batch) axis reproduces the always-class-0 predictions and chance accuracy when the batch holds one sample (probabilities of 1 for every class, argmax always class 0, cross-entropy exactly 0), and say why it does not explain a loss of 2.30. Also write diagnose(logits, labels, n_classes) that reports the predicted-class histogram, the majority-class baseline accuracy and whether the output varies across the batch.",
+  "answer": "Loss pinned at ln(10) = 2.303 means the output is roughly uniform or constant: the network is predicting the prior, not using the input. Work in this order, cheapest and most likely first.\n\n1. Look at what is predicted versus what is labelled: np.bincount of the argmax and of the labels. If predictions are one class and accuracy equals the majority-class share, it is learning the prior.\n2. Labels and data pipeline: print a few images with their labels; check that images and labels are shuffled together, not off by one, not all one class. Try to overfit a single batch of 32 images; if that fails, the bug is in the model, loss, optimiser or wiring, not in generalisation.\n3. Output and loss wiring: softmax over the batch axis (below), softmax applied twice, a loss that expects logits receiving probabilities (or the reverse; check your framework's documentation), model left in the wrong train/eval mode.\n4. Class imbalance: if one class is 90% of the data, always predicting it scores 90% and a small learning signal can collapse into it; use class weights or resampling and report per-class recall.\n5. Input normalisation: 0-255 pixels fed raw, or different preprocessing at train and eval; standardise inputs.\n6. Learning rate and dead ReLUs: too high a rate can push units permanently below zero; log the fraction of zero activations per layer and retry with the rate divided by 10.\n\n```python\nimport numpy as np\n\n\ndef softmax(z, axis=-1):\n    e = np.exp(z - z.max(axis=axis, keepdims=True))\n    return e / e.sum(axis=axis, keepdims=True)\n\n\ndef diagnose(logits, labels, n_classes):\n    \"\"\"First-look statistics for 'the model predicts one class'. logits: (N, C), labels: (N,).\"\"\"\n    pred = logits.argmax(axis=1)\n    pred_hist = np.bincount(pred, minlength=n_classes) / len(pred)\n    label_hist = np.bincount(labels, minlength=n_classes) / len(labels)\n    return {\n        \"pred_hist\": pred_hist,                       # does one class take ~100%?\n        \"label_hist\": label_hist,                     # is the majority-class baseline already high?\n        \"majority_baseline_acc\": float(label_hist.max()),\n        \"accuracy\": float((pred == labels).mean()),\n        \"logit_std_over_batch\": float(logits.std(axis=0).mean()),   # ~0 => output ignores the input\n        \"row_sums_ok\": bool(np.allclose(softmax(logits, axis=1).sum(axis=1), 1.0)),\n    }\n```\n\nExecuted demonstration: for logits shaped (batch, classes) softmax(axis=1) rows sum to 1; softmax(axis=0) makes columns sum to 1 and rows do not. With batch size 1 the wrong axis returns [1, 1, ..., 1], so argmax returns index 0 (the first maximum wins ties) and -log p[y] = 0 for every label, giving zero loss and zero gradient. Note that this explains the always-class-0 predictions but not the reported loss of 2.30: with a batch of B > 1 the wrong-axis loss starts near ln B (about 4.16 for B = 64) and the argmax is no longer always class 0. A loss pinned at ln 10 with constant predictions points to a uniform or input-ignoring output (dead units, too high a learning rate, unnormalised inputs, a label problem). With bigger batches the symptom is subtler: probabilities depend on which other samples are in the batch, and the sums per sample are not 1. A cheap guard is asserting probs.sum(axis=1) is close to 1.\n\ndiagnose() on a constant-output model with 90/10 labels reports accuracy 0.9 equal to the majority baseline and zero variation of the logits across the batch: a strong sign that the input is ignored.",
+  "key_concepts": [
+   "prediction collapse",
+   "softmax axis",
+   "majority-class baseline",
+   "overfit a single batch",
+   "dead ReLU",
+   "input normalisation",
+   "class imbalance"
+  ],
+  "common_mistakes": [
+   "Jumping to tuning the learning rate before looking at the prediction and label histograms",
+   "Treating 90% accuracy on a 90/10 dataset as success",
+   "Applying softmax and then a loss function that applies softmax again"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\n\ndef softmax(z, axis=-1):\n    e = np.exp(z - z.max(axis=axis, keepdims=True))\n    return e / e.sum(axis=axis, keepdims=True)\n\n\ndef diagnose(logits, labels, n_classes):\n    \"\"\"First-look statistics for 'the model predicts one class'. logits: (N, C), labels: (N,).\"\"\"\n    pred = logits.argmax(axis=1)\n    pred_hist = np.bincount(pred, minlength=n_classes) / len(pred)\n    label_hist = np.bincount(labels, minlength=n_classes) / len(labels)\n    return {\n        \"pred_hist\": pred_hist,                       # does one class take ~100%?\n        \"label_hist\": label_hist,                     # is the majority-class baseline already high?\n        \"majority_baseline_acc\": float(label_hist.max()),\n        \"accuracy\": float((pred == labels).mean()),\n        \"logit_std_over_batch\": float(logits.std(axis=0).mean()),   # ~0 => output ignores the input\n        \"row_sums_ok\": bool(np.allclose(softmax(logits, axis=1).sum(axis=1), 1.0)),\n    }",
+   "test": "rng = np.random.default_rng(0)\nz = rng.normal(size=(4, 3))                 # (batch, classes)\ngood, bad = softmax(z, axis=1), softmax(z, axis=0)\nassert np.allclose(good.sum(axis=1), 1.0)   # each sample's class probabilities sum to 1\nassert np.allclose(bad.sum(axis=0), 1.0)    # wrong axis: normalised across the BATCH instead ...\nassert not np.allclose(bad.sum(axis=1), 1.0)  # ... so rows no longer sum to 1\n\n# batch of one: the wrong axis returns all ones, so argmax is always class 0 (first index wins ties)\nfor _ in range(5):\n    one = rng.normal(size=(1, 5))\n    assert np.allclose(softmax(one, axis=0), 1.0)\n    assert softmax(one, axis=0).argmax(axis=1)[0] == 0\n# ... and the cross-entropy -log p[y] is exactly 0, so there is no gradient signal either\nassert -np.log(softmax(one, axis=0)[0, 3]) == 0.0\n\n# diagnose(): a network whose output ignores its input and 90/10 imbalance\nlabels = np.array([0] * 90 + [1] * 10)\nlogits = np.tile([2.0, -1.0], (100, 1))\nr = diagnose(logits, labels, 2)\nassert r[\"pred_hist\"].tolist() == [1.0, 0.0]\nassert r[\"accuracy\"] == r[\"majority_baseline_acc\"] == 0.9     # 90% accuracy, but it is just the prior\nassert r[\"logit_std_over_batch\"] == 0.0\nassert r[\"row_sums_ok\"]\nprint(\"ok\")",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "major",
+    "problem": "Wrong-axis softmax reproduces always-class-0 / chance accuracy only for batch size 1, and then the loss is 0, contradicting the stated loss of 2.30. It is not 'exactly this symptom'.",
+    "claim": "Then show in numpy how softmax over the wrong axis produces exactly this symptom: a batch of one sample gives probabilities of 1 for every class, argmax always returns class 0, and the cross-entropy i"
+   },
+   {
+    "severity": "major",
+    "problem": "Needs an explicit statement that this bug does not account for the reported ln 10 loss (verified: wrong-axis loss is ln B for random logits).",
+    "claim": "giving zero loss and zero gradient."
+   },
+   {
+    "severity": "minor",
+    "problem": "Always True by construction because diagnose computes its own softmax over axis 1; it cannot detect a wrong-axis bug in the model. The later advice to assert probs.sum(axis=1) on the model's actual probabilities is the useful version.",
+    "claim": "\"row_sums_ok\": bool(np.allclose(softmax(logits, axis=1).sum(axis=1), 1.0)),"
+   }
+  ]
+ },
+ {
+  "id": "smi-h0022",
+  "plan_id": "P2-DL-10",
+  "domain": "Deep Learning",
+  "difficulty": "Medium",
+  "question": "Implement the InfoNCE (contrastive) loss with in-batch negatives in numpy: info_nce(a, b, temperature=0.1, reduction='mean'), where a and b are (N, D) embeddings, row i of a and row i of b are a positive pair and every other row of b is a negative for a[i]; use cosine similarity and compute it stably. Example: with a = b = np.eye(4) and temperature 0.05 the loss is about 0, while with all-identical embeddings it is exactly ln N. Test against a brute-force loop version, show that a naive exp overflows at temperature 1e-3, explain what temperature does, and show with duplicates in the batch how false negatives put a floor on the loss.",
+  "answer": "```python\nimport numpy as np\n\n\ndef info_nce(a, b, temperature=0.1, reduction=\"mean\"):\n    \"\"\"InfoNCE with in-batch negatives. a, b: (N, D); row i of a and row i of b are a positive pair,\n    every other row of b is a negative for a[i]. Embeddings are L2-normalised (cosine similarity).\"\"\"\n    a = a / np.linalg.norm(a, axis=1, keepdims=True)\n    b = b / np.linalg.norm(b, axis=1, keepdims=True)\n    logits = (a @ b.T) / temperature                       # (N, N); the diagonal holds the positives\n    m = logits.max(axis=1, keepdims=True)                   # log-sum-exp trick: subtract the row max\n    lse = m[:, 0] + np.log(np.exp(logits - m).sum(axis=1))\n    per_sample = lse - np.diag(logits)                      # -log softmax(row)[i]\n    return per_sample.mean() if reduction == \"mean\" else per_sample\n```\n\nThe loss for row i is -log( exp(s_ii / tau) / sum_j exp(s_ij / tau) ), the cross-entropy of a softmax over the N candidates in which the positive's index is the target. Implemented as logsumexp(row) - logit_ii, with the row maximum subtracted before exponentiating so the largest exponent is 0. Without that, at tau = 1e-3 the cosine logits reach 1000 and exp overflows to inf (the test shows the naive version returns NaN/inf while the stable one stays finite). The test also matches a pure-Python brute-force version to 1e-10 at tau = 0.07, 0.5 and 1.0, and confirms the loss equals ln N when every embedding is identical (a uniform softmax) - a handy sanity value to see at initialisation.\n\nTemperature: dividing similarities by tau sharpens the softmax. A small tau puts most of the gradient on the hardest negatives, those most similar to the anchor, which can help separation but makes training sensitive to noisy pairs and to false negatives. A large tau spreads the gradient nearly uniformly over negatives and makes the objective weaker at separating close samples. Values somewhere around 0.05 to 0.5 are common starting points, but the best value depends on data, batch size and encoder, so tune it.\n\nFalse negatives: an in-batch 'negative' that actually belongs to the same class or is a duplicate is pushed away anyway. In the executed example items 0 and 1 are identical; the best achievable loss for each is ln 2 = 0.693, because the model cannot distinguish its positive from the duplicate, while the other two items go to about 0. Mitigations: deduplicate or group by class/id when building batches, mask known same-class pairs (other than the positive itself) out of the denominator. Larger batches give more negatives but also raise the chance of collisions.\n\nPitfalls: forgetting L2 normalisation (then tau is meaningless), masking out the diagonal by mistake, and averaging over the wrong axis.",
+  "key_concepts": [
+   "InfoNCE",
+   "in-batch negatives",
+   "temperature",
+   "log-sum-exp stability",
+   "false negatives",
+   "cosine similarity"
+  ],
+  "common_mistakes": [
+   "Computing softmax with a raw exp on large logits and getting inf/NaN",
+   "Skipping normalisation of the embeddings so temperature does not control a bounded similarity",
+   "Claiming a lower temperature is always better"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\n\ndef info_nce(a, b, temperature=0.1, reduction=\"mean\"):\n    \"\"\"InfoNCE with in-batch negatives. a, b: (N, D); row i of a and row i of b are a positive pair,\n    every other row of b is a negative for a[i]. Embeddings are L2-normalised (cosine similarity).\"\"\"\n    a = a / np.linalg.norm(a, axis=1, keepdims=True)\n    b = b / np.linalg.norm(b, axis=1, keepdims=True)\n    logits = (a @ b.T) / temperature                       # (N, N); the diagonal holds the positives\n    m = logits.max(axis=1, keepdims=True)                   # log-sum-exp trick: subtract the row max\n    lse = m[:, 0] + np.log(np.exp(logits - m).sum(axis=1))\n    per_sample = lse - np.diag(logits)                      # -log softmax(row)[i]\n    return per_sample.mean() if reduction == \"mean\" else per_sample",
+   "test": "import math\n\nrng = np.random.default_rng(0)\nN, D = 6, 5\na, b = rng.normal(size=(N, D)), rng.normal(size=(N, D))\n\ndef brute(a, b, tau):\n    n, total = len(a), 0.0\n    for i in range(n):\n        sims = []\n        for j in range(n):\n            dot = sum(a[i][k] * b[j][k] for k in range(len(a[i])))\n            na = math.sqrt(sum(v * v for v in a[i]))\n            nb = math.sqrt(sum(v * v for v in b[j]))\n            sims.append(dot / (na * nb) / tau)\n        total += -math.log(math.exp(sims[i]) / sum(math.exp(s) for s in sims))\n    return total / n\n\nfor tau in (0.07, 0.5, 1.0):\n    assert abs(info_nce(a, b, tau) - brute(a, b, tau)) < 1e-10\n\n# identical embeddings for everyone -> uniform softmax -> loss = log N\nsame = np.tile(rng.normal(size=(1, D)), (N, 1))\nassert abs(info_nce(same, same, 0.1) - math.log(N)) < 1e-12\n\n# orthogonal positives, small temperature -> loss near 0\neye = np.eye(N)\nassert info_nce(eye, eye, 0.05) < 1e-6\n\n# stability: at tau = 1e-3 the logits reach 1000 and a naive exp() overflows; the stable version does not\nwith np.errstate(over=\"ignore\", invalid=\"ignore\"):\n    naive_logits = (eye @ eye.T) / 1e-3\n    naive = -np.log(np.exp(naive_logits).diagonal() / np.exp(naive_logits).sum(axis=1)).mean()\nassert not np.isfinite(naive)\nassert np.isfinite(info_nce(eye, eye, 1e-3)) and info_nce(eye, eye, 1e-3) < 1e-6\n\n# false negatives: items 0 and 1 are duplicates (same class, same embedding), the others are orthogonal\na2 = np.eye(4)[[0, 0, 2, 3]]\nb2 = a2.copy()\nper = info_nce(a2, b2, 0.05, reduction=\"none\")\nassert np.allclose(per[:2], math.log(2), atol=1e-6)      # cannot beat log 2: the duplicate looks like a negative\nassert per[2] < 1e-6 and per[3] < 1e-6\nprint(\"ok\")",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "major",
+    "problem": "A symmetric (a->b plus b->a) loss does not remove false negatives; the clause is unsupported and misleading. (Masking should also keep the positive itself in the denominator.)",
+    "claim": "mask known same-class pairs out of the denominator, or use a symmetric loss with care."
+   },
+   {
+    "severity": "minor",
+    "problem": "Any value other than 'mean' (including a typo or 'sum') silently returns the per-sample vector.",
+    "claim": "reduction=\"mean\""
+   }
+  ]
+ },
+ {
+  "id": "smi-h0025",
+  "plan_id": "P2-PY-03",
+  "domain": "Python",
+  "difficulty": "Medium",
+  "question": "You have a resource object with begin(), commit() and rollback() methods (think of a database connection wrapper). Write a context manager that begins a transaction on entry, commits if the with-block finishes normally, and rolls back if it raises, without ever swallowing the block's exception. Provide it twice: as a class Transaction(resource) and as a @contextlib.contextmanager function transaction(resource). Both yield the resource. If commit() itself fails, the transaction must be rolled back and the commit error must propagate.\n\nExample:\nwith transaction(conn) as c:\n    c.execute(...)   # commit at the end; rollback if execute raises",
+  "answer": "The class form returns a falsy value from __exit__ so exceptions propagate; the generator form puts yield inside try/except BaseException, rolls back, and re-raises. Catching BaseException (not Exception) makes sure KeyboardInterrupt and similar also trigger a rollback, but the exception is always re-raised. Commit goes in the success path, wrapped so that a failing commit triggers rollback and then propagates.\n\n```python\nimport contextlib\n\nclass Transaction:\n    def __init__(self, resource):\n        self.resource = resource\n\n    def __enter__(self):\n        self.resource.begin()\n        return self.resource\n\n    def __exit__(self, exc_type, exc, tb):\n        if exc_type is not None:\n            self.resource.rollback()\n            return False          # never suppress the original exception\n        try:\n            self.resource.commit()\n        except BaseException:\n            self.resource.rollback()\n            raise\n        return False\n\n@contextlib.contextmanager\ndef transaction(resource):\n    resource.begin()\n    try:\n        yield resource\n    except BaseException:\n        resource.rollback()\n        raise\n    try:\n        resource.commit()\n    except BaseException:\n        resource.rollback()\n        raise\n```\n\nPitfalls: returning True from __exit__ (or a bare `except: pass` in the generator) hides the error; forgetting the re-raise in a @contextmanager makes the generator finish normally, so the with statement silently suppresses the body's exception (a RuntimeError appears only if the generator yields a second time); committing inside the except path; and not rolling back when commit fails. If rollback itself raises while handling an error, that new exception propagates and Python chains the original as __context__; decide deliberately whether that is acceptable for your resource.",
+  "key_concepts": [
+   "context manager",
+   "__enter__ and __exit__",
+   "contextlib.contextmanager",
+   "exception propagation",
+   "transaction rollback",
+   "BaseException"
+  ],
+  "common_mistakes": [
+   "Returning True from __exit__ or swallowing the exception",
+   "Forgetting to roll back when commit() fails",
+   "Omitting `raise` in the except block of a @contextmanager generator"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import contextlib\n\nclass Transaction:\n    def __init__(self, resource):\n        self.resource = resource\n\n    def __enter__(self):\n        self.resource.begin()\n        return self.resource\n\n    def __exit__(self, exc_type, exc, tb):\n        if exc_type is not None:\n            self.resource.rollback()\n            return False          # never suppress the original exception\n        try:\n            self.resource.commit()\n        except BaseException:\n            self.resource.rollback()\n            raise\n        return False\n\n@contextlib.contextmanager\ndef transaction(resource):\n    resource.begin()\n    try:\n        yield resource\n    except BaseException:\n        resource.rollback()\n        raise\n    try:\n        resource.commit()\n    except BaseException:\n        resource.rollback()\n        raise",
+   "test": "\nclass FakeResource:\n    def __init__(self, fail_commit=False, fail_rollback=False):\n        self.events = []\n        self.fail_commit = fail_commit\n        self.fail_rollback = fail_rollback\n    def begin(self):\n        self.events.append(\"begin\")\n    def commit(self):\n        self.events.append(\"commit\")\n        if self.fail_commit:\n            raise IOError(\"commit failed\")\n    def rollback(self):\n        self.events.append(\"rollback\")\n        if self.fail_rollback:\n            raise RuntimeError(\"rollback failed\")\n\nfor make in (Transaction, transaction):\n    # success\n    r = FakeResource()\n    with make(r) as got:\n        assert got is r\n        r.events.append(\"work\")\n    assert r.events == [\"begin\", \"work\", \"commit\"]\n\n    # body raises: rollback, exception propagates unchanged\n    r = FakeResource()\n    seen = None\n    try:\n        with make(r):\n            raise ValueError(\"boom\")\n    except ValueError as e:\n        seen = e\n    assert seen is not None and seen.args == (\"boom\",)\n    assert r.events == [\"begin\", \"rollback\"]\n\n    # KeyboardInterrupt also rolls back\n    r = FakeResource()\n    try:\n        with make(r):\n            raise KeyboardInterrupt()\n    except KeyboardInterrupt:\n        pass\n    else:\n        raise AssertionError(\"must propagate\")\n    assert r.events == [\"begin\", \"rollback\"]\n\n    # commit fails: rollback, commit error propagates\n    r = FakeResource(fail_commit=True)\n    try:\n        with make(r):\n            pass\n    except IOError as e:\n        assert str(e) == \"commit failed\"\n    else:\n        raise AssertionError(\"must propagate\")\n    assert r.events == [\"begin\", \"commit\", \"rollback\"]\n\n    # rollback failure is chained to the original error\n    r = FakeResource(fail_rollback=True)\n    try:\n        with make(r):\n            raise ValueError(\"orig\")\n    except RuntimeError as e:\n        assert isinstance(e.__context__, ValueError)\n    else:\n        raise AssertionError(\"rollback error should propagate\")\n",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "problem": "If the generator catches and finishes normally, contextmanager.__exit__ gets StopIteration and returns True, i.e. the exception is silently suppressed. RuntimeError (\"generator didn't stop after throw()\") only occurs if the generator yields again. Verified from CPython contextlib behaviour.",
+    "claim": "forgetting the re-raise in a @contextmanager makes the generator finish without raising, which can turn a with-body failure into a RuntimeError or silent success"
+   }
+  ]
+ },
+ {
+  "id": "smi-h0026",
+  "plan_id": "P2-PY-04",
+  "domain": "Python",
+  "difficulty": "Medium",
+  "question": "Python 3.10 has no itertools.batched. Implement two lazy generators that accept any iterable (list, generator, infinite iterator):\n\nbatched(iterable, n)         -> yields tuples of up to n items; the last may be shorter\nsliding_window(iterable, n)  -> yields overlapping tuples of exactly n items\n\nExamples:\nlist(batched(range(7), 3))          == [(0,1,2), (3,4,5), (6,)]\nlist(sliding_window(\"abcd\", 2))     == [('a','b'), ('b','c'), ('c','d')]\n\nRequirements: nothing is consumed from the source until the first item is requested, no more than one batch (or n items for the window) is held in memory, invalid n (< 1) raises ValueError immediately when the function is called (not at first next()), and an iterable shorter than n yields no window. Explain the memory difference versus slicing a fully materialised list.",
+  "answer": "Use iter() once, then pull chunks with itertools.islice, which consumes exactly n items from a shared iterator. For the window, keep a deque with maxlen=n so appending evicts the oldest item. To raise ValueError at call time, make the public function a normal function that validates and then returns an inner generator; a generator function would defer the check until the first next().\n\n```python\nfrom collections import deque\nfrom itertools import islice\n\ndef batched(iterable, n):\n    if n < 1:\n        raise ValueError(\"n must be at least 1\")\n    def gen():\n        it = iter(iterable)\n        while True:\n            batch = tuple(islice(it, n))\n            if not batch:\n                return\n            yield batch\n    return gen()\n\ndef sliding_window(iterable, n):\n    if n < 1:\n        raise ValueError(\"n must be at least 1\")\n    def gen():\n        it = iter(iterable)\n        window = deque(islice(it, n), maxlen=n)\n        if len(window) < n:\n            return\n        yield tuple(window)\n        for item in it:\n            window.append(item)\n            yield tuple(window)\n    return gen()\n```\n\nMemory: both hold O(n) items at any moment regardless of input length, so they work on infinite streams or files too large for RAM. Doing `[data[i:i+n] for i in range(0, len(data), n)]` needs the whole sequence in memory first (and len/indexing, so it fails on generators). Pitfall: create the iterator once with iter(iterable) and share it between all islice calls; calling islice(iterable, n) directly on a re-iterable such as a list would restart from the beginning every time and never advance. Python 3.12's itertools.batched returns tuples too, so these are drop-in for older versions.",
+  "key_concepts": [
+   "generator",
+   "lazy evaluation",
+   "itertools.islice",
+   "collections.deque maxlen",
+   "eager argument validation",
+   "O(n) memory",
+   "iterator protocol"
+  ],
+  "common_mistakes": [
+   "Slicing with len()/indexing, which fails on generators and materialises everything",
+   "Validating n inside a generator function so the error appears late",
+   "Yielding the same mutable list/deque object each time"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "from collections import deque\nfrom itertools import islice\n\ndef batched(iterable, n):\n    if n < 1:\n        raise ValueError(\"n must be at least 1\")\n    def gen():\n        it = iter(iterable)\n        while True:\n            batch = tuple(islice(it, n))\n            if not batch:\n                return\n            yield batch\n    return gen()\n\ndef sliding_window(iterable, n):\n    if n < 1:\n        raise ValueError(\"n must be at least 1\")\n    def gen():\n        it = iter(iterable)\n        window = deque(islice(it, n), maxlen=n)\n        if len(window) < n:\n            return\n        yield tuple(window)\n        for item in it:\n            window.append(item)\n            yield tuple(window)\n    return gen()",
+   "test": "\nfrom itertools import count\n\nassert list(batched(range(7), 3)) == [(0, 1, 2), (3, 4, 5), (6,)]\nassert list(batched([], 3)) == []\nassert list(batched(\"abc\", 5)) == [(\"a\", \"b\", \"c\")]\nassert list(batched(iter(range(4)), 2)) == [(0, 1), (2, 3)]\nassert list(sliding_window(\"abcd\", 2)) == [(\"a\", \"b\"), (\"b\", \"c\"), (\"c\", \"d\")]\nassert list(sliding_window(range(3), 3)) == [(0, 1, 2)]\nassert list(sliding_window(range(2), 3)) == []\nassert list(sliding_window([], 1)) == []\nassert list(sliding_window(range(3), 1)) == [(0,), (1,), (2,)]\n\nfor fn in (batched, sliding_window):\n    for bad in (0, -2):\n        try:\n            fn([1, 2], bad)\n        except ValueError:\n            pass\n        else:\n            raise AssertionError(\"expected eager ValueError\")\n\nclass Source:\n    def __init__(self):\n        self.pulled = 0\n        self._it = count()\n    def __iter__(self):\n        return self\n    def __next__(self):\n        self.pulled += 1\n        return next(self._it)\n\nsrc = Source()\ng = batched(src, 4)\nassert src.pulled == 0                  # lazy until first request\nassert next(g) == (0, 1, 2, 3) and src.pulled == 4\nassert next(g) == (4, 5, 6, 7) and src.pulled == 8\n\nsrc = Source()\nw = sliding_window(src, 3)\nassert src.pulled == 0\nassert next(w) == (0, 1, 2) and src.pulled == 3\nassert next(w) == (1, 2, 3) and src.pulled == 4   # one new item per window\n\n# yielded windows are independent snapshots\nsrc = Source()\nw = sliding_window(src, 2)\na, b = next(w), next(w)\nassert a == (0, 1) and b == (1, 2)\n",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "problem": "Unclear: it is true only for one-shot iterators, and the real pitfall is creating more than one iterator. Rewrite to be precise.",
+    "claim": "Pitfall: calling list(it) or islice on the original iterable twice would silently skip items; only one iterator must be shared."
+   }
+  ]
+ },
+ {
+  "id": "smi-h0029",
+  "plan_id": "P2-PY-07",
+  "domain": "Python",
+  "difficulty": "Medium",
+  "question": "Write pairwise_sq_dists(A, B) in NumPy, with no Python loops, where A has shape (n, d) and B has shape (m, d), returning an (n, m) matrix D with D[i, j] = sum_k (A[i,k] - B[j,k])**2. Use the expansion ||a-b||^2 = ||a||^2 + ||b||^2 - 2 a.b so that the work is a matrix product. Make sure the result is never negative. Also give the plain broadcasting version pairwise_sq_dists_broadcast(A, B) using A[:, None, :] - B[None, :, :], and explain the memory trade-off and the numerical issue with the expansion.\n\nExample: A = [[0,0],[1,1]], B = [[0,0],[3,4]] gives [[0, 25], [2, 13]].",
+  "answer": "The expansion version computes row norms of A and B, adds them with broadcasting (shapes (n,1) and (1,m)), and subtracts 2*A@B.T, which uses optimised BLAS. Rounding can make tiny true-zero or near-zero entries slightly negative, so clip at 0 (important if you later take a square root, which would give NaN). Centering both sets by a common mean first reduces cancellation when the data sit far from the origin, because distances are translation invariant.\n\n```python\nimport numpy as np\n\ndef pairwise_sq_dists(A, B):\n    A = np.asarray(A, dtype=float)\n    B = np.asarray(B, dtype=float)\n    mu = np.concatenate([A, B], axis=0).mean(axis=0)\n    A = A - mu\n    B = B - mu\n    a2 = np.einsum(\"ij,ij->i\", A, A)[:, None]\n    b2 = np.einsum(\"ij,ij->i\", B, B)[None, :]\n    D = a2 + b2 - 2.0 * (A @ B.T)\n    np.maximum(D, 0.0, out=D)\n    return D\n\ndef pairwise_sq_dists_broadcast(A, B):\n    A = np.asarray(A, dtype=float)\n    B = np.asarray(B, dtype=float)\n    diff = A[:, None, :] - B[None, :, :]\n    return (diff ** 2).sum(axis=-1)\n```\n\nMemory: the broadcast version materialises an (n, m, d) temporary (and diff ** 2 a second one), e.g. 5,000 x 5,000 x 128 float64 is about 25.6 GB each, while the expansion needs only the (n, m) output plus small vectors. The broadcast form is numerically accurate (no cancellation between large norms) and simplest for small inputs, or can be processed in chunks of rows of A. Numerical issue: when ||a||^2 and ||b||^2 are large and nearly equal, subtracting them cancels most significant digits (catastrophic cancellation), so close points can get inaccurate or slightly negative distances; hence the clip and the centering. For float32 inputs the error is much larger, so accumulate in float64 if accuracy matters.",
+  "key_concepts": [
+   "broadcasting",
+   "squared Euclidean distance expansion",
+   "matrix multiplication (BLAS)",
+   "catastrophic cancellation",
+   "memory footprint of temporaries",
+   "clipping negative values"
+  ],
+  "common_mistakes": [
+   "Taking sqrt of unclipped values and getting NaN",
+   "Using the broadcast version on large n, m, d and running out of memory",
+   "Forgetting the 2*A@B.T term's transpose or the (n,1)/(1,m) shapes"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\ndef pairwise_sq_dists(A, B):\n    A = np.asarray(A, dtype=float)\n    B = np.asarray(B, dtype=float)\n    mu = np.concatenate([A, B], axis=0).mean(axis=0)\n    A = A - mu\n    B = B - mu\n    a2 = np.einsum(\"ij,ij->i\", A, A)[:, None]\n    b2 = np.einsum(\"ij,ij->i\", B, B)[None, :]\n    D = a2 + b2 - 2.0 * (A @ B.T)\n    np.maximum(D, 0.0, out=D)\n    return D\n\ndef pairwise_sq_dists_broadcast(A, B):\n    A = np.asarray(A, dtype=float)\n    B = np.asarray(B, dtype=float)\n    diff = A[:, None, :] - B[None, :, :]\n    return (diff ** 2).sum(axis=-1)",
+   "test": "\nimport numpy as np\n\ndef naive(A, B):\n    out = np.zeros((len(A), len(B)))\n    for i in range(len(A)):\n        for j in range(len(B)):\n            s = 0.0\n            for k in range(len(A[0])):\n                s += (A[i][k] - B[j][k]) ** 2\n            out[i, j] = s\n    return out\n\nA0 = [[0, 0], [1, 1]]\nB0 = [[0, 0], [3, 4]]\nassert np.allclose(pairwise_sq_dists(A0, B0), [[0, 25], [2, 13]])\nassert np.allclose(pairwise_sq_dists_broadcast(A0, B0), [[0, 25], [2, 13]])\n\nrng = np.random.default_rng(0)\nA = rng.normal(size=(7, 5))\nB = rng.normal(size=(4, 5))\nD = pairwise_sq_dists(A, B)\nassert D.shape == (7, 4)\nassert np.allclose(D, naive(A.tolist(), B.tolist()), atol=1e-9)\nassert np.allclose(D, pairwise_sq_dists_broadcast(A, B), atol=1e-9)\n\n# self distances: zero diagonal (within tolerance), symmetric, never negative\nS = pairwise_sq_dists(A, A)\nassert S.min() >= 0.0\nassert np.allclose(np.diag(S), 0.0, atol=1e-9)\nassert np.allclose(S, S.T)\n\n# data far from the origin: centering keeps the expansion accurate\nAf = A + 1e6\nDf = pairwise_sq_dists(Af, Af)\nassert Df.min() >= 0.0\nassert np.allclose(Df, S, atol=1e-4)\n\n# single dimension, one row each\nassert np.allclose(pairwise_sq_dists([[2.0]], [[5.0]]), [[9.0]])\n# inputs are not modified\nA_copy = A.copy()\npairwise_sq_dists(A, B)\nassert np.array_equal(A, A_copy)\n",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "problem": "Floating-point subtraction/sum is not 'exact'; it is just numerically well-conditioned compared with the expansion.",
+    "claim": "The broadcast form is exact and simplest for small inputs"
+   },
+   {
+    "severity": "minor",
+    "problem": "25.6 GB is correct per array but diff**2 creates a second same-size temporary, so peak is roughly double.",
+    "claim": "the broadcast version materialises an (n, m, d) temporary, e.g. 5,000 x 5,000 x 128 float64 is about 25.6 GB"
+   }
+  ]
+ },
+ {
+  "id": "smi-h0032",
+  "plan_id": "P2-PY-10",
+  "domain": "Python",
+  "difficulty": "Medium",
+  "question": "This function is correct but too slow on large lists:\n\ndef has_duplicates_quadratic(items):\n    for i in range(len(items)):\n        for j in range(i + 1, len(items)):\n            if items[i] == items[j]:\n                return True\n    return False\n\nRewrite it as has_duplicates(items) running in O(n) expected time for hashable items, and as has_duplicates_sorted(items) for items that are orderable but not hashable (e.g. lists). Prove the complexity claim without wall-clock timing: write a wrapper class that counts __eq__ calls (and __hash__ / __lt__ calls) and show that on 200 unique items the quadratic version makes n(n-1)/2 comparisons while the hash version makes at most 2n hash calls and fewer than n equality calls. Finally, when would sorting beat hashing?",
+  "answer": "Hashing: add each item to a set and stop when an add does not grow the set; each add costs O(1) expected, so O(n) total, with O(n) extra memory. Sorting: sort a copy (O(n log n) comparisons), then equal items must be adjacent, so one pass over neighbouring pairs finds them; this needs only orderable items, not hashable ones.\n\n```python\ndef has_duplicates_quadratic(items):\n    for i in range(len(items)):\n        for j in range(i + 1, len(items)):\n            if items[i] == items[j]:\n                return True\n    return False\n\ndef has_duplicates(items):\n    seen = set()\n    for x in items:\n        size = len(seen)\n        seen.add(x)\n        if len(seen) == size:\n            return True\n    return False\n\ndef has_duplicates_sorted(items):\n    ordered = sorted(items)\n    return any(a == b for a, b in zip(ordered, ordered[1:]))\n```\n\nSorting beats hashing when items are unhashable but orderable (lists, or objects with __lt__ but no usable __hash__), when memory is tight and you may reorder the data (list.sort() in place avoids the set and the copy that sorted() makes, though CPython's Timsort can still use up to about n/2 temporary slots, so this saves a constant factor rather than reaching O(1) extra space), when hashing is expensive or adversarially collision-prone, or when you need the duplicates grouped anyway. Hashing wins on raw asymptotics for hashable data: expected O(n) versus O(n log n). Caveats: \"O(n)\" for sets is expected-case and assumes a good hash; the quadratic version has early exit, so its worst case is the all-unique input. Items equal by == must hash equally for the set approach to be right (e.g. 1 and 1.0 count as duplicates).\n\nCaveat: the set version first checks identity, so the same float('nan') object counted twice is reported as a duplicate even though nan != nan; the quadratic and sorted versions say False.\n\nCounting wrapper used for the demonstration (not part of the solutions):\n\n```python\nclass Counted:\n    eq_calls = hash_calls = lt_calls = 0\n    def __init__(self, v):\n        self.v = v\n    def __eq__(self, other):\n        Counted.eq_calls += 1\n        return self.v == other.v\n    def __hash__(self):\n        Counted.hash_calls += 1\n        return hash(self.v)\n    def __lt__(self, other):\n        Counted.lt_calls += 1\n        return self.v < other.v\n```\n\nWith 200 unique `Counted` items, `has_duplicates_quadratic` makes exactly 200*199/2 = 19,900 `__eq__` calls; `has_duplicates` makes 200 `__hash__` calls and 0 `__eq__` calls (equality is consulted only when full hashes collide); `has_duplicates_sorted` makes roughly n log2 n `__lt__` calls on shuffled input (measured: see the test, which asserts an upper bound).",
+  "key_concepts": [
+   "time complexity O(n^2) vs O(n)",
+   "hash set",
+   "sorting and adjacent comparison",
+   "operation counting",
+   "hashability",
+   "space-time trade-off"
+  ],
+  "common_mistakes": [
+   "Using `x in seen` followed by add, which hashes twice (still O(n) but doubles the work)",
+   "Calling list.count or `in` on a list inside a loop, which is still quadratic",
+   "Claiming hashing is always O(1) worst-case"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "def has_duplicates_quadratic(items):\n    for i in range(len(items)):\n        for j in range(i + 1, len(items)):\n            if items[i] == items[j]:\n                return True\n    return False\n\ndef has_duplicates(items):\n    seen = set()\n    for x in items:\n        size = len(seen)\n        seen.add(x)\n        if len(seen) == size:\n            return True\n    return False\n\ndef has_duplicates_sorted(items):\n    ordered = sorted(items)\n    return any(a == b for a, b in zip(ordered, ordered[1:]))",
+   "test": "\nimport math\n\nclass Counted:\n    eq_calls = hash_calls = lt_calls = 0\n    def __init__(self, v):\n        self.v = v\n    def __eq__(self, other):\n        Counted.eq_calls += 1\n        return self.v == other.v\n    def __hash__(self):\n        Counted.hash_calls += 1\n        return hash(self.v)\n    def __lt__(self, other):\n        Counted.lt_calls += 1\n        return self.v < other.v\n\ndef reset():\n    Counted.eq_calls = Counted.hash_calls = Counted.lt_calls = 0\n\nn = 200\nunique = [Counted(i) for i in range(n)]\n\nreset()\nassert has_duplicates_quadratic(unique) is False\nassert Counted.eq_calls == n * (n - 1) // 2\n\nreset()\nassert has_duplicates(unique) is False\nassert Counted.hash_calls <= 2 * n\nassert Counted.eq_calls < n\n\nimport random\nshuffled = unique[:]\nrandom.Random(7).shuffle(shuffled)\nreset()\nassert has_duplicates_sorted(shuffled) is False\nassert Counted.lt_calls <= n * math.ceil(math.log2(n))\n\n# correctness on small cases, including a duplicate\ncases = [([], False), ([1], False), ([1, 2, 3], False), ([1, 2, 1], True),\n         ([5, 5], True), ([\"a\", \"b\", \"a\"], True), ([1, 1.0], True)]\nfor items, expected in cases:\n    assert has_duplicates_quadratic(items) is expected\n    assert has_duplicates(items) is expected\n    assert has_duplicates_sorted(items) is expected\n\n# unhashable but orderable items\nassert has_duplicates_sorted([[1, 2], [3], [1, 2]]) is True\nassert has_duplicates_sorted([[1, 2], [3]]) is False\ntry:\n    has_duplicates([[1], [2]])\nexcept TypeError:\n    pass\nelse:\n    raise AssertionError(\"lists are unhashable\")\n\n# input list is not reordered by the sorted version\ndata = [3, 1, 2, 1]\nhas_duplicates_sorted(data)\nassert data == [3, 1, 2, 1]\n",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "major",
+    "problem": "The question asks to write the counting wrapper and show the counts; the answer text and fenced code never include it (only the hidden test does).",
+    "claim": "Prove the complexity claim ... write a wrapper class that counts __eq__ calls (question) / answer text has no counting class or numbers"
+   },
+   {
+    "severity": "major",
+    "problem": "CPython's list.sort (Timsort) may allocate up to ~n/2 temporary slots, so it is not O(1) extra space; and the shown has_duplicates_sorted uses sorted(), which copies (O(n)).",
+    "claim": "when memory is tight (an in-place sort of data you may reorder needs O(1) extra space versus the set's O(n))"
+   },
+   {
+    "severity": "minor",
+    "problem": "Versions disagree on NaN: for one shared nan object, quadratic -> False, sorted -> False, but has_duplicates -> True (set uses identity before ==). Worth one sentence on 'equal by ==' vs identity.",
+    "claim": "(not stated)"
+   }
+  ]
+ },
+ {
+  "id": "smi-h0033",
+  "plan_id": "P2-PY-11",
+  "domain": "Python",
+  "difficulty": "Hard",
+  "question": "An application writes lines like:\n\n2026-03-01T12:00:05Z ERROR svc=auth msg=\"token \\\"abc\\\" expired\" latency_ms=250\n2026-03-01T12:00:06Z INFO svc=api\n\nWrite parse_log(lines) returning (records, n_malformed) and to_jsonl(records) returning a string with one JSON object per line.\n\nFormat: an ISO-like UTC timestamp (YYYY-MM-DDTHH:MM:SSZ), one space-separated level among DEBUG, INFO, WARNING, ERROR, then zero or more key=value pairs. Values are either a bare token without spaces or a double-quoted string in which \\\" and \\\\ are escapes. Each record is {\"ts\", \"level\", \"fields\": {...}} where fields whose bare or quoted value is an integer (optional minus sign, digits only, bare form only) become int and the rest stay strings; repeated keys: last wins. Blank lines are ignored (not counted). Any other line, including an unterminated quote, an unknown level, or junk between pairs, is counted as malformed and skipped. Use a compiled regex with named groups.",
+  "answer": "Use one compiled regex for the line prefix (ts, level, rest) and a second compiled regex with named groups for a key=value pair, applied repeatedly with .match(rest, pos) so that any text that is not a valid pair (or whitespace) is detected as malformed rather than silently skipped, which findall/finditer would do. Unescape quoted values with a small re.sub.\n\n```python\nimport json\nimport re\n\nLINE_RE = re.compile(\n    r\"^(?P<ts>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)\"\n    r\"\\s+(?P<level>DEBUG|INFO|WARNING|ERROR)\"\n    r\"(?P<rest>(?:\\s.*)?)$\"\n)\nPAIR_RE = re.compile(\n    r'\\s*(?P<key>\\w+)=(?:\"(?P<quoted>(?:[^\"\\\\]|\\\\.)*)\"|(?P<bare>[^\\s\"]+))'\n)\nUNESCAPE_RE = re.compile(r'\\\\([\"\\\\])')\nINT_RE = re.compile(r\"-?[0-9]+\")\n\ndef _parse_fields(rest):\n    fields = {}\n    pos = 0\n    while pos < len(rest):\n        if rest[pos:].strip() == \"\":\n            break\n        m = PAIR_RE.match(rest, pos)\n        if m is None:\n            return None\n        if m.group(\"quoted\") is not None:\n            value = UNESCAPE_RE.sub(r\"\\1\", m.group(\"quoted\"))\n        else:\n            value = m.group(\"bare\")\n            if INT_RE.fullmatch(value):\n                value = int(value)\n        fields[m.group(\"key\")] = value\n        pos = m.end()\n        if pos < len(rest) and not rest[pos].isspace():\n            return None\n    return fields\n\ndef parse_log(lines):\n    records = []\n    malformed = 0\n    for line in lines:\n        line = line.rstrip(\"\\r\\n\")\n        if line.strip() == \"\":\n            continue\n        m = LINE_RE.match(line)\n        fields = _parse_fields(m.group(\"rest\")) if m else None\n        if fields is None:\n            malformed += 1\n            continue\n        records.append({\"ts\": m.group(\"ts\"), \"level\": m.group(\"level\"), \"fields\": fields})\n    return records, malformed\n\ndef to_jsonl(records):\n    return \"\\n\".join(json.dumps(r, sort_keys=True, ensure_ascii=False) for r in records)\n```\n\nDesign points: the pair regex uses an alternation of a quoted string (with escapes handled by (?:[^\"\\\\]|\\\\.)*) or a bare token, so quotes containing spaces and = work. Looping with match(rest, pos) enforces that the whole remainder is consumed; finditer would skip junk and accept corrupt lines. Reject a pair directly followed by a non-space character (for example a closing quote followed by text). Return a count instead of raising so one bad line does not abort a batch, but in production you would also log a few samples. json.dumps handles escaping on output; sort_keys makes output deterministic. Regex is fine for this flat format; for nested or evolving formats, prefer emitting JSON logs at the source.",
+  "key_concepts": [
+   "compiled regex",
+   "named groups",
+   "re.match with pos",
+   "escape handling in quoted values",
+   "malformed input accounting",
+   "JSON Lines",
+   "json.dumps"
+  ],
+  "common_mistakes": [
+   "Using findall/finditer so junk between pairs is silently ignored",
+   "A quoted-string pattern like \"[^\"]*\" that breaks on escaped quotes",
+   "Letting one bad line raise and abort the whole batch"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import json\nimport re\n\nLINE_RE = re.compile(\n    r\"^(?P<ts>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)\"\n    r\"\\s+(?P<level>DEBUG|INFO|WARNING|ERROR)\"\n    r\"(?P<rest>(?:\\s.*)?)$\"\n)\nPAIR_RE = re.compile(\n    r'\\s*(?P<key>\\w+)=(?:\"(?P<quoted>(?:[^\"\\\\]|\\\\.)*)\"|(?P<bare>[^\\s\"]+))'\n)\nUNESCAPE_RE = re.compile(r'\\\\([\"\\\\])')\nINT_RE = re.compile(r\"-?[0-9]+\")\n\ndef _parse_fields(rest):\n    fields = {}\n    pos = 0\n    while pos < len(rest):\n        if rest[pos:].strip() == \"\":\n            break\n        m = PAIR_RE.match(rest, pos)\n        if m is None:\n            return None\n        if m.group(\"quoted\") is not None:\n            value = UNESCAPE_RE.sub(r\"\\1\", m.group(\"quoted\"))\n        else:\n            value = m.group(\"bare\")\n            if INT_RE.fullmatch(value):\n                value = int(value)\n        fields[m.group(\"key\")] = value\n        pos = m.end()\n        if pos < len(rest) and not rest[pos].isspace():\n            return None\n    return fields\n\ndef parse_log(lines):\n    records = []\n    malformed = 0\n    for line in lines:\n        line = line.rstrip(\"\\r\\n\")\n        if line.strip() == \"\":\n            continue\n        m = LINE_RE.match(line)\n        fields = _parse_fields(m.group(\"rest\")) if m else None\n        if fields is None:\n            malformed += 1\n            continue\n        records.append({\"ts\": m.group(\"ts\"), \"level\": m.group(\"level\"), \"fields\": fields})\n    return records, malformed\n\ndef to_jsonl(records):\n    return \"\\n\".join(json.dumps(r, sort_keys=True, ensure_ascii=False) for r in records)",
+   "test": "\nimport json\n\nlines = [\n    '2026-03-01T12:00:05Z ERROR svc=auth msg=\"token \\\\\"abc\\\\\" expired\" latency_ms=250',\n    '2026-03-01T12:00:06Z INFO svc=api',\n    '',\n    '   ',\n    '2026-03-01T12:00:07Z DEBUG',\n    'garbage line',\n    '2026-03-01T12:00:08Z TRACE svc=x',\n    '2026-03-01T12:00:09Z INFO msg=\"unterminated',\n    '2026-03-01T12:00:10Z INFO svc=a junk svc2=b',\n    '2026-03-01T12:00:11Z WARNING a=1 a=2 neg=-5 f=1.5 q=\"7\" path=\"C:\\\\\\\\tmp\" eq=\"x=y z\"',\n    '2026-03-01T12:00:12Z INFO msg=\"ok\"extra=1',\n    '2026-03-01 12:00:13 INFO svc=a',\n]\nrecords, bad = parse_log(lines)\nassert bad == 6, bad\nassert len(records) == 4\n\nr0, r1, r2, r3 = records\nassert r0 == {\"ts\": \"2026-03-01T12:00:05Z\", \"level\": \"ERROR\",\n              \"fields\": {\"svc\": \"auth\", \"msg\": 'token \"abc\" expired', \"latency_ms\": 250}}\nassert r1[\"fields\"] == {\"svc\": \"api\"}\nassert r2 == {\"ts\": \"2026-03-01T12:00:07Z\", \"level\": \"DEBUG\", \"fields\": {}}\nassert r3[\"level\"] == \"WARNING\"\nf = r3[\"fields\"]\nassert f[\"a\"] == 2 and f[\"neg\"] == -5 and f[\"f\"] == \"1.5\"\nassert f[\"q\"] == \"7\" and isinstance(f[\"q\"], str)       # quoted stays a string\nassert f[\"path\"] == \"C:\\\\tmp\"\nassert f[\"eq\"] == \"x=y z\"\n\nout = to_jsonl(records)\nrows = [json.loads(x) for x in out.split(\"\\n\")]\nassert rows == records\nassert len(out.split(\"\\n\")) == 4\nassert to_jsonl([]) == \"\"\n\n# empty input and trailing newlines\nassert parse_log([]) == ([], 0)\nrec, bad = parse_log([\"2026-03-01T00:00:00Z INFO k=v\\n\", \"2026-03-01T00:00:00Z INFO k=v\\r\\n\"])\nassert len(rec) == 2 and bad == 0 and rec[0] == rec[1]\n",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "major",
+    "problem": "In Python 3 str patterns \\d matches any Unicode decimal digit: 'k=\u0663' is parsed as int 3 and a timestamp '\u0662\u0660\u0662\u0666-03-01T12:00:05Z' is accepted (both verified), contradicting 'digits only' and 'YYYY-MM-DD...'. Fix in answer text AND code.solution (tests still pass).",
+    "claim": "r\"^(?P<ts>\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z)\"  and  INT_RE = re.compile(r\"-?\\d+\")"
+   },
+   {
+    "severity": "minor",
+    "problem": "\\s also matches \\x0b, \\x0c and U+2028 etc., so 'a=\"x\"\\u2028b=1' parses as two pairs although the spec says space-separated. Acceptable but undocumented.",
+    "claim": "\\s+ / \\s separators"
+   },
+   {
+    "severity": "minor",
+    "problem": "With ensure_ascii=False a U+2028 in a value stays raw and str.splitlines() would split the line (verified); split('\\n') is safe. Consider ensure_ascii=True or note it.",
+    "claim": "json.dumps(r, sort_keys=True, ensure_ascii=False)"
+   },
+   {
+    "severity": "minor",
+    "problem": "Timestamp ranges are not validated ('2026-13-45T99:99:99Z' accepted) - consistent with 'ISO-like' but should be stated; unknown escapes like \\n are kept literally.",
+    "claim": "(not stated)"
+   }
+  ]
+ }
+]

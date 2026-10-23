@@ -1,0 +1,51 @@
+[
+ {
+  "cell_id": "MLO-08",
+  "topic": "Production monitoring and drift operations (input/prediction drift, PSI/KS, delayed labels, alert design)",
+  "count": 8,
+  "type_hint": "scenario;evaluation;coding;debugging",
+  "guidance": "Operational angles, not statistics theory. E.g. what to monitor when labels arrive 30 days late (input, prediction and proxy metrics, then backfilled performance); choosing PSI vs KS vs simple summary stats and what each cannot tell you; PSI bin choice and its sensitivity to small/zero bins (tested example: compute PSI with quantile bins from a reference sample, handle empty bins, show instability with few bins); alert fatigue (thresholds from historical variability, persistence windows, severity tiers, alerting on symptoms not every feature); covariate vs prior vs concept drift and which can be detected without labels; drift that is harmless vs harmful; a false drift alarm caused by an upstream schema/unit change or a null-rate change (debugging); monitoring a slice vs the aggregate; monitoring cost/sampling of logged payloads; distinguishing data-quality incidents from real drift. Avoid repeating batch-3 serving-layer monitoring (latency/error SLIs, SLO alerting) - see the existing list."
+ },
+ {
+  "cell_id": "MLO-09",
+  "topic": "Retraining and automation (triggers, continuous training, champion/challenger, rollback of a retrain)",
+  "count": 5,
+  "type_hint": "scenario;concept;evaluation",
+  "guidance": "Retrain triggers (schedule vs drift vs performance-decay vs data-volume) and their failure modes; why retraining on drifted/contaminated data can make things worse (feedback loops, label delay, training on the model's own selected outcomes); champion/challenger and promotion gates that compare on the same recent window incl. slices; automated retraining guardrails (data validation before training, minimum improvement margin, human approval for risky models, cooldown); a retrain that improved offline metrics but hurt online; warm-start vs full retrain; Easy: what continuous training means and how it differs from CI/CD for code."
+ },
+ {
+  "cell_id": "MLO-10",
+  "topic": "Data and model validation in production pipelines (training-time vs serving-time checks, slice metrics, expectations)",
+  "count": 4,
+  "type_hint": "coding;debugging;concept",
+  "guidance": "Batch 3 covered a CI promotion gate and basic data validation: add DIFFERENT angles - e.g. a tested pandas/numpy (stdlib+numpy only for recorded code; SQL via sqlite3 allowed) validation of a serving batch against a training schema (type, range, null rate, unseen categories) with fail vs warn semantics; a SQL query (sqlite3, tested) that finds training-serving mismatch or label leakage via timestamps (point-in-time correctness); debugging a pipeline that silently passes because validation compared a dataset with itself/skipped empty slices; model validation beyond aggregate metric (behavioural/invariance tests, slice floors with sample-size guard)."
+ },
+ {
+  "cell_id": "MLO-11",
+  "topic": "Security, governance, lineage and compliance for ML systems (model cards, audit trails, access control, supply chain, privacy)",
+  "count": 5,
+  "type_hint": "concept;scenario;design",
+  "guidance": "Security and governance as operations: model/artifact supply chain (unsafe deserialization, hash/signature verification of artifacts, pinned dependencies, scanning), least-privilege access to training data and registry, secrets handling, audit trail and lineage requirements (which data, code, approval produced the deployed model), model cards/documentation as release artifacts, PII in logged features/predictions (retention, minimisation, pseudonymised data is still personal data), model inversion/membership inference at the level of what the risk is and cheap mitigations (rate limiting, output rounding as partial), approval workflows, right-to-erasure vs a trained model (what can/cannot be promised). Do not give legal advice; describe engineering controls and say 'depends on jurisdiction/legal counsel' where needed. Time-sensitive regulation names: avoid or flag. Keep tool-agnostic unless docs opened."
+ },
+ {
+  "cell_id": "MLO-12",
+  "topic": "Reliability, incident response, rollback/recovery, performance and cost (SLOs, scaling, GPU utilisation, spend)",
+  "count": 9,
+  "type_hint": "scenario;debugging;business_case;design;concept",
+  "guidance": "Production incidents: latency regression after a model update (what to check in order), model returns NaNs/constant output after a library bump, memory leak / OOM growth over hours, a rollback that does not restore behaviour because the feature pipeline or preprocessing also changed (rollback needs the whole bundle: model + preprocessing + feature definitions + config), rollback vs roll-forward decision, recovery when the registry/feature store is down (fallback model, cached features, graceful degradation, default predictions), error budget burn policy for ML, runbook/postmortem for a silent quality failure; cost and scaling: GPU utilisation and batching vs latency, right-sizing, spot/preemptible capacity for training vs serving trade-offs (generic, no prices), autoscaling on queue depth vs CPU, scale-to-zero cold-start trade-off, cost per 1k predictions as a metric with a concrete hypothetical calculation, when a smaller/distilled/quantised model is the cheaper fix, caching predictions. Include at least one business_case. No prices or vendor limits."
+ },
+ {
+  "cell_id": "MLO-13",
+  "topic": "LLMOps specifics (prompt versioning, eval gates, token cost, guardrail monitoring)",
+  "count": 4,
+  "type_hint": "scenario;concept",
+  "guidance": "Prompt/template versioned as code with a regression eval set before release; model-provider version change risk (pin versions, canary on eval set); monitoring LLM apps (latency by stage, token usage per request, refusal/guardrail trigger rates, user feedback, quality sampling with rubric/LLM judge and its limits); token cost control (caching, shorter context, routing to smaller model, budget alerts per tenant). Keep different from batch-2 GenAI serving/cost items (see existing list): focus on release and operations process. time_sensitive true where tied to provider behaviour."
+ },
+ {
+  "cell_id": "MLO-14",
+  "topic": "MLOps case studies, deployment tests (canary/shadow/A-B) and online/offline consistency incidents",
+  "count": 6,
+  "type_hint": "debugging;business_case;scenario",
+  "guidance": "Integrated cases that go beyond batch 3's MLO-05 and MLO-07: a canary passes technical gates but business metric drops a week later (novelty/seasonality, delayed labels); a shadow deployment shows identical predictions yet production would break (side effects, latency under real traffic, feature freshness); A/B test contaminated by a model that updates online or by sticky caches (interference, SUTVA-style spillover, network effects) - operational view; offline AUC up but online conversion flat (offline/online metric mismatch, selection bias, position effects); online/offline feature mismatch found through a consistency check (log-and-compare features served vs recomputed offline, tolerance design, root-causing with timestamps); a business-impact write-up: choosing between investing in monitoring vs a new model with hypothetical numbers."
+ }
+]

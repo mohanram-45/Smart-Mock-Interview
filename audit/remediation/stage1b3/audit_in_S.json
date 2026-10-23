@@ -1,0 +1,569 @@
+[
+ {
+  "id": "smi-g0027",
+  "domain": "SQL",
+  "topic": "Window functions",
+  "question_type": "sql_exercise",
+  "question": "Table employees(id INTEGER PRIMARY KEY, name TEXT, dept TEXT, salary INTEGER) holds, per department, these (name, salary) rows:\nEng: Ana 150, Ben 140, Cy 140, Dee 130, Eli 120\nSales: Fay 100, Gus 100, Hal 100, Ivy 90\nHR: Jo 80, Kim 70\nWrite one query that returns the employees in the top 3 salary levels of each department (ties share a level, so a department may return more than 3 people). Output columns: dept, name, salary, rn, rnk, drnk, where rn, rnk and drnk are ROW_NUMBER, RANK and DENSE_RANK over salary DESC within the department (break the ROW_NUMBER tie by name). Order by dept, salary DESC, name. Then explain, using your output, how the three functions differ and which one you would pick for \"top 3 people\" versus \"top 3 salary levels\".",
+  "answer": "Compute all three ranking functions in a subquery partitioned by dept and filter on the outer query, because window functions are only allowed in the select list and ORDER BY, not in WHERE. Filtering drnk <= 3 gives the top 3 salary levels.\n\n```sql\nSELECT dept, name, salary, rn, rnk, drnk\nFROM (\n  SELECT dept, name, salary,\n         ROW_NUMBER() OVER (PARTITION BY dept ORDER BY salary DESC, name) AS rn,\n         RANK()       OVER (PARTITION BY dept ORDER BY salary DESC)       AS rnk,\n         DENSE_RANK() OVER (PARTITION BY dept ORDER BY salary DESC)       AS drnk\n  FROM employees\n)\nWHERE drnk <= 3\nORDER BY dept, salary DESC, name;\n```\n\nReading the output: in Eng, Ben and Cy both earn 140. ROW_NUMBER still gives them 2 and 3 (the order between them is arbitrary unless you add a tiebreaker, here name). RANK gives both 2 and then skips to 4 for Dee. DENSE_RANK gives both 2 and Dee gets 3, no gap. In Sales, Fay, Gus and Hal all have rank 1 and dense rank 1, but ROW_NUMBER numbers them 1, 2, 3, and Ivy has rnk 4 but drnk 2. So Dee and Ivy are returned only because the filter is on DENSE_RANK; HR returns 2 rows because it has only 2 people.\n\nChoosing: ROW_NUMBER <= 3 for exactly 3 people per department (needs a deterministic tiebreaker, otherwise the cut-off among tied people is arbitrary); RANK <= 3 for \"everyone who finishes in the top 3 positions\" (Sales would return 3 people at rank 1, Ivy excluded, Eng returns Ana, Ben, Cy); DENSE_RANK <= 3 for the top 3 distinct salary values.",
+  "key_concepts": [
+   "ROW_NUMBER",
+   "RANK",
+   "DENSE_RANK",
+   "PARTITION BY",
+   "window function in subquery",
+   "ties",
+   "deterministic tiebreaker"
+  ],
+  "common_mistakes": [
+   "Putting RANK() OVER (...) <= 3 directly in WHERE",
+   "Using ROW_NUMBER for 'top salary levels' and silently dropping tied employees, or relying on its arbitrary order among ties",
+   "Using LIMIT 3 per group via a plain GROUP BY"
+  ],
+  "interview_style_note": "Strong candidate wraps the window query in a subquery/CTE, explains gap vs no-gap numbering from the actual tie rows, and adds a tiebreaker to ROW_NUMBER.",
+  "sources": [
+   {
+    "title": "SQLite: Window Functions",
+    "url": "https://www.sqlite.org/windowfunctions.html",
+    "supports": "Window functions may only appear in the result set and ORDER BY of a SELECT, so filtering on them needs an outer query.",
+    "verification": "independent_reviewer_supported"
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE employees (id INTEGER PRIMARY KEY, name TEXT NOT NULL, dept TEXT NOT NULL, salary INTEGER NOT NULL);\nINSERT INTO employees VALUES\n(1,'Ana','Eng',150),(2,'Ben','Eng',140),(3,'Cy','Eng',140),(4,'Dee','Eng',130),(5,'Eli','Eng',120),\n(6,'Fay','Sales',100),(7,'Gus','Sales',100),(8,'Hal','Sales',100),(9,'Ivy','Sales',90),\n(10,'Jo','HR',80),(11,'Kim','HR',70);",
+   "solution": "SELECT dept, name, salary, rn, rnk, drnk\nFROM (\n  SELECT dept, name, salary,\n         ROW_NUMBER() OVER (PARTITION BY dept ORDER BY salary DESC, name) AS rn,\n         RANK()       OVER (PARTITION BY dept ORDER BY salary DESC)       AS rnk,\n         DENSE_RANK() OVER (PARTITION BY dept ORDER BY salary DESC)       AS drnk\n  FROM employees\n)\nWHERE drnk <= 3\nORDER BY dept, salary DESC, name;",
+   "expected": [
+    [
+     "Eng",
+     "Ana",
+     150,
+     1,
+     1,
+     1
+    ],
+    [
+     "Eng",
+     "Ben",
+     140,
+     2,
+     2,
+     2
+    ],
+    [
+     "Eng",
+     "Cy",
+     140,
+     3,
+     2,
+     2
+    ],
+    [
+     "Eng",
+     "Dee",
+     130,
+     4,
+     4,
+     3
+    ],
+    [
+     "HR",
+     "Jo",
+     80,
+     1,
+     1,
+     1
+    ],
+    [
+     "HR",
+     "Kim",
+     70,
+     2,
+     2,
+     2
+    ],
+    [
+     "Sales",
+     "Fay",
+     100,
+     1,
+     1,
+     1
+    ],
+    [
+     "Sales",
+     "Gus",
+     100,
+     2,
+     1,
+     1
+    ],
+    [
+     "Sales",
+     "Hal",
+     100,
+     3,
+     1,
+     1
+    ],
+    [
+     "Sales",
+     "Ivy",
+     90,
+     4,
+     4,
+     2
+    ]
+   ],
+   "test": "import sqlite3\nSETUP = \"CREATE TABLE employees (id INTEGER PRIMARY KEY, name TEXT NOT NULL, dept TEXT NOT NULL, salary INTEGER NOT NULL);\\nINSERT INTO employees VALUES\\n(1,'Ana','Eng',150),(2,'Ben','Eng',140),(3,'Cy','Eng',140),(4,'Dee','Eng',130),(5,'Eli','Eng',120),\\n(6,'Fay','Sales',100),(7,'Gus','Sales',100),(8,'Hal','Sales',100),(9,'Ivy','Sales',90),\\n(10,'Jo','HR',80),(11,'Kim','HR',70);\"\nSOLUTION = 'SELECT dept, name, salary, rn, rnk, drnk\\nFROM (\\n  SELECT dept, name, salary,\\n         ROW_NUMBER() OVER (PARTITION BY dept ORDER BY salary DESC, name) AS rn,\\n         RANK()       OVER (PARTITION BY dept ORDER BY salary DESC)       AS rnk,\\n         DENSE_RANK() OVER (PARTITION BY dept ORDER BY salary DESC)       AS drnk\\n  FROM employees\\n)\\nWHERE drnk <= 3\\nORDER BY dept, salary DESC, name;'\nEXPECTED = [['Eng', 'Ana', 150, 1, 1, 1], ['Eng', 'Ben', 140, 2, 2, 2], ['Eng', 'Cy', 140, 3, 2, 2], ['Eng', 'Dee', 130, 4, 4, 3], ['HR', 'Jo', 80, 1, 1, 1], ['HR', 'Kim', 70, 2, 2, 2], ['Sales', 'Fay', 100, 1, 1, 1], ['Sales', 'Gus', 100, 2, 1, 1], ['Sales', 'Hal', 100, 3, 1, 1], ['Sales', 'Ivy', 90, 4, 4, 2]]\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nparts = [p for p in SOLUTION.split(';') if p.strip()]\nfor p in parts[:-1]:\n    con.execute(p)\nrows = [list(r) for r in con.execute(parts[-1]).fetchall()]\nassert rows == EXPECTED, rows\n\ncon2 = sqlite3.connect(':memory:'); con2.executescript(SETUP)\ntry:\n    con2.execute(\"SELECT name FROM employees WHERE RANK() OVER (PARTITION BY dept ORDER BY salary DESC) <= 3\")\n    raise SystemExit('window function in WHERE unexpectedly allowed')\nexcept sqlite3.OperationalError:\n    pass\n"
+  }
+ },
+ {
+  "id": "smi-g0029",
+  "domain": "SQL",
+  "topic": "Window functions",
+  "question_type": "sql_exercise",
+  "question": "Table daily_sales(day TEXT PRIMARY KEY, revenue INTEGER) stores ISO dates. Rows (day, revenue): 2024-03-01 100, 2024-03-02 200, 2024-03-03 150, 2024-03-06 300, 2024-03-07 250, 2024-03-08 50. Note that 03-04 and 03-05 have no row.\nWrite one query returning day, revenue, cumulative_revenue (running total), avg_last_3_rows (average of the current and previous 2 rows) and avg_last_3_days (average of the rows whose day lies within the current day and the 2 days before it), both averages rounded to 2 decimals, ordered by day. Explain why the last two columns differ, and what the default window frame does when you write only ORDER BY.",
+  "answer": "```sql\nSELECT day, revenue,\n       SUM(revenue) OVER (ORDER BY day) AS cumulative_revenue,\n       ROUND(AVG(revenue) OVER (ORDER BY day\n             ROWS BETWEEN 2 PRECEDING AND CURRENT ROW), 2) AS avg_last_3_rows,\n       ROUND(AVG(revenue) OVER (ORDER BY julianday(day)\n             RANGE BETWEEN 2 PRECEDING AND CURRENT ROW), 2) AS avg_last_3_days\nFROM daily_sales\nORDER BY day;\n```\n\nCumulative revenue is a window SUM with ORDER BY and no explicit frame. The default frame is RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW, which includes the current row and all its peers (rows with the same ORDER BY value). Here days are unique so it equals a plain running total (100, 300, 450, 750, 1000, 1050). If two rows shared the same day, both would show the same running total including each other, whereas ROWS UNBOUNDED PRECEDING would advance row by row. For deterministic row-level running totals, state ROWS explicitly and order by a unique key.\n\navg_last_3_rows uses ROWS BETWEEN 2 PRECEDING AND CURRENT ROW, which counts physical rows. On 03-06 that averages 03-02, 03-03 and 03-06 = 216.67, silently reaching back across the missing days. The calendar version orders by julianday(day), a number, and uses RANGE BETWEEN 2 PRECEDING AND CURRENT ROW, so the window is days within 2 days of the current one: on 03-06 only itself (300.0), on 03-07 03-06 and 03-07 (275.0). SQLite requires exactly one ORDER BY term and a constant non-negative offset for RANGE with an offset, and the offset arithmetic only works on numbers: ordering by the text date does not raise an error, the frame just collapses to the current row's peers, so the date is converted with julianday. The first rows have fewer than 3 inputs and average whatever exists. If you need a true 'N full days' metric, generate a calendar and fill missing days with 0 first, because AVG over an incomplete window is not the same as a 3-day average.",
+  "key_concepts": [
+   "running total",
+   "window frame",
+   "ROWS vs RANGE",
+   "default frame",
+   "moving average",
+   "peer rows",
+   "missing dates"
+  ],
+  "common_mistakes": [
+   "Assuming a 3-row window is a 3-day window when dates are missing",
+   "Relying on the default RANGE frame and getting repeated running totals for tied dates",
+   "Forgetting that early rows average fewer than 3 values"
+  ],
+  "interview_style_note": "Strong candidate knows the default frame includes peers, distinguishes row-count from calendar windows, and flags that gaps in dates change what a 'moving average' means.",
+  "sources": [
+   {
+    "title": "SQLite: Window Functions",
+    "url": "https://www.sqlite.org/windowfunctions.html",
+    "supports": "Default frame is RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW including peers; RANGE with an offset needs a single numeric ORDER BY term and a constant non-negative offset; ROWS counts rows.",
+    "verification": "independent_reviewer_supported"
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE daily_sales (day TEXT PRIMARY KEY, revenue INTEGER NOT NULL);\nINSERT INTO daily_sales VALUES\n('2024-03-01',100),('2024-03-02',200),('2024-03-03',150),('2024-03-06',300),('2024-03-07',250),('2024-03-08',50);",
+   "solution": "SELECT day, revenue,\n       SUM(revenue) OVER (ORDER BY day) AS cumulative_revenue,\n       ROUND(AVG(revenue) OVER (ORDER BY day\n             ROWS BETWEEN 2 PRECEDING AND CURRENT ROW), 2) AS avg_last_3_rows,\n       ROUND(AVG(revenue) OVER (ORDER BY julianday(day)\n             RANGE BETWEEN 2 PRECEDING AND CURRENT ROW), 2) AS avg_last_3_days\nFROM daily_sales\nORDER BY day;",
+   "expected": [
+    [
+     "2024-03-01",
+     100,
+     100,
+     100.0,
+     100.0
+    ],
+    [
+     "2024-03-02",
+     200,
+     300,
+     150.0,
+     150.0
+    ],
+    [
+     "2024-03-03",
+     150,
+     450,
+     150.0,
+     150.0
+    ],
+    [
+     "2024-03-06",
+     300,
+     750,
+     216.67,
+     300.0
+    ],
+    [
+     "2024-03-07",
+     250,
+     1000,
+     233.33,
+     275.0
+    ],
+    [
+     "2024-03-08",
+     50,
+     1050,
+     200.0,
+     200.0
+    ]
+   ],
+   "test": "import sqlite3\nSETUP = \"CREATE TABLE daily_sales (day TEXT PRIMARY KEY, revenue INTEGER NOT NULL);\\nINSERT INTO daily_sales VALUES\\n('2024-03-01',100),('2024-03-02',200),('2024-03-03',150),('2024-03-06',300),('2024-03-07',250),('2024-03-08',50);\"\nSOLUTION = 'SELECT day, revenue,\\n       SUM(revenue) OVER (ORDER BY day) AS cumulative_revenue,\\n       ROUND(AVG(revenue) OVER (ORDER BY day\\n             ROWS BETWEEN 2 PRECEDING AND CURRENT ROW), 2) AS avg_last_3_rows,\\n       ROUND(AVG(revenue) OVER (ORDER BY julianday(day)\\n             RANGE BETWEEN 2 PRECEDING AND CURRENT ROW), 2) AS avg_last_3_days\\nFROM daily_sales\\nORDER BY day;'\nEXPECTED = [['2024-03-01', 100, 100, 100.0, 100.0], ['2024-03-02', 200, 300, 150.0, 150.0], ['2024-03-03', 150, 450, 150.0, 150.0], ['2024-03-06', 300, 750, 216.67, 300.0], ['2024-03-07', 250, 1000, 233.33, 275.0], ['2024-03-08', 50, 1050, 200.0, 200.0]]\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nparts = [p for p in SOLUTION.split(';') if p.strip()]\nfor p in parts[:-1]:\n    con.execute(p)\nrows = [list(r) for r in con.execute(parts[-1]).fetchall()]\nassert rows == EXPECTED, rows\n\nc4 = sqlite3.connect(':memory:')\nc4.executescript(\"CREATE TABLE t(day TEXT, r INT); INSERT INTO t VALUES('d1',10),('d2',20),('d2',30),('d3',40);\")\ntied = c4.execute(\"SELECT SUM(r) OVER (ORDER BY day), SUM(r) OVER (ORDER BY day ROWS UNBOUNDED PRECEDING) FROM t ORDER BY day, r\").fetchall()\nassert tied == [(10, 10), (60, 30), (60, 60), (100, 100)], tied\n"
+  }
+ },
+ {
+  "id": "smi-g0030",
+  "domain": "SQL",
+  "topic": "Query patterns",
+  "question_type": "sql_exercise",
+  "question": "Table logins(user_id INTEGER, login_date TEXT) records one row per login with an ISO date; a user can log in several times a day. Sample rows (user_id: dates):\n1: 2024-05-01, 05-02, 05-02, 05-03, 05-05, 05-06\n2: 2024-05-01, 05-03, 05-04, 05-06\n3: 2024-04-29, 04-30, 05-01, 05-02, 05-10, 05-11, 05-12, 05-13\nFor each user return their longest streak of consecutive calendar days with at least one login: user_id, streak_len, streak_start, streak_end. If a user has several streaks of the maximum length, return the earliest. Order by user_id. Explain why the date-minus-row-number trick identifies streaks.",
+  "answer": "```sql\nWITH days AS (\n  SELECT DISTINCT user_id, login_date FROM logins\n),\nnumbered AS (\n  SELECT user_id, login_date,\n         ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY login_date) AS rn\n  FROM days\n),\nislands AS (\n  SELECT user_id,\n         date(login_date, '-' || rn || ' days') AS grp,\n         MIN(login_date) AS streak_start,\n         MAX(login_date) AS streak_end,\n         COUNT(*)        AS streak_len\n  FROM numbered\n  GROUP BY user_id, grp\n),\nranked AS (\n  SELECT *, ROW_NUMBER() OVER (PARTITION BY user_id\n                               ORDER BY streak_len DESC, streak_start) AS pick\n  FROM islands\n)\nSELECT user_id, streak_len, streak_start, streak_end\nFROM ranked\nWHERE pick = 1\nORDER BY user_id;\n```\n\nSteps: (1) DISTINCT user_id, login_date so repeated same-day logins do not inflate the row numbers. (2) ROW_NUMBER per user ordered by date. (3) Subtract rn days from the date. Within a run of consecutive days the date rises by exactly 1 per row and rn also rises by 1, so date minus rn is constant; whenever a day is skipped the date jumps by more than 1 while rn increases by 1, so the difference changes. That difference (grp) is just a label for an island, and GROUP BY user_id, grp gives each streak with MIN, MAX and COUNT. (4) Rank the streaks per user by length descending then start ascending and keep the first.\n\nExpected result: user 1 has a 3-day streak 05-01 to 05-03 (the duplicate login on 05-02 is collapsed); user 2 has longest streak 2 days (05-03 to 05-04); user 3 has two streaks of 4 days (04-29 to 05-02 and 05-10 to 05-13, which also crosses a month boundary) and the tiebreak returns the earlier one.\n\nPitfalls: skipping the DISTINCT breaks the arithmetic, because two rows on one day add 2 to rn but 0 to the date. It also requires one row per user-day, and the trick only works for consecutive integers/days; for other gap definitions use LAG and a running sum of 'new island' flags. The date() modifier syntax used to subtract days is SQLite's; other engines have their own date arithmetic.",
+  "key_concepts": [
+   "gaps and islands",
+   "ROW_NUMBER",
+   "date arithmetic",
+   "consecutive days",
+   "deduplicate before ranking",
+   "GROUP BY island label",
+   "tie-breaking"
+  ],
+  "common_mistakes": [
+   "Not removing duplicate same-day logins, which breaks the date-minus-row_number invariant",
+   "Using the raw login row number instead of a per-user dense numbering of distinct days",
+   "Taking MAX(streak_len) per user but losing the start/end dates"
+  ],
+  "interview_style_note": "Strong candidate dedupes per day first, can explain why date minus row number is constant within a streak, and handles ties and month boundaries.",
+  "sources": [],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE logins (user_id INTEGER NOT NULL, login_date TEXT NOT NULL);\nINSERT INTO logins VALUES\n(1,'2024-05-01'),(1,'2024-05-02'),(1,'2024-05-02'),(1,'2024-05-03'),(1,'2024-05-05'),(1,'2024-05-06'),\n(2,'2024-05-01'),(2,'2024-05-03'),(2,'2024-05-04'),(2,'2024-05-06'),\n(3,'2024-04-29'),(3,'2024-04-30'),(3,'2024-05-01'),(3,'2024-05-02'),(3,'2024-05-10'),(3,'2024-05-11'),(3,'2024-05-12'),(3,'2024-05-13');",
+   "solution": "WITH days AS (\n  SELECT DISTINCT user_id, login_date FROM logins\n),\nnumbered AS (\n  SELECT user_id, login_date,\n         ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY login_date) AS rn\n  FROM days\n),\nislands AS (\n  SELECT user_id,\n         date(login_date, '-' || rn || ' days') AS grp,\n         MIN(login_date) AS streak_start,\n         MAX(login_date) AS streak_end,\n         COUNT(*)        AS streak_len\n  FROM numbered\n  GROUP BY user_id, grp\n),\nranked AS (\n  SELECT *, ROW_NUMBER() OVER (PARTITION BY user_id\n                               ORDER BY streak_len DESC, streak_start) AS pick\n  FROM islands\n)\nSELECT user_id, streak_len, streak_start, streak_end\nFROM ranked\nWHERE pick = 1\nORDER BY user_id;",
+   "expected": [
+    [
+     1,
+     3,
+     "2024-05-01",
+     "2024-05-03"
+    ],
+    [
+     2,
+     2,
+     "2024-05-03",
+     "2024-05-04"
+    ],
+    [
+     3,
+     4,
+     "2024-04-29",
+     "2024-05-02"
+    ]
+   ],
+   "test": "import sqlite3\nSETUP = \"CREATE TABLE logins (user_id INTEGER NOT NULL, login_date TEXT NOT NULL);\\nINSERT INTO logins VALUES\\n(1,'2024-05-01'),(1,'2024-05-02'),(1,'2024-05-02'),(1,'2024-05-03'),(1,'2024-05-05'),(1,'2024-05-06'),\\n(2,'2024-05-01'),(2,'2024-05-03'),(2,'2024-05-04'),(2,'2024-05-06'),\\n(3,'2024-04-29'),(3,'2024-04-30'),(3,'2024-05-01'),(3,'2024-05-02'),(3,'2024-05-10'),(3,'2024-05-11'),(3,'2024-05-12'),(3,'2024-05-13');\"\nSOLUTION = \"WITH days AS (\\n  SELECT DISTINCT user_id, login_date FROM logins\\n),\\nnumbered AS (\\n  SELECT user_id, login_date,\\n         ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY login_date) AS rn\\n  FROM days\\n),\\nislands AS (\\n  SELECT user_id,\\n         date(login_date, '-' || rn || ' days') AS grp,\\n         MIN(login_date) AS streak_start,\\n         MAX(login_date) AS streak_end,\\n         COUNT(*)        AS streak_len\\n  FROM numbered\\n  GROUP BY user_id, grp\\n),\\nranked AS (\\n  SELECT *, ROW_NUMBER() OVER (PARTITION BY user_id\\n                               ORDER BY streak_len DESC, streak_start) AS pick\\n  FROM islands\\n)\\nSELECT user_id, streak_len, streak_start, streak_end\\nFROM ranked\\nWHERE pick = 1\\nORDER BY user_id;\"\nEXPECTED = [[1, 3, '2024-05-01', '2024-05-03'], [2, 2, '2024-05-03', '2024-05-04'], [3, 4, '2024-04-29', '2024-05-02']]\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nparts = [p for p in SOLUTION.split(';') if p.strip()]\nfor p in parts[:-1]:\n    con.execute(p)\nrows = [list(r) for r in con.execute(parts[-1]).fetchall()]\nassert rows == EXPECTED, rows\n"
+  }
+ },
+ {
+  "id": "smi-g0031",
+  "domain": "SQL",
+  "topic": "NULL handling",
+  "question_type": "debugging",
+  "question": "A catalogue report is meant to list products that are not discontinued, but it returns zero rows. Tables: products(id, name) = (1,'Aviator'), (2,'Wayfarer'), (3,'Round'), (4,'Cat-eye'), (5,'Shield'); discontinued(product_id INTEGER NULL, reason TEXT) = (2,'low sales'), (4,'supplier closed'), (NULL,'legacy import, no id').\nSELECT id, name FROM products WHERE id NOT IN (SELECT product_id FROM discontinued) ORDER BY id;\nExplain exactly why this returns nothing (three-valued logic), then give a correct query that returns Aviator, Round and Shield, and say which fix you would choose.",
+  "answer": "NOT IN with a list that contains a NULL can never be TRUE. x NOT IN (2, 4, NULL) is x <> 2 AND x <> 4 AND x <> NULL. For id 1 the first two parts are TRUE but x <> NULL is UNKNOWN, and TRUE AND UNKNOWN is UNKNOWN. WHERE keeps only rows where the condition is TRUE, so UNKNOWN rows are dropped. For ids 2 and 4 a comparison is FALSE, so they are dropped as well. Result: zero rows, with no error, which is why this bug is easy to ship. It starts the day one NULL appears in the subquery column.\n\nFix with NOT EXISTS, which tests whether any matching row exists and does not get poisoned by NULLs because d.product_id = p.id with a NULL is simply not a match:\n\n```sql\nSELECT p.id, p.name\nFROM products AS p\nWHERE NOT EXISTS (\n  SELECT 1 FROM discontinued AS d WHERE d.product_id = p.id\n)\nORDER BY p.id;\n```\n\nThis returns Aviator (1), Round (3) and Shield (5).\n\nAlternative: add WHERE product_id IS NOT NULL inside the NOT IN subquery. That also returns the three rows, but it only works if you remember it every time, and it breaks again if someone changes the subquery. I would choose NOT EXISTS (or a LEFT JOIN ... IS NULL anti-join) as the default, and also add NOT NULL on discontinued.product_id plus a foreign key, since a NULL id here is a data-quality defect.",
+  "key_concepts": [
+   "NOT IN",
+   "NULL",
+   "three-valued logic",
+   "UNKNOWN",
+   "NOT EXISTS",
+   "correlated subquery",
+   "anti-join"
+  ],
+  "common_mistakes": [
+   "Saying the query is wrong because of the NULL row but proposing x <> NULL or = NULL comparisons",
+   "Fixing only with IS NOT NULL in one place without noting the pitfall recurs",
+   "Believing NOT IN returns an error or ignores NULLs"
+  ],
+  "interview_style_note": "Strong candidate walks through x <> NULL evaluating to UNKNOWN and AND/WHERE semantics instead of just saying 'NULLs are weird', then fixes the data model as well as the query.",
+  "sources": [],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE products (id INTEGER PRIMARY KEY, name TEXT NOT NULL);\nCREATE TABLE discontinued (product_id INTEGER, reason TEXT);\nINSERT INTO products VALUES (1,'Aviator'),(2,'Wayfarer'),(3,'Round'),(4,'Cat-eye'),(5,'Shield');\nINSERT INTO discontinued VALUES (2,'low sales'),(4,'supplier closed'),(NULL,'legacy import, no id');",
+   "solution": "SELECT p.id, p.name\nFROM products AS p\nWHERE NOT EXISTS (\n  SELECT 1 FROM discontinued AS d WHERE d.product_id = p.id\n)\nORDER BY p.id;",
+   "expected": [
+    [
+     1,
+     "Aviator"
+    ],
+    [
+     3,
+     "Round"
+    ],
+    [
+     5,
+     "Shield"
+    ]
+   ],
+   "test": "import sqlite3\nSETUP = \"CREATE TABLE products (id INTEGER PRIMARY KEY, name TEXT NOT NULL);\\nCREATE TABLE discontinued (product_id INTEGER, reason TEXT);\\nINSERT INTO products VALUES (1,'Aviator'),(2,'Wayfarer'),(3,'Round'),(4,'Cat-eye'),(5,'Shield');\\nINSERT INTO discontinued VALUES (2,'low sales'),(4,'supplier closed'),(NULL,'legacy import, no id');\"\nSOLUTION = 'SELECT p.id, p.name\\nFROM products AS p\\nWHERE NOT EXISTS (\\n  SELECT 1 FROM discontinued AS d WHERE d.product_id = p.id\\n)\\nORDER BY p.id;'\nEXPECTED = [[1, 'Aviator'], [3, 'Round'], [5, 'Shield']]\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nparts = [p for p in SOLUTION.split(';') if p.strip()]\nfor p in parts[:-1]:\n    con.execute(p)\nrows = [list(r) for r in con.execute(parts[-1]).fetchall()]\nassert rows == EXPECTED, rows\n\nbuggy = \"SELECT id, name FROM products WHERE id NOT IN (SELECT product_id FROM discontinued) ORDER BY id\"\nassert con.execute(buggy).fetchall() == []\nalt = \"SELECT id, name FROM products WHERE id NOT IN (SELECT product_id FROM discontinued WHERE product_id IS NOT NULL) ORDER BY id\"\nassert [list(r) for r in con.execute(alt).fetchall()] == EXPECTED\n"
+  }
+ },
+ {
+  "id": "smi-g0034",
+  "domain": "SQL",
+  "topic": "Cohort and retention queries",
+  "question_type": "sql_exercise",
+  "question": "events(user_id INTEGER, event_ts TEXT, event_name TEXT) holds app events with 'YYYY-MM-DD HH:MM:SS' timestamps (assume all in one time zone). Rows (user_id, date): u1: 06-01 (two events), 06-02; u2: 06-01 23:59, 06-03; u3: 06-01, 06-02 (two events); u4: 06-02, 06-03; u5: 06-02; u6: 06-03; u7: 06-03. (All in 2024.)\nDefine a user's cohort day as the calendar date of their first event. Define Day-1 retention as: the user has at least one event on cohort day + 1 (calendar day, not 24 hours). Write a query returning cohort_day, cohort_size, retained_day1, day1_retention_pct (1 decimal) for every cohort whose day-after date is fully observed in the data, ordered by cohort_day. State what you excluded and why.",
+  "answer": "```sql\nWITH activity AS (\n  SELECT DISTINCT user_id, date(event_ts) AS day FROM events\n),\ncohorts AS (\n  SELECT user_id, MIN(day) AS cohort_day FROM activity GROUP BY user_id\n),\nlast_day AS (\n  SELECT MAX(day) AS max_day FROM activity\n)\nSELECT c.cohort_day,\n       COUNT(*) AS cohort_size,\n       COUNT(a.user_id) AS retained_day1,\n       ROUND(100.0 * COUNT(a.user_id) / COUNT(*), 1) AS day1_retention_pct\nFROM cohorts AS c\nLEFT JOIN activity AS a\n       ON a.user_id = c.user_id\n      AND a.day = date(c.cohort_day, '+1 day')\nWHERE date(c.cohort_day, '+1 day') <= (SELECT max_day FROM last_day)\nGROUP BY c.cohort_day\nORDER BY c.cohort_day;\n```\n\nResult: cohort 2024-06-01 has 3 users (u1, u2, u3) and 2 retained (u1 and u3), 66.7%. u2's next activity is on 06-03, which is day 2, not day 1, so u2 is counted as not retained. This is why the calendar-date definition must be stated explicitly. Cohort 2024-06-02 has 2 users (u4, u5), 1 retained (u4), 50.0%.\n\nDesign points. (1) DISTINCT user-day first: multiple events in a day would otherwise multiply rows in the join and inflate retained_day1. (2) Cohort day is MIN of the user's activity days. (3) Retention is a LEFT JOIN from cohort users to activity on the exact day +1, counting matched rows, so users who did not return stay in the denominator. (4) Cohort 2024-06-03 (u6, u7) is excluded by the WHERE clause because its next day, 06-04, is after the last date in the data, so retention is unobserved; reporting 0% would be wrong, not low. This assumes the data is complete up to the max date and that the max date is a full day; in a real pipeline compare against the data-load watermark instead. (5) Counting COUNT(a.user_id), not COUNT(*), counts only matches.",
+  "key_concepts": [
+   "cohort retention",
+   "first-activity cohort",
+   "calendar-day definition",
+   "LEFT JOIN",
+   "distinct user-days",
+   "censored cohort",
+   "COUNT of nullable column"
+  ],
+  "common_mistakes": [
+   "Joining raw events so multiple events per day double-count retained users",
+   "Using an inner join so the denominator only contains returners (100% retention)",
+   "Reporting the newest cohort as 0% retained when its next day has not happened yet",
+   "Mixing a 24-hour window with calendar-day retention"
+  ],
+  "interview_style_note": "Strong candidate states the retention definition precisely, dedupes before joining, keeps non-returners in the denominator and excludes the cohort whose follow-up day is not yet observed.",
+  "sources": [],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE events (user_id INTEGER NOT NULL, event_ts TEXT NOT NULL, event_name TEXT NOT NULL);\nINSERT INTO events VALUES\n(1,'2024-06-01 09:00:00','open'),(1,'2024-06-01 09:05:00','open'),(1,'2024-06-02 20:00:00','open'),\n(2,'2024-06-01 23:59:00','open'),(2,'2024-06-03 08:00:00','open'),\n(3,'2024-06-01 10:00:00','open'),(3,'2024-06-02 10:00:00','open'),(3,'2024-06-02 11:00:00','open'),\n(4,'2024-06-02 12:00:00','open'),(4,'2024-06-03 12:00:00','open'),\n(5,'2024-06-02 07:00:00','open'),\n(6,'2024-06-03 07:00:00','open'),\n(7,'2024-06-03 08:00:00','open');",
+   "solution": "WITH activity AS (\n  SELECT DISTINCT user_id, date(event_ts) AS day FROM events\n),\ncohorts AS (\n  SELECT user_id, MIN(day) AS cohort_day FROM activity GROUP BY user_id\n),\nlast_day AS (\n  SELECT MAX(day) AS max_day FROM activity\n)\nSELECT c.cohort_day,\n       COUNT(*) AS cohort_size,\n       COUNT(a.user_id) AS retained_day1,\n       ROUND(100.0 * COUNT(a.user_id) / COUNT(*), 1) AS day1_retention_pct\nFROM cohorts AS c\nLEFT JOIN activity AS a\n       ON a.user_id = c.user_id\n      AND a.day = date(c.cohort_day, '+1 day')\nWHERE date(c.cohort_day, '+1 day') <= (SELECT max_day FROM last_day)\nGROUP BY c.cohort_day\nORDER BY c.cohort_day;",
+   "expected": [
+    [
+     "2024-06-01",
+     3,
+     2,
+     66.7
+    ],
+    [
+     "2024-06-02",
+     2,
+     1,
+     50.0
+    ]
+   ],
+   "test": "import sqlite3\nSETUP = \"CREATE TABLE events (user_id INTEGER NOT NULL, event_ts TEXT NOT NULL, event_name TEXT NOT NULL);\\nINSERT INTO events VALUES\\n(1,'2024-06-01 09:00:00','open'),(1,'2024-06-01 09:05:00','open'),(1,'2024-06-02 20:00:00','open'),\\n(2,'2024-06-01 23:59:00','open'),(2,'2024-06-03 08:00:00','open'),\\n(3,'2024-06-01 10:00:00','open'),(3,'2024-06-02 10:00:00','open'),(3,'2024-06-02 11:00:00','open'),\\n(4,'2024-06-02 12:00:00','open'),(4,'2024-06-03 12:00:00','open'),\\n(5,'2024-06-02 07:00:00','open'),\\n(6,'2024-06-03 07:00:00','open'),\\n(7,'2024-06-03 08:00:00','open');\"\nSOLUTION = \"WITH activity AS (\\n  SELECT DISTINCT user_id, date(event_ts) AS day FROM events\\n),\\ncohorts AS (\\n  SELECT user_id, MIN(day) AS cohort_day FROM activity GROUP BY user_id\\n),\\nlast_day AS (\\n  SELECT MAX(day) AS max_day FROM activity\\n)\\nSELECT c.cohort_day,\\n       COUNT(*) AS cohort_size,\\n       COUNT(a.user_id) AS retained_day1,\\n       ROUND(100.0 * COUNT(a.user_id) / COUNT(*), 1) AS day1_retention_pct\\nFROM cohorts AS c\\nLEFT JOIN activity AS a\\n       ON a.user_id = c.user_id\\n      AND a.day = date(c.cohort_day, '+1 day')\\nWHERE date(c.cohort_day, '+1 day') <= (SELECT max_day FROM last_day)\\nGROUP BY c.cohort_day\\nORDER BY c.cohort_day;\"\nEXPECTED = [['2024-06-01', 3, 2, 66.7], ['2024-06-02', 2, 1, 50.0]]\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nparts = [p for p in SOLUTION.split(';') if p.strip()]\nfor p in parts[:-1]:\n    con.execute(p)\nrows = [list(r) for r in con.execute(parts[-1]).fetchall()]\nassert rows == EXPECTED, rows\n"
+  }
+ },
+ {
+  "id": "smi-g0036",
+  "domain": "SQL",
+  "topic": "Subqueries and CTEs",
+  "question_type": "sql_exercise",
+  "question": "staff(id INTEGER PRIMARY KEY, name TEXT, manager_id INTEGER REFERENCES staff(id)) rows (id, name, manager_id): (1,Ava,NULL), (2,Dana,7), (3,Ben,2), (4,Cy,2), (5,Eli,3), (6,Fay,5), (7,Gus,6), (8,Hana,1), (9,Ian,8).\nNote the data-entry error: Dana (2) is recorded as reporting to Gus (7), who is in her own reporting chain (a cycle: 2 -> 3 -> 5 -> 6 -> 7 -> 2).\nWrite a recursive CTE listing all direct and indirect reports of Dana (id 2), excluding Dana herself, with columns id, name, depth (1 = direct report) and name_path such as 'Dana > Ben > Eli'. Order by depth, then name. The query must terminate despite the cycle. Explain how, and what would happen without a guard.",
+  "answer": "```sql\nWITH RECURSIVE reports(id, name, depth, id_path, name_path) AS (\n  SELECT id, name, 0, '/' || id || '/', name\n  FROM staff\n  WHERE id = 2\n  UNION ALL\n  SELECT s.id, s.name, r.depth + 1,\n         r.id_path || s.id || '/',\n         r.name_path || ' > ' || s.name\n  FROM staff AS s\n  JOIN reports AS r ON s.manager_id = r.id\n  WHERE instr(r.id_path, '/' || s.id || '/') = 0\n)\nSELECT id, name, depth, name_path\nFROM reports\nWHERE depth > 0\nORDER BY depth, name;\n```\n\nResult: Ben (1) and Cy (1), Eli (2), Fay (3), Gus (4), with name_path values like 'Dana > Ben > Eli > Fay > Gus'. Dana does not reappear and the query stops.\n\nStructure: the anchor row is Dana at depth 0 with id_path '/2/'. The recursive step joins staff rows whose manager_id equals a row already in the CTE, adds 1 to depth and appends the id and name to the paths. Final WHERE depth > 0 drops the anchor.\n\nCycle guard: id_path stores the ancestors of each row as '/2/3/5/'. The recursive term only follows a staff row if its id is not already in the path (instr(...) = 0). When the walk reaches Gus (7), Dana's row would be next, but '/2/' is already in the path, so the branch ends. The delimiters around ids matter so that id 1 does not match inside '/12/'.\n\nWithout a guard, UNION ALL keeps adding rows as long as the recursive step produces any, so a cycle would generate rows forever (in the cycle above I verified that a depth cap of 12 yields 16 rows, repeating the same people). Alternatives: a depth limit (WHERE depth < N), a LIMIT on the CTE which SQLite documents as stopping the recursion, or using UNION instead of UNION ALL, which discards identical rows; but UNION only stops a cycle when the full rows are identical, and here depth and paths differ each lap so it would not help unless those columns are dropped. Fixing the bad row is still the real remedy; a check query for cycles is worth keeping.",
+  "key_concepts": [
+   "recursive CTE",
+   "anchor and recursive term",
+   "cycle detection",
+   "path tracking",
+   "UNION vs UNION ALL",
+   "hierarchy traversal",
+   "depth limit"
+  ],
+  "common_mistakes": [
+   "No cycle protection, so corrupted data makes the query run forever",
+   "Substring path check without delimiters ('/1' matching '/12')",
+   "Forgetting to exclude the anchor row, or confusing depth numbering"
+  ],
+  "interview_style_note": "Strong candidate separates anchor and recursive parts, tracks the visited path for cycle protection with delimiters, and knows UNION ALL will not stop on cycles.",
+  "sources": [
+   {
+    "title": "SQLite: WITH clause (recursive CTEs)",
+    "url": "https://www.sqlite.org/lang_with.html",
+    "supports": "Recursive CTE algorithm (anchor then recursive select on queued rows); UNION discards repeated rows while UNION ALL keeps them; a LIMIT stops recursion.",
+    "verification": "independent_reviewer_supported"
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE staff (id INTEGER PRIMARY KEY, name TEXT NOT NULL, manager_id INTEGER REFERENCES staff(id));\nINSERT INTO staff VALUES\n(1,'Ava',NULL),(2,'Dana',7),(3,'Ben',2),(4,'Cy',2),(5,'Eli',3),(6,'Fay',5),(7,'Gus',6),(8,'Hana',1),(9,'Ian',8);",
+   "solution": "WITH RECURSIVE reports(id, name, depth, id_path, name_path) AS (\n  SELECT id, name, 0, '/' || id || '/', name\n  FROM staff\n  WHERE id = 2\n  UNION ALL\n  SELECT s.id, s.name, r.depth + 1,\n         r.id_path || s.id || '/',\n         r.name_path || ' > ' || s.name\n  FROM staff AS s\n  JOIN reports AS r ON s.manager_id = r.id\n  WHERE instr(r.id_path, '/' || s.id || '/') = 0\n)\nSELECT id, name, depth, name_path\nFROM reports\nWHERE depth > 0\nORDER BY depth, name;",
+   "expected": [
+    [
+     3,
+     "Ben",
+     1,
+     "Dana > Ben"
+    ],
+    [
+     4,
+     "Cy",
+     1,
+     "Dana > Cy"
+    ],
+    [
+     5,
+     "Eli",
+     2,
+     "Dana > Ben > Eli"
+    ],
+    [
+     6,
+     "Fay",
+     3,
+     "Dana > Ben > Eli > Fay"
+    ],
+    [
+     7,
+     "Gus",
+     4,
+     "Dana > Ben > Eli > Fay > Gus"
+    ]
+   ],
+   "test": "import sqlite3\nSETUP = \"CREATE TABLE staff (id INTEGER PRIMARY KEY, name TEXT NOT NULL, manager_id INTEGER REFERENCES staff(id));\\nINSERT INTO staff VALUES\\n(1,'Ava',NULL),(2,'Dana',7),(3,'Ben',2),(4,'Cy',2),(5,'Eli',3),(6,'Fay',5),(7,'Gus',6),(8,'Hana',1),(9,'Ian',8);\"\nSOLUTION = \"WITH RECURSIVE reports(id, name, depth, id_path, name_path) AS (\\n  SELECT id, name, 0, '/' || id || '/', name\\n  FROM staff\\n  WHERE id = 2\\n  UNION ALL\\n  SELECT s.id, s.name, r.depth + 1,\\n         r.id_path || s.id || '/',\\n         r.name_path || ' > ' || s.name\\n  FROM staff AS s\\n  JOIN reports AS r ON s.manager_id = r.id\\n  WHERE instr(r.id_path, '/' || s.id || '/') = 0\\n)\\nSELECT id, name, depth, name_path\\nFROM reports\\nWHERE depth > 0\\nORDER BY depth, name;\"\nEXPECTED = [[3, 'Ben', 1, 'Dana > Ben'], [4, 'Cy', 1, 'Dana > Cy'], [5, 'Eli', 2, 'Dana > Ben > Eli'], [6, 'Fay', 3, 'Dana > Ben > Eli > Fay'], [7, 'Gus', 4, 'Dana > Ben > Eli > Fay > Gus']]\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nparts = [p for p in SOLUTION.split(';') if p.strip()]\nfor p in parts[:-1]:\n    con.execute(p)\nrows = [list(r) for r in con.execute(parts[-1]).fetchall()]\nassert rows == EXPECTED, rows\n\nnoguard = \"\"\"WITH RECURSIVE reports(id, name, depth) AS (SELECT id, name, 0 FROM staff WHERE id = 2 UNION ALL SELECT s.id, s.name, r.depth + 1 FROM staff s JOIN reports r ON s.manager_id = r.id WHERE r.depth < 12) SELECT COUNT(*), MAX(depth) FROM reports\"\"\"\nassert con.execute(noguard).fetchall() == [(16, 12)]\nassert [r[1] for r in rows] == ['Ben', 'Cy', 'Eli', 'Fay', 'Gus']\n"
+  }
+ },
+ {
+  "id": "smi-g0038",
+  "domain": "SQL",
+  "topic": "Joins",
+  "question_type": "debugging",
+  "question": "A finance dashboard reports item revenue and money collected per customer, but the numbers look too high. Tables: orders(id, customer) = (1,Asha), (2,Asha), (3,Bruno), (4,Chloe); order_items(id, order_id, qty, unit_price) = (1,1,2,50), (2,1,1,30), (3,2,1,100), (4,3,3,20), (5,4,1,40); payments(id, order_id, amount) = (1,1,60), (2,1,50), (3,2,100), (4,3,60). Order 4 has no payment yet.\nThe query is: SELECT o.customer, SUM(oi.qty*oi.unit_price) AS item_total, SUM(p.amount) AS paid_total FROM orders o LEFT JOIN order_items oi ON oi.order_id=o.id LEFT JOIN payments p ON p.order_id=o.id GROUP BY o.customer ORDER BY o.customer;\nWork out what it returns for Asha and why it is wrong, then write a corrected query returning customer, item_total, paid_total (0 when nothing has been paid) ordered by customer.",
+  "answer": "The correct totals are: Asha item_total 230 (order 1: 2*50 + 30 = 130, order 2: 100) and paid_total 210 (60 + 50 + 100); Bruno 60 and 60; Chloe 40 and 0. The original query returns Asha 360 and 320, and Chloe's paid_total as NULL.\n\nCause (join fan-out): order 1 has 2 item rows and 2 payment rows. Joining both children to the order produces 2 x 2 = 4 rows for it, one per item/payment pair. Each item row is repeated once per payment (130 becomes 260) and each payment is repeated once per item (110 becomes 220). Order 2 has 1 item and 1 payment so it is unaffected, giving 260 + 100 = 360 for items and 220 + 100 = 320 for payments. Two independent one-to-many relationships joined at the same level multiply each other, and SUM then adds the repeated values. It is silent: no error, just inflated numbers.\n\nFix: aggregate each child to one row per order before joining, so every join is one-to-one on order_id:\n\n```sql\nWITH item_totals AS (\n  SELECT order_id, SUM(qty * unit_price) AS item_total\n  FROM order_items\n  GROUP BY order_id\n),\npayment_totals AS (\n  SELECT order_id, SUM(amount) AS paid_total\n  FROM payments\n  GROUP BY order_id\n)\nSELECT o.customer,\n       COALESCE(SUM(i.item_total), 0) AS item_total,\n       COALESCE(SUM(p.paid_total), 0) AS paid_total\nFROM orders AS o\nLEFT JOIN item_totals    AS i ON i.order_id = o.id\nLEFT JOIN payment_totals AS p ON p.order_id = o.id\nGROUP BY o.customer\nORDER BY o.customer;\n```\n\nAlternatives: SUM(DISTINCT x) is not a fix, because it also collapses legitimately equal values (two items with equal line totals); and COUNT(DISTINCT order_id) style distinct keys fix counts but not sums. Pre-aggregation (or separate subqueries per measure) is the reliable approach. The COALESCE handles customers with no payments or items. A good habit is to reconcile the total against SELECT SUM(...) taken from the child table alone.",
+  "key_concepts": [
+   "join fan-out",
+   "double counting",
+   "pre-aggregation",
+   "one-to-many join",
+   "COALESCE",
+   "SUM(DISTINCT) pitfall",
+   "grain of a join"
+  ],
+  "common_mistakes": [
+   "Using SUM(DISTINCT ...) which drops legitimate duplicate values",
+   "Blaming the LEFT JOINs rather than the many-to-many multiplication",
+   "Only fixing one of the two measures"
+  ],
+  "interview_style_note": "Strong candidate identifies the multiplicative effect of two one-to-many joins, computes the inflated numbers, and fixes at the grain level rather than with DISTINCT.",
+  "sources": [],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT NOT NULL);\nCREATE TABLE order_items (id INTEGER PRIMARY KEY, order_id INTEGER NOT NULL REFERENCES orders(id), qty INTEGER NOT NULL, unit_price INTEGER NOT NULL);\nCREATE TABLE payments (id INTEGER PRIMARY KEY, order_id INTEGER NOT NULL REFERENCES orders(id), amount INTEGER NOT NULL);\nINSERT INTO orders VALUES (1,'Asha'),(2,'Asha'),(3,'Bruno'),(4,'Chloe');\nINSERT INTO order_items VALUES (1,1,2,50),(2,1,1,30),(3,2,1,100),(4,3,3,20),(5,4,1,40);\nINSERT INTO payments VALUES (1,1,60),(2,1,50),(3,2,100),(4,3,60);",
+   "solution": "WITH item_totals AS (\n  SELECT order_id, SUM(qty * unit_price) AS item_total\n  FROM order_items\n  GROUP BY order_id\n),\npayment_totals AS (\n  SELECT order_id, SUM(amount) AS paid_total\n  FROM payments\n  GROUP BY order_id\n)\nSELECT o.customer,\n       COALESCE(SUM(i.item_total), 0) AS item_total,\n       COALESCE(SUM(p.paid_total), 0) AS paid_total\nFROM orders AS o\nLEFT JOIN item_totals    AS i ON i.order_id = o.id\nLEFT JOIN payment_totals AS p ON p.order_id = o.id\nGROUP BY o.customer\nORDER BY o.customer;",
+   "expected": [
+    [
+     "Asha",
+     230,
+     210
+    ],
+    [
+     "Bruno",
+     60,
+     60
+    ],
+    [
+     "Chloe",
+     40,
+     0
+    ]
+   ],
+   "test": "import sqlite3\nSETUP = \"CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT NOT NULL);\\nCREATE TABLE order_items (id INTEGER PRIMARY KEY, order_id INTEGER NOT NULL REFERENCES orders(id), qty INTEGER NOT NULL, unit_price INTEGER NOT NULL);\\nCREATE TABLE payments (id INTEGER PRIMARY KEY, order_id INTEGER NOT NULL REFERENCES orders(id), amount INTEGER NOT NULL);\\nINSERT INTO orders VALUES (1,'Asha'),(2,'Asha'),(3,'Bruno'),(4,'Chloe');\\nINSERT INTO order_items VALUES (1,1,2,50),(2,1,1,30),(3,2,1,100),(4,3,3,20),(5,4,1,40);\\nINSERT INTO payments VALUES (1,1,60),(2,1,50),(3,2,100),(4,3,60);\"\nSOLUTION = 'WITH item_totals AS (\\n  SELECT order_id, SUM(qty * unit_price) AS item_total\\n  FROM order_items\\n  GROUP BY order_id\\n),\\npayment_totals AS (\\n  SELECT order_id, SUM(amount) AS paid_total\\n  FROM payments\\n  GROUP BY order_id\\n)\\nSELECT o.customer,\\n       COALESCE(SUM(i.item_total), 0) AS item_total,\\n       COALESCE(SUM(p.paid_total), 0) AS paid_total\\nFROM orders AS o\\nLEFT JOIN item_totals    AS i ON i.order_id = o.id\\nLEFT JOIN payment_totals AS p ON p.order_id = o.id\\nGROUP BY o.customer\\nORDER BY o.customer;'\nEXPECTED = [['Asha', 230, 210], ['Bruno', 60, 60], ['Chloe', 40, 0]]\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nparts = [p for p in SOLUTION.split(';') if p.strip()]\nfor p in parts[:-1]:\n    con.execute(p)\nrows = [list(r) for r in con.execute(parts[-1]).fetchall()]\nassert rows == EXPECTED, rows\n\nbug = \"SELECT o.customer, SUM(oi.qty*oi.unit_price), SUM(p.amount) FROM orders o LEFT JOIN order_items oi ON oi.order_id=o.id LEFT JOIN payments p ON p.order_id=o.id GROUP BY o.customer ORDER BY o.customer\"\nassert con.execute(bug).fetchall() == [('Asha', 360, 320), ('Bruno', 60, 60), ('Chloe', 40, None)]\n"
+  }
+ },
+ {
+  "id": "smi-g0040",
+  "domain": "SQL",
+  "topic": "Database design",
+  "question_type": "design",
+  "question": "You are designing the relational schema for an online eyewear shop: customers (unique email), products (unique SKU, price), orders placed by one customer with a status (pending, paid, shipped or cancelled), and the products on each order with a quantity. Write the CREATE TABLE and CREATE INDEX statements for SQLite with primary keys, foreign keys, NOT NULL, UNIQUE and CHECK constraints so that bad rows are rejected (no negative price or zero quantity, no unknown status, no orphan orders, no product listed twice on one order). Store money in integer pence, and keep the price paid on the order line separately from the product's current price. Then give a query returning each customer's email, number of non-cancelled orders and total spend in pence (ordered by email), and explain which indexes you added and why.",
+  "answer": "```sql\nSELECT c.email,\n       COUNT(DISTINCT o.id) AS orders,\n       SUM(oi.quantity * oi.unit_price_pence) AS spend_pence\nFROM customers AS c\nJOIN orders AS o ON o.customer_id = c.id\nJOIN order_items AS oi ON oi.order_id = o.id\nWHERE o.status <> 'cancelled'\nGROUP BY c.id, c.email\nORDER BY c.email;\n```\nThe query above runs against this schema and sample data (setup, executed with foreign keys on):\n\n```sql\nPRAGMA foreign_keys = ON;\nCREATE TABLE customers (id INTEGER PRIMARY KEY, email TEXT NOT NULL UNIQUE, full_name TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);\nCREATE TABLE products (id INTEGER PRIMARY KEY, sku TEXT NOT NULL UNIQUE, name TEXT NOT NULL, price_pence INTEGER NOT NULL CHECK (price_pence >= 0));\nCREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER NOT NULL REFERENCES customers(id), status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','shipped','cancelled')), placed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);\nCREATE TABLE order_items (order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE, product_id INTEGER NOT NULL REFERENCES products(id), quantity INTEGER NOT NULL CHECK (quantity > 0), unit_price_pence INTEGER NOT NULL CHECK (unit_price_pence >= 0), PRIMARY KEY (order_id, product_id));\nCREATE INDEX idx_orders_customer_placed ON orders (customer_id, placed_at);\nCREATE INDEX idx_order_items_product ON order_items (product_id);\n```\n(The full setup with sample rows is in the record's setup; it is the same schema plus the INSERT statements.)\n\nDesign choices. Normalisation: customer data, product data, orders and order lines each live in one table, with order_items as the many-to-many link between orders and products, keyed by (order_id, product_id) so a product cannot appear twice on an order. unit_price_pence copies the price at purchase time: if products.price_pence changes later, historical orders must not change. Integer pence avoids floating-point rounding. UNIQUE on email and sku, CHECK on price, quantity and status, NOT NULL on required columns and foreign keys reject bad data at the database, not only in application code.\n\nSQLite specifics: foreign keys are off by default and the PRAGMA is per connection, so the application must enable it on every connection. I tested ten bad statements with it on: duplicate email, NULL email, negative price, orphan order, unknown status, zero quantity, duplicate order line, unknown product, deleting a referenced product, deleting a referenced customer; all raise IntegrityError. Deleting an order cascades to its lines. On a fresh connection without the pragma, the orphan order is accepted.\n\nIndexes: the primary key on (order_id, product_id) already serves lookups by order. SQLite does not automatically index the child columns of a foreign key, and its documentation recommends indexing them, so I added orders(customer_id, placed_at) for 'a customer's orders by date' and parent-delete checks, and order_items(product_id) for 'which orders contain this product' and to make deleting a product cheap. Every extra index costs write time and space, so add them for real query patterns, not by default.",
+  "key_concepts": [
+   "primary key",
+   "foreign key",
+   "CHECK constraint",
+   "UNIQUE constraint",
+   "normalisation",
+   "composite primary key",
+   "PRAGMA foreign_keys",
+   "index on foreign key"
+  ],
+  "common_mistakes": [
+   "Leaving foreign keys unenforced because the PRAGMA is not set on each connection",
+   "Using only products.price for historical order totals",
+   "Storing money as floating point, or putting a status list in application code only",
+   "Indexing every column instead of FK columns used in lookups and joins"
+  ],
+  "interview_style_note": "Strong candidate normalises correctly, snapshots price on the order line, enforces rules with constraints, knows SQLite's per-connection FK pragma, and justifies each index by a query pattern.",
+  "sources": [
+   {
+    "title": "SQLite Foreign Key Support",
+    "url": "https://www.sqlite.org/foreignkeys.html",
+    "supports": "SQLite foreign key enforcement is off by default and enabled per connection with PRAGMA foreign_keys; child key columns are not indexed automatically and an index on them is recommended; default action is NO ACTION and ON DELETE CASCADE is supported.",
+    "verification": "independent_reviewer_supported"
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "PRAGMA foreign_keys = ON;\nCREATE TABLE customers (\n  id         INTEGER PRIMARY KEY,\n  email      TEXT NOT NULL UNIQUE,\n  full_name  TEXT NOT NULL,\n  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP\n);\nCREATE TABLE products (\n  id          INTEGER PRIMARY KEY,\n  sku         TEXT NOT NULL UNIQUE,\n  name        TEXT NOT NULL,\n  price_pence INTEGER NOT NULL CHECK (price_pence >= 0)\n);\nCREATE TABLE orders (\n  id          INTEGER PRIMARY KEY,\n  customer_id INTEGER NOT NULL REFERENCES customers(id),\n  status      TEXT NOT NULL DEFAULT 'pending'\n              CHECK (status IN ('pending','paid','shipped','cancelled')),\n  placed_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP\n);\nCREATE TABLE order_items (\n  order_id         INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,\n  product_id       INTEGER NOT NULL REFERENCES products(id),\n  quantity         INTEGER NOT NULL CHECK (quantity > 0),\n  unit_price_pence INTEGER NOT NULL CHECK (unit_price_pence >= 0),\n  PRIMARY KEY (order_id, product_id)\n);\nCREATE INDEX idx_orders_customer_placed ON orders (customer_id, placed_at);\nCREATE INDEX idx_order_items_product ON order_items (product_id);\nINSERT INTO customers (id, email, full_name, created_at) VALUES (1,'asha@example.com','Asha Rao','2024-01-01'),(2,'bruno@example.com','Bruno Diaz','2024-01-02');\nINSERT INTO products VALUES (1,'AV-01','Aviator',12000),(2,'WF-02','Wayfarer',9500);\nINSERT INTO orders VALUES (1,1,'paid','2024-02-01'),(2,1,'pending','2024-02-05'),(3,2,'paid','2024-02-06');\nINSERT INTO order_items VALUES (1,1,1,12000),(1,2,2,9500),(2,2,1,9000),(3,1,1,12000);",
+   "solution": "SELECT c.email,\n       COUNT(DISTINCT o.id) AS orders,\n       SUM(oi.quantity * oi.unit_price_pence) AS spend_pence\nFROM customers AS c\nJOIN orders AS o ON o.customer_id = c.id\nJOIN order_items AS oi ON oi.order_id = o.id\nWHERE o.status <> 'cancelled'\nGROUP BY c.id, c.email\nORDER BY c.email;",
+   "expected": [
+    [
+     "asha@example.com",
+     2,
+     40000
+    ],
+    [
+     "bruno@example.com",
+     1,
+     12000
+    ]
+   ],
+   "test": "import sqlite3\nSETUP = \"PRAGMA foreign_keys = ON;\\nCREATE TABLE customers (\\n  id         INTEGER PRIMARY KEY,\\n  email      TEXT NOT NULL UNIQUE,\\n  full_name  TEXT NOT NULL,\\n  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP\\n);\\nCREATE TABLE products (\\n  id          INTEGER PRIMARY KEY,\\n  sku         TEXT NOT NULL UNIQUE,\\n  name        TEXT NOT NULL,\\n  price_pence INTEGER NOT NULL CHECK (price_pence >= 0)\\n);\\nCREATE TABLE orders (\\n  id          INTEGER PRIMARY KEY,\\n  customer_id INTEGER NOT NULL REFERENCES customers(id),\\n  status      TEXT NOT NULL DEFAULT 'pending'\\n              CHECK (status IN ('pending','paid','shipped','cancelled')),\\n  placed_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP\\n);\\nCREATE TABLE order_items (\\n  order_id         INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,\\n  product_id       INTEGER NOT NULL REFERENCES products(id),\\n  quantity         INTEGER NOT NULL CHECK (quantity > 0),\\n  unit_price_pence INTEGER NOT NULL CHECK (unit_price_pence >= 0),\\n  PRIMARY KEY (order_id, product_id)\\n);\\nCREATE INDEX idx_orders_customer_placed ON orders (customer_id, placed_at);\\nCREATE INDEX idx_order_items_product ON order_items (product_id);\\nINSERT INTO customers (id, email, full_name, created_at) VALUES (1,'asha@example.com','Asha Rao','2024-01-01'),(2,'bruno@example.com','Bruno Diaz','2024-01-02');\\nINSERT INTO products VALUES (1,'AV-01','Aviator',12000),(2,'WF-02','Wayfarer',9500);\\nINSERT INTO orders VALUES (1,1,'paid','2024-02-01'),(2,1,'pending','2024-02-05'),(3,2,'paid','2024-02-06');\\nINSERT INTO order_items VALUES (1,1,1,12000),(1,2,2,9500),(2,2,1,9000),(3,1,1,12000);\"\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nassert con.execute('PRAGMA foreign_keys').fetchone()[0] == 1\nrows = [tuple(r) for r in con.execute(\"SELECT c.email,\\n       COUNT(DISTINCT o.id) AS orders,\\n       SUM(oi.quantity * oi.unit_price_pence) AS spend_pence\\nFROM customers AS c\\nJOIN orders AS o ON o.customer_id = c.id\\nJOIN order_items AS oi ON oi.order_id = o.id\\nWHERE o.status <> 'cancelled'\\nGROUP BY c.id, c.email\\nORDER BY c.email;\").fetchall()]\nassert rows == [('asha@example.com', 2, 40000), ('bruno@example.com', 1, 12000)], rows\nbad = [\n \"INSERT INTO customers(email, full_name) VALUES ('asha@example.com', 'Dup')\",\n \"INSERT INTO customers(email, full_name) VALUES (NULL, 'No email')\",\n \"INSERT INTO products VALUES (3, 'XX-03', 'Neg', -1)\",\n \"INSERT INTO orders(customer_id) VALUES (99)\",\n \"INSERT INTO orders(customer_id, status) VALUES (1, 'lost')\",\n \"INSERT INTO order_items VALUES (1, 1, 0, 100)\",\n \"INSERT INTO order_items VALUES (1, 1, 1, 100)\",\n \"INSERT INTO order_items VALUES (1, 42, 1, 100)\",\n \"DELETE FROM products WHERE id = 1\",\n \"DELETE FROM customers WHERE id = 1\",\n]\nfor stmt in bad:\n    try:\n        con.execute(stmt)\n    except sqlite3.IntegrityError:\n        continue\n    raise AssertionError('not rejected: ' + stmt)\nbefore = con.execute('SELECT COUNT(*) FROM order_items').fetchone()[0]\ncon.execute('DELETE FROM orders WHERE id = 2')\nassert con.execute('SELECT COUNT(*) FROM order_items').fetchone()[0] == before - 1\n# Without the pragma (a fresh connection) the orphan order is accepted.\ncon2 = sqlite3.connect(':memory:')\ncon2.executescript(SETUP.replace('PRAGMA foreign_keys = ON;', ''))\ncon2.execute('INSERT INTO orders(customer_id) VALUES (99)')\n"
+  }
+ },
+ {
+  "id": "smi-g0041",
+  "domain": "SQL",
+  "topic": "Indexing and performance",
+  "question_type": "sql_exercise",
+  "question": "orders(id INTEGER PRIMARY KEY, customer_id INTEGER, created_at TEXT) stores timestamps like '2024-01-05 14:30:00'; it has an index on created_at and about a million rows in production. This query is slow although the index exists:\nSELECT id, created_at FROM orders WHERE date(created_at) = '2024-01-05' ORDER BY id;\nExplain why the index is not used, rewrite the predicate so it is, and show how you would verify the change with EXPLAIN QUERY PLAN. What is an alternative that keeps the original predicate? What mistake do people make when writing the rewritten range for timestamps?",
+  "answer": "The index is a B-tree sorted by the raw created_at values. The predicate compares date(created_at) to a constant, so the database would have to compute date() for every row to know which rows match; it cannot binary-search the index for a computed value, and it falls back to scanning the whole table. A predicate is index-friendly (sargable) when the bare indexed column is compared with a value or range. SQLite's optimiser documentation lists terms of the form column op expression as usable by an index and describes the same rule for exactly matching indexed expressions.\n\nRewrite as a half-open range on the column:\n\n```sql\nSELECT id, created_at\nFROM orders\nWHERE created_at >= '2024-01-05'\n  AND created_at <  '2024-01-06'\nORDER BY id;\n```\n\nThis returns orders 15 to 18 (the four orders created on 2024-01-05 in the test data). I checked the plans on 1000 rows: the original shows 'SCAN orders', the rewrite shows 'SEARCH orders USING COVERING INDEX idx_orders_created_at (created_at>? AND created_at<?)'. Plan wording differs between SQLite versions, so test with substrings like SCAN / SEARCH rather than exact text. The other tradeoff: the ORDER BY id adds a temp sort step in the plan, as the index is on created_at, not id.\n\nAlternative: SQLite supports indexes on expressions, so CREATE INDEX ON orders (date(created_at)) lets the original predicate be searched, but only when the query uses exactly the same expression, the function must be deterministic, and it costs extra storage and write time. The range rewrite needs no new index.\n\nCommon mistake: BETWEEN '2024-01-05' AND '2024-01-05 23:59:59' misses values with fractional seconds after 23:59:59 and depends on the string format; use >= start AND < next day. This also relies on all values being consistently formatted ISO text; mixed formats break both the index and the comparison. Other expressions on the column, such as lower(col) or col + 0, are in the same position as date(col).",
+  "key_concepts": [
+   "sargable predicate",
+   "B-tree index",
+   "EXPLAIN QUERY PLAN",
+   "half-open range",
+   "expression index",
+   "function on indexed column",
+   "SCAN vs SEARCH"
+  ],
+  "common_mistakes": [
+   "Using BETWEEN with an end time of 23:59:59",
+   "Adding a second index on the same column instead of fixing the predicate",
+   "Asserting exact plan strings that vary between versions"
+  ],
+  "interview_style_note": "Strong candidate explains why a function on the column defeats the B-tree, rewrites to a half-open range, and verifies with a plan check without hard-coding plan text.",
+  "sources": [
+   {
+    "title": "SQLite Query Optimizer Overview",
+    "url": "https://www.sqlite.org/optoverview.html",
+    "supports": "Index-usable WHERE terms are written as a bare indexed column compared with an expression (or an exactly matching indexed expression).",
+    "verification": "independent_reviewer_supported"
+   },
+   {
+    "title": "SQLite: Indexes On Expressions",
+    "url": "https://www.sqlite.org/expridx.html",
+    "supports": "Expression indexes require deterministic functions, and the query must use the indexed expression exactly as written in CREATE INDEX.",
+    "verification": "independent_reviewer_supported"
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER NOT NULL, created_at TEXT NOT NULL);\nWITH RECURSIVE n(i) AS (SELECT 0 UNION ALL SELECT i+1 FROM n WHERE i < 999)\nINSERT INTO orders (customer_id, created_at)\nSELECT i % 50, strftime('%Y-%m-%d %H:%M:%S', '2024-01-01 00:00:00', '+' || (i * 7) || ' hours') FROM n;\nCREATE INDEX idx_orders_created_at ON orders (created_at);",
+   "solution": "SELECT id, created_at\nFROM orders\nWHERE created_at >= '2024-01-05'\n  AND created_at <  '2024-01-06'\nORDER BY id;",
+   "expected": [
+    [
+     15,
+     "2024-01-05 02:00:00"
+    ],
+    [
+     16,
+     "2024-01-05 09:00:00"
+    ],
+    [
+     17,
+     "2024-01-05 16:00:00"
+    ],
+    [
+     18,
+     "2024-01-05 23:00:00"
+    ]
+   ],
+   "test": "import sqlite3\nSETUP = \"CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER NOT NULL, created_at TEXT NOT NULL);\\nWITH RECURSIVE n(i) AS (SELECT 0 UNION ALL SELECT i+1 FROM n WHERE i < 999)\\nINSERT INTO orders (customer_id, created_at)\\nSELECT i % 50, strftime('%Y-%m-%d %H:%M:%S', '2024-01-01 00:00:00', '+' || (i * 7) || ' hours') FROM n;\\nCREATE INDEX idx_orders_created_at ON orders (created_at);\"\nFAST = \"SELECT id, created_at\\nFROM orders\\nWHERE created_at >= '2024-01-05'\\n  AND created_at <  '2024-01-06'\\nORDER BY id;\"\nSLOW = \"SELECT id, created_at FROM orders WHERE date(created_at) = '2024-01-05' ORDER BY id;\"\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\ndef plan(sql):\n    return ' | '.join(r[3] for r in con.execute('EXPLAIN QUERY PLAN ' + sql))\nassert 'SCAN' in plan(SLOW) and 'SEARCH' not in plan(SLOW), plan(SLOW)\nassert 'SEARCH' in plan(FAST) and 'idx_orders_created_at' in plan(FAST), plan(FAST)\nassert con.execute(SLOW).fetchall() == con.execute(FAST).fetchall()\nassert [r[0] for r in con.execute(FAST)] == [15, 16, 17, 18]\ncon.execute('CREATE INDEX idx_orders_date_expr ON orders (date(created_at))')\nassert 'idx_orders_date_expr' in plan(SLOW), plan(SLOW)\n"
+  }
+ }
+]

@@ -1,0 +1,254 @@
+[
+ {
+  "a": "smi-j0020",
+  "b": "smi-j0036",
+  "contradiction": "none",
+  "duplicate_intent": true,
+  "evidence": "Both: selective tenant/metadata filter on ANN gives 0-2 results under post-filtering; compare post/pre/filter-aware and choose by selectivity. Same strategy: j0020 'Loose filters (most data matches): post-filter with a modest oversampling factor'; j0036 'use post-filter with generous ef when most data matches (for example more than half)'; both send very selective filters to exact scan/partition. Wording differs (modest vs generous), not incompatible."
+ },
+ {
+  "a": "smi-l0014",
+  "b": "smi-l0039",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Both retry-safe pipelines. l0014 'let a retry resume from the failed step; cap retries... fail fast on deterministic ones' agrees with l0039 'Retry only transient failures... OOM kill usually repeats... fail fast'. Cache key (code, params, input digests) is consistent."
+ },
+ {
+  "a": "smi-l0016",
+  "b": "smi-l0020",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: both treat registry versions as immutable and aliases as mutable pointers; l0016 'folder is enough' only for one model/author/consumer, no provenance, which l0020's audit scenario does not meet."
+ },
+ {
+  "a": "smi-h0017",
+  "b": "smi-k0033",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Same formula 2 x layers x kv_heads x head_dim x seq x batch x bytes; both give 2 GiB for 32 layers/32 heads/128/4096/fp16. Different tasks (KV-cache decoder code vs capacity helper)."
+ },
+ {
+  "a": "smi-l0005",
+  "b": "smi-l0016",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent roles: tracker holds runs, registry holds immutable promoted versions with pointer; l0016 lists the same registry benefits. Different questions."
+ },
+ {
+  "a": "smi-j0006",
+  "b": "smi-j0037",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Arithmetic consistent: HNSW M=16 layer0 = 32 links x 4 B = 128 B/vector (j0006 2.56 GB for 20M; j0037 6.4 GB for 50M). 768-d float32 20M = 61.44 GB + 2.56 = ~64 GB matches."
+ },
+ {
+  "a": "smi-k0033",
+  "b": "smi-k0039",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Numbers agree: 8 KV heads = 128 KiB/token, 512 MiB per 4096-token sequence (k0033) ; k0039 60 GiB/512 MiB = 120; k0033 usable 60.96 GiB /512 MiB = 121. Different questions (helper function vs paged allocation)."
+ },
+ {
+  "a": "smi-h0009",
+  "b": "smi-j0003",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: both say raw dot rewards norm, fix is L2-normalise docs, on unit vectors L2/IP/cosine rankings coincide, and check model docs for dot-trained models. Worked numbers verified (cosines 0.994/0.707/0.9997)."
+ },
+ {
+  "a": "smi-k0010",
+  "b": "smi-k0027",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: both say in-band filtering is unreliable and bound damage with least privilege, confirmation, untrusted-data separation (k0010 'filtering prompts... unreliable' vs k0027 'filter... weak')."
+ },
+ {
+  "a": "smi-j0021",
+  "b": "smi-j0034",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent on pooling bias (unjudged = non-relevant, pool from several systems). j0021 also covers tuning on same queries, noise, metric choice, so intent is broader than j0034's pooling-only question. Overlap but not duplicate."
+ },
+ {
+  "a": "smi-j0001",
+  "b": "smi-j0007",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: j0001 'centroids are trained on a snapshot... go stale if distribution shifts' is exactly j0007's scenario; j0007 'HNSW graphs do not have this exact issue' agrees with j0001 HNSW delete/churn caveat."
+ },
+ {
+  "a": "smi-j0031",
+  "b": "smi-k0016",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent protocol: j0031 'count a win only when the same system wins in both [orders]; disagreements are ties' vs k0016 'if it flips with the order, record a tie'. Different questions (diagnose bias vs choose pointwise/pairwise)."
+ },
+ {
+  "a": "smi-l0024",
+  "b": "smi-m0030",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: both say CPU is a poor scaling signal for accelerator work and use in-flight/queue wait with headroom and start-up lag. 60% vs 70% target utilisation are different scenarios. Arithmetic checks (100/28 = 3.6)."
+ },
+ {
+  "a": "smi-k0027",
+  "b": "smi-k0032",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent. k0032 notes 'a user typing an override... is often called direct prompt injection' and OWASP overlap, matching k0027's direct/indirect definition. Different question (jailbreak vs injection; blocklist weakness)."
+ },
+ {
+  "a": "smi-l0001",
+  "b": "smi-l0005",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: both name code commit, data snapshot, config, seeds, environment as the lineage chain. Different questions (what to record vs tracker vs registry)."
+ },
+ {
+  "a": "smi-m0003",
+  "b": "smi-m0011",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: both separate data-quality invariants (null/zero rate, schema) from drift, require persistence, and block auto-retrain on DQ failure. Different scenarios (alert fatigue vs retrain-on-corrupt-data)."
+ },
+ {
+  "a": "smi-k0010",
+  "b": "smi-k0028",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent defence set (least privilege, confirmation, quarantined/untrusted handling, recipient validation). k0028 is a broader layered-design question; k0010 is control-flow explanation plus one rule."
+ },
+ {
+  "a": "smi-l0013",
+  "b": "smi-m0026",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: both favour shifting traffic back/controlled comparison with a concurrent control and require the old version retained and compatible features. l0013 'compare against a concurrent control... rather than last week' vs m0026 'otherwise against the same hour a week earlier' is conditional (no control available), not conflicting."
+ },
+ {
+  "a": "smi-j0033",
+  "b": "smi-j0042",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: both say gold chunk in context does not guarantee a right answer, use oracle/gold-only and closed-book style ablations. Different questions (metric gap vs single-answer triage)."
+ },
+ {
+  "a": "smi-j0001",
+  "b": "smi-j0037",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent sizing (153.6 GB raw, 6.4 GB layer-0 links). j0001 shortlists 'IVF-PQ with re-rank' for a 64 GB node and HNSW sharded/compressed as alternative; j0037 (100 GB nodes, HNSW fixed) picks int8 first and says PQ pays off when memory binds. Different constraints."
+ },
+ {
+  "a": "smi-l0001",
+  "b": "smi-l0003",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent reproducibility factors (code, data, seed, environment, hardware). Different questions (what to record vs ordered debugging checklist). Seed-SD arithmetic verified."
+ },
+ {
+  "a": "smi-h0003",
+  "b": "smi-j0030",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: both separate faithfulness, relevance, correctness; h0003 'Faithfulness is not correctness: a faithful answer built on a stale or wrong chunk is still wrong' matches j0030 case A."
+ },
+ {
+  "a": "smi-j0008",
+  "b": "smi-j0045",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: j0008 chunk arithmetic verified (20/23/26 chunks) and both say compare chunk configs by answer-span hit not chunk id; j0045 '256-token chunks double the chunk count' agrees."
+ },
+ {
+  "a": "smi-h0010",
+  "b": "smi-j0034",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: both say unjudged documents count as non-relevant (h0010 convention vs j0034 pooling bias). nDCG 0.578 verified. Different tasks."
+ },
+ {
+  "a": "smi-j0029",
+  "b": "smi-k0017",
+  "contradiction": "none",
+  "duplicate_intent": true,
+  "evidence": "Same core scenario and intent: high raw agreement (91% / 90%) on imbalanced labels, vendor/colleague says trust the LLM judge as gate; compute kappa/error-type rates and calibrate. j0029 adds a cohen_kappa implementation; k0017 adds calibration protocol. Numbers consistent (kappa 0.36 and 0.61 verified; both stress per-class bad-answer recall 30% vs 60% on different data)."
+ },
+ {
+  "a": "smi-h0003",
+  "b": "smi-j0043",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: both treat unsupported claims via claim-level support, answer-only-from-context, abstention, and say faithfulness differs from correctness. Different questions."
+ },
+ {
+  "a": "smi-j0015",
+  "b": "smi-j0041",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: RRF as robust default (c=60), normalisation needs tuning; j0041 RRF arithmetic (0.03227 vs 0.03226) and IDF numbers (10.72, 8.73) verified. j0041 is about shard-local BM25 stats."
+ },
+ {
+  "a": "smi-k0010",
+  "b": "smi-k0013",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: both enforce permissions in code, not the prompt; recipient allowlist, least privilege per task, confirmation for outbound email."
+ },
+ {
+  "a": "smi-j0030",
+  "b": "smi-j0043",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: both state faithfulness != correctness and report them separately. j0043 is diagnosing sources of unsupported claims."
+ },
+ {
+  "a": "smi-i0034",
+  "b": "smi-l0033",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: both warn of novelty effects, check sample ratio, user-level randomisation. i0034 sample size (~154k/arm, 39.5k/arm) verified. Different questions."
+ },
+ {
+  "a": "smi-k0033",
+  "b": "smi-k0034",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: 0.5 MiB/token for 32 layers x 32 KV heads x 128 fp16 in both; 2,000 tokens = 1.05e9 B; 64 x 1.05 GB = 67 GB. Different questions."
+ },
+ {
+  "a": "smi-m0001",
+  "b": "smi-m0002",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent PSI numerics: m0001 eps=1e-4 vs m0002 ceiling ~8.3 for 10 bins (verified 8.28); m0002's 0.055 PSI for 9% null-to-zero agrees with m0001 on binned PSI weakness. Different questions."
+ },
+ {
+  "a": "smi-h0037",
+  "b": "smi-m0037",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: chi2 14.23 (p~1.6e-4) and chi2 40.0 (p~2.5e-10) both verified; both say treat SRM as invalid until explained. m0037 adds cache/online-learning interference."
+ },
+ {
+  "a": "smi-l0041",
+  "b": "smi-m0015",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent as-of semantics: l0041 'feature_ts <= event_ts' and m0015 'computed at or before prediction_ts'. Different tasks (join impl vs SQL audit)."
+ },
+ {
+  "a": "smi-h0004",
+  "b": "smi-k0025",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: LoRA 4.19M params verified; QLoRA 4-bit ~4x smaller base than 16-bit. Different questions."
+ },
+ {
+  "a": "smi-j0001",
+  "b": "smi-j0002",
+  "contradiction": "none",
+  "duplicate_intent": false,
+  "evidence": "Consistent: j0001 recall target vs j0002 ANN-recall measurement; no overlapping claims in conflict. Different questions."
+ }
+]

@@ -1,0 +1,450 @@
+[
+ {
+  "id": "P2-DA-01",
+  "verdict": "pass",
+  "reasons": [
+   "Reference numbers all reproduced (14,751; 3,841; 57,763; 19,747; 21,950; 8,158; 39,240; total 29,502).",
+   "Formula (pooled variance under H0, unpooled under H1) is the standard form and matches the code."
+  ],
+  "parts_answered": {
+   "function with stdlib only": true,
+   "example 3841": true,
+   "n vs MDE": true,
+   "n vs baseline": true,
+   "n vs power": true,
+   "n vs alpha": true,
+   "pitfalls needing more traffic": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "I cross-checked the constant against scipy's norm.ppf",
+    "problem": "First-person provenance claim; harmless (scipy.stats.norm.ppf does agree) but not part of an interview answer.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short formula implementation plus qualitative scaling discussion; single concept (power analysis).",
+  "key_concepts_findings": "All 7 are discussed (pooled variance and inverse-normal critical values appear in formula/code).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0172",
+   "same_intent": false
+  },
+  "code_findings": "Solution+test re-run from scratch on sandbox Python 3.13 (numpy 2.5/pandas 3.0) and v310/v311 (numpy 2.2.6, pandas 2.3.3) with python -I: all pass. Fenced block equals tested solution. Own edge cases: f(0.5,0.01)=39240, f(0.05,0.01)=8158, negative mde works (13495), p2>=1 and mde=0 raise ValueError, power=1.0 raises statistics.StatisticsError (trivial). stdlib only; no version dependence.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-DA-02",
+  "verdict": "pass",
+  "reasons": [
+   "Simulation reproduces the quoted figures (about 20-22% vs about 5%; 14% for 5 days, 28% for 30 days).",
+   "Explanation of correlated looks, group-sequential/alpha-spending and the hedged Bayesian remark are accurate."
+  ],
+  "parts_answered": {
+   "simulate_peeking signature/return": true,
+   "expected values": true,
+   "why not 14x5%": true,
+   "remedies": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Using more looks pushes it higher; in my runs, 5 looks gave about 14% and 30 looks about 28%.",
+    "problem": "days=5/30 changes total data collected as well as number of looks (looks are always daily); also seed 1 gives 19.7%, so 'roughly 20-22%' is slightly tight.",
+    "replacement": "Running the daily-peeking policy for longer pushes it higher; in my runs, 5 days (5 looks) gave about 14% and 30 days (30 looks) about 28%."
+   },
+   {
+    "severity": "minor",
+    "claim": "counting a look as one-sided",
+    "problem": "Obscure pitfall; not explained.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Vectorised cumulative simulation plus explanation of correlated sequential tests; no tricky derivation.",
+  "key_concepts_findings": "All 7 covered; 'seeded simulation' is a method detail rather than a concept but is used.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0172",
+   "same_intent": false
+  },
+  "code_findings": "All three interpreters pass. Seeds 0-4 (n_sims=4000): peeking 22.0/19.7/21.3/21.8/21.6%, fixed 5.2/4.7/5.0/5.7/5.0%. days=5 -> 14.1%, days=30 -> 28.2%; 14 days at n_sims=20000 -> 21.9%. Deterministic by seed; days=1 gives identical rates. Not tested by author: n_sims=0 (nan mean with warning). Fenced block equals tested solution.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-DA-03",
+  "verdict": "correct",
+  "reasons": [
+   "Verified: chi2 14.2292, p 1.618e-4, df 1; closed forms for df 2..11 agree with scipy.stats.chisquare (rel err 1.5e-13, 2000 random cases incl. unequal ratios).",
+   "Two loose sentences: 'harmless' imbalances, and an ambiguous '1.2% imbalance'."
+  ],
+  "parts_answered": {
+   "srm_check implemented without scipy": true,
+   "example chi2 14.23, small p, True": true,
+   "interpretation": true,
+   "causes to investigate first": true,
+   "what to do with results": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "even tiny, harmless imbalances become significant",
+    "problem": "A flagged SRM should be treated as a pipeline problem regardless of size; calling imbalances 'harmless' invites ignoring a real alarm.",
+    "replacement": "with very large traffic even tiny imbalances become statistically significant; still treat a flagged SRM as a pipeline problem and look at the size of the gap and its cause as well as p."
+   },
+   {
+    "severity": "minor",
+    "claim": "with 100k users a 1.2% imbalance is not small",
+    "problem": "Ambiguous: the PM's 2.4% is treatment vs control; 1.2% is the gap as a share of the total, and each arm is 0.6 pp from 50%.",
+    "replacement": "with 100k users, treatment having 2.4% more users than control (50.6% vs 49.4% of the total) is not small."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Chi-square goodness of fit by hand with a df=1 erfc trick, plus a diagnosis checklist.",
+  "key_concepts_findings": "All 6 discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0237",
+   "same_intent": false
+  },
+  "code_findings": "All three interpreters pass. Verified vs scipy. Own edge cases: counts [0,0] -> ZeroDivisionError (unhandled, minor), [0,10] fine, numpy array and tuple inputs fine, huge chi2 gives p=0.0 without error. Fenced block equals tested solution.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-DA-04",
+  "verdict": "pass",
+  "reasons": [
+   "All figures verified (17.5% vs 8.67%; desktop 20/22%, mobile 5/6%; standardised 12.5% vs 14.0%; 83% mixes).",
+   "Answer conditions the 'which to trust' on how the mix arose and flags the randomisation red flag; no blanket rule."
+  ],
+  "parts_answered": {
+   "pooled rate": true,
+   "per-segment rates": true,
+   "pooled winner": true,
+   "segment winner or None": true,
+   "reversal flag": true,
+   "mix-standardised rates": true,
+   "cause of reversal": true,
+   "which comparison to trust": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "seg = df.set_index([\"segment\", \"variant\"])",
+    "problem": "Duplicate segment/variant rows raise 'Index contains duplicate entries'; a missing segment-variant cell makes the standardised rate silently skip that segment (A=0.083 in my test). Input assumed pre-aggregated, undocumented.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short pandas aggregation plus conceptual choice between pooled and stratified comparison.",
+  "key_concepts_findings": "All 6 present and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0311",
+   "same_intent": false
+  },
+  "code_findings": "All three interpreters pass (pandas 2.3.3 and 3.0). Own cases: tie in a segment -> segment_winner None, reversal False; 3 variants works; shuffled row order fine; missing cell -> None winner with biased standardised rate; duplicate rows -> ValueError; zero-user cell -> NaN skipped. Fenced block equals tested solution.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-DA-05",
+  "verdict": "pass",
+  "reasons": [
+   "Verified: z-score flags none (max |z| 2.845, bound 9/sqrt(10)=2.846); IQR (Q1 25.5, Q3 37) and MAD (M=95.4) flag 950.",
+   "Log-normal figures reproduced exactly: 2.04%, 6.24%, 5.80% raw; on logs MAD 2, IQR 27. Normal-theory rates by 2M-sample simulation: IQR 0.71%, modified z>3.5 0.049%."
+  ],
+  "parts_answered": {
+   "mad_outliers with MAD=0 fallback": true,
+   "zscore_outliers": true,
+   "iqr_outliers": true,
+   "which flags 950": true,
+   "why": true,
+   "log-normal behaviour": true,
+   "what to do with flagged points": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "zscore_outliers (code)",
+    "problem": "n=1 gives NaN sd plus RuntimeWarning; NaN inputs silently yield all False. The 'cannot fire' bound is stated for the sample SD (ddof=1) which the code uses.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Three short robust-statistics functions plus explanation of masking; one concept family.",
+  "key_concepts_findings": "All 7 discussed (breakdown points 50%/25% correct; winsorising named).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0267",
+   "same_intent": false
+  },
+  "code_findings": "All three interpreters pass. Own cases: n=1, n=2, all-identical, 9 identical + 1000, NaN input, 2-D array: no crashes (warnings only). Fenced block equals tested solution. Iglewicz-Hoaglin 3.5 and the 1.253314 MeanAD fallback are standard but I did not open the original source.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-DA-06",
+  "verdict": "correct",
+  "reasons": [
+   "Reproduced (12.0, 28.0) for seeds 0-3 (seed 4: 27.01), so 'roughly (12, 28)' is right.",
+   "Coverage claim reproduced: 0.92-0.94 (min 0.9175) for lognormal/exponential/normal at n=5,10,15 (2000 reps, 1000 boots).",
+   "One internally inconsistent sentence about endpoints being data points for n=10."
+  ],
+  "parts_answered": {
+   "vectorised percentile bootstrap": true,
+   "meaning/non-meaning of interval": true,
+   "when unreliable": true,
+   "deterministic test assertions": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "so the interval endpoints are data points and coverage can be below nominal",
+    "problem": "For n = 10 (even) bootstrap medians are data values or averages of two, so endpoints need not be data points; np.quantile also interpolates between order statistics.",
+    "replacement": "so the interval endpoints come from that small set of values (data points or midpoints, possibly interpolated) and coverage can be below nominal"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short vectorised bootstrap plus interpretation and failure modes.",
+  "key_concepts_findings": "All 7 discussed (BCa and block bootstrap named, not demonstrated).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0169",
+   "same_intent": false
+  },
+  "code_findings": "All three interpreters pass. Own cases: [1,2] -> (1.0, 2.0); NaN in x -> (nan, nan) silently; n_boot=0 -> IndexError (not validated); memory n_boot*n indices is undocumented. Fenced block equals tested solution.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-DA-07",
+  "verdict": "pass",
+  "reasons": [
+   "All numbers verified: 1 expected FP, 64.15% (answer 64.2%), Bonferroni rejects 2, BH rejects 6 (rank 4 fails, ranks 5-6 pass).",
+   "BH and Bonferroni match an exact-Fraction reference on 20,000 random inputs (0 mismatches)."
+  ],
+  "parts_answered": {
+   "expected false positives": true,
+   "P(at least one)": true,
+   "bonferroni original order": true,
+   "benjamini_hochberg original order": true,
+   "what each controls": true,
+   "when to prefer which": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "benjamini_hochberg (code)",
+    "problem": "NaN p-values are 'rejected' (benjamini_hochberg([nan, 0.001]) -> [True, True]); no range validation.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Two short procedures; the step-up subtlety is the only trap.",
+  "key_concepts_findings": "All 7 discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0170",
+   "same_intent": false
+  },
+  "code_findings": "All three interpreters pass. statsmodels not installed, so I used an exact rational-arithmetic reference (0/20000 mismatches, m up to 30, ties included). Own cases: empty list, single p, NaN (see issue). Fenced block equals tested solution.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-DA-08",
+  "verdict": "correct",
+  "reasons": [
+   "Passes on pandas 3.0 and 2.3.3, so the answer's 'only executed on pandas 3.0.5' caveat is outdated provenance noise.",
+   "Own edge cases mostly robust; only empty signups fails."
+  ],
+  "parts_answered": {
+   "precise definition": true,
+   "weekly_retention implemented": true,
+   "Monday weeks": true,
+   "cohort_size incl. inactive": true,
+   "pre-signup/non-signup ignored": true,
+   "censoring to NaN": true,
+   "example rows": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "I ran it on a six-user fixture, including a duplicate-same-week event, a non-signup user, a pre-signup event and a user with no events; the test compares values via lists and np.allclose, uses strftime on the index, and avoids chained assignment, so it does not depend on pandas 2.x versus 3.x display or dtype choices (I only executed it on pandas 3.0.5).",
+    "problem": "Process narration, and the version caveat is outdated: it also passes on pandas 2.3.3 (Python 3.10 and 3.11).",
+    "replacement": "The code was checked on a six-user fixture that includes a duplicate same-week event, a non-signup user, a pre-signup event and a user with no events; it passes on pandas 2.3 and 3.0."
+   },
+   {
+    "severity": "minor",
+    "claim": "as_of handling (code)",
+    "problem": "Signups after as_of give a cohort row with all-NaN cells but nonzero cohort_size; empty signups raises ValueError 'cannot convert float NaN to integer'; nested .loc loop is O(cohorts x weeks).",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-step pandas implementation: week alignment, de-duplication, merge, k computation, right-censoring, many edge semantics.",
+  "key_concepts_findings": "All 7 discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0034",
+   "same_intent": false
+  },
+  "code_findings": "All three interpreters pass; the question's example rows [1.0,0.667,0.333] and [1.0,0.0,NaN] are reproduced. Own cases: events=[] (fine), timestamps with times, as_of mid-week (later cells NaN), as_of before all signups, duplicate signup rows, max_week=0, signup after as_of, datetime64 inputs: all sane; empty signups errors. Fenced block equals tested solution.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-DA-09",
+  "verdict": "pass",
+  "reasons": [
+   "Verified: mix -0.154 pt, rate -0.140 pt, total -0.294 pt, exact sum; z = 3.949 (answer 'about 3.9').",
+   "Midpoint decomposition is algebraically exact."
+  ],
+  "parts_answered": {
+   "decompose_conversion_change": true,
+   "mix+rate sum exactly": true,
+   "numbers reported": true,
+   "significance": true,
+   "next diagnostic steps": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "question wording / answer convention",
+    "problem": "The question does not fix a decomposition convention, so per-segment numbers are convention-dependent; the answer does say to state the convention, which mitigates this.",
+    "replacement": null
+   },
+   {
+    "severity": "minor",
+    "claim": "segment present in only one period (code)",
+    "problem": "A zero-session segment gives NaN rates, so mix/rate/total silently skip it and no longer sum to the overall change (tested).",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Needs an exactly additive decomposition plus interpretation of mix vs rate, significance and diagnosis.",
+  "key_concepts_findings": "All 7 discussed (midpoint called Shapley-style; acceptable for two factors).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0172",
+   "same_intent": false
+  },
+  "code_findings": "All three interpreters pass. Own cases: new segment in period 1 only -> NaN; all-zero orders -> 0. Fenced block equals tested solution.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-DA-10",
+  "verdict": "pass",
+  "reasons": [
+   "All numbers verified: raw 4.14, weights 5/1/0.333, post-stratified 3.54, Kish n 174.4.",
+   "Limits are accurate and well hedged."
+  ],
+  "parts_answered": {
+   "name the bias": true,
+   "how to check": true,
+   "poststratify returns raw/weighted/weights/Kish": true,
+   "worked numbers": true,
+   "limits of reweighting": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "every population stratum must have respondents; empty strata cannot be reweighted",
+    "problem": "Stated as a requirement but the code does not enforce it: a population stratum with no respondents is silently dropped and the others renormalised (pop a:.5,b:.3,c:.2 with only a,b -> 2.75, no error). NaN scores still count in w.sum() (2.98 vs 3.0).",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Standard weighting formula in a few lines of pandas plus conceptual caveats.",
+  "key_concepts_findings": "All 7 discussed; 'missing at random given strata' is covered by limit (1).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0009",
+   "same_intent": false
+  },
+  "code_findings": "All three interpreters pass. Own cases: empty stratum (silent), NaN score (silent bias), NaN stratum label (silently weighted), populations not summing to 1 raise. Fenced block equals tested solution.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-DA-11",
+  "verdict": "pass",
+  "reasons": [
+   "Reproduced: seasonal max error 0.753 (answer 'about 0.8'), residual sd 0.640, multiplicative max |resid-1| 0.00053, additive max resid 2.99. Trend matches pandas rolling(12).rolling(2) to 3e-14."
+  ],
+  "parts_answered": {
+   "decompose_classical implemented": true,
+   "even/odd centred MA": true,
+   "seasonal re-centring add/mult": true,
+   "NaN ends": true,
+   "synthetic test": true,
+   "when multiplicative is better": true,
+   "what the method cannot do": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "return value (code)",
+    "problem": "Input Series index (e.g. DatetimeIndex) is discarded; result has a RangeIndex though the docstring accepts a Series.",
+    "replacement": null
+   },
+   {
+    "severity": "minor",
+    "claim": "is also needed when data must be positive",
+    "problem": "Unclear sentence; the point is that multiplicative models and log transforms both require strictly positive data.",
+    "replacement": "and, like the multiplicative model, it requires strictly positive data."
+   },
+   {
+    "severity": "minor",
+    "claim": "Forgetting to re-centre the seasonal indices so the trend absorbs a bias",
+    "problem": "Without re-centring the leftover mean ends up in the seasonal/residual split, not in the trend.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Specified algorithm (centred MA, per-position mean, recentre) with validation; mostly careful coding.",
+  "key_concepts_findings": "All 7 discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0319",
+   "same_intent": false
+  },
+  "code_findings": "All three interpreters pass. Own cases: n=2*period exactly (fine), Series with DatetimeIndex (index lost), period 2 and 3, constant series (seasonal 0, mult resid 1), NaN in y (no crash), float period -> TypeError. Fenced block equals tested solution. statsmodels not installed, so no cross-check against seasonal_decompose.",
+  "sources_findings": []
+ },
+ {
+  "id": "P2-DA-12",
+  "verdict": "correct",
+  "reasons": [
+   "Reproduced (0.00457, 0.00072, 0.00038); over seeds 1-100 naive mean 0.0043 (theory 0.042/9.75), adjusted mean 1.7e-5 (sd 0.0004), randomised 3.6e-5 (sd 0.0004), so 'near zero within noise' holds.",
+   "One conceptual mislabel: page speed is a mediator, not a confounder."
+  ],
+  "parts_answered": {
+   "why not causal": true,
+   "specific confounders": true,
+   "experiment design (what/unit/metric/analysis)": true,
+   "observational fallbacks with assumptions": true,
+   "simulate_confounding": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Mechanism confounds exist too: more images can slow the page, which pushes the other way.",
+    "problem": "Page speed lies on the causal path (mediator), not a confounder; the later pitfall says so correctly.",
+    "replacement": "Mediators matter too: more images can slow the page, which pushes the other way, so do not adjust for page speed when estimating the total effect of images."
+   },
+   {
+    "severity": "minor",
+    "claim": "small n (code)",
+    "problem": "simulate_confounding(n=10) returns (0.0, 0.0, 0.0) because of a rank-deficient design; irrelevant at default n.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open-ended causal design with trade-offs (unit, clustering, guardrails, identification assumptions) plus a simulation.",
+  "key_concepts_findings": "All 8 discussed; propensity weighting and unmeasured confounding are named only briefly.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0311",
+   "same_intent": false
+  },
+  "code_findings": "All three interpreters pass; seeds 1-100 give naive 0.0035-0.0050, adjusted -0.0011..0.0011, randomised -0.0008..0.0012, so test bands are safe. Deterministic by seed. Fenced block equals tested solution.",
+  "sources_findings": []
+ }
+]

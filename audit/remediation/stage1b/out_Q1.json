@@ -1,0 +1,492 @@
+[
+ {
+  "id": "smi-0001",
+  "status": "ok",
+  "question": "What is R2? What are some other metrics that could be better than R2 and why?",
+  "answer": "R^2 (coefficient of determination) is 1 - SS_res/SS_tot: the fraction of the variance of y that the model explains relative to a mean-only baseline. For OLS with an intercept, evaluated on the training data, it lies in [0, 1] and cannot decrease when you add a predictor, so it rewards complexity and says nothing about overfitting. On held-out data it can be negative (worse than predicting the mean). It also does not show whether the model is correctly specified or whether errors are large in absolute terms.\n\nBetter alternatives depend on the goal. Adjusted R^2 = 1 - (1 - R^2)(n - 1)/(n - p - 1) penalises extra predictors, so it can fall when a useless variable is added. For predictive quality use held-out or cross-validated error in the units of y: RMSE (penalises large errors) or MAE (robust to outliers). For comparing models on the same data use AIC/BIC, which trade fit against the number of parameters. Training error alone is not a fix: it also improves monotonically with complexity. Always inspect residual plots too.",
+  "key_concepts": [
+   "R-squared",
+   "adjusted R-squared",
+   "overfitting",
+   "cross-validation",
+   "RMSE",
+   "MAE",
+   "AIC/BIC"
+  ],
+  "difficulty": "Medium",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Removed the incorrect 'or train error metrics' suggestion (training error always improves with complexity); replaced with held-out/CV RMSE/MAE and AIC/BIC; added adjusted R^2 formula and R^2 definition; rewrote the fragment answer. Difficulty raised Easy->Medium (comparison of metrics).",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0015",
+  "status": "ok",
+  "question": "Given that you have wifi data in your office, how would you determine which rooms and areas are underutilized and overutilized?",
+  "answer": "Frame it as estimating occupancy per room over time, then comparing it with capacity and opening hours.\n\n1. Data and mapping: WiFi association logs (device ID, access point, timestamp) joined to a floor plan that maps each AP to rooms or zones. Aggregate to fixed intervals (e.g. 15 minutes) as the count of distinct devices per zone.\n2. Turn devices into people: exclude static devices (printers, desktops, APs) and very short visits, deduplicate by user login where available, and calibrate devices-per-person against a ground-truth sample (manual counts, door sensors, badge swipes or room bookings). Randomised MAC addresses inflate counts unless handled.\n3. Metrics per room: average and peak (e.g. 95th percentile) estimated occupancy divided by capacity, share of working hours above a high threshold (e.g. over 80% of capacity) and below a low one (e.g. under 20%), and utilisation by hour and weekday. Thresholds are business choices; agree them with facilities. Compare with booked time to find booked-but-empty rooms.\n4. Segment by room type, team and time (day of week, season) because a room can be overused on Tuesdays and empty on Fridays.\n5. Pitfalls: devices are not people, overlapping AP coverage and roaming misattribute devices, people in corridors are counted, and tracking must be aggregated/anonymised to meet privacy law (e.g. GDPR).\n\nOutput: a ranked list of persistently under- and over-used spaces with confidence caveats.",
+  "key_concepts": [
+   "occupancy estimation",
+   "utilisation vs capacity",
+   "peak vs average",
+   "ground-truth calibration",
+   "segmentation",
+   "MAC randomisation",
+   "privacy"
+  ],
+  "difficulty": "Medium",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Question text repaired (lost 'fi' ligatures: 'wi'->'wifi', 'o ce'->'office'). Answer expanded into a structured framework (data mapping, device-to-person calibration, metrics with thresholds, segmentation, pitfalls). Thresholds given are illustrative and labelled as business choices.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0018",
+  "status": "ok",
+  "question": "Given position data of NBA players in a season’s games, how would you evaluate a basketball player’s defensive ability?",
+  "answer": "Defence is hard to measure from box scores, so use tracking data (player and ball x-y coordinates over time) together with play-by-play and build metrics that compare outcomes with what was expected.\n\n1. Shot-level: model the expected make probability of each shot from shot location, distance to the nearest defender, shooter identity, shot type and game context. For shots a player contests, compute expected points minus actual points (points saved). A related view is opponent FG% at the rim when the player is the nearest defender versus the expected FG%.\n2. Possession-level: opponent points per possession while the player is on court, adjusted for teammates and opponents (e.g. regularised regression on stints, RAPM-style) because raw on/off numbers are confounded by who else is playing.\n3. Event counts as supporting signals: steals, blocks, deflections, defensive rebounds, fouls drawn or committed. These are noisy and can reward gambling.\n4. Matchup: use the assigned or inferred man-to-man matchup (who guards whom) to measure the efficiency of the offensive players they guard relative to those players' usual output.\n\nGuardrails: report per-possession rates with enough sample size and shrink small samples toward the mean; compare within position and role; account for team scheme (drop coverage, switching) and the quality of teammates, which influence a player's defensive numbers. Validate by checking year-over-year stability and agreement with team defensive results.",
+  "key_concepts": [
+   "tracking data",
+   "expected points model",
+   "shot contest",
+   "opponent FG%",
+   "on/off adjusted plus-minus",
+   "regularisation",
+   "sample size",
+   "team scheme confounding"
+  ],
+  "difficulty": "Hard",
+  "domain": "Data Analysis",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original answer only restated the question. Replaced with a concrete framework (expected-shot model, points saved, adjusted possession-level model, matchup data) plus confounders and validation. No specific league statistics asserted.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0034",
+  "status": "ok",
+  "question": "What are the deep learning frameworks or tools?",
+  "answer": "The main general-purpose deep learning frameworks today are PyTorch, TensorFlow (usually used through its Keras API) and JAX. Keras 3 is multi-backend: it can run on JAX, TensorFlow or PyTorch (OpenVINO is supported for inference only). Higher-level libraries such as Hugging Face Transformers, PyTorch Lightning and fastai are built on top of these frameworks rather than replacing them.\n\nSeveral older frameworks are no longer a good default for new work: Theano and Microsoft CNTK are no longer actively developed, Caffe2 was merged into the PyTorch codebase, and Chainer is in maintenance mode (bug fixes only). Frameworks differ in their programming model (eager/imperative define-by-run versus graph compilation, e.g. via XLA in JAX), deployment tooling and ecosystem. The landscape changes, so check current documentation before choosing.",
+  "key_concepts": [
+   "PyTorch",
+   "TensorFlow",
+   "JAX",
+   "Keras 3 multi-backend",
+   "define-by-run vs graph compilation",
+   "deprecated frameworks"
+  ],
+  "difficulty": "Easy",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [
+   {
+    "title": "Keras 3 announcement",
+    "url": "https://keras.io/keras_3/",
+    "supports": "Keras 3 runs on JAX, TensorFlow, PyTorch, or OpenVINO (inference-only)."
+   },
+   {
+    "title": "Chainer GitHub README",
+    "url": "https://github.com/chainer/chainer",
+    "supports": "Chainer is in the maintenance phase with development limited to bug fixes and maintenance."
+   }
+  ],
+  "change_notes": "Original answer listed Theano/CNTK/Caffe2/Chainer as current alongside run-together text; the current answer already separated them, and this version adds Keras 3 backend detail (OpenVINO inference-only) and Chainer's maintenance status, both confirmed from the pages opened. Statements about Theano, CNTK and Caffe2 are from my own knowledge, not from an opened source.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0053",
+  "status": "ok",
+  "question": "In which layer softmax activation function used?",
+  "answer": "Softmax is typically used in the output layer of a network for multi-class classification with mutually exclusive classes. It maps a vector of logits z to probabilities softmax(z)_i = exp(z_i) / sum_j exp(z_j), which are positive and sum to 1, and is paired with cross-entropy loss. For multi-label problems (classes not exclusive) use independent sigmoids instead, and for binary classification a single sigmoid. Softmax is not restricted to the output layer: attention mechanisms apply it to scores inside hidden layers, and mixture-of-experts gating uses it to weight experts. In practice frameworks often take raw logits in the loss (e.g. PyTorch CrossEntropyLoss) for numerical stability, so the softmax is folded into the loss rather than being a separate layer.",
+  "key_concepts": [
+   "softmax",
+   "output layer",
+   "multi-class classification",
+   "cross-entropy",
+   "sigmoid for multi-label",
+   "logits",
+   "attention"
+  ],
+  "difficulty": "Easy",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "'has to be used in the output layer' was too absolute: softmax is the typical output activation for single-label multi-class classification but is also used inside attention/gating. Added formula and when not to use it.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0062",
+  "status": "ok",
+  "question": "What are the main benefits of Mini-batch Gradient Descent?",
+  "answer": "Mini-batch gradient descent updates the weights using the gradient over a small batch (e.g. 32-512 examples), which sits between SGD (batch of 1) and full-batch descent.\n\nBenefits:\n- Computational efficiency: batches are processed as vectorised matrix operations, which uses GPU/CPU hardware far better than one-example-at-a-time SGD.\n- Memory: only one batch has to be in memory, so datasets larger than memory or very large models can be trained.\n- Lower-variance gradient than SGD: the gradient estimate noise shrinks roughly with 1/batch size, giving more stable updates, while you still get many updates per epoch (unlike full-batch descent), which usually means faster progress per unit of compute.\n- Useful noise: the remaining gradient noise can help move through saddle points and shallow regions, and is often reported to act as a mild regulariser.\n\nCaveats: the claims that mini-batches 'find flat minima' or 'avoid local minima' are empirical tendencies that are debated, not guarantees; very large batches often need a tuned (larger) learning rate or warm-up to generalise as well. Batch size is a hyperparameter.",
+  "key_concepts": [
+   "mini-batch",
+   "gradient variance",
+   "vectorisation",
+   "SGD",
+   "saddle points",
+   "batch size",
+   "learning rate"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Removed the loosely stated 'finds flat minima' and 'avoid local minima' claims as benefits (now flagged as debated empirical tendencies); replaced with well-established benefits: hardware efficiency, memory, variance reduction versus SGD, more frequent updates versus full batch.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0100",
+  "status": "ok",
+  "question": "What are the types of autoencoders?",
+  "answer": "There is no single canonical list; autoencoder variants are distinguished by how they stop the network from just copying its input, plus architecture choices.\n\nBy regularisation or objective:\n- Undercomplete: the bottleneck is smaller than the input, forcing a compressed code.\n- Sparse: a sparsity penalty on the activations (e.g. L1 or KL-based), so few units fire per input; the code can even be wider than the input.\n- Denoising: trained to reconstruct the clean input from a corrupted one (noise or masking), which learns robust features.\n- Contractive: adds a penalty on the Jacobian of the encoder so the code is insensitive to small input changes.\n- Variational (VAE): the encoder outputs a distribution over latent variables and the loss combines reconstruction with a KL term toward a prior, which makes it a generative model.\n\nBy architecture: deep/stacked (multiple hidden layers), convolutional (for images), and recurrent or Transformer-based (for sequences). Architecture and regulariser can be combined, e.g. a convolutional denoising autoencoder.",
+  "key_concepts": [
+   "undercomplete autoencoder",
+   "sparse autoencoder",
+   "denoising autoencoder",
+   "contractive autoencoder",
+   "variational autoencoder",
+   "bottleneck",
+   "reconstruction loss"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "The 'four main types' list was arbitrary (mixed architectures with regularisation schemes) and omitted undercomplete, denoising and variational autoencoders. Rewritten as two axes with all common types.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0119",
+  "status": "ok",
+  "question": "What are some advantages in using a CNN (convolutional neural network) rather than a DNN (dense neural network) in an image classification task?",
+  "answer": "A CNN builds in assumptions that fit images, which a dense network does not:\n- Parameter sharing and local connectivity: each filter is small and reused at every position, so the number of parameters is far smaller than a dense layer connecting every pixel to every unit. This reduces overfitting and memory use and makes deeper models feasible.\n- Translation equivariance: shifting the input shifts the feature map by the same amount, so a pattern is detected wherever it appears. Approximate translation invariance for classification then comes from pooling (or strided convolution) and global pooling at the end; convolution alone is equivariant, not invariant, and CNNs are not invariant to rotation or scale.\n- Exploits spatial locality: neighbouring pixels are processed together, whereas a dense network treats pixels as an unordered vector and has to learn spatial structure from scratch.\n- Hierarchical features: early layers learn edges and textures, later layers combine them into parts and objects. First-layer filters are easy to visualise; deeper features are interpretable only partly.\n- Works with variable input size (for fully convolutional parts) since the same filters slide over any size.",
+  "key_concepts": [
+   "parameter sharing",
+   "translation equivariance",
+   "pooling",
+   "local connectivity",
+   "hierarchical features",
+   "overfitting",
+   "receptive field"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Corrected 'translation invariant' to equivariant (convolution) with approximate invariance coming from pooling; softened the interpretability claim (only early filters are easily visualised); added local connectivity and parameter sharing as the mechanism behind fewer parameters; fixed garbled phrase 'learns patterns in by describing'.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0121",
+  "status": "ok",
+  "question": "Suppose you have a NN with 3 layers and ReLU activations. What will happen if we initialize all the weights with the same value? what if we only had 1 layer (i.e linear/logistic regression?)",
+  "answer": "Multi-layer network: if all weights (and biases) in a layer start with the same value, every hidden unit in that layer computes the same output and receives the same gradient, so they keep identical weights after each update. The symmetry is never broken and the layer behaves like a single unit repeated, which greatly limits capacity. (If the constant is zero, ReLU units additionally output 0 and typically pass no gradient to earlier weights, so little or nothing is learned.) The fix is random initialisation (e.g. He/Kaiming for ReLU) to break symmetry.\n\nSingle layer (linear or logistic regression): identical initial weights are fine, because each weight multiplies a different input feature and so receives a different gradient; there is no symmetry between hidden units to break. The loss is convex (MSE for linear regression, cross-entropy for logistic regression), so there are no spurious local minima and the initial value does not determine the solution. With a suitable step size, gradient descent converges to a global minimum (unique if the problem is strictly convex, e.g. full-rank features or regularisation). Two caveats: too large a learning rate can diverge, and for logistic regression on linearly separable data there is no finite minimiser, so the weights grow without bound while the loss tends to zero.",
+  "key_concepts": [
+   "symmetry breaking",
+   "weight initialisation",
+   "He initialisation",
+   "convex loss",
+   "logistic regression",
+   "linearly separable data",
+   "learning rate"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "The claim that weights 'will always converge to the optimal point regardless of the initial value' was overstated: it depends on step size and fails for separable logistic regression (no finite optimum); also clarified why same-value init is harmless with one layer and the zero-init ReLU case.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0130",
+  "status": "ok",
+  "question": "When using mini batch gradient descent, why is it important to shuffle the data?",
+  "answer": "Mini-batch gradient descent assumes each batch gives a roughly unbiased, representative estimate of the full-data gradient. If the data are ordered (for example all samples of class A before class B, or sorted by time or user), then consecutive batches contain only one class or one regime. Each update then pushes the weights toward fitting that batch, so training oscillates, the model ends each epoch biased toward the most recently seen data, and convergence is slower and less stable. It can also hurt batch normalisation, whose statistics are computed per batch.\n\nShuffling randomises batch composition so the gradient noise is zero-mean around the true gradient. Reshuffling every epoch also avoids presenting batches in the same fixed order each pass, which could create systematic biases. It is a training-time practice; do not shuffle in ways that break dependencies in sequences within a sample, and validation/test data do not need shuffling. For time series, shuffle windows or samples, not the order within a window.",
+  "key_concepts": [
+   "mini-batch gradient descent",
+   "shuffling",
+   "unbiased gradient estimate",
+   "gradient noise",
+   "batch normalisation",
+   "epoch",
+   "ordered data"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Replaced the overstated 'will make the weights converge to a wrong value' with the actual mechanism: ordered batches give biased, non-representative gradients causing oscillation and instability; added reshuffling per epoch and batch-norm note.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0148",
+  "status": "ok",
+  "question": "What is random forest?",
+  "answer": "Random forest is an ensemble of decision trees that reduces variance by combining bagging with extra randomness in tree building. Each tree is trained on a bootstrap sample of the training data, and at every split only a random subset of the features (the max_features hyperparameter, commonly about sqrt(p) for classification and p/3 for regression as rules of thumb) is considered; the feature subset is redrawn at each split, not once per tree. Trees are usually grown deep (low bias, high variance), and predictions are combined by majority vote (classification) or averaging (regression).\n\nWhy it works: averaging B trees with pairwise correlation rho and variance sigma^2 has variance rho*sigma^2 + (1 - rho)*sigma^2/B, so reducing the correlation between trees (via feature subsampling) lowers the ensemble variance beyond plain bagging. Extras: out-of-bag samples give a built-in error estimate, and it provides feature importance. Limitations: less interpretable than a single tree, larger and slower at prediction time, and it cannot extrapolate beyond the range of training targets.",
+  "key_concepts": [
+   "random forest",
+   "bagging",
+   "bootstrap sample",
+   "feature subsampling at each split",
+   "tree decorrelation",
+   "out-of-bag error",
+   "variance reduction"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Corrected: the random feature subset is drawn at each split, not once per tree. Added bootstrap, variance formula, voting/averaging and OOB estimate.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0167",
+  "status": "ok",
+  "question": "What are Gaussian/Normal and Bernoulli Distributions?",
+  "answer": "Gaussian/Normal: x ~ N(µ, σ²) is a continuous, symmetric, bell-shaped distribution with mean µ and variance σ², with density (1/(σ√(2π))) exp(-(x-µ)²/(2σ²)). About 68.3% of the probability lies within 1 standard deviation of the mean, about 95.4% within 2, and about 99.7% within 3 (the 68-95-99.7 rule). It arises as the limit of sums of many independent effects (central limit theorem), which is why it is so common in modelling noise.\n\nBernoulli: a discrete random variable that takes the value 1 with probability p and 0 with probability 1 - p. Its expectation is p and its variance is p(1 - p), which is largest at p = 0.5. It models a single binary outcome (success/failure, click/no click); the sum of n independent Bernoulli(p) variables is Binomial(n, p). Logistic regression models the label as Bernoulli with a probability that depends on the features.",
+  "key_concepts": [
+   "Gaussian distribution",
+   "68-95-99.7 rule",
+   "Bernoulli distribution",
+   "expectation and variance",
+   "central limit theorem",
+   "binomial distribution"
+  ],
+  "difficulty": "Easy",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Fixed the 3-sigma coverage (about 99.7%, not about 99%; I computed erf(k/sqrt2) = 0.6827, 0.9545, 0.9973). Added the density, CLT context and the Bernoulli-to-binomial link.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0185",
+  "status": "ok",
+  "question": "What happens when we have correlated features in our data?",
+  "answer": "Effects depend on the model.\n- Linear/logistic regression: strong multicollinearity makes the coefficient estimates unstable, with inflated variance and standard errors; small changes in the data can flip signs or shift weight between correlated features. Overall predictions on data like the training data can still be fine, but individual coefficients are hard to interpret. Detect with correlation matrices, variance inflation factor (VIF) or the condition number.\n- Random forest and other tree ensembles: correlated features substitute for each other at splits, so importance is shared between them and each looks less important than it would alone; importance rankings (impurity-based or permutation) become unstable, though predictive accuracy is usually little affected.\n- Other effects: redundant features add cost and noise, and in k-NN or distance-based methods they over-weight the shared information.\n\nRemedies: drop or combine redundant features, use PCA, or regularise. Ridge shrinks correlated coefficients together; lasso tends to pick one of a correlated group somewhat arbitrarily; elastic net mixes both.",
+  "key_concepts": [
+   "multicollinearity",
+   "variance inflation factor",
+   "coefficient instability",
+   "feature importance dilution",
+   "ridge regression",
+   "lasso",
+   "PCA"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Answer already avoided the unsupported 'twice as likely to be picked' claim; refined it: added detection (VIF, condition number), the effect on k-NN, and the ridge/lasso/elastic-net behaviour on correlated groups. Kept 'little affected' as 'usually'.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0191",
+  "status": "ok",
+  "question": "What is a neural network?",
+  "answer": "A neural network is a parametrised function built from layers of simple units (neurons). Each unit computes a weighted sum of its inputs plus a bias and passes it through a non-linear activation function. An input layer receives the features, one or more hidden layers transform them into progressively more useful representations, and an output layer produces the prediction. The non-linear activations are what let the network represent non-linear functions; without them the whole network collapses to one linear map.\n\nTraining: define a loss between predictions and targets. Backpropagation applies the chain rule to compute the gradient of the loss with respect to every weight efficiently, and an optimiser such as gradient descent/SGD or Adam uses those gradients to update the weights. Backpropagation is only the gradient computation; the loss surface of a neural network is non-convex, so gradient descent is not guaranteed to reach the global minimum. In practice it reaches a local minimum or saddle region that is often good enough. Networks with enough hidden units can approximate a wide class of continuous functions (universal approximation), but this does not say they are easy to train or will generalise.",
+  "key_concepts": [
+   "neurons and layers",
+   "activation function",
+   "backpropagation",
+   "gradient descent",
+   "non-convex loss",
+   "universal approximation"
+  ],
+  "difficulty": "Easy",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original said backprop performs gradient descent 'towards a (local) minimum along the steepest vector' - backprop only computes gradients and gradient descent gives no global guarantee (non-convex loss); rewritten cleanly. Domain moved Machine Learning -> Deep Learning. Checked existing_questions.json: no duplicate of this question (nearest are smi-0041 on layer types and smi-0118 on non-linearity).",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0192",
+  "status": "ok",
+  "question": "How do you deal with sparse data (features that are mostly zeros)?",
+  "answer": "First separate two meanings: 'sparse' as mostly zeros (e.g. bag-of-words, one-hot features) versus missing values; this answer covers mostly-zero data.\n\n- Representation: store it in a sparse format (e.g. CSR/CSC), so memory and computation scale with the number of non-zero entries. Avoid operations that densify it, such as mean-centring or standard scaling with the mean; use scaling by max-abs or no centring, and note that ordinary PCA centres the data, so use truncated SVD instead.\n- Models: L1-regularised linear/logistic regression handles many features and also selects features; linear SVMs and Naive Bayes work well on high-dimensional sparse text; tree models can also be used but are less efficient with very wide data.\n- Reduce dimension: drop very rare features, apply feature hashing for high-cardinality categories, truncated SVD, or learn dense embeddings.\n- Pitfalls: distance-based methods (k-NN) suffer because most vectors are far apart in high dimensions; a zero can mean 'absent' or 'unknown', which affects interpretation.",
+  "key_concepts": [
+   "sparse matrix format (CSR)",
+   "L1 regularisation",
+   "truncated SVD",
+   "feature hashing",
+   "linear SVM",
+   "Naive Bayes",
+   "embeddings"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "The original garbled phrase ('linear regression either - svm') is gone from the current answer; clarified the ambiguity of 'sparse' (mostly zeros vs missing). Added warning that centring/standardising densifies data and ordinary PCA needs centring (use truncated SVD).",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0195",
+  "status": "ok",
+  "question": "What is the advantage of performing dimensionality reduction before fitting an SVM?",
+  "answer": "Possible advantages: it can remove noisy or redundant features, lower training and prediction cost, and reduce overfitting when features greatly outnumber samples. Kernel SVM training time grows at least quadratically with the number of samples, and every kernel evaluation costs time proportional to the number of features, so fewer features help speed. With an RBF kernel, many irrelevant features add noise to the distances and can dilute the signal.\n\nIt is not always beneficial. SVMs maximise the margin and are regularised through C, so they often work well in high-dimensional spaces (e.g. text) without reduction. PCA is unsupervised: the highest-variance directions are not necessarily the most discriminative, so it can discard information the SVM would use. Also fit the reduction inside each cross-validation fold (e.g. with a Pipeline) to avoid leakage. Decide by comparing cross-validated performance with and without it.",
+  "key_concepts": [
+   "SVM",
+   "PCA",
+   "curse of dimensionality",
+   "RBF kernel",
+   "regularisation parameter C",
+   "cross-validation",
+   "data leakage"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original reason flagged circular/unsupported answer; the current answer was already conditional, tightened the complexity claim (quadratic-in-samples as a lower bound; cost per kernel evaluation linear in features) and added that PCA is unsupervised and must be fit inside CV folds.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0199",
+  "status": "ok",
+  "question": "What's a Fourier transform?",
+  "answer": "The Fourier transform decomposes a signal into a sum (or integral) of sinusoids, i.e. complex exponentials, at different frequencies, and gives for each frequency its amplitude and phase. For a continuous signal, X(f) = ∫ x(t) e^(-i2πft) dt; for sampled data the discrete Fourier transform (DFT) does the same and is computed with the FFT in O(N log N). The transform is invertible, so no information is lost: it is a change of representation from the time domain to the frequency domain.\n\nUses in ML and data analysis: extracting spectral features from audio, vibration and sensor signals (the magnitude spectrum, or a spectrogram from the short-time Fourier transform), filtering noise by removing frequency bands, finding periodicity or seasonality, and fast convolution via the convolution theorem. Caveats: the plain transform assumes the whole signal is considered at once and loses information about when a frequency occurs (use STFT or wavelets for that); finite windows cause spectral leakage; and frequencies above half the sampling rate (the Nyquist frequency) alias.",
+  "key_concepts": [
+   "Fourier transform",
+   "frequency domain",
+   "amplitude and phase",
+   "FFT",
+   "spectrogram (STFT)",
+   "Nyquist frequency",
+   "spectral leakage"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "The reason cited 'symmetric functions' should read sinusoids; the current answer already said sinusoids, so I added the definition, DFT/FFT, invertibility and caveats (time localisation, leakage, aliasing). Checked existing_questions.json: no other Fourier question found, so no duplicate to resolve.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0216",
+  "status": "ok",
+  "question": "List the advantages and limitations of the Temporal Difference Learning Method.",
+  "answer": "Temporal-difference (TD) learning combines ideas from Monte Carlo (learn from sampled experience, no model of the environment needed) and dynamic programming (bootstrapping: update an estimate from another estimate, e.g. V(s) <- V(s) + α[r + γV(s') - V(s)]).\n\nAdvantages:\n- Online and incremental: it updates after every step, without waiting for the end of an episode.\n- It can learn from incomplete episodes and in continuing (non-terminating) tasks, where Monte Carlo needs complete episodes.\n- It usually has lower variance than Monte Carlo, because the target depends on one random transition rather than a whole return, and it often learns faster in practice.\n- It does not need a model of transition probabilities, unlike dynamic programming.\n\nLimitations:\n- Bootstrapping makes the targets biased while the value estimates are still inaccurate, so early errors propagate; for the same reason the result depends on the initial value estimates (Monte Carlo does not).\n- With function approximation, especially off-policy, bootstrapping can be unstable or diverge (the 'deadly triad': function approximation, bootstrapping, off-policy).\n- Tabular TD needs a state space small enough to store; large or continuous state spaces require function approximation.\n- Results are sensitive to the step size α.",
+  "key_concepts": [
+   "temporal-difference learning",
+   "bootstrapping",
+   "Monte Carlo methods",
+   "bias-variance trade-off",
+   "online learning",
+   "function approximation",
+   "deadly triad"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Reworded the ambiguous 'works in continuous environments' (true for continuing tasks, but continuous state spaces need function approximation, where TD can diverge off-policy) and justified 'sensitive to initialization' by mechanism (bootstrapping from initial estimates). Added the TD(0) update rule. No source was opened; claims are standard textbook RL facts.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0229",
+  "status": "ok",
+  "question": "When can a categorical value be treated as a continuous variable and what effect does it have when done so?",
+  "answer": "An ordinal categorical variable can be encoded as integers and treated as continuous when the order is meaningful and the gaps between levels are roughly equal, e.g. a 1-5 rating or an education level, or when it is really a count or discretised numeric (year, number of rooms). The effect: one parameter instead of k - 1 dummy variables (fewer parameters, less risk of overfitting, works with sparse data), but a linear model then assumes each step has the same effect on the target. If spacing is unequal or the relationship is non-monotonic, the model is misspecified and performance can suffer. Tree-based models are less affected, since splits only use the ordering.\n\nNominal categories (no order, e.g. colour or city) should not be integer-coded as continuous for linear or distance-based models, since the arbitrary numbers invent an order and distances. Use one-hot, target or other encodings. A practical check is to compare the integer encoding against one-hot by cross-validation.",
+  "key_concepts": [
+   "ordinal encoding",
+   "one-hot encoding",
+   "nominal vs ordinal",
+   "linearity assumption",
+   "misspecification",
+   "tree-based models"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Question grammar fixed ('When can be a categorical value...' -> 'When can a categorical value be...'). Answer already dropped the unsupported 'inclusion increases performance'; added tree-model behaviour, count/discretised-numeric case and a cross-validation check.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0240",
+  "status": "ok",
+  "question": "How does item-based collaborative filtering recommend similar items?",
+  "answer": "Item-based collaborative filtering computes similarity between items from users' interaction patterns, then recommends items similar to those a user has already liked or bought. Each item is represented by its column of the user-item matrix (ratings or purchases), and the similarity of two items is computed over the users who interacted with both, e.g. cosine similarity, adjusted cosine (subtracting each user's mean rating) or Pearson correlation. To score item i for user u, take a similarity-weighted average of u's ratings of the items most similar to i: score(u, i) = sum_j sim(i, j) r_uj / sum_j |sim(i, j)|, over the k nearest neighbours of i that u has rated. Rank the unseen items by this score.\n\nWhy it is used: item-item similarities are relatively stable, so they can be precomputed offline, and it scales better than user-based filtering when users far outnumber items (this is the approach described by Linden et al. 2003 for Amazon). Limits: cold start for new items and users, sparse overlap between item vectors, popularity bias, and recommendations that stay close to what the user already knows.",
+  "key_concepts": [
+   "item-based collaborative filtering",
+   "cosine similarity",
+   "adjusted cosine",
+   "user-item matrix",
+   "nearest neighbours",
+   "cold start",
+   "precomputed similarity"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Answer already described item-to-item (not user-to-user) filtering; added the concrete scoring formula, similarity options and limitations. Difficulty raised Easy->Medium (mechanism). The Linden et al. 2003 attribution is from my own knowledge, not an opened source.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0253",
+  "status": "ok",
+  "question": "When does XGBoost tend to outperform an SVM, and when might an SVM be preferable?",
+  "answer": "Neither is universally better; it depends on the data, so compare with cross-validation.\n\nXGBoost (gradient-boosted trees) tends to do better on tabular data with mixed numeric and categorical-like features, non-linear interactions, and missing values (it handles missing values natively). It needs little feature scaling, is invariant to monotonic transformations of features, scales to large numbers of rows, and gives feature importances. It has many hyperparameters to tune (learning rate, depth, number of trees, regularisation) and can overfit noisy small data.\n\nSVMs can be preferable on smaller datasets, in high-dimensional sparse settings such as text (a linear SVM is a strong baseline), when the margin-based solution suits the problem, or when a suitable kernel is known for structured inputs. Drawbacks: kernel SVM training scales poorly with the number of samples (at least quadratic), it needs feature scaling, tuning of C and the kernel parameters, and does not give calibrated probabilities directly.",
+  "key_concepts": [
+   "XGBoost",
+   "gradient boosting",
+   "SVM kernels",
+   "tabular data",
+   "feature scaling",
+   "high-dimensional sparse data",
+   "cross-validation"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Question was already reworded to be balanced; answer kept and extended with trade-offs (tuning, scaling, native missing-value handling, kernel SVM scaling). No absolute claims.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0257",
+  "status": "ok",
+  "question": "What are the advantages of using a naive Bayes for classification?",
+  "answer": "Naive Bayes applies Bayes' rule with the assumption that features are conditionally independent given the class, so P(class|x) is proportional to P(class) * product_j P(x_j|class).\n\nAdvantages:\n- Very simple, fast to train (mostly counting or estimating per-feature means/variances) and to predict; cost grows linearly with the number of samples and features, so it scales to large, high-dimensional data such as text.\n- Zero counts are handled with Laplace (additive) smoothing so an unseen feature value does not zero the whole product.\n- Needs relatively little training data: it estimates many low-dimensional distributions rather than a joint one. A known result (Ng and Jordan, 2001) is that it reaches its asymptotic error with fewer samples than logistic regression, although that asymptotic error is higher when the independence assumption is badly violated.\n- Naturally multi-class, and handles discrete (multinomial/Bernoulli) and continuous (Gaussian) features through different variants.\n- Outputs class probabilities, but they are often poorly calibrated (overconfident, since correlated features are double-counted); the ranking can still be good, and calibration can fix the probabilities.\n- Often a strong baseline in practice (spam, text classification), even when independence is only roughly true, but this is not guaranteed.\n- Irrelevant features that have similar distributions across classes have little effect on the decision, but many noisy or correlated features still hurt.",
+  "key_concepts": [
+   "conditional independence",
+   "Bayes' rule",
+   "Laplace smoothing",
+   "multinomial naive Bayes",
+   "probability calibration",
+   "generative vs discriminative"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Replaced overgeneral claims 'works great in practice' and 'not sensitive to irrelevant features' with conditioned versions; added that probabilities are poorly calibrated. Added the generative-vs-discriminative sample-efficiency result (Ng & Jordan 2001, from memory, not an opened source). Difficulty Easy->Medium.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0270",
+  "status": "ok",
+  "question": "What can you do if your dataset has no target variable but you need supervised learning?",
+  "answer": "Supervised learning requires labels, so the real task is to obtain or approximate them. Options:\n- Get labels: manual annotation by domain experts or crowdsourcing; active learning to label only the most informative samples; or derive them from a business rule or an existing outcome that is a legitimate proxy for the target.\n- If some labels exist: semi-supervised learning or weak supervision (labelling functions, heuristics) to extend them.\n- Self-supervised pre-training on the unlabelled data to learn representations, which still needs a small labelled set to train the downstream task.\n- Reframe as unsupervised learning if the goal allows (clustering, anomaly detection, dimensionality reduction).\n\nCluster assignments can be used as pseudo-labels, but they reflect the clustering algorithm's assumptions and not ground truth, so a model trained on them mostly reproduces the clusters. Validate with domain knowledge or a small hand-labelled sample, and keep pseudo-labelled data out of the evaluation set.",
+  "key_concepts": [
+   "active learning",
+   "weak supervision",
+   "semi-supervised learning",
+   "self-supervised learning",
+   "pseudo-labels",
+   "clustering",
+   "annotation"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Answer was already corrected to say supervised learning needs labels; added proxy/business-rule labels, the point that self-supervised pre-training still needs labels downstream, and evaluation-set hygiene.",
+  "confidence": "high"
+ }
+]

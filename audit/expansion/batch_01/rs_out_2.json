@@ -1,0 +1,820 @@
+[
+ {
+  "plan_id": "B1-GEN-04-4",
+  "claims": [
+   {
+    "claim": "MMR on reranked results reduces redundancy; use a modest diversity weight (lambda ~0.7)",
+    "field": "detailed_answer/practical_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "MMR paper defines the lambda relevance/diversity trade-off and mentions ~0.7 for a relevance-leaning setting; exact value remains a tuning choice."
+   },
+   {
+    "claim": "Near-duplicate detection via shingle overlap (Jaccard > 0.8 on word 5-grams)",
+    "field": "detailed_answer/practical_answer",
+    "status": "partially",
+    "source_index": 1,
+    "note": "Shingle resemblance (Jaccard-like) is established; the 0.8 and n=5 values are our heuristics, not from the source."
+   },
+   {
+    "claim": "Extractive and abstractive compression of retrieved context",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 2,
+    "note": "Both compressor types exist; RECOMP also supports compressing to nothing when irrelevant."
+   },
+   {
+    "claim": "Abstractive summaries can alter numbers / drop qualifiers; extractive pruning can cut an 'unless' exception",
+    "field": "detailed_answer/common_mistakes",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found; left as engineering judgement."
+   },
+   {
+    "claim": "Embedding-similarity dedup drops legitimately different near-identical clauses",
+    "field": "common_mistakes",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found; left as engineering judgement."
+   },
+   {
+    "claim": "Overlap merging, is_latest version filter, hashing exact duplicates",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Design reasoning/derivation, no external claim."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Carbonell & Goldstein 1998, The Use of MMR, Diversity-Based Reranking",
+    "url": "https://www.cs.cmu.edu/~jgc/publication/The_Use_MMR_Diversity_Based_LTMIR_1998.pdf",
+    "type": "paper",
+    "quote": "\"a linear combination of both criteria is optimized\"; MMR \"computes incrementally the standard relevance-ranked list when the parameter X=1\" and \"computes a maximal diversity ranking among the documents in R when X=0\"; the paper suggests a value near 0.7 to focus on multiple overlapping/reinforcing relevant documents and a smaller value (about 0.3) for broad exploration.",
+    "supports": "MMR trades relevance against redundancy via a lambda parameter; lambda near 0.7 is a relevance-leaning setting (our '~0.7' is a heuristic consistent with, not mandated by, the paper).",
+    "status": "supported"
+   },
+   {
+    "title": "Broder et al. 1997, On the resemblance and containment of documents",
+    "url": "https://www.cs.princeton.edu/courses/archive/spring13/cos598C/broder97resemblance.pdf",
+    "type": "paper",
+    "quote": "\"A contiguous subsequence contained in D is called a shingle.\" ... \"the resemblance r of two documents A and B is defined as\" [shared shingles over total distinct shingles]; \"Hence the resemblance is some number between 0 and 1.\"",
+    "supports": "Shingle (contiguous word n-gram) overlap, as a Jaccard-style resemblance score, is an established near-duplicate measure; the 0.8 threshold and n=5 are our own tuning choices, not from the paper.",
+    "status": "partially"
+   },
+   {
+    "title": "RECOMP: Improving Retrieval-Augmented LMs with Compression and Selective Augmentation (arXiv 2310.04408)",
+    "url": "https://arxiv.org/abs/2310.04408",
+    "type": "paper",
+    "quote": "\"an extractive compressor which selects useful sentences from retrieved documents\"; \"an abstractive compressor which generates summaries by synthesizing information from multiple documents\"; \"our compressor can return an empty string, implementing selective augmentation.\"",
+    "supports": "Extractive (sentence selection) and abstractive (model-generated summary) compression of retrieved documents are established approaches. Does not itself state the risks of dropped qualifiers or altered numbers.",
+    "status": "partially"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Jaccard >0.8 on word 5-grams threshold (heuristic value)",
+   "Abstractive summaries alter numbers/drop qualifiers; extractive pruning can cut exceptions",
+   "Embedding similarity dedup drops near-identical clauses"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-04-5",
+  "claims": [
+   {
+    "claim": "A valid citation ID does not mean the passage supports the claim; cited passages often fail to fully support statements",
+    "field": "detailed_answer/common_mistakes",
+    "status": "supported",
+    "source_index": 0,
+    "note": "51.5% of sentences fully supported by citations."
+   },
+   {
+    "claim": "Entailment-style (NLI) check of claim versus cited passage; automatic citation checks correlate with human judgement",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "ALCE uses an NLI model (TRUE) to test whether cited passages entail the generation, and reports strong correlation with humans. LLM-judge calibration advice is separate."
+   },
+   {
+    "claim": "Models can invent citation IDs; verbatim-quote substring check catches fabricated support",
+    "field": "detailed_answer/practical_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Mechanical validation is a derivation; no opened source documents invented IDs specifically."
+   },
+   {
+    "claim": "Sentence-level citation is harder for models to produce reliably than a source list at the end",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found; left as engineering judgement."
+   },
+   {
+    "claim": "Post-hoc attribution may attach a plausible passage to a claim from parametric memory",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Derivation in evidence_so_far."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Evaluating Verifiability in Generative Search Engines (arXiv 2304.09848)",
+    "url": "https://arxiv.org/abs/2304.09848",
+    "type": "paper",
+    "quote": "\"on average, a mere 51.5% of generated sentences are fully supported by citations\"; defines \"high citation precision; every cite supports its associated statement\" and \"high citation recall; all statements are fully supported by citations\".",
+    "supports": "Having a citation does not mean the cited source supports the sentence; citation precision and recall are separate properties that must be checked.",
+    "status": "supported"
+   },
+   {
+    "title": "ALCE: Enabling LLMs to Generate Text with Citations (arXiv 2305.14627)",
+    "url": "https://arxiv.org/pdf/2305.14627",
+    "type": "paper",
+    "quote": "The paper uses TRUE to \"examine whether the cited passages entail the model generation\"; \"We calculate the citation recall of each statement (0 or 1) and average over all statements\"; \"Our automatic evaluation of citation quality strongly correlates with human judgements.\" Abstract: \"even the best models lack complete citation support 50% of the time.\"",
+    "supports": "Entailment-style (NLI) checking of a statement against its cited passages is an established citation-support evaluation that correlates with human judgement, and a cited passage often does not fully support the statement.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Models can invent citation IDs",
+   "Sentence-level citation less reliable than trailing source list",
+   "Quote verification adds output tokens / brittle to paraphrase (engineering judgement)"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-04-6",
+  "claims": [
+   {
+    "claim": "8192-600-100-1200-1000 = 5,292; 11 chunks; running totals",
+    "field": "concise/detailed/practical",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Executed arithmetic."
+   },
+   {
+    "claim": "System prompt, history and generated output all count toward one context window",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Quote supports the shared-window budget; the answer reserve concept is consistent with output counting toward the window."
+   },
+   {
+    "claim": "Over-length prompt is rejected by the provider",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 0,
+    "note": "Supported for this provider (400 'prompt is too long' for oversized input). Our text already says 'depending on the stack'."
+   },
+   {
+    "claim": "Some stacks silently truncate the start or end of an over-length prompt",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No opened source documents silent truncation; the doc describes errors instead. Wording is already hedged."
+   },
+   {
+    "claim": "Word-count estimates can be off by tens of percent; tokenisation differs across models",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Not verified against an opened source."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Claude docs: Context windows",
+    "url": "https://platform.claude.com/docs/en/build-with-claude/context-windows",
+    "type": "official_doc",
+    "quote": "\"Everything in the request counts toward the context window: the system prompt, every message in messages ... The output Claude generates for the turn, including its extended thinking, counts too.\" \"If the input alone already exceeds the model's context window, the API returns a 400 invalid_request_error (\\\"prompt is too long\\\") on every model.\" \"On earlier models, the API returns a validation error instead.\"",
+    "supports": "System prompt, history, and generated output all share one window, and an over-long input is rejected with an error on this provider. Does not document silent truncation.",
+    "status": "partially"
+   }
+  ],
+  "fixes": [
+   {
+    "field": "detailed_answer",
+    "claim": "either the request fails or the provider/framework truncates silently (depending on the stack, by cutting the start or the end of the prompt)",
+    "problem": "Opened vendor documentation only supports rejection with an error; silent truncation is not documented in any source we opened.",
+    "replacement": "either the request is rejected with an error (as the Claude API does for an over-long input) or, in some frameworks, the prompt is truncated (cutting the start or the end, depending on the stack)"
+   }
+  ],
+  "residual_background_only": [
+   "Some stacks silently truncate (framework-dependent, unsourced)",
+   "Word-count token estimates off by tens of percent"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-07-1",
+  "claims": [
+   {
+    "claim": "Position/distraction effects: chunk position and extra context change accuracy",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Relevant info in the middle of long context is used less well."
+   },
+   {
+    "claim": "Position effect is model-dependent, so test it",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 0,
+    "note": "Paper shows the effect across models, including explicitly long-context ones; the 'model-dependent magnitude' wording is our hedge."
+   },
+   {
+    "claim": "Parametric override: model answers from memory instead of the context",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 1,
+    "note": "Paper shows LLMs are often receptive to conflicting context but show confirmation bias toward memory in some conditions; supports 'test it', not 'common default wins'."
+   },
+   {
+    "claim": "'30 days' is a typical notice period so the model defaults to it",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Illustrative assumption."
+   },
+   {
+    "claim": "Ablation ladder numbers",
+    "field": "practical_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Hypothetical results, derivation."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Lost in the Middle: How Language Models Use Long Contexts (arXiv 2307.03172)",
+    "url": "https://arxiv.org/abs/2307.03172",
+    "type": "paper",
+    "quote": "\"performance is often highest when relevant information occurs at the beginning or end of the input context\"; performance \"significantly degrades when models must access relevant information in the middle of long contexts\"; \"current language models do not robustly make use of information in long input contexts\".",
+    "supports": "Position of relevant information within the prompt affects answer quality, and extra irrelevant context can hurt.",
+    "status": "supported"
+   },
+   {
+    "title": "Adaptive Chameleon or Stubborn Sloth: Revealing the Behavior of LLMs in Knowledge Conflicts (arXiv 2305.13300)",
+    "url": "https://arxiv.org/abs/2305.13300",
+    "type": "paper",
+    "quote": "\"LLMs can be highly receptive to external evidence even when that conflicts with their parametric memory\"; \"LLMs also demonstrate a strong confirmation bias\" when external evidence partly matches their parametric memory, \"despite being presented with conflicting evidence at the same time.\"",
+    "supports": "Models can be pulled toward parametric memory over supplied context in some conditions, but are not uniformly stubborn, so the override test is worth running rather than assumed.",
+    "status": "partially"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "'30 days' typical default notice period (illustrative)"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-07-2",
+  "claims": [
+   {
+    "claim": "Faithfulness (claims supported by context) is distinct from correctness (claims true); a true unsupported claim is unfaithful",
+    "field": "detailed_answer/common_mistakes",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Hallucinated content can be factual yet not supported by the source."
+   },
+   {
+    "claim": "Faithfulness defined as claims supported by the retrieved context",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Direct definition."
+   },
+   {
+    "claim": "Lower temperature helps variability, not grounding",
+    "field": "detailed_answer/common_mistakes",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found; left as engineering judgement."
+   },
+   {
+    "claim": "Closed-book reappearance indicates parametric source; 512/640 arithmetic",
+    "field": "detailed_answer/practical_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Executed/derived."
+   }
+  ],
+  "sources": [
+   {
+    "title": "On Faithfulness and Factuality in Abstractive Summarization (arXiv 2005.00661)",
+    "url": "https://arxiv.org/pdf/2005.00661",
+    "type": "paper",
+    "quote": "\"the majority of hallucinations are extrinsic, which potentially could be valid abstractions that use background knowledge.\" \"Hallucinations are not necessarily erroneous.\" \"Factual hallucinations may be composed of intrinsic hallucinations or extrinsic hallucinations.\"",
+    "supports": "Content not supported by the source document (unfaithful) can still be factually true, so faithfulness and correctness are distinct properties.",
+    "status": "supported"
+   },
+   {
+    "title": "Ragas docs: Faithfulness",
+    "url": "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/faithfulness/",
+    "type": "official_doc",
+    "quote": "\"The Faithfulness metric measures how factually consistent a response is with the retrieved context.\" \"A response is considered faithful if all its claims can be supported by the retrieved context.\"",
+    "supports": "Faithfulness is defined over the response and the retrieved context (not against a reference answer).",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Lowering temperature does not fix grounding"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-07-3",
+  "claims": [
+   {
+    "claim": "Feedback bias: unhappy users click thumbs-down more; thumbs-down reflects latency/UI",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found; left as engineering judgement."
+   },
+   {
+    "claim": "Query distribution shift between team-written golden queries and real users; stale golden set",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found; left as engineering judgement."
+   },
+   {
+    "claim": "Faithfulness measures support, not usefulness",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Ragas defines faithfulness only as consistency of response claims with retrieved context, so a faithful but unhelpful answer can score well."
+   },
+   {
+    "claim": "LLM faithfulness judge may be lenient / miscalibrated against humans",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found; left as engineering judgement."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Ragas docs: Faithfulness",
+    "url": "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/faithfulness/",
+    "type": "official_doc",
+    "quote": "\"The Faithfulness metric measures how factually consistent a response is with the retrieved context.\" \"A response is considered faithful if all its claims can be supported by the retrieved context.\"",
+    "supports": "Faithfulness is defined over the response and the retrieved context (not against a reference answer).",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Feedback bias",
+   "Distribution shift and stale golden set",
+   "LLM judge leniency"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-07-4",
+  "claims": [
+   {
+    "claim": "Model effect +2, chunk effect -7",
+    "field": "practical_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Executed."
+   },
+   {
+    "claim": "New embedding model may need different query/document prefix",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Docs state some models require specific prompts; E5 example."
+   },
+   {
+    "claim": "Blue/green index with an alias; roll back with one alias flip",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Atomic alias switch."
+   },
+   {
+    "claim": "Same, for Elasticsearch",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 2,
+    "note": "Aliases allow reindex without downtime and atomic switching."
+   },
+   {
+    "claim": "Truncated input exceeding the new model's token limit",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Fetched sbert pages did not show the max_seq_length text, so not cited."
+   },
+   {
+    "claim": "256-token chunks double the chunk count",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Derivation."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Sentence Transformers docs: Computing Embeddings (prompts)",
+    "url": "https://sbert.net/examples/sentence_transformer/applications/computing-embeddings/README.html",
+    "type": "official_doc",
+    "quote": "\"Some models require using specific text prompts to achieve optimal performance.\" The E5 example prefixes queries with \"query: \" and passages with \"passage:\".",
+    "supports": "Some embedding models need specific query/document prefixes, so a model swap can silently degrade retrieval if they are omitted.",
+    "status": "supported"
+   },
+   {
+    "title": "Qdrant docs: Collections (aliases)",
+    "url": "https://qdrant.tech/documentation/concepts/collections/",
+    "type": "official_doc",
+    "quote": "\"Aliases are additional names for existing collections.\" \"Multiple alias actions are performed atomically.\" \"Since all changes of aliases happen atomically, no concurrent requests will be affected during the switch.\"",
+    "supports": "Pointing an alias at a newly built collection and switching atomically gives a one-step cutover and rollback (blue/green index versioning).",
+    "status": "supported"
+   },
+   {
+    "title": "Elasticsearch docs: Aliases",
+    "url": "https://www.elastic.co/docs/manage-data/data-store/aliases",
+    "type": "official_doc",
+    "quote": "\"You can use the aliases API to perform multiple actions in a single atomic operation.\" Benefits of aliases include \"Reindex data without downtime\" and \"Change which indices/data streams your application uses in real time.\"",
+    "supports": "Aliases allow reindexing and switching an application between indices without downtime.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Inputs exceeding the embedding model's max sequence length are truncated"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-07-5",
+  "claims": [
+   {
+    "claim": "Dense retrievers do poorly on entity-centric / rare-entity questions versus sparse methods",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 0,
+    "note": "Supports weak dense performance on entities; near-miss ID conflation is our inference."
+   },
+   {
+    "claim": "BM25 is a robust baseline; lexical retrieval complements dense",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Abstract quote."
+   },
+   {
+    "claim": "Fuse lexical and dense with RRF",
+    "field": "detailed_answer/practical_answer",
+    "status": "supported",
+    "source_index": 2,
+    "note": "Elasticsearch docs define RRF."
+   },
+   {
+    "claim": "Rare IDs tokenised into subword fragments, embeddings similar to other IDs (SLA-7 near SLA-8)",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Mechanism plausible but no opened source states it."
+   },
+   {
+    "claim": "Fine-tuning handles arbitrary IDs poorly",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found; left as engineering judgement."
+   },
+   {
+    "claim": "Hybrid table numbers",
+    "field": "practical_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Hypothetical, derivation."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Simple Entity-Centric Questions Challenge Dense Retrievers (arXiv 2109.08535)",
+    "url": "https://arxiv.org/abs/2109.08535",
+    "type": "paper",
+    "quote": "\"observe that dense retrievers drastically underperform sparse methods.\" \"dense retrievers can only generalize to common entities unless the question pattern is explicitly observed during training.\"",
+    "supports": "Dense retrievers do poorly on entity-centric questions relative to sparse (BM25-style) retrieval, which supports our diagnosis for ID/acronym queries. It does not specifically show near-miss ID conflation.",
+    "status": "partially"
+   },
+   {
+    "title": "BEIR: A Heterogeneous Benchmark for Zero-shot Evaluation of IR Models (arXiv 2104.08663)",
+    "url": "https://arxiv.org/abs/2104.08663",
+    "type": "paper",
+    "quote": "\"Our results show BM25 is a robust baseline\"; dense and sparse-retrieval models \"often underperform other approaches, highlighting the considerable room for improvement in their generalization capabilities.\"",
+    "supports": "BM25 is a robust baseline that dense models do not uniformly beat out of domain, supporting adding lexical retrieval.",
+    "status": "supported"
+   },
+   {
+    "title": "Elasticsearch docs: Reciprocal rank fusion",
+    "url": "https://www.elastic.co/docs/reference/elasticsearch/rest-apis/reciprocal-rank-fusion",
+    "type": "official_doc",
+    "quote": "\"Reciprocal rank fusion (RRF) is a method for combining multiple result sets with different relevance indicators\"; scoring: \"score += 1.0 / ( k + rank( result(q), d ) )\".",
+    "supports": "RRF is a standard way to fuse lexical and dense result lists using rank only.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [
+   {
+    "field": "detailed_answer",
+    "claim": "so their embeddings are weakly informative and similar to many other IDs",
+    "problem": "Stated as established fact; the opened source only shows dense retrievers underperform sparse methods on entity-centric questions, not the embedding-similarity mechanism.",
+    "replacement": "so their embeddings are plausibly weakly informative and may sit close to many other IDs (dense retrievers are documented to underperform sparse methods on entity-centric questions)"
+   }
+  ],
+  "residual_background_only": [
+   "Subword fragmentation makes ID embeddings near-neighbours of other IDs",
+   "Fine-tuned embedders still handle arbitrary IDs poorly"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-05-1",
+  "claims": [
+   {
+    "claim": "Paired bootstrap: resample queries with replacement, score both systems on each resample",
+    "field": "detailed_answer/practical_answer",
+    "status": "partially",
+    "source_index": 0,
+    "note": "Describes paired bootstrap resampling; percentile CI on mean difference is standard but Koehn computes win frequency."
+   },
+   {
+    "claim": "Small test sets need large gains to be significant; 40 queries too small",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Test size strongly affects significance threshold."
+   },
+   {
+    "claim": "Exact sign / McNemar-style test on discordant queries",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 2,
+    "note": "Exact binomial McNemar exists; p=2x37/256 itself is arithmetic."
+   },
+   {
+    "claim": "CI [-0.025,+0.225], SE 0.070 vs 0.112, p~0.29, 400-query CI",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Executed."
+   },
+   {
+    "claim": "Queries not independent, so cluster the resampling; percentile bootstrap approximate at small n; multiple comparisons",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found; left as engineering judgement."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Koehn 2004, Statistical Significance Tests for Machine Translation Evaluation",
+    "url": "https://aclanthology.org/W04-3250.pdf",
+    "type": "paper",
+    "quote": "\"We call this method paired bootstrap resampling, since we compare a pair of systems.\" \"create new virtual test sets by drawing sentences with replacement from the collection.\" \"For each set, we compute the evaluation metric score for both systems.\"",
+    "supports": "Resampling the test items with replacement and scoring both systems on each resample (paired bootstrap) is an established method. Koehn derives significance from win frequency; the percentile CI on the mean difference is the standard analogous use.",
+    "status": "partially"
+   },
+   {
+    "title": "Berg-Kirkpatrick et al. 2012, An Empirical Investigation of Statistical Significance in NLP",
+    "url": "https://aclanthology.org/D12-1091.pdf",
+    "type": "paper",
+    "quote": "\"As might be expected, the size of the test corpus has a large effect.\" \"the larger the corpus size, the lower the threshold for p-value < 0.05\"; \"the first 100 sentences of the Brown corpus have a threshold of 3.00 F1.\"",
+    "supports": "Small test sets need large observed gains to be significant, supporting 'the set is too small' for a 10-point gain on 40 queries.",
+    "status": "supported"
+   },
+   {
+    "title": "statsmodels docs: mcnemar",
+    "url": "https://www.statsmodels.org/stable/generated/statsmodels.stats.contingency_tables.mcnemar.html",
+    "type": "official_doc",
+    "quote": "\"If exact is True, then the binomial distribution will be used.\" \"If the exact binomial distribution is used, then this contains the min(n1, n2),\" where n1 and n2 are the counts that are zero in one sample and one in the other.",
+    "supports": "McNemar's test on a 2x2 paired table can be computed exactly with the binomial distribution on the discordant cells, matching our sign-test framing (the page does not use the word 'discordant').",
+    "status": "partially"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Clustered resampling for non-independent queries",
+   "Percentile bootstrap approximate at small n",
+   "Multiple-comparison caution"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-05-2",
+  "claims": [
+   {
+    "claim": "kappa = (p_o - p_e)/(1 - p_e) with p_e from marginals",
+    "field": "detailed_answer/practical_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Formula and marginal-based p_e confirmed."
+   },
+   {
+    "claim": "Confusion matrix 88/2/7/3, kappa 0.357, balanced 0.82, per-class recall 3/10",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Executed/derived."
+   },
+   {
+    "claim": "Kappa depends on prevalence and is not comparable across class mixes",
+    "field": "detailed_answer/common_mistakes",
+    "status": "not_found",
+    "source_index": null,
+    "note": "Opened sklearn page is silent on prevalence."
+   },
+   {
+    "claim": "Report human-human agreement, oversample bad examples",
+    "field": "detailed_answer",
+    "status": "not_found",
+    "source_index": null,
+    "note": "No authoritative source found; left as engineering judgement."
+   }
+  ],
+  "sources": [
+   {
+    "title": "scikit-learn docs: cohen_kappa_score",
+    "url": "https://scikit-learn.org/stable/modules/generated/sklearn.metrics.cohen_kappa_score.html",
+    "type": "official_doc",
+    "quote": "\"a score that expresses the level of agreement between two annotators on a classification problem.\" kappa = (p_o - p_e) / (1 - p_e), where p_e \"is the expected agreement when both annotators assign labels randomly. p_e is estimated using a per-annotator empirical prior over the class labels\". \"0.0 indicates no agreement beyond what would be expected by chance.\"",
+    "supports": "Kappa formula, the marginal-based chance-agreement estimate and the chance-level interpretation of 0 match our calculation. The page says nothing on prevalence effects.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": [
+   "Kappa prevalence dependence / non-comparability across datasets",
+   "Report human-human agreement and oversample bad items"
+  ]
+ },
+ {
+  "plan_id": "B1-GEN-05-3",
+  "claims": [
+   {
+    "claim": "Faithfulness uses answer plus context",
+    "field": "detailed_answer/concise_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Direct."
+   },
+   {
+    "claim": "Answer relevance uses question plus answer and does not assess factual accuracy",
+    "field": "detailed_answer/concise_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Direct."
+   },
+   {
+    "claim": "Correctness needs a reference answer",
+    "field": "detailed_answer/concise_answer",
+    "status": "supported",
+    "source_index": 2,
+    "note": "Direct."
+   },
+   {
+    "claim": "Faithful content can be incorrect / unfaithful content can be correct",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 3,
+    "note": "Hallucinated content may be factual."
+   },
+   {
+    "claim": "A/B/C labelling",
+    "field": "concise_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Derivation."
+   },
+   {
+    "claim": "An LLM faithfulness judge inherits errors in the context it is shown",
+    "field": "detailed_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Follows from the definition (judged against context)."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Ragas docs: Faithfulness",
+    "url": "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/faithfulness/",
+    "type": "official_doc",
+    "quote": "\"The Faithfulness metric measures how factually consistent a response is with the retrieved context.\" \"A response is considered faithful if all its claims can be supported by the retrieved context.\"",
+    "supports": "Faithfulness is defined over the response and the retrieved context (not against a reference answer).",
+    "status": "supported"
+   },
+   {
+    "title": "Ragas docs: Answer Relevancy",
+    "url": "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/answer_relevance/",
+    "type": "official_doc",
+    "quote": "\"The Answer Relevancy metric measures how relevant a response is to the user input.\" \"This metric is calculated using the user_input and the response\" and \"focuses on how well the answer matches the intent of the question, without evaluating factual accuracy.\"",
+    "supports": "Relevance uses question plus answer and does not assess factual accuracy.",
+    "status": "supported"
+   },
+   {
+    "title": "Ragas docs: Factual Correctness",
+    "url": "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/factual_correctness/",
+    "type": "official_doc",
+    "quote": "FactualCorrectness \"compares and evaluates the factual accuracy of the generated response with the reference.\"",
+    "supports": "Correctness needs a reference answer.",
+    "status": "supported"
+   },
+   {
+    "title": "On Faithfulness and Factuality in Abstractive Summarization (arXiv 2005.00661)",
+    "url": "https://arxiv.org/pdf/2005.00661",
+    "type": "paper",
+    "quote": "\"the majority of hallucinations are extrinsic, which potentially could be valid abstractions that use background knowledge.\" \"Hallucinations are not necessarily erroneous.\" \"Factual hallucinations may be composed of intrinsic hallucinations or extrinsic hallucinations.\"",
+    "supports": "Content not supported by the source document (unfaithful) can still be factually true, so faithfulness and correctness are distinct properties.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [],
+  "residual_background_only": []
+ },
+ {
+  "plan_id": "B1-GEN-05-4",
+  "claims": [
+   {
+    "claim": "Position, verbosity and self-enhancement biases exist in LLM judges but vary by model",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Direct, with per-model differences."
+   },
+   {
+    "claim": "Answer order alone changes verdicts/rankings",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 1,
+    "note": "Direct."
+   },
+   {
+    "claim": "Count a win only when same system wins in both orders; disagreements are ties",
+    "field": "detailed_answer/practical_answer",
+    "status": "supported",
+    "source_index": 0,
+    "note": "Direct."
+   },
+   {
+    "claim": "Control for length (length-matched bins / length-adjusted win rate)",
+    "field": "detailed_answer",
+    "status": "supported",
+    "source_index": 2,
+    "note": "Length-controlled evaluation is an established mitigation."
+   },
+   {
+    "claim": "Self-preference: a judge tends to favour text resembling its own outputs",
+    "field": "detailed_answer",
+    "status": "partially",
+    "source_index": 0,
+    "note": "Paper reports mixed self-enhancement evidence and states it cannot determine it; wording should be hedged."
+   },
+   {
+    "claim": "Worked example arithmetic",
+    "field": "practical_answer",
+    "status": "covered_by_execution",
+    "source_index": null,
+    "note": "Executed."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena (arXiv 2306.05685)",
+    "url": "https://arxiv.org/pdf/2306.05685",
+    "type": "paper",
+    "quote": "\"Position bias is when an LLM exhibits a propensity to favor certain positions over others.\" \"Verbosity bias is when an LLM judge favors longer, verbose responses.\" Self-enhancement: \"the effect that LLM judges may favor the answers generated by themselves.\" Swap method: \"only declare a win when an answer is preferred in both orders\" and \"If the results are inconsistent after swapping, we can call it a tie.\" \"Only GPT-4 outputs consistent results in more than 60% of cases.\" \"GPT-4 defends significantly better than others\" against verbosity. \"Due to limited data and small differences, our study cannot determine whether the models exhibit a self-enhancement bias.\"",
+    "supports": "Position, verbosity and self-enhancement biases exist in LLM judges, vary across judge models, and the both-orders-agree-else-tie rule is a published mitigation. Self-enhancement evidence is explicitly inconclusive.",
+    "status": "supported"
+   },
+   {
+    "title": "Large Language Models are not Fair Evaluators (arXiv 2305.17926)",
+    "url": "https://arxiv.org/abs/2305.17926",
+    "type": "paper",
+    "quote": "\"the quality ranking of candidate responses can be easily hacked by simply altering their order of appearance\"; proposes \"Balanced Position Calibration, which aggregates results across various orders to determine the final score\".",
+    "supports": "Answer order alone can change an LLM evaluator's ranking; aggregating across orders is a mitigation.",
+    "status": "supported"
+   },
+   {
+    "title": "Length-Controlled AlpacaEval (arXiv 2404.04475)",
+    "url": "https://arxiv.org/abs/2404.04475",
+    "type": "paper",
+    "quote": "\"Despite being highly correlated with human preferences, AlpacaEval is known to favor models that generate longer outputs.\" \"We introduce a length-controlled AlpacaEval that aims to answer the counterfactual question:\"",
+    "supports": "Automatic judges can favour longer outputs, and length-controlled comparison is a recognised mitigation.",
+    "status": "supported"
+   }
+  ],
+  "fixes": [
+   {
+    "field": "detailed_answer",
+    "claim": "self-preference (a judge tending to favour text resembling its own outputs, so avoid using the same model family as both generator and judge, or at least check)",
+    "problem": "Stated as an established tendency; the MT-Bench paper found mixed evidence and said it could not determine whether self-enhancement bias exists.",
+    "replacement": "self-preference (judges may favour text resembling their own outputs; evidence is mixed, so avoid using the same model family as both generator and judge, or at least check)"
+   }
+  ],
+  "residual_background_only": []
+ }
+]

@@ -1,0 +1,768 @@
+[
+ {
+  "plan_id": "B3-MLO-04-3",
+  "verdict": "correct",
+  "reasons": [
+   "Applied correction (max_wait=0 edge case wording; practical test sentence) is correct and consistent with executed behaviour: [0,0,0] with max_wait=0, max_batch=2 batches as [2,1].",
+   "Code, fenced copy and every quoted number reproduce exactly on 3.10/3.11/3.13.",
+   "Only residual: question leaves the tie case (arrival exactly at dispatch instant) unspecified; the solution counts it as waiting, so a different valid reading gives different numbers."
+  ],
+  "parts_answered": {
+   "simulate_microbatch with validation": true,
+   "dispatch rule (free AND full-or-timeout), FIFO": true,
+   "service time and latency definition": true,
+   "nearest-rank percentile": true,
+   "explain load dependence at 1 ms and 20 ms with overhead 10 / per_item 0.5": true
+  },
+  "evidence": [
+   {
+    "claim": "Fenced code in practical_answer equals code.solution",
+    "method": "executed",
+    "evidence": "regex-extracted fence == solution: True"
+   },
+   {
+    "claim": "[0,1,2,3], mb2, mw5, ovh10, pi2 -> [15,14,27,26]",
+    "method": "derivation",
+    "evidence": "batch1 dispatch t=1, finish 1+10+4=15 -> 15,14; batch2 full at 3 but worker free at 15, finish 29 -> 27,26; also asserted by test"
+   },
+   {
+    "claim": "2000 arrivals/1 ms: mb1 p95=18,051 (first 10.5, last 19,001); mb16/mw4 p95=260.5; mb32/mw8 p95=38, mean batch ~19.6",
+    "method": "executed",
+    "evidence": "outputs (18051.0,...,10.5,19001.0), 260.5 (mean batch 15.87), 38.0 (mean 19.61) on 3.10/3.11/3.13"
+   },
+   {
+    "claim": "500 arrivals/20 ms: mb1 -> 10.5 each; mb8/mw5 -> 15.5 each, all batches size 1",
+    "method": "executed",
+    "evidence": "(10.5,1.0,...) and (15.5,1.0,...)"
+   },
+   {
+    "claim": "max_batch 32 handles 32 requests per 26 ms (>1/ms); capacity formula n/(overhead+per_item*n)",
+    "method": "derivation",
+    "evidence": "10+0.5*32=26 ms -> 1.23 req/ms; mb16: 16/18=0.89 <1 so queue grows (matches p95 260.5)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "question",
+    "claim": "It contains the waiting requests up to max_batch.",
+    "problem": "Tie case unspecified: the reference counts a request arriving exactly at the dispatch instant as waiting (arrivals[j] <= dispatch). Another reader could exclude it and get different latencies at boundaries.",
+    "replacement": "It contains the waiting requests up to max_batch (a request arriving exactly at the dispatch instant counts as waiting)."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Needs a correct event-driven dispatch rule combining worker-free time, fullness and timeout, plus load-dependent interpretation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Derives the closed-form dispatch rule, edge cases and the load interpretation."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Full tested code plus observed results; not duplicated in detailed."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (unchanged)",
+  "key_concepts_findings": "All 7 specific and discussed (head-of-line wait appears via oldest-request timeout).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0035",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran solution+test on /home/claude/work/dep/v/bin/python (3.13.16), v310 (3.10.20), v311 (3.11.17): 'ok' on all. Own edge cases, identical on all three: empty arrivals -> ([],[]); [0,0,0] mb2 mw0 -> lat [12,12,23], sizes [2,1]; five simultaneous arrivals mb2 mw5 -> sizes [2,2,1]; [0,1,2] mb3 mw100 dispatches at t=2 (full) -> [15,14,13]; arrival exactly at window edge [0,5,5.0001] mw5 -> sizes [2,1]; backlog [0..6] mb2 mw1 -> sizes [2,2,2,1]; max_batch=0 and max_wait=-1 raise ValueError; percentile([1,2,3,4],50)=2, 25->1, 100->4, empty raises ValueError. percentile with p>100 would IndexError and p=0 returns the minimum (outside documented (0,100] domain, harmless). Stdlib only, no 3.11+ features.",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Accelerator cost model (fixed overhead + per-item) is a stated modelling assumption, not a sourced fact"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-04-4",
+  "verdict": "correct",
+  "reasons": [
+   "Applied correction 'up to roughly 9,000 (fewer while the ramp is still climbing)' is directionally right but still loose: it is 100 req/s excess x 90 s only if demand were already 200/s for the whole 90 s.",
+   "Applied practical correction (scheduled minimum 10 replicas from 08:45, 3 otherwise) is correct and now consistent with 24/2.4=10 and max 14.",
+   "All other arithmetic reproduces."
+  ],
+  "parts_answered": {
+   "diagnose failure (CPU signal, startup lag, capacity shortfall)": true,
+   "redesign scaling policy": true
+  },
+  "evidence": [
+   {
+    "claim": "Per-replica 4/0.12=33.3 rps; 3 replicas ~100 rps; 50 rps = 50% busy",
+    "method": "derivation",
+    "evidence": "4/0.12=33.33; x3=100"
+   },
+   {
+    "claim": "Little's law: 200 x 0.12 = 24 in flight -> 6 replicas at 100%, 10 at 60% (2.4 each); 3 at 50 rps (6/2.4=2.5)",
+    "method": "derivation",
+    "evidence": "24/4=6; 24/2.4=10; 6/2.4=2.5->3"
+   },
+   {
+    "claim": "Excess ~100 rps x 90 s = 9,000 requests",
+    "method": "derivation",
+    "evidence": "Holds for a step to 200 rps. With the stated 2-minute linear ramp from 50 to 200 and no scale-out until 90 s, backlog beyond capacity is only ~1,600 at t=90 s, ~4,000 at t=120 s and ~7,000 at t=150 s; 9,000 is the step-load upper figure."
+   },
+   {
+    "claim": "Saturation is a golden signal: 'How full your service is'",
+    "method": "doc",
+    "evidence": "SRE book: Saturation: 'How \"full\" your service is.'"
+   },
+   {
+    "claim": "Queue limit 8 = two rounds of 4 x 120 ms = ~240 ms",
+    "method": "derivation",
+    "evidence": "2 x 120 = 240 ms"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "so up to roughly 9,000 requests (fewer while the ramp is still climbing) arrive faster than they can be served",
+    "problem": "9,000 assumes demand already at 200 rps for 90 s; with the stated two-minute ramp the shortfall at 90 s is a few thousand, and scrape/decision delay pushes it back up. Wording should say what the 9,000 is.",
+    "replacement": "so on the order of 9,000 requests (100 requests/s of excess times 90 s, an upper figure that assumes demand is already at 200 requests/s; the two-minute ramp lowers it, scrape and decision delay raise it) arrive faster than they can be served"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Multi-step capacity arithmetic plus a standard autoscaling redesign; no subtle trap.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Diagnosis and design principles with sizing."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete policy numbers consistent with the sizing (10 replicas, 14 max, queue 8)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (unchanged)",
+  "key_concepts_findings": "All 7 specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "status": "supported",
+    "evidence": "Saturation: 'How \"full\" your service is.' Source only backs the golden-signal remark; the other supports-text items (latency of successes vs failures, percentiles) are not used in this answer."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Little's law application and replica sizing (derivation, fine)",
+   "'Scale up aggressively, down slowly with a stabilisation window' is general autoscaler practice (Kubernetes HPA has configurable behavior/stabilizationWindowSeconds) - not opened this session"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-04-6",
+  "verdict": "correct",
+  "reasons": [
+   "Applied detailed correction (alert on fraction slower than objective, not the mean) is correct and answers the 'which latency statistic' part.",
+   "Applied practical correction introduced a redundant phrase: 'over a long and a short window (burn-rate rules over a long and a short window, ...)'. Replace with the verified SRE Workbook parameters.",
+   "Volume arithmetic correct: 500 x 86,400 = 43.2M/day; x1 KB = 43.2 GB."
+  ],
+  "parts_answered": {
+   "per-prediction log fields": true,
+   "dashboard panels from four golden signals": true,
+   "which latency statistic is alerted": true,
+   "what not to page on": true,
+   "cost and privacy of logging": true
+  },
+  "evidence": [
+   {
+    "claim": "43.2 M requests/day, ~43 GB/day at 1 KB",
+    "method": "derivation",
+    "evidence": "500*86400=43,200,000"
+   },
+   {
+    "claim": "Four golden signals; distinguish latency of successful vs failed requests; errors include implicit and policy-based (slower than a committed threshold)",
+    "method": "doc",
+    "evidence": "SRE book (WebFetch): 'It's important to distinguish between the latency of successful requests and the latency of failed requests'; errors explicit/implicit/policy-based"
+   },
+   {
+    "claim": "Mean hides the tail",
+    "method": "doc",
+    "evidence": "SRE book 'Worrying About Your Tail': designing monitoring around the mean is misleading; recommends latency-bucketed counts (histograms)"
+   },
+   {
+    "claim": "Multiwindow multi-burn-rate paging for a 99.9% SLO",
+    "method": "doc",
+    "evidence": "SRE Workbook Alerting on SLOs Table 5-8: page at burn 14.4 over 1 h and 5 min; burn 6 over 6 h and 30 min; ticket at burn 1 over 3 d and 6 h"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "above an SLO burn threshold over a long and a short window (burn-rate rules over a long and a short window, as in a standard 99.9% SLO policy)",
+    "problem": "Phrase repeats itself and is vague.",
+    "replacement": "above an SLO burn-rate threshold over both a long and a short window (for a 99.9% SLO the SRE Workbook's starting point pages at burn rate 14.4 over 1 h and 5 min)"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "avoid raw identifiers or free text where a hash is enough",
+    "problem": "A hash of an identifier is still personal data if it can be re-identified (low-entropy inputs are reversible by lookup); overstated as a privacy fix.",
+    "replacement": "avoid raw identifiers or free text where a keyed hash is enough (a plain hash of a low-entropy identifier can be reversed, and pseudonymised data is still personal data)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Broad design recall (golden signals, SLO alerting, logging) with limited calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Structured per-request log with request id, model+feature-set version, fallback flag, latency breakdown",
+    "tradeoff": "Joins to later outcomes and debugging vs storage and PII exposure"
+   },
+   {
+    "decision": "Golden-signal panels split by model version/route/client",
+    "tradeoff": "Catches single-version regressions vs dashboard cardinality"
+   },
+   {
+    "decision": "Alert on SLO burn (error ratio and fraction slower than objective) over long and short windows, not on mean latency",
+    "tradeoff": "Symptom-based and low noise vs misses slow quality drift"
+   },
+   {
+    "decision": "Do not page on drift, offline accuracy or single noisy metrics; ticket/dashboard them",
+    "tradeoff": "Avoids alert fatigue vs slower reaction to model-quality problems"
+   },
+   {
+    "decision": "Sample full features (e.g. 1%), pseudonymise identifiers, set retention and access limits",
+    "tradeoff": "Cost/privacy vs ability to debug and replay"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Rationale for log fields, signals, alerts, volume."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete record and starter alert set; small overlap with detailed alert text is acceptable."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (unchanged)",
+  "key_concepts_findings": "All 7 specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "status": "supported",
+    "evidence": "Latency of successes vs failures, four signals, tail/mean warning all present; 'percentiles' specifically: book recommends latency-bucketed histograms, which supports distribution-over-mean."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Alerting on SLOs (Google SRE Workbook)",
+    "url": "https://sre.google/workbook/alerting-on-slos/",
+    "supports": "Multiwindow, multi-burn-rate alerts for a 99.9% SLO: page at burn rate 14.4 (1 h long / 5 min short window) and 6 (6 h / 30 min); ticket at burn rate 1 (3 d / 6 h).",
+    "quote": "the multiwindow, multi-burn-rate alerting technique is the most appropriate approach",
+    "type": "official_doc"
+   },
+   {
+    "title": "Monitoring Distributed Systems (Google SRE Book)",
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "supports": "Page on symptoms rather than causes.",
+    "quote": "it's better to spend much more effort on catching symptoms than causes",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Choice of 2% fallback ticket threshold and 1% feature sampling are illustrative"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-05-3",
+  "verdict": "correct",
+  "reasons": [
+   "Applied change to '57,000' is right for the conservative formula but the new parenthetical '(about 47,000 if the baseline variance is used for both hypotheses)' is mislabeled: baseline variance for both gives ~43,500; ~47,000-48,000 is the standard null-variance/alt-variance formula.",
+   "The first reviewer's edit left a downstream inconsistency: 'about 116 complaints ... across 58,000 requests' (57,000 x 0.2% = 114).",
+   "The 38% power figure belongs to the conservative formula; the standard formula gives ~47%.",
+   "Core argument (neither colleague right; z 1.4; upper bound 0.31%; non-inferiority) is correct."
+  ],
+  "parts_answered": {
+   "evaluate 'not significant so safe'": true,
+   "evaluate 'close enough, ship'": true,
+   "how to design the check (power/events, non-inferiority)": true,
+   "delayed complaints (known after a week)": true
+  },
+  "evidence": [
+   {
+    "claim": "Expected 40 at baseline, Poisson SD 6.3",
+    "method": "executed",
+    "evidence": "0.002*20000=40; sqrt(40)=6.32"
+   },
+   {
+    "claim": "SE of difference 0.035 pp; z 1.41; two-sided p 0.16",
+    "method": "executed",
+    "evidence": "sqrt(.0025*.9975/20000+.002*.998/1.98e6)=3.545e-4; z=1.41; p=0.1585"
+   },
+   {
+    "claim": "One-sided 95% upper bound on canary ~0.31%, ~54% above baseline",
+    "method": "executed",
+    "evidence": "0.0025+1.645*3.531e-4=0.00308 -> 1.54x"
+   },
+   {
+    "claim": "Sample size to detect 0.20%->0.26%, 80% power, two-sided 5%",
+    "method": "executed",
+    "evidence": "control 99x: standard (null var for alpha) n=47,692; conservative (alt variance everywhere) n=56,979 (~57,000); baseline variance for both 43,957; control ignored: 47,251 / 56,539 / 43,518"
+   },
+   {
+    "claim": "Power at 20,000 canary requests",
+    "method": "executed",
+    "evidence": "conservative formula 38.2%; standard formula 47.5%"
+   },
+   {
+    "claim": "57,000/20,000 ~ 3 days at 1%; 100,000/day at 5%",
+    "method": "derivation",
+    "evidence": "2.85 days; 5% of 2M = 100,000"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "answer",
+    "claim": "(about 47,000 if the baseline variance is used for both hypotheses)",
+    "problem": "Wrong label/number: baseline variance for both hypotheses gives ~44,000; ~47,000-48,000 is the usual formula (baseline variance under the null, 0.26% variance under the alternative); 57,000 is the conservative version using the alternative variance throughout (two-sided 5%, 80% power, control 99x larger).",
+    "replacement": "(about 48,000 with the usual formula that uses baseline variance under the null; two-sided 5% test, 80% power)"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "One day at 1% (20,000) gives only about 38% power",
+    "problem": "38% belongs to the conservative formula; the usual formula gives ~47%. Say so.",
+    "replacement": "One day at 1% (20,000) gives only about 38 to 48% power depending on the formula"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "about 116 complaints expected at baseline across 58,000 requests",
+    "problem": "Inconsistent with the corrected 57,000 (57,000 x 0.2% = 114).",
+    "replacement": "about 114 complaints expected at baseline across 57,000 requests"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Needs power calculation, interval reasoning with small event counts, non-inferiority framing and delayed-label design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single-answer record; no duplicate fields."
+   }
+  ],
+  "suggested_answer_set": "single (unchanged)",
+  "key_concepts_findings": "All 7 specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "status": "supported",
+    "evidence": "'We define canarying as a partial and time-limited deployment of a change in a service and its evaluation'; 'the remainder of the service is the control'; 'sizeable and last long enough to be representative'; 'just a handful of queries doesn't provide a useful signal'. Note the chapter explicitly avoids statistics, so the power/non-inferiority numbers are derivation, not sourced."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Non-inferiority framing and sample-size formulas (standard statistics, derived and executed here)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-05-4",
+  "verdict": "correct",
+  "reasons": [
+   "Applied outcome-check correction is right that 14 days is too early for 45-day chargebacks, but introduces two gaps: after Stage 3 (100%) there is no concurrent old-model cohort, so the comparison can only use Stage 1-2 cohorts (or a holdout), and the old model is only kept warm 7 days, so a later rollback is a redeploy not 'a traffic switch'.",
+   "All traffic arithmetic reproduces: 7.5 rps, 27,000/h, 4,500 per 10 min, SE 0.105 pp; 25%: 22,500 per window, SE 0.047 pp."
+  ],
+  "parts_answered": {
+   "comparison baseline": true,
+   "guardrail metrics": true,
+   "minimum samples per stage": true,
+   "example thresholds": true,
+   "what stays manual": true,
+   "why 'ever higher than control' is a poor rule": true
+  },
+  "evidence": [
+   {
+    "claim": "5% of 150 rps = 7.5 rps = 27,000/h = 4,500 per 10 min",
+    "method": "derivation",
+    "evidence": "7.5*3600=27,000; 7.5*600=4,500"
+   },
+   {
+    "claim": "SE at 0.5% baseline, n=4,500 is ~0.1 pp; 0.5 pp ~ 5 SE",
+    "method": "executed",
+    "evidence": "sqrt(.005*.995/4500)=0.001051; 0.005/0.00105=4.8 (diff-vs-control SE 0.00108 incl. control)"
+   },
+   {
+    "claim": "25%: 22,500 per 10 min, SE ~0.05 pp, 0.3 pp margin",
+    "method": "executed",
+    "evidence": "37.5 rps*600=22,500; SE 0.00047; 0.3pp=6.4 SE"
+   },
+   {
+    "claim": "Canary = partial time-limited deployment, rest is control; handful of queries gives no useful signal",
+    "method": "doc",
+    "evidence": "SRE Workbook quotes above"
+   },
+   {
+    "claim": "No-difference canary exceeds control by chance ~half the time",
+    "method": "derivation",
+    "evidence": "symmetric null distribution"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "Any breach triggers a review and, if needed, rollback.",
+    "problem": "After Stage 3 there is no concurrent control and the old model is warm only 7 days, so late outcome checks rely on Stage 1-2 cohorts (or a small old-model holdout) and a rollback then is a redeploy, not a traffic switch; Stage 1-2 cohorts are small, so a 0.1%-ish chargeback rate yields few events.",
+    "replacement": "Any breach triggers a review and, if needed, rollback. After Stage 3 there is no concurrent control, so these comparisons use the Stage 1-2 cohorts (or a small old-model holdout if you keep one), which have few chargeback events; and once the 7-day warm period ends a rollback means redeploying the registered old model rather than flipping traffic."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-constraint policy design with sample-size derivation, delayed labels and automation boundaries.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Concurrent control with sticky assignment, not yesterday's numbers",
+    "tradeoff": "Removes time-of-day/mix effects vs requires traffic splitting"
+   },
+   {
+    "decision": "Tiered metrics: operational guardrails auto-rollback; behavioural proxies banded; outcomes verified later",
+    "tradeoff": "Fast decisions vs slow ground truth (45-day chargebacks)"
+   },
+   {
+    "decision": "Minimum samples and time per stage derived from traffic and baseline variance",
+    "tradeoff": "Statistical reliability vs longer exposure"
+   },
+   {
+    "decision": "Margin plus persistence over consecutive windows",
+    "tradeoff": "Fewer false rollbacks vs slower detection"
+   },
+   {
+    "decision": "Automatic rollback, gated automatic promotion, human review on behavioural-band breach",
+    "tradeoff": "Speed vs risk of unintended strictness change"
+   },
+   {
+    "decision": "Keep previous model warm; verify matured outcomes later",
+    "tradeoff": "Cheap rollback vs duplicate capacity and long tail of labels"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Reasoning and sample-size derivation."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete staged policy table."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (unchanged)",
+  "key_concepts_findings": "All 8 specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "status": "supported",
+    "evidence": "Control = remainder of the service; 'just a handful of queries doesn't provide a useful signal'; 'pause and roll back the deployment, or perhaps contact a human'; 'no more than a dozen' metrics."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Thresholds and window lengths are hypothetical and labelled so"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-05-5",
+  "verdict": "pass",
+  "reasons": [
+   "Applied correction (gate would have blocked the column drop because v6 still declares it; at rollback time it fails loudly) is correct and consistent with the expand-contract timeline.",
+   "Concise is 72 words, no number conflicts across fields; timeline arithmetic ok (Day 5 + 21 = Day 26; delete Day 33).",
+   "Expand-contract claims match Fowler's description."
+  ],
+  "parts_answered": {
+   "why rollback failed": true,
+   "how to structure release so rollback is safe": true
+  },
+  "evidence": [
+   {
+    "claim": "Expand/migrate/contract: augment interface to support both versions, migrate clients, then remove old",
+    "method": "doc",
+    "evidence": "Fowler: 'In the expand phase you augment the interface to support both the old and the new versions.' ... 'perform the contract phase to remove the old version'"
+   },
+   {
+    "claim": "Timeline numbers",
+    "method": "derivation",
+    "evidence": "Day 5 v7 at 100% + 21 days = Day 26; Day 33 delete; consistent with 'few weeks' rollback window"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "One core insight (model rollback does not roll back data contract) plus a standard migration pattern.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Genuinely shorter interview answer (72 words)."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanism, steps and controls."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Day-by-day timeline and gate; not in detailed."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical (unchanged)",
+  "key_concepts_findings": "All 7 specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0006",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://martinfowler.com/bliki/ParallelChange.html",
+    "status": "supported",
+    "evidence": "'In the expand phase you augment the interface to support both the old and the new versions.' (verified)"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Feature-store compatibility check and registry feature_set declaration are engineering practice, not documented behaviour of a named product"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-06-2",
+  "verdict": "correct",
+  "reasons": [
+   "Applied change from 80% to 85% is arithmetically consistent: 2.9/3.5 = 82.9%.",
+   "Applied loader-overhead insertion leaves the sizing unclear: the 3.6/4.2/2.9 GiB sums exclude the 4 data-loader workers, yet the text says the measurement 'should include' them.",
+   "Other numbers reproduce: 2x1.4+0.8=3.6; +0.6=4.2; +0.5=4.7; option (a) 1.4+0.4+0.6+0.5=2.9; 3.5/2.9=1.21; 4.7*1.17=5.5."
+  ],
+  "parts_answered": {
+   "why it did not fail locally": true,
+   "how to find real memory need": true,
+   "what to change": true
+  },
+  "evidence": [
+   {
+    "claim": "Memory limits enforced by kernel OOM kills; CPU limits by throttling; OOMKilled means container tried to use more memory than limit",
+    "method": "doc",
+    "evidence": "K8s: '`memory` limits are enforced by the kernel with out of memory (OOM) kills'; '`cpu` limits are enforced by CPU throttling'; 'The `OOMKilled` reason shows that the container tried to use more memory than its limit.'"
+   },
+   {
+    "claim": "emptyDir medium Memory counts against the writing container's memory limit",
+    "method": "doc",
+    "evidence": "K8s volumes: 'files you write count against the memory limit of the container that wrote them.'"
+   },
+   {
+    "claim": "Sizing arithmetic",
+    "method": "derivation",
+    "evidence": "3.6, 4.2, 4.7, 2.9 GiB; 2.9/3.5=82.9%; 3.5/2.9-1=20.7%"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "the 4 data-loader workers add their own overhead, which the measurement should include",
+    "problem": "The idle (3.6) and peak (4.2) sums exclude these 4 processes, so the worked numbers are a lower bound unless their overhead is counted somewhere.",
+    "replacement": "the 4 data-loader workers run only during batch calls, so assume their own interpreter overhead is folded into the 0.6 GiB request-peak figure below, and confirm by measuring every process"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Per-process memory accounting plus knowledge of K8s limit semantics and shm; straightforward once the model is known.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanism and method."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked sizing and pod spec."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (unchanged)",
+  "key_concepts_findings": "8 concepts; 'memory request' is only briefly discussed (request 3Gi in YAML vs 'request close to steady state' in text: option (a) steady state is nearer 2 to 2.5 GiB; consider 2.5Gi). Not a correctness fault.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+    "status": "supported",
+    "evidence": "Quotes above (kubernetes.io page body was truncated in WebFetch; verified against the page's source markdown in the kubernetes/website repo, fetched via raw.githubusercontent.com). The 'Pending' and extended-resource claims in the supports text are not used in the answer and were not checked."
+   },
+   {
+    "url": "https://kubernetes.io/docs/concepts/storage/volumes/",
+    "status": "supported",
+    "evidence": "'If you set the emptyDir.medium field to \"Memory\", Kubernetes mounts a tmpfs (RAM-backed filesystem)... files you write count against the memory limit of the container that wrote them.' (kubernetes.io page body was truncated in WebFetch; verified against the page's source markdown in the kubernetes/website repo, fetched via raw.githubusercontent.com)"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Forked workers may or may not share model pages (hedged correctly in the answer)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-06-3",
+  "verdict": "correct",
+  "reasons": [
+   "Applied correction #1 (lengthen load to 350 s, not 200 s) is correct: 30 x 10 s = 300 s budget.",
+   "Applied correction #2 (conditional validation) is good but the next sentence, kept from the original, tests a 350 s load and 'confirms the startup probe fails'; that only happens when loading blocks the HTTP server. In the background-load branch just described, a longer load only leaves the pod unready. Internal contradiction in the test procedure.",
+   "Liveness timing ok: probes at 20, 30, 40 s -> kill ~40 s (plus timeout), stated 40 to 50 s.",
+   "common_mistakes[2] 'Using one /health endpoint for liveness and readiness' is overstated: Kubernetes docs describe a shared low-cost endpoint with a higher liveness failureThreshold as a common pattern; the real mistake is a shared endpoint that includes model loading or dependencies. Suggest rewording to that (field not in the exact-replacement schema)."
+  ],
+  "parts_answered": {
+   "explain what is happening": true,
+   "design probe configuration": true,
+   "what each endpoint checks": true,
+   "one way design could still go wrong": true
+  },
+  "evidence": [
+   {
+    "claim": "Liveness first check at 20 s, 3 consecutive failures at 10 s -> ~40 s",
+    "method": "derivation",
+    "evidence": "checks at t=20,30,40"
+   },
+   {
+    "claim": "Startup budget = failureThreshold x periodSeconds = 300 s; killed if never succeeds",
+    "method": "doc",
+    "evidence": "K8s configure page: '(30 * 10 = 300s) to finish its startup.' 'If the startup probe never succeeds, the container is killed after 300s and subject to the pod's restartPolicy.'"
+   },
+   {
+    "claim": "Liveness/readiness not executed until startup succeeds; startup suits slow containers; failed startup -> kill subject to restart policy",
+    "method": "doc",
+    "evidence": "K8s probes: 'Kubernetes does not execute liveness or readiness probes until the startup probe succeeds'; 'If the startup probe fails, the kubelet kills the container...'"
+   },
+   {
+    "claim": "Startup probe should check the same endpoint as liveness",
+    "method": "doc",
+    "evidence": "K8s probes: 'you should specify a startup probe that checks the same endpoint as the liveness probe'"
+   },
+   {
+    "claim": "Readiness-failed pods get no Service traffic; readiness runs for whole lifecycle",
+    "method": "doc",
+    "evidence": "K8s configure page: 'the pod will be marked unready and will not receive traffic'; 'Readiness probes run on the container during its whole lifecycle.'"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "practical_answer",
+    "claim": "Then lengthen the simulated load beyond the budget (for example 350 s) and confirm the startup probe fails and the pod is restarted, proving the budget is enforced; a 200 s load would still pass inside the 300 s budget.",
+    "problem": "Only true if loading blocks /health/live; in the background-loading branch described just before, the startup probe succeeds immediately and a 350 s load merely keeps the pod unready.",
+    "replacement": "Then, in a setup where loading blocks the HTTP server (so /health/live is unanswered), lengthen the simulated load beyond the budget (for example 350 s) and confirm the startup probe fails and the pod is restarted, proving the budget is enforced; a 200 s load would still pass inside the 300 s budget. If the server answers during background loading, a longer load only keeps the pod unready, not restarted."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Needs the three probe roles and budget arithmetic; one subtle design caveat.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Diagnosis, design, risks."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "YAML plus validation plan."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (unchanged)",
+  "key_concepts_findings": "All 8 specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": null,
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://kubernetes.io/docs/concepts/workloads/pods/probes/",
+    "status": "supported",
+    "evidence": "Startup/liveness/readiness gating, kill on failed startup, 'Liveness probes do not wait for readiness probes to succeed', 'startup probe that checks the same endpoint as the liveness probe' (kubernetes.io page body was truncated in WebFetch; verified against the page's source markdown in the kubernetes/website repo, fetched via raw.githubusercontent.com)"
+   },
+   {
+    "url": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/",
+    "status": "supported",
+    "evidence": "300 s example, readiness whole lifecycle, unready pod gets no traffic (kubernetes.io page body was truncated in WebFetch; verified against the page's source markdown in the kubernetes/website repo, fetched via raw.githubusercontent.com)"
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Kubernetes Docs: Liveness, Readiness and Startup Probes",
+    "url": "https://kubernetes.io/docs/concepts/workloads/pods/probes/",
+    "supports": "Liveness should report app health; readiness additionally checks required back-end services (basis for keeping dependency checks out of liveness).",
+    "quote": "The liveness probe passes when the app itself is healthy, but the readiness probe additionally checks that each required back-end service is available.",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Claim that a dependency outage in liveness restarts every pod is inference from the above, not stated in the docs"
+  ],
+  "code_patch": null
+ }
+]

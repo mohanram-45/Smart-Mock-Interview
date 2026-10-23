@@ -1,0 +1,668 @@
+[
+ {
+  "plan_id": "B3-MLO-04-2",
+  "verdict": "correct",
+  "reasons": [
+   "Minor: the 3.05 MB / 5x JSON figure holds only when float32 values are serialised via float64 repr (numpy tolist); shortest-float32 text is ~1.75 MB (~2.9x). State the assumption.",
+   "Applied change (gRPC-Web wording) is correct and matches the page: Envoy used in the guide's example; 'generally cannot' is background but hedged."
+  ],
+  "parts_answered": {
+   "move main route to gRPC?": true,
+   "checks before": true,
+   "checks after": true,
+   "browser dashboard route": true
+  },
+  "evidence": [
+   {
+    "claim": "602,112 raw bytes; 0.18 GB/s at 300 rps",
+    "method": "executed",
+    "evidence": "150528*4=602112; *300=0.1806 GB/s"
+   },
+   {
+    "claim": "JSON 3.05 MB, ~5x, ~0.915 GB/s, ~7.3 Gbit/s",
+    "method": "executed",
+    "evidence": "3 seeds uniform float32 .tolist(): 3,050,653-3,051,011 bytes; ratio 5.07; 0.915 GB/s*8=7.3 Gbit/s"
+   },
+   {
+    "claim": "rounded to 4 decimals ~1.19 MB",
+    "method": "executed",
+    "evidence": "1,187,478-1,187,658 bytes (uniform); normal data 1.26 MB"
+   },
+   {
+    "claim": "shortest float32 repr JSON",
+    "method": "executed",
+    "evidence": "~1.750 MB, i.e. ~2.9x raw; so headline depends on serialisation"
+   },
+   {
+    "claim": "gRPC: always set deadline, none by default, propagation",
+    "method": "doc",
+    "evidence": "grpc.io deadlines guide quoted"
+   },
+   {
+    "claim": "L7 balancing spreads streams of one HTTP/2 connection",
+    "method": "doc",
+    "evidence": "grpc load-balancing blog quote"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Serialised as JSON text at full precision (random values in a local test with Python's json module)",
+    "problem": "5x depends on float32 values being written with float64 digits (numpy tolist); shortest float32 text is ~1.75 MB (~2.9x).",
+    "replacement": "Serialised as JSON text with float64 digits (random float32 values converted by numpy tolist and dumped with Python's json module; shortest float32 text would be about 1.75 MB)"
+   },
+   {
+    "severity": "minor",
+    "field": "concise_answer",
+    "claim": "150,528 random float values serialised as JSON text",
+    "problem": "same assumption unstated; replacement adds 3 words (still <=80).",
+    "replacement": "150,528 random float32 values serialised as JSON text with float64 digits"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Trade-off judgement with payload arithmetic and operational checks; no deep derivation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Fix the payload first (send encoded image or binary tensor, preprocess server-side)",
+    "tradeoff": "Largest bandwidth/CPU win vs moving preprocessing to server"
+   },
+   {
+    "decision": "Adopt gRPC/protobuf for the internal route",
+    "tradeoff": "Compact binary, typed contract, HTTP/2 vs tooling/debuggability and L7/client-side balancing needs"
+   },
+   {
+    "decision": "Set explicit deadlines (within 150 ms budget) and propagate",
+    "tradeoff": "Prevents unbounded waits vs tuning from measured latency"
+   },
+   {
+    "decision": "Keep REST (or gRPC-Web gateway) for browser dashboard",
+    "tradeoff": "Browser compatibility vs two protocols to maintain"
+   },
+   {
+    "decision": "Benchmark p50/p95/p99 and CPU per request before/after; run both routes during deprecation",
+    "tradeoff": "Evidence-based and reversible vs temporary duplicate operation"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "71 words, interview-ready verdict plus key numbers."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Adds balancing, browser, deadline, rollout checks; numbers consistent with concise (0.60 MB, 3.05 MB, 0.9 vs 0.18 GB/s)."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "All 7 specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0035",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://grpc.io/docs/guides/deadlines/",
+    "status": "supported",
+    "evidence": "'By default, gRPC does not set a deadline'; 'you should always explicitly set a realistic deadline in your clients'; propagation 'supported by some gRPC implementations'."
+   },
+   {
+    "url": "https://grpc.io/blog/grpc-load-balancing/",
+    "status": "partially",
+    "evidence": "Supports 'With HTTP/2, LB can distribute the streams from one client among multiple backends' and that L4 just copies frames to one backend; does not literally say L4 leaves replicas idle (implication only, answer wording is hedged 'can')."
+   },
+   {
+    "url": "https://grpc.io/docs/platforms/web/basics/",
+    "status": "partially",
+    "evidence": "gRPC-Web lets browsers access gRPC services; example uses Envoy to forward. Does not state native gRPC is impossible; answer says 'generally cannot', background."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "browsers generally cannot speak native gRPC directly (background; gRPC-Web page implies a proxy)",
+   "encoded image typically small fraction of raw tensor (background, hedged)"
+  ],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-04-3",
+  "verdict": "pass",
+  "reasons": [
+   "Applied change (arrival exactly at dispatch instant counts as waiting) matches code (arrivals[j] <= dispatch) and test.",
+   "Code identical to fence; all tests and my extra cases pass on 3.10/3.11/3.13; reported p95s reproduce."
+  ],
+  "parts_answered": {
+   "simulator": true,
+   "percentile nearest-rank": true,
+   "ValueErrors": true,
+   "explain 1 ms vs 20 ms with overhead=10, per_item=0.5": true
+  },
+  "evidence": [
+   {
+    "claim": "hand cases [0,1,2,3],2,5,10,2 -> [15,14,27,26]; lone request 17",
+    "method": "derivation",
+    "evidence": "batch1 dispatch t=1, 1+14=15; batch2 dispatch at free time 15, finish 29; 5+12=17"
+   },
+   {
+    "claim": "2000 arrivals 1/ms: (1,0) p95 18051, first 10.5, last 19001; (16,4) p95 260.5; (32,8) p95 38, mean batch 19.6",
+    "method": "executed",
+    "evidence": "all reproduced on 3.13/3.10/3.11"
+   },
+   {
+    "claim": "500 arrivals/20 ms: 10.5 each; (8,5) 15.5 each, batch size 1",
+    "method": "executed",
+    "evidence": "reproduced"
+   },
+   {
+    "claim": "capacity 32/26 ms = 1.23/ms >1; 1/10.5 ms <1/ms",
+    "method": "derivation",
+    "evidence": "10+0.5*32=26"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Precise event-driven dispatch semantics with boundary conditions plus load-dependent interpretation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanism, dispatch formula, edge cases, interpretation."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Code plus executed results and sizing rule; numbers match detailed (10.5 ms service, 26 ms for 32)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0035",
+   "same_intent": false
+  },
+  "code_findings": "solution.py == fenced code (exact match). test passes under python -I on 3.13.16, 3.10.20, 3.11.17. Extra cases (all passed on all three): empty arrivals -> ([],[]); three simultaneous arrivals, max_batch 2, max_wait 0 -> sizes [2,1], lat [12,12,23]; arrival exactly at dispatch instant ([0,5], wait 5) joins batch -> sizes [2], lat [19,14]; backlog with huge max_wait [0..4], batch 3 -> sizes [3,2]; max_batch 0 / negative max_wait / empty percentile raise ValueError; percentile([1,2,3,4],25/26/100) -> 1/2/4; equal arrival times accepted. stdlib only (math), no 3.11+ features.",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-04-4",
+  "verdict": "pass",
+  "reasons": [
+   "Applied change (9,000 hedge) is arithmetically right: 100 rps excess x 90 s = 9,000; caveats on ramp (lowers) and scrape/decision delay (raises) are correct directionally.",
+   "All sizing numbers recomputed and consistent across detailed and practical fields."
+  ],
+  "parts_answered": {
+   "diagnose": true,
+   "redesign scaling policy": true
+  },
+  "evidence": [
+   {
+    "claim": "4/0.12=33.3 rps/replica; 3 replicas ~100 rps; 50% busy at 50 rps",
+    "method": "derivation",
+    "evidence": "exact"
+   },
+   {
+    "claim": "9,000 backlog",
+    "method": "derivation",
+    "evidence": "(200-100)*90"
+   },
+   {
+    "claim": "Little: 200*0.12=24 in flight -> 6 replicas at 100%; 60% target 2.4 -> 10 replicas; 6/2.4=2.5 -> 3",
+    "method": "derivation",
+    "evidence": "exact"
+   },
+   {
+    "claim": "queue limit 8 ~ 240 ms",
+    "method": "derivation",
+    "evidence": "two rounds x 120 ms"
+   },
+   {
+    "claim": "saturation = how full the service is",
+    "method": "doc",
+    "evidence": "SRE book quote"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Application of Little's law and lag reasoning to a scenario; arithmetic is simple.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Diagnosis and principles."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete hypothetical config; numbers (10, 14, 2.4, 8) consistent with detailed."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0005",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "status": "supported",
+    "evidence": "Saturation: 'How \"full\" your service is'; 'distinguish between the latency of successful requests and the latency of failed requests'; mean-vs-percentile warning."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "scale up aggressively / down slowly with stabilisation window, readiness warm-up, queue bounds (standard practice; K8s HPA page could not be read in full)"
+  ],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-04-5",
+  "verdict": "pass",
+  "reasons": [
+   "Applied change (dropping 'as the SRE book recommends') is correct: the monitoring page supports distinguishing failed vs successful latency, but the wording was attributive; the remaining sentence is fine.",
+   "Amplification arithmetic recomputed: 1+.5+.25+.125=1.875; 0.8*1.875=1.5."
+  ],
+  "parts_answered": {
+   "mechanism": true,
+   "timeouts": true,
+   "retries": true,
+   "idempotency": true,
+   "fallbacks": true,
+   "server changes": true
+  },
+  "evidence": [
+   {
+    "claim": "1.875x and 150% capacity",
+    "method": "derivation",
+    "evidence": "exact"
+   },
+   {
+    "claim": "10% retry ratio",
+    "method": "doc",
+    "evidence": "'A request will only be retried as long as this ratio is below 10%'"
+   },
+   {
+    "claim": "backoff, retry limit, reject when queue full, check deadline before more work, deadline propagation, server wasting work after client deadline",
+    "method": "doc",
+    "evidence": "cascading-failures chapter quotes"
+   },
+   {
+    "claim": "circuit breaker",
+    "method": "background_only",
+    "evidence": "not mentioned in the cascading-failures chapter; standard pattern"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Positive-feedback mechanism with quantification and layered client/server mitigations.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer, ~326 words, structured; acceptable for 'single'."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0023",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://grpc.io/docs/guides/deadlines/",
+    "status": "supported",
+    "evidence": "'By default, gRPC does not set a deadline'; 'you should always explicitly set a realistic deadline in your clients'; propagation 'supported by some gRPC implementations'."
+   },
+   {
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "status": "supported",
+    "evidence": "Saturation: 'How \"full\" your service is'; 'distinguish between the latency of successful requests and the latency of failed requests'; mean-vs-percentile warning."
+   },
+   {
+    "url": "https://sre.google/sre-book/handling-overload/",
+    "status": "supported",
+    "evidence": "'A request will only be retried as long as this ratio is below 10%'; 'per-request retry budget of up to three attempts'."
+   },
+   {
+    "url": "https://sre.google/sre-book/addressing-cascading-failures/",
+    "status": "partially",
+    "evidence": "Backoff, limit retries, reject when queue full, deadline check per stage, deadline propagation, abandoned work all quoted; no circuit-breaker text."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "circuit breaker (background)",
+   "cancel in-flight inference on disconnect (partly supported by 'cancellation propagation reduces doomed work')"
+  ],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-04-6",
+  "verdict": "pass",
+  "reasons": [
+   "Applied changes verified: 14.4 burn over 1 h and 5 min for 99.9% SLO is in the Workbook table; keyed-hash/pseudonymisation caveat is correct (GDPR Recital 26).",
+   "43.2M/day and ~43 GB/day at 1 KB recomputed."
+  ],
+  "parts_answered": {
+   "what to log": true,
+   "dashboard panels from golden signals": true,
+   "alerts": true,
+   "latency statistic alerted on": true,
+   "what not to page on": true,
+   "cost and privacy": true
+  },
+  "evidence": [
+   {
+    "claim": "500*86400=43.2M; x1 KB=43.2 GB",
+    "method": "derivation",
+    "evidence": "exact"
+   },
+   {
+    "claim": "burn 14.4 / 1h+5m, 6 / 6h+30m, 1 / 3d+6h for 99.9%",
+    "method": "doc",
+    "evidence": "Workbook alerting-on-slos table"
+   },
+   {
+    "claim": "golden signals, failed vs successful latency, mean vs tail",
+    "method": "doc",
+    "evidence": "SRE book quotes"
+   },
+   {
+    "claim": "pseudonymised data is still personal data",
+    "method": "doc",
+    "evidence": "GDPR Recital 26 opening: 'Personal data which have undergone pseudonymisation, which could be attributed to a natural person...'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Broad design recall with some arithmetic; no hard derivation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Structured per-request log with request id, model+feature-set version, fallback flag, latency breakdown",
+    "tradeoff": "Enables joins with outcomes and debugging vs storage and PII exposure"
+   },
+   {
+    "decision": "Golden-signal panels split by model version/route/client",
+    "tradeoff": "Catches regressions in one version vs dashboard cardinality"
+   },
+   {
+    "decision": "Page on SLO burn (error ratio and fraction slow) over multiple windows",
+    "tradeoff": "Symptom-based, low noise vs misses slow quality drift"
+   },
+   {
+    "decision": "Do not page on drift, offline accuracy, single noisy metrics; ticket/dashboard them",
+    "tradeoff": "Avoids alert fatigue vs slower reaction to model-quality problems"
+   },
+   {
+    "decision": "Sample full features (e.g. 1%), hash identifiers, set retention and access limits",
+    "tradeoff": "Cost/privacy vs ability to debug and replay"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Log fields, signals, alerting philosophy, cost."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Example record and alert set. Latency parts 4+6+31=41 vs total 43 (illustrative, not an error)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0001",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "status": "supported",
+    "evidence": "Saturation: 'How \"full\" your service is'; 'distinguish between the latency of successful requests and the latency of failed requests'; mean-vs-percentile warning."
+   },
+   {
+    "url": "https://sre.google/workbook/alerting-on-slos/",
+    "status": "supported",
+    "evidence": "For 99.9% SLO: page at burn rate 14.4 (1 h long, 5 min short, 2% budget), 6 (6 h/30 min), ticket at 1 (3 d/6 h); 'the multiwindow, multi-burn-rate alerting technique is the most appropriate approach'."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "GDPR Recital 26 (gdpr-info.eu reproduction)",
+    "url": "https://gdpr-info.eu/recitals/no-26/",
+    "supports": "Pseudonymised data that could be attributed to a person by additional information is still information on an identifiable person.",
+    "quote": "Personal data which have undergone pseudonymisation, which could be attributed to a natural person",
+    "type": "secondary"
+   }
+  ],
+  "unsourced_claims": [
+   "a plain hash of a low-entropy identifier can be reversed (background, dictionary/brute-force)"
+  ],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-05-3",
+  "verdict": "correct",
+  "reasons": [
+   "Round-2 defect re-examined. With the real 99:1 control (n_control = 99 n), the null-variance-at-baseline formula gives n=47,692 (infinite-control 47,251) and the alternative-variance formula gives 56,979 (infinite 56,539). So 'about 48,000' and 'roughly 57,000' are both correct and mutually consistent (the first reviewer's 47,000->48,000 change is right for the stated 99:1 design, though 47,000-48,000 is the safe range).",
+   "Power at 20,000: 47.9% (null-variance formula), 38.4% (alt-variance) -> '38 to 48%' correct. 57,000 x 0.2% = 114 \u2713 (58,000 x 0.2% = 116 was the old value; change correct). 57,000/20,000=2.85 days \u2713; 57,000/100,000 <1 day \u2713.",
+   "Remaining minor: z 1.4/p 0.16 is the Wald (observed-rate) figure; with baseline variance z=1.58, p=0.113. Not significant either way, but state the range for consistency with the two-formula treatment later."
+  ],
+  "parts_answered": {
+   "evaluate colleague 1": true,
+   "evaluate colleague 2": true,
+   "design the check": true,
+   "delayed complaints": true
+  },
+  "evidence": [
+   {
+    "claim": "z=1.416, p=0.157 (observed variance); z=1.583, p=0.113 (baseline variance)",
+    "method": "executed",
+    "evidence": "statistics.NormalDist"
+   },
+   {
+    "claim": "SE diff 0.035 pp; Poisson sd 6.3; upper 95% one-sided bound 0.308% = 1.54x baseline",
+    "method": "executed",
+    "evidence": "exact"
+   },
+   {
+    "claim": "n: A=47,251 (inf ctrl) / 47,692 (99:1); B=56,539 / 56,979; C(baseline var both)=43,518",
+    "method": "executed",
+    "evidence": "za=1.95996, zb=0.84162"
+   },
+   {
+    "claim": "power at n=20,000: 47.9% / 38.4% (47.5% finite-control A)",
+    "method": "executed",
+    "evidence": "normal approx"
+   },
+   {
+    "claim": "events: 57,000*0.002=114; 20,000*0.002=40",
+    "method": "derivation",
+    "evidence": "exact"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "gives z of about 1.4 (two-sided p about 0.16)",
+    "problem": "This uses the observed-rate (Wald) variance; the baseline-variance test gives z about 1.58, p about 0.11. Conclusion unchanged but the answer later treats the formula choice explicitly.",
+    "replacement": "gives z of about 1.4 to 1.6 (two-sided p about 0.11 to 0.16, depending on whether the observed or the baseline rate sets the variance)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Statistical power and non-inferiority reasoning with multiple formulas and delayed-outcome design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single long answer (338 words); all numbers now internally consistent."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0040",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "status": "supported",
+    "evidence": "'It should be sizeable and last long enough to be representative of the overall deployment'; 'a handful of queries doesn't provide a useful signal'; the workbook explicitly avoids statistics, so power numbers are derivation-only."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "clustering by user reduces effective sample size (statistical background)"
+  ],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-05-4",
+  "verdict": "correct",
+  "reasons": [
+   "Applied change (no concurrent control after Stage 3; rollback = redeploy after 7-day warm period) is accurate and consistent with the Stage 3 line and the 14-day interim check.",
+   "All numbers recomputed: 7.5 rps -> 27,000/h, 4,500/10 min; SE sqrt(.005*.995/4500)=0.105 pp; 0.5 pp = 4.8 SE (4.6 with finite control); Stage 2 22,500/10 min, SE 0.047 pp (0.054 with 75% control).",
+   "Minor gap: Stage 3 states no gates or sample minimum, and its guardrails have no concurrent control to compare with."
+  ],
+  "parts_answered": {
+   "comparison baseline": true,
+   "guardrail metrics": true,
+   "minimum samples": true,
+   "example thresholds": true,
+   "what stays manual": true,
+   "why 'ever higher' rule is poor": true
+  },
+  "evidence": [
+   {
+    "claim": "27,000/h; 4,500/10 min; SE 0.105 pp",
+    "method": "executed",
+    "evidence": "sqrt(0.005*0.995/4500)=0.001051"
+   },
+   {
+    "claim": "22,500/10 min; SE 0.047 pp",
+    "method": "executed",
+    "evidence": "sqrt(.005*.995/22500)=0.00047"
+   },
+   {
+    "claim": "canary evaluated against rest of service as control; handful of queries gives no useful signal",
+    "method": "doc",
+    "evidence": "SRE workbook canarying quotes"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "Stage 3: 100%, with the previous model kept deployed and warm for 7 days; the rollback is a traffic switch.",
+    "problem": "No gate or sample minimum for Stage 3, and with 100% traffic there is no concurrent control for the relative thresholds above.",
+    "replacement": "Stage 3: 100%, with the previous model kept deployed and warm for 7 days; the rollback is a traffic switch. There is no concurrent control at 100%, so the same auto-rollback rules apply with absolute limits and the Stage 2 control values as reference, again over two consecutive windows."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-part policy design with statistical sizing and delayed labels.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Compare against a concurrent control with sticky assignment, not yesterday's numbers",
+    "tradeoff": "Removes time-of-day/mix effects vs needs traffic splitting"
+   },
+   {
+    "decision": "Tiered metrics: operational guardrails auto-rollback; behavioural proxies banded; outcomes verified later",
+    "tradeoff": "Fast decisions vs slow ground truth (45-day chargebacks)"
+   },
+   {
+    "decision": "Minimum samples/time per stage derived from traffic and baseline variance",
+    "tradeoff": "Statistical reliability vs longer exposure"
+   },
+   {
+    "decision": "Thresholds with margin plus persistence over consecutive windows",
+    "tradeoff": "Fewer false rollbacks vs slower detection"
+   },
+   {
+    "decision": "Automatic rollback, gated automatic promotion, human review on behavioural-band breach",
+    "tradeoff": "Speed vs risk of unintended strictness changes"
+   },
+   {
+    "decision": "Keep previous model warm and verify matured outcomes later",
+    "tradeoff": "Cheap rollback vs duplicate capacity and long tail of delayed labels"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Rationale, tiers, sample math."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete policy table, numbers consistent with detailed."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0006",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "status": "supported",
+    "evidence": "Control = remainder of the service; 'Terminating a canary deployment after receiving just a handful of queries doesn't provide a useful signal'; pause and roll back on bad canary."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "thresholds are hypothetical, labelled as such"
+  ],
+  "code_patch": null,
+  "sources_to_drop": []
+ }
+]

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}How to read the labels · SMART Mock Interview{% endblock %}
+{% block body %}
+<section class="hero"><h1>How to read the labels</h1><p class="lead">Every result on these pages says where it came from. Five situations are kept visibly apart.</p></section>
+<div class="cards">
+  <article class="card"><h3>Operational flow</h3><p>Setup, the interview conversation, progress and the feedback report. This never depends on any scorer: if a scorer or the experimental evaluator fails, the interview carries on.</p></article>
+  <article class="card"><h3><span class="chip chip-legacy">SENTENCE-BERT</span></h3><p>The only similarity scorer for new interviews. It measures how close an answer is to a reference answer and appears only in the optional technical details. This demo never adapts questions to it.</p></article>
+  <article class="card"><h3><span class="chip chip-real">REAL MODEL</span> <span class="chip chip-mock">MOCK VERIFIER</span></h3><p><strong>Experimental modular evaluation</strong> (opt-in). A model labels which required concepts your answer states, with your own words as evidence; fixed rules turn that into a rubric. <strong>MOCK</strong> uses a rule-based test double: it shows the pipeline, not answer quality. <strong>REAL</strong> uses a local model and is slow.</p></article>
+  <article class="card"><h3><span class="chip chip-code">EXPERIMENTAL CODE CHECK</span></h3><p>Opt-in and separate from every score. For a few Python questions it lists, in five groups, what was <strong>verified by running tests</strong> (only in an isolated sandbox, never in this web server), what the code <strong>contains</strong>, what is <strong>missing</strong>, what is <strong>incorrect</strong> and what is <strong>unverified</strong> (explanations are matched by wording only). If no sandbox is set up the code is only <em>read</em>, and the page says so. It gives <strong>no score</strong> and never affects anything adaptive.</p></article>
+  <article class="card"><h3><span class="chip chip-adv">ADVISORY ONLY</span></h3><p>Most questions have no penalty-eligible scope. You get verified findings and feedback but <strong>no number</strong>, by design.</p></article>
+  <article class="card"><h3>Abstained / unavailable</h3><p>When the evidence is not enough to decide, the evaluator says so and gives the reason (the model could not decide, the evidence check rejected a finding, the answer was off-topic, or the model service failed). It never invents a score.</p></article>
+  <article class="card"><h3><span class="chip chip-nohv">NOT human-validated</span></h3><p>No score or finding here has been checked against human judgement. "Internally consistent" describes the evaluator's own evidence, not accuracy. The recorded run failed its acceptance gate (abstain rate 0.45 &gt; 0.40).</p></article>
+</div>
+{% endblock %}

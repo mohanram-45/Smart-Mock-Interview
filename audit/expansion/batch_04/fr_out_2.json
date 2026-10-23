@@ -1,0 +1,481 @@
+[
+ {
+  "plan_id": "B4-MLO-08-4",
+  "verdict": "pass",
+  "reasons": [
+   "All simulation numbers reproduced (eight seeds 0-7: KS 0.0035-0.00546, p 9.8e-6 to 2.3e-13, PSI 5.6e-5 to 1.7e-4; 1,000-row 0.3 sd case: KS mean 0.135, PSI 5th-95th pct 0.065-0.154, 30/200 draws match the quoted draw); noise-floor formula verified; one attached source (arXiv 2303.01227) supports no sentence as worded and should be dropped."
+  ],
+  "parts_answered": {
+   "compare what KS and PSI measure": true,
+   "explain alert storm": true,
+   "what neither tells you": true
+  },
+  "evidence": [
+   {
+    "claim": "KS ~0.004 (0.0035-0.0055 over eight seeds), p 1e-5..1e-13, PSI ~0.0001 at n=1e6, shift 0.01 sd",
+    "method": "executed",
+    "evidence": "numpy default_rng seeds 0-7 + scipy ks_2samp: D 0.003496-0.005458; p 9.8e-6 (seed 3) to 2.3e-13 (seed 1); PSI 5.6e-5-1.67e-4"
+   },
+   {
+    "claim": "1,000 rows, 0.3 sd: KS 0.14 (p~8e-9), PSI~0.10, PSI range 0.07-0.16",
+    "method": "executed",
+    "evidence": "300 draws: PSI 5%-95% = 0.065-0.154, min 0.048 max 0.186; asymptotic p at D=0.14 is 6e-9, exact scipy value same order; 15% of draws have D within 0.006 of 0.14 and PSI within 0.012 of 0.10"
+   },
+   {
+    "claim": "PSI noise floor ~ (B-1)(1/n+1/m)",
+    "method": "executed",
+    "evidence": "null PSI mean n=1e6: 1.77e-5 vs formula 1.8e-5; n=1000: 0.0182 vs 0.018"
+   },
+   {
+    "claim": "KS statistic = max abs ECDF difference; H0 identical distributions; continuous assumption",
+    "method": "doc",
+    "evidence": "SciPy page quoted"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Comparison of two metrics plus sample-size mechanism; no multi-step derivation required.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single, 340 words, no paraphrased siblings"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "7 specific concepts, all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0005",
+   "same_intent": false
+  },
+  "code_findings": "none",
+  "sources_findings": [
+   {
+    "url": "https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.ks_2samp.html",
+    "status": "supported",
+    "evidence": "'The statistic is the maximum absolute difference between the empirical distribution functions of the samples.' 'The null hypothesis is that the two distributions are identical' 'assumed to be drawn from a continuous distribution'"
+   },
+   {
+    "url": "https://arxiv.org/pdf/2303.01227",
+    "status": "partially",
+    "evidence": "Paper has PSI cut-offs 0.1/0.25 (Lewis) and 'the critical value of the PSI decreases with sample size and increases with the number of groups', but no (B-1)(1/n+1/m) formula and the answer states neither the cut-offs nor the critical-value sentence; supports no sentence as worded."
+   }
+  ],
+  "sources_to_drop": [
+   "https://arxiv.org/pdf/2303.01227"
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "KS more sensitive to bulk than tails (hedged 'often'); noise-floor formula is derived and executed, not sourced"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-10-1",
+  "verdict": "correct",
+  "reasons": [
+   "Round-two code patch is correct: fenced code equals recorded solution; test passes on 3.13, 3.10, 3.11 (numpy 2.5.3 / 2.2.6) and 9 extra edge cases pass; all quoted rates (0.0, 100% of 500, 52.4%) reproduced.",
+   "Two minor prose fixes: the tolerance-setting part of the question is answered only vaguely, and one sentence is a run-on."
+  ],
+  "parts_answered": {
+   "invariance_failures": true,
+   "directional_failures": true,
+   "behavioural_report": true,
+   "how to set tolerances": "thin (fixed by minor issue)",
+   "why strict monotonicity may not hold for tree ensemble": true
+  },
+  "evidence": [
+   {
+    "claim": "rates 0.0 / directional 1.0 on 500 rows / postcode 0.524 with hash 0.0",
+    "method": "executed",
+    "evidence": "ran solution+test on 3.13.16, 3.10.20, 3.11.17: identical dict output"
+   },
+   {
+    "claim": "int matrix not truncated; float32 stays float32; NaN score is a failure",
+    "method": "executed",
+    "evidence": "asserts in test pass; extra: direction=-1, exact-tol boundary passes, tol+1e-4 fails, inputs not mutated, identity perturb never fails, NaN baseline with identity perturb counts 4/4, list-of-lists input works"
+   },
+   {
+    "claim": "edge behaviours not claimed in answer",
+    "method": "executed",
+    "evidence": "empty X -> ZeroDivisionError in behavioural_report; missing limit key -> KeyError; predict returning (n,k>1) would mis-index (outside scope)"
+   },
+   {
+    "claim": "CheckList defines MFT/INV/DIR",
+    "method": "paper",
+    "evidence": "arXiv 2005.04118 s2.2 quoted"
+   },
+   {
+    "claim": "XGBoost can enforce monotone constraints",
+    "method": "doc",
+    "evidence": "quoted"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Invariance tolerances should cover float noise and small genuine sensitivity, and the allowed failure rate is usually at or near zero.",
+    "problem": "Question asks how to set tolerances; answer gives no method.",
+    "replacement": "Calibrate invariance tolerances empirically: run the check on the current production model (and on a retrain with a different seed) and set tol just above the float noise and routine score movement they show, then fix tol before looking at the candidate; the allowed failure rate is usually at or near zero."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "monotone, so a pragmatic gate compares",
+    "problem": "Run-on sentence ('so ... so').",
+    "replacement": "monotone. A pragmatic gate compares"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Three short numpy functions plus tolerance reasoning; dtype/NaN subtleties are handled but the task is not deep algorithmically (record says Hard; I would say Medium).",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "rigorous explanation"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "fenced code identical to solution plus executed results and wiring"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "7 concepts, all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0011",
+   "same_intent": false
+  },
+  "code_findings": "Passes on 3.13/3.10/3.11; stdlib+numpy only; no 3.11+ features; fence==solution (verified by string compare). Extra edge cases listed in evidence.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/pdf/2005.04118",
+    "status": "supported",
+    "evidence": "'is when we apply label-preserving perturbations to inputs and expect the model prediction to remain the same' (INV); DIR: 'similar, except that the label is expected to change in a certain way'; MFT: 'a collection of simple examples (and labels) to check a behavior within a capability'"
+   },
+   {
+    "url": "https://xgboost.readthedocs.io/en/stable/tutorials/monotonic.html",
+    "status": "supported",
+    "evidence": "'XGBoost has the ability to enforce monotonicity constraints on any features used in a boosted model.'"
+   }
+  ],
+  "sources_to_drop": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "unconstrained ensembles can dip locally (background, hedged)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-1",
+  "verdict": "pass",
+  "reasons": [
+   "Ordered investigation with rule-in/out table; numbers (+3 ms, 120 to 410 = 3.4x) correct; claims are hedged; kernel source supports throttling sentence."
+  ],
+  "parts_answered": {
+   "order of investigation": true,
+   "what each observation rules in/out": true,
+   "mitigate first": true,
+   "why offline benchmark missed it": true
+  },
+  "evidence": [
+   {
+    "claim": "p99 more than tripled (120->410 = 3.4x), median +3 ms",
+    "method": "derivation",
+    "evidence": "410/120=3.42"
+   },
+   {
+    "claim": "CPU quota throttling: threads wait until next period",
+    "method": "doc",
+    "evidence": "kernel sched-bwc quoted; nr_throttled/throttled_time counters in cpu.stat (page notes cgroup v1)"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Application of standard tail-latency triage; broad but each step is familiar.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "ordered reasoning"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "runbook table with quick tests and time-box, not a paraphrase"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "8 concepts, all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0025",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [
+   {
+    "url": "https://docs.kernel.org/scheduler/sched-bwc.html",
+    "status": "supported",
+    "evidence": "'Throttled threads will not be able to run again until the next period when the quota is replenished.'; cpu.stat exports throttling statistics (nr_throttled, throttled_time)"
+   }
+  ],
+  "sources_to_drop": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "warm-up, batching wait, GC and dependency-tail effects (standard operational background)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-13-2",
+  "verdict": "correct",
+  "reasons": [
+   "Round-two edits are correct (2.7 = 3.9 - 1.2; concise is 73 words and consistent with detailed); one overstated 'only means' sentence."
+  ],
+  "parts_answered": {
+   "decide real traffic vs prompt/model change vs miscalibrated guardrail": true,
+   "what to log": true,
+   "30-min vs 3-day": true,
+   "latency link": true
+  },
+  "evidence": [
+   {
+    "claim": "2.7 extra points",
+    "method": "derivation",
+    "evidence": "3.9-1.2=2.7"
+   },
+   {
+    "claim": "concise <=80 words",
+    "method": "executed",
+    "evidence": "73 words"
+   },
+   {
+    "claim": "prompt versions immutable, alias mutable",
+    "method": "doc",
+    "evidence": "MLflow quoted"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "a rise in one category only means either a real abuse campaign or a classifier that over-triggers on a new input pattern",
+    "problem": "Overstated exclusivity: a prompt/model change that alters outputs can also raise one category.",
+    "replacement": "a rise in one category most often means either a real abuse campaign or a classifier that over-triggers on a new input pattern (or the release changed what the model outputs in that category)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Segmentation/attribution reasoning plus logging design; no calculation.",
+  "type_ok": true,
+  "suggested_type": "scenario (acceptable as debugging)",
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "genuinely shorter, interview-ready"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "adds reasoning, threshold/pitfalls, fail-open detail"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "7 concepts, all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0039",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/genai/prompt-registry/",
+    "status": "supported",
+    "evidence": "'Prompt versions in MLflow are immutable...'; alias is 'A mutable named reference to the prompt.'"
+   }
+  ],
+  "sources_to_drop": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "block-and-regenerate raising p95 (derived mechanism, hedged 'if')"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-2",
+  "verdict": "correct",
+  "reasons": [
+   "Round-two edit is correct and hedged. Property 4 duplicates property 2; the Rules of ML sentence says 'for this reason' slightly beyond what Rule 29 states."
+  ],
+  "parts_answered": {
+   "properties explaining clean pass": true,
+   "latency 70 vs 400": true,
+   "duplicate notifications": true,
+   "lower live scores": true,
+   "changes for next shadow": true
+  },
+  "evidence": [
+   {
+    "claim": "Rule 29: save features used at serving time and log them",
+    "method": "doc",
+    "evidence": "Rules of ML quoted"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "4. No feedback: shadow decisions do not change customer behaviour, so downstream effects are not exercised.",
+    "problem": "Restates item 2; claim of 'Four properties' is padded.",
+    "replacement": "4. No feedback loop: shadow decisions do not change customer behaviour (customers retry or call support after a hold, fraudsters adapt), so the traffic and load the live model faces differ from the mirrored traffic."
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "Google's Rules of Machine Learning recommend saving the features used at serving time for this reason.",
+    "problem": "Rule 29's stated reason is training-serving consistency; 'for this reason' overreads it.",
+    "replacement": "Google's Rules of Machine Learning (Rule #29) recommend saving the features used at serving time so that serving and training values can be checked for consistency."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-symptom incident diagnosis from one setup plus redesign; causes are interlinked.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer, 377 words, no sibling fields"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "7 concepts, all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0029",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "'The best way to make sure that you train like you serve is to save the set of features used at serving time, and then pipe those features to a log'"
+   }
+  ],
+  "sources_to_drop": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "shadow async path/capacity differences, idempotency (standard practice; speculative links hedged with 'could')"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-6",
+  "verdict": "correct",
+  "reasons": [
+   "All arithmetic recomputed and correct (see evidence), but the 'much higher variance / steadier' claim for A vs B contradicts the record's own sensitivity table (B's net swings -68,600 to +85,800 for 1-4 incidents, a 154k range, vs A's -10,000 to 170,000 = 180k range; under Poisson(3) incidents sd of B's net is about 89k vs about 70k for A across 25-75% realisation)."
+  ],
+  "parts_answered": {
+   "EV of A": true,
+   "EV of B": true,
+   "sensitivity": true,
+   "recommendation": true
+  },
+  "evidence": [
+   {
+    "claim": "A gross 180,000, net 80,000; 25% -> -10,000; 75% -> 170,000",
+    "method": "derivation",
+    "evidence": "0.015*0.5*24M=180,000; minus 100,000"
+   },
+   {
+    "claim": "incident cost 55,400; with monitoring 3,900; saving 51,400; 3 incidents 154,300",
+    "method": "derivation",
+    "evidence": "24M*0.02=480k; *6/52=55,385; *3/365=3,945; diff 51,440; x3=154,320"
+   },
+   {
+    "claim": "B year1 net 34,300; later 94,300; break-even 2.3 and 1.2",
+    "method": "derivation",
+    "evidence": "154,320-120,000=34,320; -60,000 -> 94,320; 120,000/51,440=2.33; 60,000/51,440=1.17"
+   },
+   {
+    "claim": "B sensitivity 1..4 incidents: -68,600 / -17,100 / 34,300 / 85,800",
+    "method": "derivation",
+    "evidence": "51,440*k-120,000 = -68,560/-17,120/34,320/85,760"
+   },
+   {
+    "claim": "external world rarely stable; prediction-bias monitoring; ML Test Score monitoring tests 3 (skew) and 4 (staleness)",
+    "method": "paper",
+    "evidence": "quoted from both PDFs"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "detailed_answer",
+    "claim": "but with much higher variance; B has a smaller but steadier return that is insurance against a loss you currently cannot see.",
+    "problem": "Contradicted by own sensitivity table: B's net ranges -68,600 to +85,800 across 1-4 incidents, similar spread to A's -10,000 to +170,000, so B is not shown to be steadier.",
+    "replacement": "but its realised gain is uncertain until an online test (net from -10,000 to +170,000 for 25% to 75% realisation); B's net swings similarly with the incident rate (-68,600 to +85,800 for 1 to 4 incidents a year), yet it is insurance against a loss you currently cannot see, so neither option is low-risk."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Straight arithmetic with two assumptions and a judgement recommendation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "full derivation"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "sensitivity table and questions; numbers consistent with detailed"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "7 concepts, all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0042",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "supported",
+    "evidence": "'Experience has shown that the external world is rarely stable.'; prediction bias section on comparing predicted vs observed label distributions"
+   },
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "'we present 28 specific tests and monitoring needs'; monitoring tests 'Training and serving are not skewed', 'Models are not too stale'"
+   }
+  ],
+  "sources_to_drop": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "all figures hypothetical and labelled so"
+  ],
+  "code_patch": null
+ }
+]

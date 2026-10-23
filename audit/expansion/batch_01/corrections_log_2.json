@@ -1,0 +1,219 @@
+[
+ [
+  "B1-GEN-01-3",
+  "answer",
+  "(IVF, which clusters by L2)",
+  "(IVF)",
+  "minor"
+ ],
+ [
+  "B1-GEN-01-4",
+  "answer",
+  "while new documents look artificially strong or weak depending on score distributions",
+  "while new documents are scored sensibly against model-B queries but their scores are not comparable with the meaningless scores of old documents, so new content tends to dominate or vanish depending on score distributions",
+  "minor"
+ ],
+ [
+  "B1-GEN-01-4",
+  "answer",
+  "are the only case where",
+  "are a case where",
+  "minor"
+ ],
+ [
+  "B1-GEN-01-5",
+  "detailed_answer",
+  "Learned embeddings occupy a much lower-dimensional region",
+  "Learned embeddings typically occupy a much lower-dimensional region",
+  "minor"
+ ],
+ [
+  "B1-GEN-01-6",
+  "answer",
+  " The 768-d float32 index (about 64 GB) leaves no headroom, and 1,024-d float32 does not fit.",
+  "",
+  "minor"
+ ],
+ [
+  "B1-GEN-01-7",
+  "answer",
+  "The new product line is therefore squeezed into a few cells, which become huge (that explains the 100x lists and the latency jump: probing a big cell scans far more vectors), while queries in that region still probe only 16 lists, so many true neighbours sit in cells that are not probed (the new content is cut into more oversized cells than nprobe = 16 covers, along boundaries that were fit to the old data).",
+  "The new product line is therefore squeezed into a comparatively small set of old cells, which become huge (that explains the 100x lists and the latency jump: probing a big cell scans far more vectors). Recall falls when that region spans more oversized cells than nprobe = 16 can probe and the old centroid boundaries cut through the new neighbourhoods, so true neighbours end up in cells that are not probed; if only a few giant cells held the new content, skew alone would usually raise recall and cost latency, so measure recall per content type to see which case you are in.",
+  "major"
+ ],
+ [
+  "B1-GEN-03-4",
+  "detailed_answer",
+  "tokenisation and stop-word handling change scores far more than k1 or b",
+  "tokenisation and stop-word handling can change scores as much as, or more than, tuning k1 or b",
+  "minor"
+ ],
+ [
+  "B1-GEN-03-7",
+  "practical_answer",
+  "oversampling to about 2k/selectivity candidates (twice the number needed on average for k survivors)",
+  "oversampling to about 2k/s candidates, where s is the fraction of chunks that match the filter (twice the number needed on average for k survivors)",
+  "minor"
+ ],
+ [
+  "B1-GEN-03-7",
+  "detailed_answer",
+  "when selectivity is low",
+  "when the filter is restrictive (few vectors match)",
+  "minor"
+ ],
+ [
+  "B1-GEN-02-4",
+  "detailed_answer",
+  "the index would roughly double each night",
+  "the index would grow by about its original size every night (+100% of the baseline per night, not 4%)",
+  "major"
+ ],
+ [
+  "B1-GEN-02-4",
+  "detailed_answer",
+  "Boundary shifts make it worse: an edit near the start of a document can move every following fixed-size chunk boundary, so even untouched text gets new chunk hashes and is re-inserted.",
+  "Boundary shifts matter for the redesign: with fixed-size chunking an edit near the start of a document can move every following chunk boundary, so even untouched text gets new chunk hashes and is re-embedded; structure-aware chunking (headings, paragraphs) keeps diffs small.",
+  "major"
+ ],
+ [
+  "B1-GEN-02-4",
+  "detailed_answer",
+  "a paragraph that survived three edits exists three times (duplicates)",
+  "a paragraph that survived two edits of its page exists three times (the original plus two re-inserted copies, i.e. duplicates)",
+  "minor"
+ ],
+ [
+  "B1-GEN-02-4",
+  "practical_answer",
+  "Run validation queries against the staged index;",
+  "Apply the adds and deletes to a staged index version (new collection or copy-on-write), not the live one, then run validation queries against it;",
+  "minor"
+ ],
+ [
+  "B1-GEN-04-6",
+  "detailed_answer",
+  "truncates silently, depending on the stack by cutting the start or the end of the prompt",
+  "truncates silently (depending on the stack, by cutting the start or the end of the prompt)",
+  "minor"
+ ],
+ [
+  "B1-GEN-04-6",
+  "detailed_answer",
+  "Put the question and key instructions where truncation cannot reach them, and always verify the final token count before the call.",
+  "Since truncation may hit either end, do not rely on position to protect the question and instructions: guarantee they fit by exact counting, and always verify the final token count before the call (reject or trim rather than send an over-budget prompt).",
+  "minor"
+ ],
+ [
+  "B1-GEN-04-6",
+  "detailed_answer",
+  "counted exactly.",
+  "counted exactly, plus a small safety margin for chat-template and special tokens.",
+  "minor"
+ ],
+ [
+  "B1-GEN-04-6",
+  "practical_answer",
+  "trim chunk 10 to its best 292-token window (total exactly 5,292)",
+  "trim chunk 10 to the best window that fits in 292 tokens including its 30 formatting tokens (about 262 tokens of text; total exactly 5,292, so keep a few tokens of margin in practice)",
+  "minor"
+ ],
+ [
+  "B1-GEN-07-1",
+  "detailed_answer",
+  "(for example 'be concise' leading to dropping conditions).",
+  "(for example 'be concise' leading to dropping conditions). Check: re-run with a strict 'answer only from the context, say not found otherwise' instruction and compare.",
+  "minor"
+ ],
+ [
+  "B1-GEN-07-1",
+  "detailed_answer",
+  "If it then answers 60, distractors are the problem.",
+  "If it then answers 60, distractors are the problem; if it still answers 30 with only the gold chunk, the model is overriding or misreading the context (see 6).",
+  "minor"
+ ],
+ [
+  "B1-GEN-07-4",
+  "detailed_answer",
+  "The interaction is also visible: the new model may need",
+  "Interactions matter too, and the new model may need",
+  "minor"
+ ],
+ [
+  "B1-GEN-05-4",
+  "detailed_answer",
+  "for nearly a third of pairs the verdict depends on which answer is shown first, not on content",
+  "for nearly a third of pairs the verdict changed when only the order changed; re-running the same order (to measure plain sampling noise) separates position bias from randomness",
+  "minor"
+ ],
+ [
+  "B1-GEN-05-4",
+  "detailed_answer",
+  "If the judge were consistent, only a few percent of verdicts should change.",
+  "A judge that tracked content would flip on only a small fraction of pairs (how small depends on how many pairs are genuinely close).",
+  "minor"
+ ],
+ [
+  "B1-GEN-05-4",
+  "practical_answer",
+  "and 'B wins or ties' vs 'A wins' views give you a range instead of one number",
+  "and counting every inconsistent pair for A or for B gives a range (B 47.5% to 78.5% of all 200 pairs) instead of one number",
+  "minor"
+ ],
+ [
+  "B1-GEN-05-6",
+  "detailed_answer",
+  "for example 1.6 points if 10 questions flip",
+  "for example 1.7 points if 11 questions flip (say 7 improved, 4 got worse)",
+  "minor"
+ ],
+ [
+  "B1-GEN-05-6",
+  "practical_answer",
+  "recall@10 gain of +0.06 equals 12 queries newly hit",
+  "recall@10 gain of +0.06 equals 12 net newly hit queries (assuming one gold chunk per question)",
+  "minor"
+ ],
+ [
+  "B1-GEN-05-7",
+  "answer",
+  "while the real precision@5 is 4/5",
+  "while the real precision@5 is 4/5 (if z is not relevant)",
+  "minor"
+ ],
+ [
+  "B1-GEN-05-7",
+  "answer",
+  "the missing labels bias every query the same way",
+  "the missing labels bias every query in the same direction",
+  "minor"
+ ],
+ [
+  "B1-GEN-05-8",
+  "detailed_answer",
+  "and one chunk should not be counted twice",
+  "and several retrieved duplicates of the same group count once (a chunk listed in two groups would cover both, so keep groups disjoint)",
+  "minor"
+ ],
+ [
+  "B1-GEN-06-3",
+  "practical_answer",
+  "set the document's status to withdrawn in the metadata store first (takes effect at once through the filter)",
+  "set active:false on all chunks of that doc_id first (or mark the document withdrawn in a table that queries join against); this takes effect at once through the filter",
+  "minor"
+ ],
+ [
+  "B1-GEN-06-6",
+  "concise_answer",
+  "or evenly distributed documents, or fuse by rank.",
+  "or evenly distributed documents; rank-based merging across shards is only a fallback and is unsafe when shards differ.",
+  "major"
+ ],
+ [
+  "B1-GEN-06-6",
+  "detailed_answer",
+  "normalise per query if you must, but note that merging by per-shard rank is also unsafe when shards differ in size or content, so prefer global statistics or even routing.",
+  "per-query score normalisation or merging by per-shard rank are only fallbacks, because both remain unsafe when shards differ in size or content, so prefer global statistics or even routing.",
+  "minor"
+ ]
+]

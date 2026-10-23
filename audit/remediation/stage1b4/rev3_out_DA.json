@@ -1,0 +1,278 @@
+[
+ {
+  "id": "P3-DA-01",
+  "verdict": "pass",
+  "reasons": [
+   "Self-contained, ordered, and gives a documentation list. No numeric or library-specific claims to verify."
+  ],
+  "parts_answered": {
+   "what you check": true,
+   "in what order": true,
+   "what you write down": true
+  },
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Structured procedure and ordering judgement, but no deep multi-step reasoning.",
+  "key_concepts_findings": "All key concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0318",
+   "same_intent": false
+  },
+  "code_findings": "No code (code is null).",
+  "sources_findings": []
+ },
+ {
+  "id": "P3-DA-02",
+  "verdict": "pass",
+  "reasons": [
+   "Mean/median reasoning is correct (mean x n = total revenue; median robust; mode rarely useful for continuous data). Numbers 84/41 are from the question only."
+  ],
+  "parts_answered": {
+   "which number": true,
+   "why gap/skew": true,
+   "what to put on dashboard": true
+  },
+  "issues": [],
+  "difficulty_blind": "Easy",
+  "difficulty_rationale": "Single-concept (mean vs median under skew) with a reporting recommendation.",
+  "key_concepts_findings": "All key concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0169",
+   "same_intent": false
+  },
+  "code_findings": "No code (code is null).",
+  "sources_findings": []
+ },
+ {
+  "id": "P3-DA-03",
+  "verdict": "correct",
+  "reasons": [
+   "Definitions and consequences of complete-case vs imputation are right; MAR vs MNAR untestable is right.",
+   "One overstated claim about testing."
+  ],
+  "parts_answered": {
+   "decide MCAR/MAR/MNAR with business examples": true,
+   "drop vs impute": true,
+   "what can be tested": true
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "Differences rule out MCAR.",
+    "problem": "Overstated: a statistically significant difference is evidence against MCAR, not proof, and absence of a significant difference does not establish MCAR (low power, unobserved drivers).",
+    "replacement": "Clear differences are evidence against MCAR; finding none does not prove it, because the test can lack power and missingness may depend on unobserved variables."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Conceptual comparison of three mechanisms and their consequences; no multi-step design.",
+  "key_concepts_findings": "All key concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0318",
+   "same_intent": false
+  },
+  "code_findings": "No code (code is null).",
+  "sources_findings": []
+ },
+ {
+  "id": "P3-DA-04",
+  "verdict": "correct",
+  "reasons": [
+   "Design structure is sound (SRM, user-level randomisation, weekly cycles, peeking). Verified sample sizes with the standard two-proportion normal-approximation formula (scipy): 4.0->4.2 percent = 154,304 per arm; 4.0->4.4 percent = 39,475 per arm.",
+   "The 10 percent relative figure is misstated and the 5 percent figure is rounded down."
+  ],
+  "parts_answered": {
+   "primary and guardrail metrics": true,
+   "randomisation unit": true,
+   "sample size": true,
+   "duration": true,
+   "novelty effects": true,
+   "stopping rule": true
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "A 10 percent relative lift needs about 38,000 to 39,000 per arm.",
+    "problem": "Computed value is about 39,500 per arm (39,475), outside the stated range.",
+    "replacement": "A 10 percent relative lift (4.0 to 4.4 percent) needs about 39,500 per arm."
+   },
+   {
+    "severity": "minor",
+    "claim": "gives roughly 150,000 users per arm (illustrative, computed)",
+    "problem": "Computed value is about 154,000; also assumes pooled-variance normal approximation, equal arms.",
+    "replacement": "gives roughly 154,000 users per arm (normal approximation, equal allocation; computed)"
+   },
+   {
+    "severity": "minor",
+    "claim": "150,000 per arm takes roughly 8 days",
+    "problem": "Follows from 154,000/20,000 = 7.7 days, but assumes all 40,000 daily visitors are unique new users, which the answer then partly caveats.",
+    "replacement": "about 154,000 per arm takes roughly 8 days if every daily visitor were a new unique user; in practice longer"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-part experiment design with power calculation, trade-offs and duration reasoning.",
+  "key_concepts_findings": "All key concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0172",
+   "same_intent": false
+  },
+  "code_findings": "No code (code is null).",
+  "sources_findings": []
+ },
+ {
+  "id": "P3-DA-05",
+  "verdict": "pass",
+  "reasons": [
+   "Interpretation of CI is correct; width drivers correct (SE = s/sqrt(n), four times data to halve width); conditions stated; credible interval contrast correct."
+  ],
+  "parts_answered": {
+   "is statement right": true,
+   "what interval means": true,
+   "what widens/narrows": true
+  },
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Interpretation plus drivers of width; a well-known concept with some nuance.",
+  "key_concepts_findings": "All key concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0169",
+   "same_intent": false
+  },
+  "code_findings": "No code (code is null).",
+  "sources_findings": []
+ },
+ {
+  "id": "P3-DA-06",
+  "verdict": "pass",
+  "reasons": [
+   "Checked arithmetic: 5 percent x 2.0 percent = +0.10 pp; 5 x -0.5 percent = -0.025 pp; 5 x 4.5 percent = +0.225 pp. Upper end 4.5 < 5 percent relative threshold, as stated. Interpretation of CI containing zero is correct. Dollar and threshold figures are labelled illustrative."
+  ],
+  "parts_answered": {
+   "conclusion": true,
+   "recommendation": true,
+   "what extra info would change decision": true
+  },
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Interpretation and a decision recommendation with conditions; moderate reasoning.",
+  "key_concepts_findings": "All key concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0172",
+   "same_intent": false
+  },
+  "code_findings": "No code (code is null).",
+  "sources_findings": []
+ },
+ {
+  "id": "P3-DA-07",
+  "verdict": "pass",
+  "reasons": [
+   "Interference/SUTVA explanation correct; bias direction explicitly not asserted; switchback and cluster trade-offs correct and conditioned. Mechanism claims are standard background knowledge (not run)."
+  ],
+  "parts_answered": {
+   "why biased": true,
+   "alternatives": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Two-sided or hybrid designs, and modelling the interference, which depend on assumptions.",
+    "problem": "Vague; adds little for a grader.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Requires diagnosing interference and weighing design trade-offs (bias vs power, carryover).",
+  "key_concepts_findings": "All key concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0172",
+   "same_intent": false
+  },
+  "code_findings": "No code (code is null).",
+  "sources_findings": []
+ },
+ {
+  "id": "P3-DA-08",
+  "verdict": "pass",
+  "reasons": [
+   "Survivorship bias, direction (satisfaction overstated; tenure hedged), and KM/censoring fixes are correct. Direction on tenure is appropriately left conditional."
+  ],
+  "parts_answered": {
+   "what is wrong": true,
+   "which way is the bias": true,
+   "how to detect": true,
+   "how to fix/reframe": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Fixing it by weighting survivors instead of recovering churned data",
+    "problem": "Listed as a mistake, but inverse-probability weighting can be valid when churner covariates are available; overstated as always wrong.",
+    "replacement": "Relying only on weighting survivors without checking that the weights can capture why people left, instead of recovering churned data"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Identify bias, reason about direction, propose fix; the tenure direction nuance (inspection paradox vs censoring) is subtle but hedged.",
+  "key_concepts_findings": "All key concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0318",
+   "same_intent": false
+  },
+  "code_findings": "No code (code is null).",
+  "sources_findings": []
+ },
+ {
+  "id": "P3-DA-09",
+  "verdict": "pass",
+  "reasons": [
+   "Structured diagnostic is sound and conditions are stated. Minor ambiguity: a 12 percent drop in a monthly metric within one week is itself a hint of rolling-window/definition effects, which the answer does not use, but the answer is not wrong."
+  ],
+  "parts_answered": {
+   "real vs artefact": true,
+   "reconcile": true,
+   "explain to stakeholders": true
+  },
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Structured investigation; no single hard computation.",
+  "key_concepts_findings": "All key concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0408",
+   "same_intent": false
+  },
+  "code_findings": "No code (code is null).",
+  "sources_findings": []
+ },
+ {
+  "id": "P3-DA-10",
+  "verdict": "pass",
+  "reasons": [
+   "Arithmetic verified: 0.5/2.0 = 25 percent; 0.5/20 = 2.5 percent; 25 percent of 20 = 5 pp (10x of 0.5); 0.5 pp x 100,000 = 500; 50->25 is -25 pp/-50 percent, recovery +100 percent; 'up 0.5 percent' of 2.0 = 2.01."
+  ],
+  "parts_answered": {
+   "which is right": true,
+   "how to write it": true,
+   "why base rate matters": true,
+   "same absolute change on 20 percent baseline": true
+  },
+  "issues": [],
+  "difficulty_blind": "Easy",
+  "difficulty_rationale": "Single-concept recall (pp vs percent) with simple arithmetic. Easy label is honest.",
+  "key_concepts_findings": "All key concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0169",
+   "same_intent": false
+  },
+  "code_findings": "No code (code is null).",
+  "sources_findings": []
+ }
+]

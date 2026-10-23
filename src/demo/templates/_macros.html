@@ -1,0 +1,192 @@
+{% macro chips(src) -%}
+{%- for t in src.tags -%}<span class="chip chip-{{ 'real' if t == 'REAL MODEL' else 'mock' if t == 'MOCK VERIFIER' else 'adv' if t == 'ADVISORY ONLY' else 'unavail' }}">{{ t }}</span>{%- endfor -%}
+<span class="chip chip-nohv">{{ src.human }}</span>
+{%- endmacro %}
+
+{% set SCORER_EXPLAIN = {
+  'bilstm': 'a small neural network trained on this project\'s own question/answer pairs. It mostly saw near-exact matches, so it tends to under-score correct answers phrased differently.',
+  'bert': 'Sentence-BERT (all-MiniLM-L6-v2): the cosine similarity between a numerical summary (embedding) of your answer and of the reference answer, i.e. closeness of wording and meaning. It reads only about the first 256 word-pieces of each text, so the tail of a long answer or of long code is not compared.',
+  'tfidf': 'TF-IDF keyword overlap: how much of the reference answer\'s distinctive vocabulary your answer uses. The grammar check in this scorer is not part of the number.' } %}
+
+{% macro answer_view(text) %}
+<div class="answer-view">
+{%- for b in answer_blocks(text) %}
+  {%- if b.kind == 'code' %}
+  <div class="codeblock"><div class="codebar"><span>{{ (b.language or 'code')|upper }}</span><span class="muted small">line breaks and indentation exactly as submitted</span></div><pre class="code" tabindex="0"><code>{% for ln in b.lines %}<span class="cl"{% if b.start %} data-n="{{ b.start + loop.index0 }}"{% endif %}>{{ ln }}</span>{% endfor %}</code></pre></div>
+  {%- else %}
+  <div class="prose-answer">{{ b.lines|join('\n') }}</div>
+  {%- endif %}
+{%- endfor %}
+</div>
+{% endmacro %}
+
+{% macro legacy_card(l, kind=None, compact=False) %}
+<section class="panel panel-legacy" aria-label="Similarity score">
+  <header class="panel-head"><h4>Similarity score (Sentence-BERT)</h4><div><span class="chip chip-legacy">SENTENCE-BERT</span><span class="chip chip-nohv">NOT human-validated</span></div></header>
+  {% if l.status == 'scored' %}
+    <p class="simvalue"><span class="simnum">{{ l.score|sim }}</span> <span class="muted small">similarity to one reference answer, on a 0 to 1 scale</span></p>
+    <p class="not-grade">Resemblance, not correctness and not a percentage correct. Whether the answer is right is shown separately, under <em>Correctness check</em>.</p>
+    {% if compact %}<details class="explain"><summary>What does this number mean?</summary>
+    <p class="muted"><strong>What this number is:</strong> {{ SCORER_EXPLAIN.get(l.model, 'a similarity between your answer and a reference answer.') }} It measures resemblance, <strong>not correctness</strong>: a right answer in different words can score low, and an answer that borrows the reference's vocabulary can score high.</p>
+    {% if kind in ('code', 'mixed') %}<p class="muted"><strong>For code:</strong> the scorer compares the <em>text</em> of your code with the text of a reference solution. It does not run your code, so it cannot tell whether yours works. A correct solution written differently can score low, and a similar-looking one with a bug can score high.</p>{% endif %}
+    </details>{% else %}
+    <p class="muted"><strong>What this number is:</strong> {{ SCORER_EXPLAIN.get(l.model, 'a similarity between your answer and a reference answer.') }} It measures resemblance, <strong>not correctness</strong>: a right answer in different words can score low, and an answer that borrows the reference's vocabulary can score high.</p>
+    {% if kind in ('code', 'mixed') %}<p class="muted"><strong>For code:</strong> the scorer compares the <em>text</em> of your code with the text of a reference solution. It does not run your code, so it cannot tell whether yours works. A correct solution written differently can score low, and a similar-looking one with a bug can score high.</p>{% endif %}
+    {% endif %}
+    {# Stage 12: the old band comment ("Excellent work - this answer is clear, accurate, and complete") was chosen from the similarity number alone and read as a correctness verdict; it is no longer shown in /demo. #}
+  {% elif l.status == 'skipped' %}
+    <p class="muted">Skipped: no score.</p>
+  {% elif l.status == 'not_scored' %}
+    <p class="muted">Not scored. {{ l.reason }}</p>
+  {% else %}
+    <div class="banner banner-warn"><strong>Similarity unavailable</strong><span>The interview continues without it, and no other scorer is used instead. {{ l.reason }}</span></div>
+  {% endif %}
+</section>
+{% endmacro %}
+
+{% macro code_panel(c) %}
+{% set STATUS = {'passed': 'passed', 'failed': 'failed', 'error': 'raised an error', 'not_run': 'not run', 'demonstrated': 'found in the code', 'missing': 'not found', 'contradicted': 'contradicts the question', 'unclear': 'unclear',
+                 'not_applicable': 'not applicable', 'mentioned_unverified': 'mentioned (not verified)', 'partial_unverified': 'partly mentioned (not verified)'} %}
+{% set r = c.report %}
+<section class="panel panel-code" aria-label="Experimental code check">
+  <header class="panel-head"><h4>Experimental code check</h4><div><span class="chip chip-code">EXPERIMENTAL</span><span class="chip chip-nohv">NOT human-validated</span><span class="chip chip-adv">NO SCORE</span>
+    {% if r and r.status == 'assessed' %}{% if r.executed %}<span class="chip chip-real">SANDBOXED RUN ({{ r.execution.backend }})</span>{% else %}<span class="chip chip-adv">STATIC READ: code NOT run</span>{% endif %}{% endif %}</div></header>
+  {% if c.status == 'pending' %}
+    <p data-poll="1" aria-live="polite"><span class="spinner" aria-hidden="true"></span> Running the behaviour tests in the isolated sandbox. This can take several seconds; the result will appear here.</p>
+  {% elif c.status == 'interrupted' %}
+    <div class="banner banner-bad"><strong>Code check unavailable</strong><span>The server was restarted while this check was running, so there is no result for it. Nothing was verified.</span></div>
+  {% elif c.status == 'failed' or not r %}
+    <div class="banner banner-bad"><strong>Code check unavailable</strong><span>The code check did not produce a result. Nothing was verified.</span></div>
+  {% elif r.status != 'assessed' %}
+    <div class="banner banner-{{ 'bad' if r.status in ('parse_error', 'error') else 'adv' }}"><strong>{{ {'no_code': 'No code found', 'parse_error': 'Code could not be parsed', 'error': 'Code check unavailable', 'no_spec': 'No code check for this question'}.get(r.status, 'Not assessed') }}</strong><span>{{ r.message }}</span></div>
+  {% else %}
+    <p class="muted"><strong>{{ r.title }}.</strong> {% if r.executed %}Behaviour tests ran in an isolated sandbox; the structural and explanation findings come from reading the text.{% else %}<strong>Your code was read, not run.</strong> Nothing below is verified behaviour: the code may or may not work.{% endif %}</p>
+    <ul class="plainlist">
+      <li><strong>Behaviour:</strong> {{ r.summary.functional }}</li>
+      <li><strong>Structure:</strong> {{ r.summary.structure }}</li>
+      <li><strong>Explanation:</strong> {{ r.summary.explanation }}</li>
+    </ul>
+    {% if r.policy_violations %}<div class="banner banner-warn"><strong>Not run by policy</strong><span>This code uses constructs that are never sent to an execution backend: {% for v in r.policy_violations[:4] %}line {{ v.line }}: {{ v.what }}{{ '; ' if not loop.last }}{% endfor %}.</span></div>{% endif %}
+    <div class="buckets">
+    {% for b in ['verified_correct', 'incorrect', 'missing', 'demonstrated', 'unverified'] %}
+      {% set items = r.requirements|selectattr('bucket', 'equalto', b)|list %}
+      <section class="bucket bucket-{{ b }}"><h5>{{ r.bucket_labels[b] }} <span class="muted small">({{ items|length }})</span></h5>
+        {% if items %}<ul>{% for x in items %}<li><span class="st-word">{{ STATUS.get(x.status, x.status) }}</span> {{ x.label }}
+          {% if x.evidence %}<div class="evidence">{% for e in x.evidence|unique %}<code>{{ e }}</code>{% endfor %}</div>{% endif %}
+          {% if x.note %}<div class="muted small">{{ x.note }}</div>{% endif %}</li>{% endfor %}</ul>
+        {% else %}<p class="muted small">None.</p>{% endif %}
+      </section>
+    {% endfor %}
+    </div>
+    <p class="muted small">"Found in the code" means the text contains the approach; it is not proof that it works. "Mentioned" means matching words appeared; it is not proof the explanation is right. Similarity scores are never used here.</p>
+    {% for n in r.notes %}<p class="muted small">{{ n }}</p>{% endfor %}
+  {% endif %}
+</section>
+{% endmacro %}
+
+{% macro grounded_panel(g) %}
+<section class="panel panel-grounded" aria-label="Written feedback grounded in curated evidence">
+  <header class="panel-head"><h4>Written feedback</h4><div><span class="chip chip-code">EXPERIMENTAL</span><span class="chip chip-nohv">NOT human-validated</span><span class="chip chip-adv">NO GRADE</span>{% if g.mock %}<span class="chip chip-mock">MOCK VERIFIER</span>{% endif %}</div></header>
+  <p>{{ g.headline }}</p>
+  {% if g.abstention %}<div class="banner banner-warn"><strong>No firm judgement</strong><span>{{ g.abstention }}</span></div>{% endif %}
+  <div class="gf-grid">
+    <section class="gf gf-supported"><h5>Covered in your answer <span class="muted small">({{ g.supported|length }})</span></h5>
+      {% if g.supported %}<ul>{% for x in g.supported %}<li><strong>{{ x.concept }}</strong> <span class="muted small">{{ x.tier }}; {{ x.strength }}</span>{% for w in x.your_words %}<div class="evidence"><q>{{ w }}</q></div>{% endfor %}</li>{% endfor %}</ul>
+      {% else %}<p class="muted small">No curated concept could be confirmed from your wording.</p>{% endif %}</section>
+    <section class="gf gf-missing"><h5>Not found in your answer <span class="muted small">({{ g.maybe_missing|length }})</span></h5>
+      {% if g.maybe_missing %}<ul>{% for x in g.maybe_missing %}<li><strong>{{ x.concept }}</strong> <span class="muted small">{{ x.tier }}</span></li>{% endfor %}</ul><p class="muted small">{{ g.maybe_missing[0].note }}</p>
+      {% else %}<p class="muted small">Nothing flagged.</p>{% endif %}</section>
+    <section class="gf gf-errors"><h5>Possible technical errors with evidence <span class="muted small">({{ g.errors|length }})</span></h5>
+      {% if g.errors %}<ul>{% for x in g.errors %}<li><strong>{{ x.concept }}</strong>{% for w in x.your_words %}<div class="evidence">You wrote: <q>{{ w }}</q></div>{% endfor %}<div class="evidence">The curated reference says: <q>{{ x.reference_says }}</q></div>{% if x.why %}<div class="muted small">{{ x.why }}</div>{% endif %}<div class="muted small">{{ x.label }}</div></li>{% endfor %}</ul>
+      {% else %}<p class="muted small">No error met the evidence bar. That does not mean there are none.</p>{% endif %}</section>
+    <section class="gf gf-uncertain"><h5>Could not be decided <span class="muted small">({{ g.uncertain|length }})</span></h5>
+      {% if g.uncertain %}<ul>{% for x in g.uncertain %}<li><strong>{{ x.concept }}</strong> <span class="muted small">{{ x.reason }}</span></li>{% endfor %}</ul>{% else %}<p class="muted small">Nothing left undecided.</p>{% endif %}</section>
+  </div>
+  <p class="muted small">{{ g.caveats|join(' ') }}</p>
+</section>
+{% endmacro %}
+
+{% macro modular_panel(view, answer=None, title="Experimental modular evaluation", open_details=False) %}
+{% set st = describe_state(view) %}
+<section class="panel panel-modular state-{{ st.state }}" aria-label="{{ title }}">
+  <header class="panel-head"><h4>{{ title }}</h4><div>{{ chips(view.source) }}{% if view.variant %}<span class="chip">engine {{ view.engine }} · variant {{ view.variant }}</span>{% elif view.engine %}<span class="chip">engine {{ view.engine }}</span>{% endif %}{% if view.repeat is not none and view.repeat is defined %}<span class="chip">repeat {{ view.repeat }}</span>{% endif %}</div></header>
+  <div class="banner banner-{{ st.css }}"><strong>{{ st.title }}</strong><span>{{ st.text }}</span></div>
+  {% if view.score is not none %}<p class="bigscore">{{ view.score }}<small>/100</small></p>{% endif %}
+  <p class="muted">{{ view.source.text }}</p>
+  {% if view.status in ('scored', 'abstained', 'advisory_only') %}<p class="muted">Consistency signal: {{ view.consistency }}. This is internal consistency only, not human-verified accuracy.</p>{% endif %}
+
+  {% set cf = concept_findings(view) %}
+  {% if cf %}<div class="glance" aria-label="Concept findings (experimental)">
+    <div class="stated"><h5>Stated in your answer</h5>{% if cf.stated %}<ul>{% for x in cf.stated %}<li>{{ x }}</li>{% endfor %}</ul>{% else %}<span class="none">None found</span>{% endif %}</div>
+    <div class="notfound"><h5>Not found</h5>{% if cf.not_found %}<ul>{% for x in cf.not_found %}<li>{{ x }}</li>{% endfor %}</ul>{% else %}<span class="none">None</span>{% endif %}</div>
+    {% if cf.wrong %}<div class="wrong"><h5>Flagged as incorrect</h5><ul>{% for x in cf.wrong %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+    {% if cf.undecided %}<div class="undec"><h5>Could not be decided</h5><ul>{% for x in cf.undecided %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+  </div>{% endif %}
+
+  {% if view.status == 'abstained' and view.taxonomy and view.taxonomy.blockers %}
+  <details class="why" {{ 'open' if open_details }}><summary>Why there is no score</summary>
+    <ul>{% for b in view.taxonomy.blockers %}<li><strong>{{ b.member }}</strong> ({{ b.tier }}): {{ 'the model said it could not decide' if b.origin == 'model_unverified' else 'the model said "' ~ b.model_said ~ '" but the evidence check rejected that (' ~ (b.reason or 'no reason recorded') ~ ')' }}</li>{% endfor %}</ul>
+  </details>
+  {% endif %}
+
+  {% if view.claims %}
+  <details {{ 'open' if open_details }}><summary>Your answer, with the evidence the evaluator used</summary>
+    <pre class="answer-hl">{{ highlight(view, answer)|safe }}</pre>
+    <p class="muted small"><span class="hl hl-good">green</span> credited · <span class="hl hl-bad">red</span> flagged as wrong · <span class="hl hl-unv">yellow</span> cited by the model but rejected by the evidence check. Text matching an instruction is underlined and is never used as evidence.</p>
+  </details>
+  {% endif %}
+
+  {% if view.verdicts %}
+  <details {{ 'open' if open_details }}><summary>Concept decisions ({{ view.verdicts|length }})</summary>
+    <div class="scroll"><table class="tbl">
+      <thead><tr><th>Req</th><th>Concept</th><th>Decision</th><th>Evidence (your words)</th></tr></thead>
+      <tbody>{% for v in view.verdicts %}
+      <tr><td>{{ v.requirement_id }}<br><span class="muted small">{{ v.tier }}</span></td><td>{{ v.member }}</td>
+        <td><span class="st st-{{ v.final_state }}">{{ v.final_state|replace('_', ' ') }}</span>
+          {% if v.model_state != v.final_state %}<br><span class="muted small">model said {{ v.model_state|replace('_', ' ') }}; evidence check: {{ (v.downgrade_reason or '')|replace('_', ' ') }}</span>{% endif %}
+          {% if v.finding_class %}<br><span class="muted small">{{ finding_label(v.finding_class) }}</span>{% endif %}
+          {% if v.note %}<br><span class="muted small">{{ v.note }}</span>{% endif %}</td>
+        <td>{% for c in view.claims if c.id in v.claim_ids %}<div class="quote">{{ c.text }}</div>{% else %}<span class="muted">none</span>{% endfor %}</td></tr>
+      {% endfor %}</tbody></table></div>
+  </details>
+  {% endif %}
+
+  {% if view.dimensions %}
+  <details {{ 'open' if open_details }}><summary>Rubric breakdown (fixed rules, not a model opinion)</summary>
+    <div class="scroll"><table class="tbl">
+      <thead><tr><th>Dimension</th><th>Weight</th><th>Level</th><th>Rule that produced it</th></tr></thead>
+      <tbody>{% for d in view.dimensions %}<tr><td>{{ d.name }}</td><td>{{ d.weight }}</td>
+        <td>{% if d.level is not none %}{{ d.level }}/4{% elif d.level_min is not none %}undetermined ({{ d.level_min }}–{{ d.level_max }}){% else %}not determined{% endif %}</td>
+        <td class="muted">{{ d.derivation }}</td></tr>{% endfor %}</tbody></table></div>
+  </details>
+  {% endif %}
+
+  {% if view.feedback and view.feedback.text %}
+  <details {{ 'open' if open_details }}><summary>Feedback built from the verified findings</summary>
+    <pre class="plain">{{ view.feedback.text }}</pre>
+  </details>
+  {% endif %}
+
+  {% if view.flags or view.uncertainty_flags %}
+  <p class="muted small">Flags: {{ (view.flags + view.uncertainty_flags)|join(', ') }}</p>
+  {% endif %}
+</section>
+{% endmacro %}
+
+{% macro assessment_panel(r) %}
+{% set CSS = {'correct': 'ok', 'partially_correct': 'adv', 'incorrect': 'bad', 'uncertain': 'warn', 'unavailable': 'muted', 'pending': 'muted', 'not_applicable': 'muted'} %}
+{% set BASIS = {'local_model_concept_check': 'LOCAL MODEL CONCEPT CHECK', 'mock_verifier': 'MOCK VERIFIER', 'rules': 'RULE: NO ATTEMPT', 'none': 'NOT ASSESSED'} %}
+{% if r.verdict != 'not_applicable' %}
+<section class="panel panel-assess verdict-{{ r.verdict }}" aria-label="Correctness check" data-verdict="{{ r.verdict }}" data-basis="{{ r.basis }}">
+  <header class="panel-head"><h4>Correctness check</h4><div><span class="chip chip-{{ 'mock' if r.basis == 'mock_verifier' else 'legacy' }}">{{ BASIS.get(r.basis, r.basis|upper) }}</span><span class="chip chip-nohv">NOT human-validated</span></div></header>
+  <p class="verdict"><span class="verdict-badge badge-{{ CSS.get(r.verdict, 'muted') }}">{{ r.label }}</span>
+  {% if r.verdict == 'pending' %}<span class="muted small">The local model is still checking this answer.</span>{% endif %}</p>
+  {% if r.correct_concepts %}<p><b>Correct concepts identified:</b> {{ r.correct_concepts|join('; ') }}</p>{% endif %}
+  {% if r.missing_concepts %}<p><b>Missing concepts:</b> {{ r.missing_concepts|join('; ') }}</p>{% endif %}
+  {% if r.misconceptions %}<div class="misconceptions"><p><b>Misconceptions or contradictions:</b></p><ul>{% for mc in r.misconceptions %}<li><q>{{ mc.claim }}</q>{% if mc.why %} — {{ mc.why }}{% endif %}{% if mc.reference_says %}<br><span class="muted small">The reference says: <q>{{ mc.reference_says }}</q></span>{% endif %}</li>{% endfor %}</ul></div>{% endif %}
+  {% if r.unverified_concepts and r.verdict in ('uncertain', 'partially_correct') %}<p class="muted small">Could not be decided automatically: {{ r.unverified_concepts|join('; ') }}. That is not a judgement that they are wrong.</p>{% endif %}
+  {% if r.feedback %}<ul class="assess-feedback">{% for f in r.feedback %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
+  <p class="muted small">The verdict comes from the concept check and the check for wrong statements, never from the similarity value. Both compare your answer with an AI-written reference, which can itself be wrong.</p>
+</section>
+{% endif %}
+{% endmacro %}

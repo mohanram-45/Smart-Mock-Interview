@@ -1,0 +1,304 @@
+[
+ {
+  "id": "smi-sqlp-01",
+  "verdict": "accept",
+  "issues": [],
+  "code_rerun": "Setup+solution re-run in SQLite 3.45.1: rows identical to `expected` (values and types); the embedded `test` script also exits 0; solution text appears verbatim in the answer. Claims in the answer text re-checked against output (RANK 2,2,4; DENSE_RANK 2,2,3; Sales 1,1,1 / Ivy rnk 4 drnk 2).",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [
+   {
+    "url": "https://www.sqlite.org/windowfunctions.html",
+    "result": "supported",
+    "note": "Page states: \"Window functions may only appear in the result set and in the ORDER BY clause of a SELECT statement.\""
+   }
+  ],
+  "edge_case": "Empty table -> 0 rows (correct). All salaries equal -> every row has drnk=1 so every employee is returned (correct for 'top 3 levels'; rn still 1..n).",
+  "duplicates_check": "Existing smi-0431 'Difference between ROW_NUMBER and RANK?' is a bare concept question; this is a tested top-N exercise with a different intent. Not a duplicate.",
+  "question_quality": "Self-contained (schema, all data, columns, ordering). Realistic top-N-per-group with ties. Common mistakes genuine; note is gradable."
+ },
+ {
+  "id": "smi-sqlp-02",
+  "verdict": "accept",
+  "issues": [],
+  "code_rerun": "Setup+solution re-run in SQLite 3.45.1: rows identical to `expected` (values and types); the embedded `test` script also exits 0; solution text appears verbatim in the answer. Part (a) query also run: returns lee 2, sam 3 exactly as stated. Survivors 2,3,6,7,8 confirmed.",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [],
+  "edge_case": "Empty table OK. Tie on created_at between id 2 and a new id 9 -> lower id (2) survives. Empty-string emails ('' vs '') are treated as duplicates of each other (keeps one) - arguably desired, not mentioned. A tab-padded email is NOT normalised because trim() only strips spaces by default - known limitation, not claimed otherwise.",
+  "duplicates_check": "No near-duplicate in the batch or existing_questions.json.",
+  "question_quality": "Self-contained, realistic, covers NULL trap and deterministic survivor. Part (a) is not covered by the executed `solution` (only DELETE+SELECT) but was verified here."
+ },
+ {
+  "id": "smi-sqlp-03",
+  "verdict": "fix",
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "SQLite requires a single numeric ORDER BY term and a constant non-negative offset for RANGE with an offset; that is why the date is converted.",
+    "problem": "Docs require exactly one ORDER BY term and a non-negative constant offset; they do not require the term to be numeric. I ran RANGE BETWEEN 2 PRECEDING with ORDER BY on the TEXT day: no error, the frame silently collapses to the row itself (100,200,150). Two ORDER BY terms do raise 'RANGE with offset PRECEDING/FOLLOWING requires one ORDER BY expression'. So 'requires numeric' is overstated and hides the silent-failure mode that is the real reason to convert.",
+    "replacement": "SQLite requires exactly one ORDER BY term and a constant non-negative offset for RANGE with an offset, and the offset arithmetic only works on numbers: ordering by the text date does not raise an error, the frame just collapses to the current row's peers, so the date is converted with julianday."
+   }
+  ],
+  "code_rerun": "Setup+solution re-run in SQLite 3.45.1: rows identical to `expected` (values and types); the embedded `test` script also exits 0; solution text appears verbatim in the answer. Also confirmed default-frame peer behaviour with the test's tied-day table.",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [
+   {
+    "url": "https://www.sqlite.org/windowfunctions.html",
+    "result": "supported",
+    "note": "Default frame RANGE UNBOUNDED PRECEDING..CURRENT ROW includes peers; RANGE offset needs exactly one ORDER BY term and a non-negative constant offset; ROWS counts rows. Page does NOT say the ORDER BY term must be numeric (non-numeric just makes the boundary the peer group), so \"numeric\" in the answer is slightly overstated."
+   }
+  ],
+  "edge_case": "Empty table -> 0 rows. Added an out-of-order/odd date row ('2024-03-00') - still runs. Running totals correct. No breakage found beyond the wording issue.",
+  "duplicates_check": "No near-duplicate in the batch or existing_questions.json.",
+  "question_quality": "Good, specific, self-contained; common mistakes genuine."
+ },
+ {
+  "id": "smi-sqlp-04",
+  "verdict": "accept",
+  "issues": [],
+  "code_rerun": "Setup+solution re-run in SQLite 3.45.1: rows identical to `expected` (values and types); the embedded `test` script also exits 0; solution text appears verbatim in the answer. ",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [],
+  "edge_case": "Empty table -> 0 rows. Leap day / year boundary (02-28,02-29,03-01 -> streak 3; 2024-12-31,2025-01-01 -> streak 2) correct. Timestamps instead of dates in login_date would still run but the string comparison/DISTINCT would be per timestamp (not claimed).",
+  "duplicates_check": "No near-duplicate in the batch or existing_questions.json.",
+  "question_quality": "Realistic classic gaps-and-islands with duplicate logins, tie and month boundary. Hard is defensible."
+ },
+ {
+  "id": "smi-sqlp-05",
+  "verdict": "accept",
+  "issues": [],
+  "code_rerun": "Setup+solution re-run in SQLite 3.45.1: rows identical to `expected` (values and types); the embedded `test` script also exits 0; solution text appears verbatim in the answer. Original NOT IN query returns 0 rows; adding IS NOT NULL returns the same 3 rows as stated.",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [],
+  "edge_case": "discontinued empty -> all 5 products; products empty -> 0 rows; correct.",
+  "duplicates_check": "Overlaps thematically with smi-sqlp-06 (anti-join) but intent differs (three-valued logic vs ON/WHERE placement). Not a duplicate.",
+  "question_quality": "Good debugging question with exact data and bug query."
+ },
+ {
+  "id": "smi-sqlp-06",
+  "verdict": "accept",
+  "issues": [],
+  "code_rerun": "Setup+solution re-run in SQLite 3.45.1: rows identical to `expected` (values and types); the embedded `test` script also exits 0; solution text appears verbatim in the answer. Colleague 1 query returns 0 rows, colleague 2 query returns only Dev, ON-clause LEFT JOIN form returns Bruno and Dev: all as stated.",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [],
+  "edge_case": "No orders -> all 4 customers. Order at 2024-12-31 23:59:59 counts as 2024 and 2025-01-01 does not (Bruno excluded, Dev only for those inserted) - half-open range behaves correctly.",
+  "duplicates_check": "Related to smi-sqlp-05 only by anti-join theme; distinct.",
+  "question_quality": "Self-contained; the two broken colleague queries are well specified."
+ },
+ {
+  "id": "smi-sqlp-07",
+  "verdict": "accept",
+  "issues": [],
+  "code_rerun": "Setup+solution re-run in SQLite 3.45.1: rows identical to `expected` (values and types); the embedded `test` script also exits 0; solution text appears verbatim in the answer. ",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [],
+  "edge_case": "Empty table -> 0 rows (a pivot of nothing). A month with only an unknown/differently-cased category ('sunglasses' lower-case) gives 0,0,0 and total 10, confirming the limitation described in the answer.",
+  "duplicates_check": "No near-duplicate in the batch or existing_questions.json.",
+  "question_quality": "Fine. Slight gap: no mention that months with no sales at all produce no row (not required by the question)."
+ },
+ {
+  "id": "smi-sqlp-08",
+  "verdict": "accept",
+  "issues": [],
+  "code_rerun": "Setup+solution re-run in SQLite 3.45.1: rows identical to `expected` (values and types); the embedded `test` script also exits 0; solution text appears verbatim in the answer. Hand-checked: cohort 06-01 users 1,2,3 with 1 and 3 retained; 06-02 users 4,5 with 4 retained; 06-03 excluded.",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [],
+  "edge_case": "Empty table -> 0 rows. Adding an event on 06-04 makes cohort 06-03 observable and it correctly shows 2 users, 0 retained, 0.0. Single-user data -> one cohort, 100.0.",
+  "duplicates_check": "No near-duplicate in the batch or existing_questions.json.",
+  "question_quality": "Definition is stated precisely; censoring caveat is genuine. Hard is fair."
+ },
+ {
+  "id": "smi-sqlp-09",
+  "verdict": "accept",
+  "issues": [],
+  "code_rerun": "Setup+solution re-run in SQLite 3.45.1: rows identical to `expected` (values and types); the embedded `test` script also exits 0; solution text appears verbatim in the answer. Author's claim 'checked empty, one-row, all-equal' reproduced for all three approaches (each returns a single NULL row); naive OFFSET 1 returns 300 on the sample.",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [],
+  "edge_case": "Empty, one row, all equal -> single row with NULL for LIMIT/OFFSET, MAX and DENSE_RANK forms. Nullable salary with only NULLs plus one value -> NULL (correct); NULLs sort last under DESC in SQLite, as the answer says.",
+  "duplicates_check": "No near-duplicate in the batch or existing_questions.json.",
+  "question_quality": "Specific, self-contained, realistic."
+ },
+ {
+  "id": "smi-sqlp-10",
+  "verdict": "accept",
+  "issues": [],
+  "code_rerun": "Setup+solution re-run in SQLite 3.45.1: rows identical to `expected` (values and types); the embedded `test` script also exits 0; solution text appears verbatim in the answer. Author's claim 'depth cap 12 yields 16 rows' reproduced (asserted in test). UNION with only (id,name) columns terminates with 6 rows; UNION with depth column does not help (16 rows at cap 12) - consistent with the answer.",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [
+   {
+    "url": "https://www.sqlite.org/lang_with.html",
+    "result": "supported",
+    "note": "Queue-based algorithm, UNION discards repeated rows vs UNION ALL keeps them, LIMIT stops recursion: all stated on the page."
+   }
+  ],
+  "edge_case": "No cycle -> same 5 reports. Self-loop (Dana manages herself) -> same 5 reports, terminates. Dana missing -> 0 rows. Added id 12 under Cy: appears with path 'Dana > Cy > Zed' (delimiters prevent '/1' matching '/12/').",
+  "duplicates_check": "No near-duplicate in the batch or existing_questions.json.",
+  "question_quality": "Strong, realistic data-error twist. Hard is right."
+ },
+ {
+  "id": "smi-sqlp-11",
+  "verdict": "accept",
+  "issues": [],
+  "code_rerun": "Setup+solution re-run in SQLite 3.45.1: rows identical to `expected` (values and types); the embedded `test` script also exits 0; solution text appears verbatim in the answer. Row counts in the explanation re-counted: January 6 rows, February 4 rows, UNION ALL 10, UNION 5 distinct users.",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [],
+  "edge_case": "Empty table -> 0 rows. User with purchases 2024-01-31 23:59:59 and 2024-02-29 23:59:59 correctly lands in 'both' (half-open ranges). NULL equality: SELECT NULL EXCEPT SELECT NULL returns no row, INTERSECT returns one, as stated.",
+  "duplicates_check": "No near-duplicate in the batch or existing_questions.json.",
+  "question_quality": "Fine; wording asks for set operators, which the solution uses."
+ },
+ {
+  "id": "smi-sqlp-12",
+  "verdict": "accept",
+  "issues": [],
+  "code_rerun": "Setup+solution re-run in SQLite 3.45.1: rows identical to `expected` (values and types); the embedded `test` script also exits 0; solution text appears verbatim in the answer. Original buggy query returns Asha 360/320, Bruno 60/60, Chloe 40/NULL as claimed; SUM(DISTINCT) version returns Asha 130/210 (confirms it is not a fix).",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [],
+  "edge_case": "No children -> 0/0 for all. Customer with no orders -> 0/0 (LEFT JOIN + COALESCE). Partial payment on order 4 -> Chloe 40/10 correct.",
+  "duplicates_check": "No near-duplicate in the batch or existing_questions.json.",
+  "question_quality": "Good concrete fan-out debugging; numbers are verifiable."
+ },
+ {
+  "id": "smi-sqlp-13",
+  "verdict": "accept",
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Why generate months: a plain GROUP BY",
+    "problem": "Edge case found: on an EMPTY orders table the query returns one bogus row (NULL, 0, NULL, NULL) instead of no rows, because the seed row of the recursive CTE is strftime of NULL. Not claimed in the answer and outside the question's data, so cosmetic.",
+    "replacement": null
+   }
+  ],
+  "code_rerun": "Setup+solution re-run in SQLite 3.45.1: rows identical to `expected` (values and types); the embedded `test` script also exits 0; solution text appears verbatim in the answer. ",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [
+   {
+    "url": "https://www.sqlite.org/lang_with.html",
+    "result": "supported",
+    "note": "Recursive CTE syntax/processing, with series-generation examples, is on the page."
+   }
+  ],
+  "edge_case": "Empty table -> one row (NULL,0,NULL,NULL) (minor, see issue). Single month -> one row with NULLs. Range crossing year end with long zero run (Jun-Dec) -> prev=0 gives NULL pct; 2025-01 correct. Starting on Jan 31 steps correctly because the CTE uses 'YYYY-MM-01'.",
+  "duplicates_check": "No near-duplicate in the batch or existing_questions.json.",
+  "question_quality": "Good: realistic gap-month trap. Medium is fine."
+ },
+ {
+  "id": "smi-sqlp-14",
+  "verdict": "accept",
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "WHERE o.status <> 'cancelled'",
+    "problem": "Edge case: inner joins mean an order with no order_items rows (allowed by the schema) is not counted, and a customer whose orders are all cancelled is omitted although the question says 'each customer'. Result is correct for the sample and arguably acceptable, but the limitation is not stated.",
+    "replacement": null
+   }
+  ],
+  "code_rerun": "Setup+solution re-run in SQLite 3.45.1: rows identical to `expected` (values and types); the embedded `test` script also exits 0; solution text appears verbatim in the answer. Schema constraint tests re-run with foreign_keys ON: all 11 bad statements I tried (dup email, NULL email, negative price, orphan order, bad status, qty 0, duplicate order line, unknown product, delete referenced product, delete referenced customer, negative line price) raise IntegrityError, so the author's 'ten bad statements' claim holds. Answer text shows the same schema (condensed) and the same query as `solution`.",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [
+   {
+    "url": "https://www.sqlite.org/foreignkeys.html",
+    "result": "supported",
+    "note": "FKs off by default and enabled per connection via PRAGMA; child-key indexes not required but recommended (\"almost always beneficial\"); default NO ACTION; ON DELETE CASCADE supported."
+   }
+  ],
+  "edge_case": "Added a pending order with no lines and a customer with only a cancelled order: both are silently absent from the result (see issue). Everything else behaved.",
+  "duplicates_check": "No near-duplicate in the batch or existing_questions.json.",
+  "question_quality": "Realistic design task, specific requirements, gradable. Hard with trade-offs is right."
+ },
+ {
+  "id": "smi-sqlp-15",
+  "verdict": "accept",
+  "issues": [],
+  "code_rerun": "Setup+solution re-run in SQLite 3.45.1: rows identical to `expected` (values and types); the embedded `test` script also exits 0; solution text appears verbatim in the answer. Plans re-run: original -> 'SCAN orders'; rewrite -> 'SEARCH orders USING COVERING INDEX idx_orders_created_at (created_at>? AND created_at<?)' plus 'USE TEMP B-TREE FOR ORDER BY', exactly as the answer states.",
+  "key_concepts_ok": true,
+  "suggested_key_concepts": null,
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "domain_ok": true,
+  "suggested_domain": null,
+  "sources_check": [
+   {
+    "url": "https://www.sqlite.org/optoverview.html",
+    "result": "supported",
+    "note": "Lists \"column op expression\" WHERE terms as index-usable and says indexed expressions can be substituted for \"column\"."
+   },
+   {
+    "url": "https://www.sqlite.org/expridx.html",
+    "result": "supported",
+    "note": "Deterministic functions only; query must use the indexed expression exactly as in CREATE INDEX."
+   }
+  ],
+  "edge_case": "Empty table -> 0 rows. Values '2024-01-05T10:00:00' and '2024-01-05 23:59:59.500' are returned by the range, while '2024-01-06 00:00:00' is excluded (BETWEEN ... 23:59:59 would miss the fractional one). Non-ISO formats are called out in the answer.",
+  "duplicates_check": "Existing smi-0438/smi-0439 (slow query, execution plans) are generic concepts; this is a specific sargability exercise. Not a duplicate.",
+  "question_quality": "Realistic; question_type sql_exercise is acceptable though it is performance-oriented."
+ }
+]

@@ -1,0 +1,42 @@
+# Line endings are part of the integrity story: corpus CSVs, manifests, frozen Stage 3 data and a few frozen source files are pinned by sha256 of their
+# exact BYTES (src/retrieval/corpus.py, scripts/stage3c2_freeze_v2.py, scripts/check_integrity.py). Git for Windows defaults to core.autocrlf=true, which
+# would check these files out with CRLF and make every fresh Windows clone (and the windows-latest CI job) fail the integrity check.
+# Forcing LF in the working tree on every OS keeps the bytes identical to what was hashed.
+* text=auto eol=lf
+
+# Windows launchers need CRLF to be reliable in cmd.exe / Windows PowerShell 5.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Never touched by line-ending conversion.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.pt binary
+*.pth binary
+*.faiss binary
+*.npy binary
+*.npz binary
+*.safetensors binary
+*.zip binary
+*.db binary
+
+# Stage 7B: these files are hash-pinned over their exact bytes AND are stored with Windows (CRLF) line endings (they were written by Python on Windows, and their
+# checksums were computed over those bytes). Converting them to LF, as the rule above would, changes the bytes and breaks the pinned checksums. "-text" = byte-exact in
+# both directions on every OS. tests/mlops/test_publication_safety.py finds any pinned CRLF file that is missing from this list.
+data/retrieval/eval/immutable_pre_pooling_stage2b/retrieval_benchmark_minilm.json -text
+data/retrieval/eval/immutable_pre_pooling_stage2b/retrieval_benchmark_minilm.md -text
+reports/retrieval_benchmark_minilm.json -text
+reports/retrieval_benchmark_minilm.md -text
+data/expansion/batch_01/corrections.csv -text
+data/expansion/batch_02/corrections.csv -text
+data/expansion/batch_04/corrections.csv -text
+data/raw/expanded_interview_questions.csv -text
+data/raw/questions_seed.csv -text
+data/processed/questions.csv -text
+data/processed/questions_cleaned.json -text
+data/interim/transformed.json -text
+src/model/Pretrained_NEURALN.py -text

@@ -1,0 +1,1869 @@
+[
+ {
+  "id": "smi-h0001",
+  "plan_id": "P2-NLP-01",
+  "domain": "NLP",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 2,
+  "corrections_applied": 0,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Hard",
+  "difficulty_final": "Hard",
+  "code_findings": "Fenced block == tested solution. Passes on 3.13, 3.10, 3.11. Own edge cases: beam_size=0 -> []; max_len=1 returns truncated beams ordered by score; max_len=2 beam 3 returns only the finished hypotheses (unfinished dropped, as specified); -inf log-probs do not crash; beam 50 alpha=1 ranks b</s> first. Only break: max_len=0 & alpha>0 ZeroDivisionError.",
+  "reasons": [
+   "Examples (0.24 vs 0.36), wide-beam == exhaustive and length-normalisation behaviour all reproduced; claims hedged appropriately."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "(none blocking) max_len=0 with alpha>0",
+    "problem": "beam_search(...,max_len=0,alpha=1.0) raises ZeroDivisionError (0.0 / 0**1); with alpha=0 returns [((),0.0)]. Edge case outside the stated contract.",
+    "replacement": null
+   },
+   {
+    "severity": "minor",
+    "claim": "finished hypotheses do not occupy beam slots",
+    "problem": "This is one valid convention but not the only one (other libraries count finished beams against beam_size); the question's spec is explicit enough that the reference is not arbitrary.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "(a) teacher forcing + exposure bias + why val loss hides it": true,
+   "(b) wider beam higher probability but worse translations": true,
+   "(c) beam_search implementation": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0005",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0002",
+  "plan_id": "P2-NLP-02",
+  "domain": "NLP",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Fenced block == tested solution. Pass on 3.13/3.10/3.11. Own checks: temperature=nan returns NaN array (no ValueError, since nan<=0 is False); top_p=0.5 on [.5,.5] keeps one token (index 0) as required by tie rule; 1e308 logits stable; top_p=0.0 and negative keep one token. Spec'd behaviours all hold.",
+  "reasons": [
+   "All numbers re-derived: T=0.5 -> [.685,.247,.062,.007], T=2 -> [.379,.294,.208,.120]; ten equal tokens: top-k=2 keeps 2 (0.5 each), top-p=0.8 keeps 8 (0.125 each)."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "(none blocking) code behaviour outside spec",
+    "problem": "All -inf logits gives NaN plus RuntimeWarning; top_k<0 silently drops tokens (top_k=-1 on 3 equal logits returns [.5,.5,0]); top_p>1 or <0 not validated. Unspecified in the question.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "(a) temperature effect and T>0": true,
+   "(b) surviving tokens, renormalised probs, top-p vs top-k on flat": true,
+   "(c) sampling_probs": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0005",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0003",
+  "plan_id": "P2-NLP-03",
+  "domain": "NLP",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 2,
+  "corrections_applied": 2,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Hard",
+  "difficulty_final": "Hard",
+  "code_findings": "No code.",
+  "reasons": [
+   "Sound diagnostic structure; one overstated phrase about reranker recovery and answer relevance is only named, not defined."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "15 of them recoverable by a reranker over a top-50 candidate set",
+    "problem": "Presence in the top-50 is only an upper bound on what a reranker could rescue; it does not mean they are recovered.",
+    "replacement": "15 of them are within the top-50, so a reranker over a 50-candidate set could rescue at most those 15"
+   },
+   {
+    "severity": "minor",
+    "claim": "Answer relevance: does it address the question asked.",
+    "problem": "Metric is named but not operationalised although the question asks how to compute it.",
+    "replacement": "Answer relevance: does it address the question asked; compute it with an LLM judge (1-5 or yes/no against a rubric) or, as RAGAS does, by generating questions from the answer and measuring their embedding similarity to the original question; validate on human labels."
+   }
+  ],
+  "parts_answered": {
+   "separate retrieval from generation": true,
+   "metrics (context recall, faithfulness, answer relevance) and how computed": true,
+   "fix per bucket": true,
+   "problems with 60-sample": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0011",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0004",
+  "plan_id": "P2-NLP-04",
+  "domain": "NLP",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 1,
+  "minor": 0,
+  "corrections_applied": 1,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Fenced functions == tested solution. Pass 3.13/3.10/3.11. Own checks: 1-D x and batched (2,4,9) x agree merged vs unmerged; float32 merged/unmerged max diff 3.8e-6; r=0 gives 0 params; (10,5,0)->(0,50,0.0). Numbers: 65,536; 4,194,304; 1,073,741,824; 0.39% all verified (4,194,304 also matches the commonly cited Llama-7B q,v r=8 figure, from memory, not re-fetched).",
+  "reasons": [
+   "Part (b) asks to 'show with numpy' that merged and unmerged outputs agree and rank <= r; the answer only asserts it and the demonstration exists only in the hidden test."
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "the update has rank at most r even though W is full rank.",
+    "problem": "The question explicitly asks to show merge equivalence and rank <= r with numpy; no demonstration code appears in the answer.",
+    "replacement": "the update has rank at most r even though W is full rank. Demonstration:\n```python\nrng = np.random.default_rng(0)\nd_out, d_in, r, alpha = 12, 20, 4, 8\nW = rng.normal(size=(d_out, d_in)); A = rng.normal(size=(r, d_in)) * 0.1; B = rng.normal(size=(d_out, r)) * 0.1\nx = rng.normal(size=(5, d_in))\nWm = merge_lora(W, A, B, alpha, r)\nassert np.allclose(x @ Wm.T, lora_forward(x, W, A, B, alpha, r), atol=1e-10)\nassert np.linalg.matrix_rank(Wm - W, tol=1e-9) == r  # <= r in general; == r for random A, B\n```"
+   }
+  ],
+  "parts_answered": {
+   "(a) parameter count and comparison": true,
+   "(b) three functions": true,
+   "(b) numpy demonstration of equivalence and rank<=r": false,
+   "(c) B=0 init, alpha/r, when poor": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0025",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0005",
+  "plan_id": "P2-NLP-05",
+  "domain": "NLP",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Fenced block == tested solution. Pass on all three interpreters. Own checks: rouge_n('','',1) all 0; identical single token 1.0; n larger than text -> zeros; the the the vs the -> (1/3,1,0.5); punctuation/case ignored by rouge_l; n=0 returns (1,1,1) (degenerate, unspecified).",
+  "reasons": [
+   "All example values re-derived (unigram 6/6,6/7; bigram 4/5,4/6; LCS 6; contradiction F1 0.9333, LCS recall 1.0); ROUGE-Lsum remark correct."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "(none blocking) tokeniser",
+    "problem": "The mandated [a-z0-9]+ tokeniser splits non-ASCII words (e.g. 'für' becomes 'f','r'); required by the question, so no change.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "rouge_n clipped": true,
+   "rouge_l LCS": true,
+   "empty inputs": true,
+   "what ROUGE rewards/misses with the contradiction example": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0012",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0006",
+  "plan_id": "P2-NLP-06",
+  "domain": "NLP",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 2,
+  "corrections_applied": 1,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Hard",
+  "difficulty_final": "Hard",
+  "code_findings": "Fenced block == tested solution. Pass on 3.13/3.10/3.11. Own checks: max_answer_len=0 -> None; all-equal logits -> (0,0) (smallest start, then end); all -inf logits over a valid context returns (0,0,-inf), an index that is not a meaningful answer (should be None); sliding_windows(0,4,2)->[(0,0)], (5,4,0)->[(0,4),(4,5)], negative overlap gives gapped windows [(0,4),(5,5)] (no validation). Window guarantee exhaustively checked in test for n=23.",
+  "reasons": [
+   "Core claims verified (examples, window-coverage guarantee L <= overlap+1). merge_windows is under-specified and ignores the null decision that part (c) introduces."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "How to combine the per-window null scores differs between implementations (for example, using the smallest null score across windows), so define it explicitly and tune the threshold on dev data.",
+    "problem": "As written, merge_windows silently drops windows without an answer, so any window with a spurious span overrides windows that preferred null; the code never applies the part (c) null decision across windows.",
+    "replacement": "How to combine the per-window null scores differs between implementations (for example, using the smallest null score across windows and comparing it with the best merged span score); merge_windows below only merges real spans, so apply the null_threshold decision on its result yourself and tune the threshold on dev data."
+   },
+   {
+    "severity": "minor",
+    "claim": "merge_windows(per_window)",
+    "problem": "The question does not state the input format of merge_windows, so the reference format ((window_start, (i, j, score) or None)) is one arbitrary choice.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "(a) why independent argmax wrong": true,
+   "(b) best_span": true,
+   "(c) predict with null_threshold": true,
+   "(d) sliding_windows": true,
+   "(d) merge_windows combining per-window answers": true,
+   "(d) which answers guaranteed to fit": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0008",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0007",
+  "plan_id": "P2-NLP-07",
+  "domain": "NLP",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 3,
+  "corrections_applied": 1,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Fenced block == tested solution. Pass on 3.13/3.10/3.11. Verified FNV-1a vectors ('a'=0xE40C292C, 'foobar'=0xBF9CF968). Jaccard refund/refundd = 0.50, refund/refnud = 0.086 (answer says 'about 0.09': ok). fastText's signed-char variant gives a different hash for non-ASCII ('é' 0x3cfa68c1 vs 0x1e9de8c1), supporting the 'variant' claim. Own edges: '' -> ['<>']; 'a' -> ['<a>'] without duplicate; n_min>n_max -> whole word only. Note overlap of scenario with smi-g0001 (same refundd ticket setting) though intent differs (hashing implementation vs BPE comparison).",
+  "reasons": [
+   "Hashing/n-gram code correct; one example in the prose is wrong ('he' is never generated with n_min=3)."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "'<he' (start of 'her') differs from 'he' within 'where'",
+    "problem": "No 2-gram 'he' is produced with n_min=3. The distinction the markers make is between the word 'her' ('<her>') and 'her' inside 'where'.",
+    "replacement": "'<her>' (the word 'her') differs from 'her' inside 'where'"
+   },
+   {
+    "severity": "minor",
+    "claim": "fastText's default is, to my knowledge, around two million buckets and n-gram lengths 3 to 6",
+    "problem": "Hedged and matches my recollection (bucket=2000000, minn=3, maxn=6) but I could not open the fastText docs to confirm.",
+    "replacement": null
+   },
+   {
+    "severity": "minor",
+    "claim": "plus the whole marked word '<word>' as a hashed unit",
+    "problem": "In real fastText the in-vocabulary word has its own embedding row, not a hashed bucket; for an OOV word the hashed '<word>' bucket is an untrained random row adding noise. Answer already says untrained n-grams are random, but not that this unit is a deviation.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "how char n-grams give OOV a vector": true,
+   "char_ngrams": true,
+   "fnv1a_32": true,
+   "ngram_buckets": true,
+   "word_vector": true,
+   "what it does not fix": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0001",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0008",
+  "plan_id": "P2-NLP-08",
+  "domain": "NLP",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 2,
+  "corrections_applied": 2,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "No code.",
+  "reasons": [
+   "Good scenario answer; the 'test that decides' is stated loosely and the latency claim for the baseline is unhedged."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "it trains in seconds and has p95 latency far below 30 ms on CPU",
+    "problem": "Plausible but unmeasured; should be hedged and tied to the later latency check.",
+    "replacement": "it trains in seconds and normally has p95 latency of a few milliseconds on CPU (confirm with the latency check below)"
+   },
+   {
+    "severity": "minor",
+    "claim": "but this should be shown on your data with several random seeds, since small-data fine-tunes vary run to run.",
+    "problem": "The decision rule is not explicit: no paired comparison or minimum gain.",
+    "replacement": "but decide with a paired comparison on identical folds: fine-tune with several seeds, bootstrap the macro-F1 / QWK difference against the baseline, and adopt the transformer only if the lower confidence bound of the gain exceeds a threshold agreed in advance (and its distilled or quantised form still meets the 30 ms p95)."
+   }
+  ],
+  "parts_answered": {
+   "baseline": true,
+   "evaluation protocol and metric": true,
+   "error analysis and label noise": true,
+   "test deciding fine-tune justified": true,
+   "latency check": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0007",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0009",
+  "plan_id": "P2-NLP-09",
+  "domain": "NLP",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 1,
+  "minor": 2,
+  "corrections_applied": 2,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Fenced block == tested solution. Pass on 3.13/3.10/3.11. Own breaks: empty matrix -> IndexError; k=0 -> empty arrays (ok); zero-norm query -> ValueError (not specified in question); NaN in a row with k=2 returns empty arrays silently (thr becomes NaN); five scaled copies of the query all score 1.0 but are returned as [1,2,3,0,4], not index order (1-ulp differences). Euclidean order for the example computed as [2,0,1].",
+  "reasons": [
+   "Numbers verified, but the Euclidean statement is wrong for the question's own example."
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "So switching to Euclidean does not address a norm effect; normalising does.",
+    "problem": "Euclidean distance is norm-sensitive and in the example ranks [2, 0, 1] (squared distances 0.45, 81.8, 163.8 vs the long vector [10,10]), so it demotes the long vector; it just differs from cosine by penalising any norm mismatch (including short, correct documents) instead of ignoring norm.",
+    "replacement": "So switching to Euclidean does not reproduce cosine: it penalises any norm mismatch with the query (here it ranks [0.5, 0.45], then [10, 0], then [10, 10], whereas cosine ranks [10, 10] second), so it can demote the long vectors but also demotes legitimate documents whose norm differs from the query's; normalising is the targeted fix."
+   },
+   {
+    "severity": "minor",
+    "claim": "If every vector is L2-normalised, |a-b|^2 = 2 - 2cos, so cosine, dot product and Euclidean distance produce identical rankings",
+    "problem": "Sufficient but not necessary: equal document norms already make all three rankings identical for a given query.",
+    "replacement": "If every vector is L2-normalised (or, for a fixed query, all documents merely share one norm), |a-b|^2 = 2 - 2cos up to constants, so cosine, dot product and Euclidean distance produce identical rankings"
+   },
+   {
+    "severity": "minor",
+    "claim": "scores = (M / safe[:, None]) @ (q / qn)",
+    "problem": "Builds a float64 copy of the whole matrix per query (about 6 GB for 1M x 768, plus another normalised copy), contrary to the answer's own advice to normalise once; also exactly parallel rows scaled by different factors differ by an ulp so 'ties by lower index' only holds for bit-identical scores.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "(a) relation of dot, cosine, Euclid and when rankings agree": true,
+   "(b) topk_cosine": true,
+   "(b) matches pre-normalised dot": true,
+   "(c) hubness and anisotropy hedged": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0010",
+  "plan_id": "P2-NLP-10",
+  "domain": "NLP",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 1,
+  "minor": 2,
+  "corrections_applied": 3,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Fenced block == tested solution. Pass on 3.13/3.10/3.11. Own checks: nDCG k=0 -> 0.0; negative k in recall -> 0.0; relevant given as a list with repeats still 1.0; fractional exponential gains work; duplicate-shift behaviour confirmed (see issue). Hand-computed values: linear 2.7542/4.7619=0.5784; exponential 5.7086/9.3928=0.6078.",
+  "reasons": [
+   "Metric values verified (0.5784 / 0.6078) but the duplicate convention in the question is ambiguous and the code's reading shifts ranks."
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "ranked lists may contain duplicates (count a document once, at its first position)",
+    "problem": "Ambiguous: 'at its first position' suggests positions are preserved, but the code deletes repeats and shifts later documents up (reciprocal_rank(['a','a','b'],{'b'}) = 0.5, not 1/3; recall_at_k(['a','a','b'],{'b'},2) = 1.0). Two defensible readings give different scores.",
+    "replacement": "ranked lists may contain duplicates (drop every repeat after a document's first occurrence before ranking, so later documents move up one position per dropped repeat)"
+   },
+   {
+    "severity": "minor",
+    "claim": "a system that finds the second and third relevant documents at ranks 2 and 3 scores the same as one that finds nothing else.",
+    "problem": "Confusing: the point is that MRR depends only on the rank of the first relevant document.",
+    "replacement": "a system whose first relevant document is at rank 1 scores 1.0 whether or not it also retrieves the remaining relevant documents."
+   },
+   {
+    "severity": "minor",
+    "claim": "nDCG@k equals 1.0 only when the top k matches the best possible top k from the judged set",
+    "problem": "Documents with equal gain can be swapped (the test shows this) so it is the gain sequence that must match.",
+    "replacement": "nDCG@k equals 1.0 only when the gains of the top k, in order, equal the best possible gain sequence from the judged set"
+   }
+  ],
+  "parts_answered": {
+   "recall_at_k": true,
+   "reciprocal_rank and mrr": true,
+   "ndcg_at_k with exponential option and ideal from all judged docs": true,
+   "duplicates/no-relevant/unjudged conventions": true,
+   "what each metric hides": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0011",
+  "plan_id": "P2-NLP-11",
+  "domain": "NLP",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 2,
+  "corrections_applied": 2,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Hard",
+  "difficulty_final": "Hard",
+  "code_findings": "No code.",
+  "reasons": [
+   "Strong ordered checklist; omits the model's position limit as an effect of the max_length change."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Changing 512 to 1024 can also alter which examples were cut off between training and evaluation, so the data seen at test time differs from training; keep them consistent.",
+    "problem": "Does not check that 1024 is within the model's trained context / max_position_embeddings; exceeding it errors or gives degraded positional behaviour, and padding to a fixed 1024 adds many pad tokens for short tickets.",
+    "replacement": "Changing 512 to 1024 can also alter which examples were cut off between training and evaluation, so the data seen at test time differs from training; keep them consistent. Also check that 1024 does not exceed the model's trained context (max_position_embeddings / rotary scaling), and whether padding to a fixed 1024 turns short tickets into mostly pad tokens."
+   },
+   {
+    "severity": "minor",
+    "claim": "a different pad token",
+    "problem": "Tokenizer upgrades can also change default padding_side, truncation_side or special-token insertion; this should be on the diff list (hedged, version dependent).",
+    "replacement": "a different pad token, a different default padding side or truncation side"
+   }
+  ],
+  "parts_answered": {
+   "ordered cheapest-first checklist": true,
+   "likely causes per symptom (short tickets, non-stopping)": true,
+   "cause for the max_length change": false,
+   "how to confirm the fix": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0003",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0012",
+  "plan_id": "P2-NLP-12",
+  "domain": "NLP",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 2,
+  "corrections_applied": 2,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Fenced block == tested solution. Pass on 3.13/3.10/3.11. Own checks: item with exactly n tokens -> overlap 1.0 flagged; n-1 tokens -> (None, False); empty test_items -> []; threshold=0.0 flags everything checkable; Chinese text -> None; partial leak 9/15... gives 0.222 below 0.5. GPT-3 13-gram claim verified at arxiv.org/pdf/2005.14165 ('13-gram overlap').",
+  "reasons": [
+   "Code correct; threshold trade-off asked in the question is barely discussed."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "A full match of a 40-token question is strong evidence of exposure; 10% overlap on an 8-token question is not.",
+    "problem": "The threshold's own trade-off (what raising or lowering overlap >= threshold does) is not stated although the question asks for it.",
+    "replacement": "A full match of a 40-token question is strong evidence of exposure; 10% overlap on an 8-token question is not. Raising the threshold flags only near-verbatim copies (fewer false positives, misses partial leaks such as question-only or lightly edited items); lowering it catches partial leaks but flags templated or boilerplate-heavy items, so pick it on known leaked and clean examples."
+   },
+   {
+    "severity": "minor",
+    "claim": "Normalising case and punctuation prevents trivial formatting differences from hiding a copy",
+    "problem": "The mandated [a-z0-9]+ tokeniser drops all non-Latin scripts, so non-English items return None (unchecked) rather than a score (verified with a Chinese example).",
+    "replacement": "Normalising case and punctuation prevents trivial formatting differences from hiding a copy (but this [a-z0-9]+ tokeniser yields no tokens for non-Latin scripts, so multilingual benchmarks need a different tokeniser)"
+   }
+  ],
+  "parts_answered": {
+   "contamination_report": true,
+   "what n-gram overlap cannot catch": true,
+   "n trade-off": true,
+   "threshold trade-off": false,
+   "web scale": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0012",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0013",
+  "plan_id": "P2-DL-01",
+  "domain": "Deep Learning",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 2,
+  "corrections_applied": 1,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Re-ran solution+test from scratch (fence == solution verified) on sandbox Python 3.13 (numpy 2.5), /home/claude/work/v310 and v311 (numpy 2.2.6): all print ok. Edge cases of my own: x**0 at x=0 -> ZeroDivisionError (k*0.0**-1); x**2 at 0 -> grad 0 ok; sqrt via **0.5 ok (0.25 at 4); relu at 0 -> 0; 2-Value subtraction grads (1,-1) ok; (-x) ok; 1 - Value -> TypeError (no __rsub__); calling backward() twice gives 12.0 for x*x (answer correctly warns to zero grads); shared diamond 2^60 fan-out finishes instantly (visited set works); depth 900 ok, depth 2000 raises RecursionError at default limit (answer discloses). tanh grad matches 1-tanh^2.",
+  "reasons": [
+   "Technically sound micrograd-style engine; examples 6.0 and 2.0 reproduce; numerical-check claim (~1e-8) holds (measured max error 1.6e-10).",
+   "Intro paragraph uses 'parents/children' inconsistently with the code comment (operands called 'parents' in sentence 1, 'children' in the code comment), which is confusing in a topological-order explanation."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "remembers its parents and a closure that pushes out.grad back to them, multiplied by the local derivative. backward() builds a topological order with a DFS (parents appended after all their children in the graph direction)",
+    "problem": "Terminology contradicts the code (where _prev entries are called 'children' and are the operands) and is hard to parse; 'parents' here means operands.",
+    "replacement": "remembers its operands (the nodes it was computed from) and a closure that pushes out.grad back to them, multiplied by the local derivative. backward() builds a topological order with a DFS (a node is appended only after all of its operands)"
+   },
+   {
+    "severity": "minor",
+    "claim": "__sub__ defined but no __rsub__",
+    "problem": "2 - x (int minus Value) raises TypeError although the question says the engine supports '-'. Fix would need code+test change: def __rsub__(self, other): return (-self) + other (keep fence == solution).",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "Value with + * - ** const, tanh, relu": true,
+   "backward fills .grad on every node": true,
+   "x*x=6.0 and x+x=2.0": true,
+   "why topological order": true,
+   "why += not =": true,
+   "how to test against numerical differentiation": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0015",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0014",
+  "plan_id": "P2-DL-02",
+  "domain": "Deep Learning",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Re-ran solution+test from scratch (fence == solution verified) on sandbox Python 3.13 (numpy 2.5), /home/claude/work/v310 and v311 (numpy 2.2.6): all print ok. Own checks: random B=2,D=3,H=4 vs independent re-derivation: identical; B=0 works; 1-D inputs raise IndexError (documented shapes are 2-D); sigmoid(-1000) emits RuntimeWarning overflow in exp (result still correct, 0) - minor numerical-stability note, not wrong.",
+  "reasons": [
+   "Gate order, shapes and example values verified (c=1.28783, h=0.62766); mechanism and hedging correct.",
+   "Claims about forget-bias heuristic are hedged; 0.5/step decay and copy behaviour verified in test."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "each with W and a tanh derivative below 1",
+    "problem": "tanh' is at most 1 (equals 1 at 0); 'below 1' is trivially loose. Not worth changing.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "lstm_step with given shapes/order": true,
+   "example reproduced": true,
+   "additive cell update vs vanishing gradient": true,
+   "forget-gate bias init and why": true
+  },
+  "nearest_existing": {
+   "id": "smi-0113",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0015",
+  "plan_id": "P2-DL-03",
+  "domain": "Deep Learning",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Re-ran solution+test from scratch (fence == solution verified) on sandbox Python 3.13 (numpy 2.5), /home/claude/work/v310 and v311 (numpy 2.2.6): all print ok. Edge cases: NaN input -> found_inf True; empty array -> ([], False); python scalar ok; 65504 ok, 65520 -> inf (rounds up, found_inf True); negative overflow -inf flagged. to_bf16 checked against an independent struct-based round-to-nearest-even reference on 100k random values spanning 1e-20..1e20: identical; 3.4028235e38 rounds to inf (correct RNE), inf/nan inputs pass through unchanged (docstring says not handled specially). Identical results on numpy 2.2.6 and 2.5.",
+  "reasons": [
+   "All numbers in the answer verified by execution: 1e-7 -> 1.19e-7 (19.2% error), 1e-6 -> 1.33% error, scale 2**15 max relative error 4.4e-4 (<0.05%), 5.0*2**15 overflows with found_inf True; example output [0.0, 1.0002e-4], False reproduced.",
+   "fp16/bf16 range statements correct; fp32 list reasonable and hedged ('usually', 'typically')."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "found_inf = bool(~np.all(np.isfinite(g16)))",
+    "problem": "Relies on np.all returning np.bool_ (~ on a Python bool would give -2, truthy). Works today but `not np.all(...)` is more robust.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "fp16_roundtrip": true,
+   "to_bf16": true,
+   "example reproduced": true,
+   "scale 1 vs 2**15 demonstration": true,
+   "fp16 and bf16 ranges": true,
+   "why loss scaling works": true,
+   "what is kept in fp32": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0016",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0016",
+  "plan_id": "P2-DL-04",
+  "domain": "Deep Learning",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 0,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Re-ran solution+test from scratch (fence == solution verified) on sandbox Python 3.13 (numpy 2.5), /home/claude/work/v310 and v311 (numpy 2.2.6): all print ok. Own checks: n_pos=0 returns (0,d); d=2 ok; offset_matrix for k=0, -3, 7 with d=64 over 300 positions all satisfy pe[p+k]=M@pe[p] and M is orthogonal; odd d rejected by assert; with a causal mask equivariance does fail (so the 'no mask' qualifier in the answer is necessary and present).",
+  "reasons": [
+   "Example row 1 verified [0.84147, 0.54030, 0.0099998, 0.99995]; rotation identity, dot-product identity and permutation equivariance verified.",
+   "Careful hedging about extrapolation and what the rotation structure guarantees."
+  ],
+  "issues": [],
+  "parts_answered": {
+   "sinusoidal_pe": true,
+   "(a) range in [-1,1]": true,
+   "(b) fixed-offset matrix": true,
+   "(c) permutation equivariance": true,
+   "alternatives named without ranking": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0006",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0017",
+  "plan_id": "P2-DL-05",
+  "domain": "Deep Learning",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 0,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Re-ran solution+test from scratch (fence == solution verified) on sandbox Python 3.13 (numpy 2.5), /home/claude/work/v310 and v311 (numpy 2.2.6): all print ok. Own checks with non-square projections (d_model 6/7, d_k 3/4, d_v 5/2) for T=1,2,9: cached and uncached equal the causal reference; row counts 1,3,45 for uncached; large-magnitude inputs stay finite (max-subtraction); kv_cache_bytes(...,seq_len=0)=0; GQA 8 heads batch 16 -> 8 GiB.",
+  "reasons": [
+   "Cached, uncached and reference outputs agree; row counts T vs T(T+1)/2 verified; 2 GiB example exact (2**31).",
+   "Appropriately states attention still costs O(t*d) per step and that the saving is recomputation, not length dependence."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "def kv_cache_bytes(n_layers, n_kv_heads, head_dim, seq_len, batch=1, bytes_per_elem=2)",
+    "problem": "Defaults for batch and bytes_per_elem are an addition to the signature in the question; harmless.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "Decoder with use_cache True/False": true,
+   "equality with full_causal_attention": true,
+   "K/V rows projected counts": true,
+   "kv_cache_bytes": true,
+   "example 2 GiB": true,
+   "where saving comes from": true,
+   "how cache memory grows": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0006",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0018",
+  "plan_id": "P2-DL-06",
+  "domain": "Deep Learning",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Re-ran solution+test from scratch (fence == solution verified) on sandbox Python 3.13 (numpy 2.5), /home/claude/work/v310 and v311 (numpy 2.2.6): all print ok. Own checks: array-valued t raises ValueError (needs reshaping; question only specifies scalar t); t=-1 silently wraps to last element, t=1000 IndexError; T=1 schedule works. Wrong-formula sensitivity analysis done as in issue above.",
+  "reasons": [
+   "alpha_bar example values verified (0.9999, 0.89702, 0.078587, 4.036e-05); mean/variance and chain-vs-closed-form claims verified (chain: mean 1.8942 vs 1.8942, var 0.1027 vs 0.1030).",
+   "Epsilon-prediction target and MSE loss stated correctly."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "assert abs(xt.var() - (1.0 - ab[t])) < 0.02 (test, t=0)",
+    "problem": "At t=0 the tolerance 0.02 is vacuous for the variance (true value 1e-4; also beta_0 == 1-alpha_bar_0 so a wrong beta_t variance cannot be detected there) and the mean check cannot tell alpha_bar from sqrt(alpha_bar) at t=0 or 999 (differences 1e-4 and 0.0126 < 0.02). The tests at t=99/499 do discriminate, and the answer discloses the tolerance. No change required.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "make_schedule": true,
+   "q_sample": true,
+   "predict_x0": true,
+   "mean/variance test": true,
+   "closed form vs step-by-step chain": true,
+   "what network predicts + loss": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0020",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0019",
+  "plan_id": "P2-DL-07",
+  "domain": "Deep Learning",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 2,
+  "minor": 1,
+  "corrections_applied": 2,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Hard",
+  "difficulty_final": "Hard",
+  "code_findings": "Re-ran solution+test from scratch (fence == solution verified) on sandbox Python 3.13 (numpy 2.5), /home/claude/work/v310 and v311 (numpy 2.2.6): all print ok. Own checks: accumulated_grad with micro > N, micro=1 equal full gradient; warmup_steps=0 returns peak (no div by zero); N=0 gives RuntimeWarning/NaN; logistic_grad overflow warning for very large weights (value still finite). Seed 0 results reproduced.",
+  "reasons": [
+   "Numerics verified (gradient mean over 8 shards equals big-batch gradient to 8e-17; sum is 8x; ragged-chunk error 1.8e-3 vs gradient magnitude 4.6e-2; sqrt rule 0.283).",
+   "The sub-question 'when gradient accumulation is the better option' is not actually answered: the text only says accumulation keeps BN at 256 and is the closest stand-in.",
+   "Warmup length 'roughly 500 to 2000 steps' is not consistent with '3 to 5 epochs' for any stated dataset size (ImageNet-1k at batch 2048 is about 625 steps/epoch, i.e. 1,900-3,100 steps)."
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "Gradient accumulation (8 micro-batches of 256 on one GPU) also keeps BN at 256 per forward pass, which is why it is the closest single-GPU stand-in; it costs wall-clock time, not accuracy.",
+    "problem": "Does not answer 'when is gradient accumulation the better option', and 'costs ... not accuracy' ignores that BN equivalence only holds if the micro-batch stays at 256.",
+    "replacement": "Gradient accumulation (8 micro-batches of 256 on one GPU) also keeps BN at 256 per forward pass, which is why it is the closest single-GPU stand-in; it costs wall-clock time, not accuracy, provided the micro-batch stays near 256. It is the better option when you do not have 8 GPUs or cannot fit a large per-GPU batch (for example 2 GPUs x 4 accumulation steps x 256 gives the same global 2048), when the all-reduce is the bottleneck (accumulate locally and synchronise once per optimiser step), or when you want a single-device reference run to debug the 8-GPU one. If memory forces micro-batches much smaller than 256, BN statistics become noisier than in the original run, so use SyncBN or GroupNorm or accept the difference."
+   },
+   {
+    "severity": "major",
+    "claim": "over the first few epochs (say 3 to 5, or roughly 500 to 2000 steps)",
+    "problem": "Step range is not derivable from the epoch range; at ImageNet scale 3-5 epochs of batch 2048 is about 1,900-3,100 steps, and for smaller datasets it is far fewer. Dataset size is not given in the question.",
+    "replacement": "over the first 3 to 5 epochs (the usual choice at ImageNet scale; that is roughly 1,900 to 3,100 steps at batch 2048 on 1.28M images, so convert with your own dataset size)"
+   },
+   {
+    "severity": "minor",
+    "claim": "for Adam-type optimisers a square-root scaling (0.1 * sqrt(8) = 0.28 in the same arithmetic)",
+    "problem": "A base lr of 0.1 is not an Adam value; 'in the same arithmetic' flags it, but it could mislead. Optional.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "concrete lr value": true,
+   "warmup values": true,
+   "BN stats with/without SyncBN": true,
+   "when accumulation is better": false,
+   "verification plan": true,
+   "numpy check: averaged shard gradients equal big-batch": true,
+   "numpy check: accumulation mistakes break it": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0016",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0020",
+  "plan_id": "P2-DL-08",
+  "domain": "Deep Learning",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 2,
+  "minor": 1,
+  "corrections_applied": 2,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Re-ran solution+test from scratch (fence == solution verified) on sandbox Python 3.13 (numpy 2.5), /home/claude/work/v310 and v311 (numpy 2.2.6): all print ok. Own checks: wrong-axis CE for B=1,2,64,256 = 0, 0.693, 4.16, 5.55 (= ln B); right-axis CE with tiny logits 2.30; diagnose() on empty input gives NaN with warnings; float labels raise TypeError in bincount; labels >= n_classes silently lengthen label_hist.",
+  "reasons": [
+   "Question premise is internally inconsistent: the symptom is loss ~2.30 with always-class-0 predictions, but softmax over the wrong axis with batch 1 gives loss exactly 0, and with batch B gives loss ~ln B and predictions that are NOT all class 0 (executed: B=64 -> CE 4.16, argmax spread over classes). So it does not produce 'exactly this symptom'.",
+   "Answer partly acknowledges ('subtler with bigger batches') but never states that the 2.30 loss is not explained by this bug."
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "Then show in numpy how softmax over the wrong axis produces exactly this symptom: a batch of one sample gives probabilities of 1 for every class, argmax always returns class 0, and the cross-entropy is exactly 0.",
+    "problem": "Wrong-axis softmax reproduces always-class-0 / chance accuracy only for batch size 1, and then the loss is 0, contradicting the stated loss of 2.30. It is not 'exactly this symptom'.",
+    "replacement": "Then show in numpy how softmax over the wrong (batch) axis reproduces the always-class-0 predictions and chance accuracy when the batch holds one sample (probabilities of 1 for every class, argmax always class 0, cross-entropy exactly 0), and say why it does not explain a loss of 2.30."
+   },
+   {
+    "severity": "major",
+    "claim": "giving zero loss and zero gradient.",
+    "problem": "Needs an explicit statement that this bug does not account for the reported ln 10 loss (verified: wrong-axis loss is ln B for random logits).",
+    "replacement": "giving zero loss and zero gradient. Note that this explains the always-class-0 predictions but not the reported loss of 2.30: with a batch of B > 1 the wrong-axis loss starts near ln B (about 4.16 for B = 64) and the argmax is no longer always class 0. A loss pinned at ln 10 with constant predictions points to a uniform or input-ignoring output (dead units, too high a learning rate, unnormalised inputs, a label problem)."
+   },
+   {
+    "severity": "minor",
+    "claim": "\"row_sums_ok\": bool(np.allclose(softmax(logits, axis=1).sum(axis=1), 1.0)),",
+    "problem": "Always True by construction because diagnose computes its own softmax over axis 1; it cannot detect a wrong-axis bug in the model. The later advice to assert probs.sum(axis=1) on the model's actual probabilities is the useful version.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "ordered checklist covering labels/imbalance/normalisation/dead ReLU/lr/softmax axis": true,
+   "numpy demo of wrong-axis softmax (probs 1, argmax 0, CE 0)": true,
+   "diagnose() with histogram, majority baseline, variation flag": true,
+   "states that the demo explains the reported 2.30 loss": false
+  },
+  "nearest_existing": {
+   "id": "smi-g0016",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0021",
+  "plan_id": "P2-DL-09",
+  "domain": "Deep Learning",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Re-ran solution+test from scratch (fence == solution verified) on sandbox Python 3.13 (numpy 2.5), /home/claude/work/v310 and v311 (numpy 2.2.6): all print ok. Own checks: depthwise conv_params(32,32,3,groups=32)=288; bias counting; c_in=0 -> 0; basic_block 64->128 with projection 230,144 reproduced.",
+  "reasons": [
+   "All worked examples and BN totals verified; additionally cross-checked against known torchvision totals: ResNet-50 layer1 = 215,808, ResNet-18 layer1 = 147,968, layer2 = 525,568 - all reproduced by the helpers.",
+   "Bottleneck and projection-shortcut explanations are correct and hedged."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "conv_params(c_in, c_out, k, bias=False, groups=1)",
+    "problem": "groups is never validated or explained: conv_params(3, 8, 3, groups=2) silently returns 72 (should be an error since 3 % 2 != 0). Not used by the block helpers.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "conv_params": true,
+   "bn_params": true,
+   "basic_block_params": true,
+   "bottleneck_params": true,
+   "worked examples 73,728 / 69,632 / 73,728": true,
+   "why bottleneck": true,
+   "when projection shortcut needed": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0024",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0022",
+  "plan_id": "P2-DL-10",
+  "domain": "Deep Learning",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 1,
+  "minor": 1,
+  "corrections_applied": 1,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Re-ran solution+test from scratch (fence == solution verified) on sandbox Python 3.13 (numpy 2.5), /home/claude/work/v310 and v311 (numpy 2.2.6): all print ok. Own checks: N=1 -> 0; zero-vector embeddings -> NaN (no eps in normalisation); rescaling inputs leaves loss unchanged (scale invariance); float32 at tau 1e-3 finite; loss asymmetric in (a,b) as expected (1.58 vs 2.75); three duplicates give floor ln 3 = 1.0986 (generalises the ln 2 claim); reduction='sum' returns a vector.",
+  "reasons": [
+   "Implementation, brute-force match, ln N sanity value, overflow demonstration and ln 2 floor all verified.",
+   "One mitigation listed ('use a symmetric loss with care') does not address false negatives and is unsupported."
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "mask known same-class pairs out of the denominator, or use a symmetric loss with care.",
+    "problem": "A symmetric (a->b plus b->a) loss does not remove false negatives; the clause is unsupported and misleading. (Masking should also keep the positive itself in the denominator.)",
+    "replacement": "mask known same-class pairs (other than the positive itself) out of the denominator."
+   },
+   {
+    "severity": "minor",
+    "claim": "reduction=\"mean\"",
+    "problem": "Any value other than 'mean' (including a typo or 'sum') silently returns the per-sample vector.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "info_nce with cosine similarity, stable": true,
+   "example eye(4) tau 0.05 ~ 0 and identical -> ln N": true,
+   "brute-force comparison": true,
+   "naive exp overflow at 1e-3": true,
+   "temperature explanation": true,
+   "false-negative floor with duplicates": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0004",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0023",
+  "plan_id": "P2-PY-01",
+  "domain": "Python",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Extra edges: get_option({'a':None},'a') -> None (present key wins); add_tag('x', ()) raises AttributeError (caller error, fine); tests cover empty caller list identity, None as supplied default, 0 default. Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution.",
+  "reasons": [
+   "Accurate, specific, answers all three asks."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Dataclasses reject mutable defaults",
+    "problem": "Only list/dict/set (unhashable defaults) are rejected; fine as a brief aside.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "why state leaks": true,
+   "fix add_tag": true,
+   "sentinel pattern for get_option": true
+  },
+  "nearest_existing": {
+   "id": "none close (nearest smi-0441)",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0024",
+  "plan_id": "P2-PY-02",
+  "domain": "Python",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 0,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Extra: maker(0)==[] tested; make_default_arg(2)[0](99)==99 and factory raising TypeError verified; nested def loop also [2,2,2]. Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution.",
+  "reasons": [
+   "Correct late-binding explanation; three fixes implemented; downside stated."
+  ],
+  "issues": [],
+  "parts_answered": {
+   "why last value": true,
+   "make_default_arg": true,
+   "make_partial": true,
+   "make_factory": true,
+   "one downside": true
+  },
+  "nearest_existing": {
+   "id": "none close (nearest smi-0440)",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0025",
+  "plan_id": "P2-PY-03",
+  "domain": "Python",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 1,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Extra edges via tests: KeyboardInterrupt rolls back and propagates; rollback failure chains original as __context__; commit failure then rollback. Both idioms behave identically. Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution.",
+  "reasons": [
+   "Code is correct and tested; one inaccurate explanatory sentence."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "forgetting the re-raise in a @contextmanager makes the generator finish without raising, which can turn a with-body failure into a RuntimeError or silent success",
+    "problem": "If the generator catches and finishes normally, contextmanager.__exit__ gets StopIteration and returns True, i.e. the exception is silently suppressed. RuntimeError (\"generator didn't stop after throw()\") only occurs if the generator yields again. Verified from CPython contextlib behaviour.",
+    "replacement": "forgetting the re-raise in a @contextmanager makes the generator finish normally, so the with statement silently suppresses the body's exception (a RuntimeError appears only if the generator yields a second time)"
+   }
+  ],
+  "parts_answered": {
+   "class Transaction": true,
+   "@contextmanager transaction": true,
+   "yield resource": true,
+   "rollback on body error, never swallow": true,
+   "commit failure -> rollback + propagate": true
+  },
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0026",
+  "plan_id": "P2-PY-04",
+  "domain": "Python",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 1,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Extra: batched('ab',1), window shorter than n -> [], sliding_window over count() (infinite) works; batched(range(5),2.0) raises ValueError from islice only at first next (non-int n not specified, fine); batched(None,2) fails at first next with TypeError (not eager; not required). Pull counts verified (lazy, one new item per window). Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution. itertools.batched facts (3.12, yields tuples) are from my knowledge of the docs; not re-fetched.",
+  "reasons": [
+   "Code verified; one pitfall sentence is vague/wrong for sequences."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Pitfall: calling list(it) or islice on the original iterable twice would silently skip items; only one iterator must be shared.",
+    "problem": "Unclear: it is true only for one-shot iterators, and the real pitfall is creating more than one iterator. Rewrite to be precise.",
+    "replacement": "Pitfall: create the iterator once with iter(iterable) and share it between all islice calls; calling islice(iterable, n) directly on a re-iterable such as a list would restart from the beginning every time and never advance."
+   }
+  ],
+  "parts_answered": {
+   "batched": true,
+   "sliding_window": true,
+   "lazy until first next": true,
+   "O(n) memory": true,
+   "eager ValueError": true,
+   "short iterable yields no window": true,
+   "memory difference vs slicing": true
+  },
+  "nearest_existing": {
+   "id": "smi-0467",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0027",
+  "plan_id": "P2-PY-05",
+  "domain": "Python",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 0,
+  "corrections_applied": 0,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Extra: delay=.5,backoff=3,times=3 sleeps [0.5,1.5] then raises OSError; times=2.5 accepted silently (not specified); exceptions=ValueError (bare class, not tuple) raises TypeError at decoration (tuple() of a class) - spec says tuple, minor. Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution.",
+  "reasons": [
+   "Spec-exact implementation; off-by-one handled; claims accurate."
+  ],
+  "issues": [],
+  "parts_answered": {
+   "decorator factory signature": true,
+   "times semantic and >=1": true,
+   "only listed exceptions retried": true,
+   "delay*backoff**k, no sleep after last": true,
+   "re-raise last": true,
+   "functools.wraps": true,
+   "injectable sleep": true
+  },
+  "nearest_existing": {
+   "id": "smi-0440",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0028",
+  "plan_id": "P2-PY-06",
+  "domain": "Python",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 0,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Extra: limit larger than jobs, limit=1 serialises, empty funcs -> [], limit=1.5 accepted, generator of funcs works. In-flight max asserted == limit with varied durations. Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution. asyncio.TaskGroup 3.11+ claim matches my knowledge of the docs.",
+  "reasons": [
+   "Correct; semaphore + gather(return_exceptions=True); GIL/event-loop explanation hedged properly."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "gather returns results in argument order regardless of completion order",
+    "problem": "True; but note a BaseException (KeyboardInterrupt) raised in a job is not captured by return_exceptions and propagates (verified). Not required by the question.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "bounded_gather with limit": true,
+   "order preserved": true,
+   "exceptions kept in slots, siblings finish": true,
+   "limit<1 ValueError": true,
+   "why asyncio not for CPU-bound": true,
+   "what to use instead": true
+  },
+  "nearest_existing": {
+   "id": "smi-0466",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0029",
+  "plan_id": "P2-PY-07",
+  "domain": "Python",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 2,
+  "corrections_applied": 2,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Extra: zero-row A -> shape (0,m); both empty gives shape (0,0) plus RuntimeWarning 'Mean of empty slice'; NaN input propagates; dim mismatch ValueError; 1-D input raises (spec says 2-D); offset 1e8 vs broadcast max abs err 1.4e-14 (centering works). Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution.",
+  "reasons": [
+   "Code correct; two wording overstatements."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "The broadcast form is exact and simplest for small inputs",
+    "problem": "Floating-point subtraction/sum is not 'exact'; it is just numerically well-conditioned compared with the expansion.",
+    "replacement": "The broadcast form is numerically accurate (no cancellation between large norms) and simplest for small inputs"
+   },
+   {
+    "severity": "minor",
+    "claim": "the broadcast version materialises an (n, m, d) temporary, e.g. 5,000 x 5,000 x 128 float64 is about 25.6 GB",
+    "problem": "25.6 GB is correct per array but diff**2 creates a second same-size temporary, so peak is roughly double.",
+    "replacement": "the broadcast version materialises an (n, m, d) temporary (and diff ** 2 a second one), e.g. 5,000 x 5,000 x 128 float64 is about 25.6 GB each"
+   }
+  ],
+  "parts_answered": {
+   "vectorised expansion": true,
+   "never negative": true,
+   "broadcast version": true,
+   "memory trade-off": true,
+   "numerical issue": true
+  },
+  "nearest_existing": {
+   "id": "smi-0462",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0030",
+  "plan_id": "P2-PY-08",
+  "domain": "Python",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Extra: empty prices -> all NaN, n_unmatched=len(orders); empty orders -> empty frame, 0; non-default orders index is reset to RangeIndex (fine); unsorted prices handled. Verified on pandas 3.0 (sandbox) and 2.3.3 (v310/v311). Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution.",
+  "reasons": [
+   "Correct diagnosis and fix; works on pandas 2.3.3 and 3.0 (tests ok under both)."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "(not stated)",
+    "problem": "Unspecified edge: a NaT effective_date sorts last, so that row wins as 'latest' (verified); orders already having a 'price' column yield price_x/price_y; null product_id on both sides matches (pandas merges NaN keys); equal-date ties keep the last input row. None is required by the question.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "explain why 6 rows": true,
+   "attach_price returns (result, n_unmatched)": true,
+   "one row per order, original order": true,
+   "latest price, NaN if none": true,
+   "validate=": true,
+   "indicator=": true
+  },
+  "nearest_existing": {
+   "id": "none close (nearest smi-0461)",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0031",
+  "plan_id": "P2-PY-09",
+  "domain": "Python",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Extra: 4-way tie with keep_ties=False -> exactly 2 rows by name; keep_ties=True -> all 4; empty df -> (0,4); single-product category share 1.0. Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution.",
+  "reasons": [
+   "Correct, tie policy fully specified, deterministic output; tested on pandas 2.3.3 and 3.0."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "(not stated)",
+    "problem": "Unspecified edges: NaN category rows are dropped by groupby; category total 0 gives NaN shares; negative revenue gives inf shares. Not part of the question.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "named aggregation": true,
+   "transform share over whole category": true,
+   "top 2 with tie policies": true,
+   "output columns/sort/RangeIndex": true
+  },
+  "nearest_existing": {
+   "id": "none close (nearest smi-0021 unrelated)",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0032",
+  "plan_id": "P2-PY-10",
+  "domain": "Python",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 2,
+  "minor": 1,
+  "corrections_applied": 3,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Counts independently verified: quadratic eq=19900, hash version hash=200 eq=0, sorted lt=1273 (<=1600). Extra: [nan,nan] inconsistent as above; sorted([1,'a']) TypeError; sets (partial order) give a wrong False for sorted version; generator input fails for quadratic (len) but works for hash. Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution.",
+  "reasons": [
+   "Answer omits the requested counting wrapper and its results (only present in the test); an O(1)-space claim is wrong for CPython sorting."
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "Prove the complexity claim ... write a wrapper class that counts __eq__ calls (question) / answer text has no counting class or numbers",
+    "problem": "The question asks to write the counting wrapper and show the counts; the answer text and fenced code never include it (only the hidden test does).",
+    "replacement": "Counting wrapper (for the demonstration, not part of the solutions):\n```python\nclass Counted:\n    eq_calls = hash_calls = lt_calls = 0\n    def __init__(self, v):\n        self.v = v\n    def __eq__(self, other):\n        Counted.eq_calls += 1\n        return self.v == other.v\n    def __hash__(self):\n        Counted.hash_calls += 1\n        return hash(self.v)\n    def __lt__(self, other):\n        Counted.lt_calls += 1\n        return self.v < other.v\n```\nWith 200 unique Counted items: has_duplicates_quadratic makes exactly 200*199/2 = 19,900 __eq__ calls; has_duplicates makes 200 __hash__ calls and 0 __eq__ calls (equality is consulted only when full hashes collide); has_duplicates_sorted makes about 1,270 __lt__ calls on shuffled input (roughly n log2 n)."
+   },
+   {
+    "severity": "major",
+    "claim": "when memory is tight (an in-place sort of data you may reorder needs O(1) extra space versus the set's O(n))",
+    "problem": "CPython's list.sort (Timsort) may allocate up to ~n/2 temporary slots, so it is not O(1) extra space; and the shown has_duplicates_sorted uses sorted(), which copies (O(n)).",
+    "replacement": "when memory is tight and you may reorder the data (list.sort() in place avoids the set and the copy that sorted() makes, though CPython's Timsort can still use up to about n/2 temporary slots, so this saves a constant factor rather than reaching O(1) extra space)"
+   },
+   {
+    "severity": "minor",
+    "claim": "(not stated)",
+    "problem": "Versions disagree on NaN: for one shared nan object, quadratic -> False, sorted -> False, but has_duplicates -> True (set uses identity before ==). Worth one sentence on 'equal by ==' vs identity.",
+    "replacement": "Caveat: the set version first checks identity, so the same float('nan') object counted twice is reported as a duplicate even though nan != nan; the quadratic and sorted versions say False."
+   }
+  ],
+  "parts_answered": {
+   "rewrite has_duplicates O(n)": true,
+   "has_duplicates_sorted": true,
+   "counting wrapper class and demonstration of counts": false,
+   "when sorting beats hashing": true
+  },
+  "nearest_existing": {
+   "id": "smi-0449",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0033",
+  "plan_id": "P2-PY-11",
+  "domain": "Python",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 1,
+  "minor": 3,
+  "corrections_applied": 1,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Hard",
+  "difficulty_final": "Hard",
+  "code_findings": "Extra edges run: empty value k= malformed; k=\"\" ok; leading zeros 007->7, -0->0, +5 and 1_0 stay str; unterminated/odd escape \"x\\\" malformed; a=b\"c malformed; lowercase level malformed; tabs as separators accepted; 20k-backslash line returns quickly (no catastrophic backtracking); non-str element raises AttributeError (not specified). Unicode-digit bug confirmed on 3.10 and 3.13. Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution.",
+  "reasons": [
+   "Regex uses \\d, which matches non-ASCII Unicode digits, violating the stated 'YYYY-MM-DD' and 'digits only' rules."
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "r\"^(?P<ts>\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z)\"  and  INT_RE = re.compile(r\"-?\\d+\")",
+    "problem": "In Python 3 str patterns \\d matches any Unicode decimal digit: 'k=٣' is parsed as int 3 and a timestamp '٢٠٢٦-03-01T12:00:05Z' is accepted (both verified), contradicting 'digits only' and 'YYYY-MM-DD...'. Fix in answer text AND code.solution (tests still pass).",
+    "replacement": "Use r\"^(?P<ts>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)\" and INT_RE = re.compile(r\"-?[0-9]+\")"
+   },
+   {
+    "severity": "minor",
+    "claim": "\\s+ / \\s separators",
+    "problem": "\\s also matches \\x0b, \\x0c and U+2028 etc., so 'a=\"x\"\\u2028b=1' parses as two pairs although the spec says space-separated. Acceptable but undocumented.",
+    "replacement": null
+   },
+   {
+    "severity": "minor",
+    "claim": "json.dumps(r, sort_keys=True, ensure_ascii=False)",
+    "problem": "With ensure_ascii=False a U+2028 in a value stays raw and str.splitlines() would split the line (verified); split('\\n') is safe. Consider ensure_ascii=True or note it.",
+    "replacement": null
+   },
+   {
+    "severity": "minor",
+    "claim": "(not stated)",
+    "problem": "Timestamp ranges are not validated ('2026-13-45T99:99:99Z' accepted) - consistent with 'ISO-like' but should be stated; unknown escapes like \\n are kept literally.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "parse_log returns (records, n_malformed)": true,
+   "to_jsonl": true,
+   "timestamp/level validation": true,
+   "quoted escapes": true,
+   "int conversion rules (bare only)": true,
+   "last wins": true,
+   "blank vs malformed": true,
+   "compiled regex with named groups": true
+  },
+  "nearest_existing": {
+   "id": "none close",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0034",
+  "plan_id": "P2-PY-12",
+  "domain": "Python",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 2,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Extra: make_grid(0,3)==[]; make_grid with mutable fill aliases (as the answer warns); deepcopy of a Lock raises TypeError (as claimed); cycle and shared-reference preservation tested. Re-ran solution+test from scratch: passes on Python 3.13 (sandbox), 3.10.20 and 3.11.17 venvs (xrun.py, 12/12 ok); fenced block in answer is byte-identical to code.solution. The 'is vs ==' part overlaps smi-0441 but this record is broader (copy semantics).",
+  "reasons": [
+   "Correct on every sub-part; compound question but each part answered."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "def make_config(defaults, **overrides)",
+    "problem": "A key literally named 'defaults' cannot be overridden (TypeError multiple values for argument) - inherent to the requested signature; positional-only `defaults, /` would avoid it.",
+    "replacement": null
+   },
+   {
+    "severity": "minor",
+    "claim": "question wording",
+    "problem": "Question bundles four loosely related topics (shallow copy, grid aliasing, ==/is, deepcopy internals); fine for a written check but long for a live interview.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "what .copy() did": true,
+   "make_config": true,
+   "[[0]*3]*3 problem and fix": true,
+   "== vs is": true,
+   "deepcopy shared refs and cycles": true
+  },
+  "nearest_existing": {
+   "id": "smi-0441",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0035",
+  "plan_id": "P2-DA-01",
+  "domain": "Data Analysis",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Solution+test re-run from scratch on sandbox Python 3.13 (numpy 2.5/pandas 3.0) and v310/v311 (numpy 2.2.6, pandas 2.3.3) with python -I: all pass. Fenced block equals tested solution. Own edge cases: f(0.5,0.01)=39240, f(0.05,0.01)=8158, negative mde works (13495), p2>=1 and mde=0 raise ValueError, power=1.0 raises statistics.StatisticsError (trivial). stdlib only; no version dependence.",
+  "reasons": [
+   "Reference numbers all reproduced (14,751; 3,841; 57,763; 19,747; 21,950; 8,158; 39,240; total 29,502).",
+   "Formula (pooled variance under H0, unpooled under H1) is the standard form and matches the code."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "I cross-checked the constant against scipy's norm.ppf",
+    "problem": "First-person provenance claim; harmless (scipy.stats.norm.ppf does agree) but not part of an interview answer.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "function with stdlib only": true,
+   "example 3841": true,
+   "n vs MDE": true,
+   "n vs baseline": true,
+   "n vs power": true,
+   "n vs alpha": true,
+   "pitfalls needing more traffic": true
+  },
+  "nearest_existing": {
+   "id": "smi-0172",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0036",
+  "plan_id": "P2-DA-02",
+  "domain": "Data Analysis",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 2,
+  "corrections_applied": 1,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "All three interpreters pass. Seeds 0-4 (n_sims=4000): peeking 22.0/19.7/21.3/21.8/21.6%, fixed 5.2/4.7/5.0/5.7/5.0%. days=5 -> 14.1%, days=30 -> 28.2%; 14 days at n_sims=20000 -> 21.9%. Deterministic by seed; days=1 gives identical rates. Not tested by author: n_sims=0 (nan mean with warning). Fenced block equals tested solution.",
+  "reasons": [
+   "Simulation reproduces the quoted figures (about 20-22% vs about 5%; 14% for 5 days, 28% for 30 days).",
+   "Explanation of correlated looks, group-sequential/alpha-spending and the hedged Bayesian remark are accurate."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Using more looks pushes it higher; in my runs, 5 looks gave about 14% and 30 looks about 28%.",
+    "problem": "days=5/30 changes total data collected as well as number of looks (looks are always daily); also seed 1 gives 19.7%, so 'roughly 20-22%' is slightly tight.",
+    "replacement": "Running the daily-peeking policy for longer pushes it higher; in my runs, 5 days (5 looks) gave about 14% and 30 days (30 looks) about 28%."
+   },
+   {
+    "severity": "minor",
+    "claim": "counting a look as one-sided",
+    "problem": "Obscure pitfall; not explained.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "simulate_peeking signature/return": true,
+   "expected values": true,
+   "why not 14x5%": true,
+   "remedies": true
+  },
+  "nearest_existing": {
+   "id": "smi-0172",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0037",
+  "plan_id": "P2-DA-03",
+  "domain": "Data Analysis",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 2,
+  "corrections_applied": 2,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "All three interpreters pass. Verified vs scipy. Own edge cases: counts [0,0] -> ZeroDivisionError (unhandled, minor), [0,10] fine, numpy array and tuple inputs fine, huge chi2 gives p=0.0 without error. Fenced block equals tested solution.",
+  "reasons": [
+   "Verified: chi2 14.2292, p 1.618e-4, df 1; closed forms for df 2..11 agree with scipy.stats.chisquare (rel err 1.5e-13, 2000 random cases incl. unequal ratios).",
+   "Two loose sentences: 'harmless' imbalances, and an ambiguous '1.2% imbalance'."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "even tiny, harmless imbalances become significant",
+    "problem": "A flagged SRM should be treated as a pipeline problem regardless of size; calling imbalances 'harmless' invites ignoring a real alarm.",
+    "replacement": "with very large traffic even tiny imbalances become statistically significant; still treat a flagged SRM as a pipeline problem and look at the size of the gap and its cause as well as p."
+   },
+   {
+    "severity": "minor",
+    "claim": "with 100k users a 1.2% imbalance is not small",
+    "problem": "Ambiguous: the PM's 2.4% is treatment vs control; 1.2% is the gap as a share of the total, and each arm is 0.6 pp from 50%.",
+    "replacement": "with 100k users, treatment having 2.4% more users than control (50.6% vs 49.4% of the total) is not small."
+   }
+  ],
+  "parts_answered": {
+   "srm_check implemented without scipy": true,
+   "example chi2 14.23, small p, True": true,
+   "interpretation": true,
+   "causes to investigate first": true,
+   "what to do with results": true
+  },
+  "nearest_existing": {
+   "id": "smi-0237",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0038",
+  "plan_id": "P2-DA-04",
+  "domain": "Data Analysis",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "All three interpreters pass (pandas 2.3.3 and 3.0). Own cases: tie in a segment -> segment_winner None, reversal False; 3 variants works; shuffled row order fine; missing cell -> None winner with biased standardised rate; duplicate rows -> ValueError; zero-user cell -> NaN skipped. Fenced block equals tested solution.",
+  "reasons": [
+   "All figures verified (17.5% vs 8.67%; desktop 20/22%, mobile 5/6%; standardised 12.5% vs 14.0%; 83% mixes).",
+   "Answer conditions the 'which to trust' on how the mix arose and flags the randomisation red flag; no blanket rule."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "seg = df.set_index([\"segment\", \"variant\"])",
+    "problem": "Duplicate segment/variant rows raise 'Index contains duplicate entries'; a missing segment-variant cell makes the standardised rate silently skip that segment (A=0.083 in my test). Input assumed pre-aggregated, undocumented.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "pooled rate": true,
+   "per-segment rates": true,
+   "pooled winner": true,
+   "segment winner or None": true,
+   "reversal flag": true,
+   "mix-standardised rates": true,
+   "cause of reversal": true,
+   "which comparison to trust": true
+  },
+  "nearest_existing": {
+   "id": "smi-0311",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0039",
+  "plan_id": "P2-DA-05",
+  "domain": "Data Analysis",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "All three interpreters pass. Own cases: n=1, n=2, all-identical, 9 identical + 1000, NaN input, 2-D array: no crashes (warnings only). Fenced block equals tested solution. Iglewicz-Hoaglin 3.5 and the 1.253314 MeanAD fallback are standard but I did not open the original source.",
+  "reasons": [
+   "Verified: z-score flags none (max |z| 2.845, bound 9/sqrt(10)=2.846); IQR (Q1 25.5, Q3 37) and MAD (M=95.4) flag 950.",
+   "Log-normal figures reproduced exactly: 2.04%, 6.24%, 5.80% raw; on logs MAD 2, IQR 27. Normal-theory rates by 2M-sample simulation: IQR 0.71%, modified z>3.5 0.049%."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "zscore_outliers (code)",
+    "problem": "n=1 gives NaN sd plus RuntimeWarning; NaN inputs silently yield all False. The 'cannot fire' bound is stated for the sample SD (ddof=1) which the code uses.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "mad_outliers with MAD=0 fallback": true,
+   "zscore_outliers": true,
+   "iqr_outliers": true,
+   "which flags 950": true,
+   "why": true,
+   "log-normal behaviour": true,
+   "what to do with flagged points": true
+  },
+  "nearest_existing": {
+   "id": "smi-0267",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0040",
+  "plan_id": "P2-DA-06",
+  "domain": "Data Analysis",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 1,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "All three interpreters pass. Own cases: [1,2] -> (1.0, 2.0); NaN in x -> (nan, nan) silently; n_boot=0 -> IndexError (not validated); memory n_boot*n indices is undocumented. Fenced block equals tested solution.",
+  "reasons": [
+   "Reproduced (12.0, 28.0) for seeds 0-3 (seed 4: 27.01), so 'roughly (12, 28)' is right.",
+   "Coverage claim reproduced: 0.92-0.94 (min 0.9175) for lognormal/exponential/normal at n=5,10,15 (2000 reps, 1000 boots).",
+   "One internally inconsistent sentence about endpoints being data points for n=10."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "so the interval endpoints are data points and coverage can be below nominal",
+    "problem": "For n = 10 (even) bootstrap medians are data values or averages of two, so endpoints need not be data points; np.quantile also interpolates between order statistics.",
+    "replacement": "so the interval endpoints come from that small set of values (data points or midpoints, possibly interpolated) and coverage can be below nominal"
+   }
+  ],
+  "parts_answered": {
+   "vectorised percentile bootstrap": true,
+   "meaning/non-meaning of interval": true,
+   "when unreliable": true,
+   "deterministic test assertions": true
+  },
+  "nearest_existing": {
+   "id": "smi-0169",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0041",
+  "plan_id": "P2-DA-07",
+  "domain": "Data Analysis",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "All three interpreters pass. statsmodels not installed, so I used an exact rational-arithmetic reference (0/20000 mismatches, m up to 30, ties included). Own cases: empty list, single p, NaN (see issue). Fenced block equals tested solution.",
+  "reasons": [
+   "All numbers verified: 1 expected FP, 64.15% (answer 64.2%), Bonferroni rejects 2, BH rejects 6 (rank 4 fails, ranks 5-6 pass).",
+   "BH and Bonferroni match an exact-Fraction reference on 20,000 random inputs (0 mismatches)."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "benjamini_hochberg (code)",
+    "problem": "NaN p-values are 'rejected' (benjamini_hochberg([nan, 0.001]) -> [True, True]); no range validation.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "expected false positives": true,
+   "P(at least one)": true,
+   "bonferroni original order": true,
+   "benjamini_hochberg original order": true,
+   "what each controls": true,
+   "when to prefer which": true
+  },
+  "nearest_existing": {
+   "id": "smi-0170",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0042",
+  "plan_id": "P2-DA-08",
+  "domain": "Data Analysis",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 2,
+  "corrections_applied": 1,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Hard",
+  "difficulty_final": "Hard",
+  "code_findings": "All three interpreters pass; the question's example rows [1.0,0.667,0.333] and [1.0,0.0,NaN] are reproduced. Own cases: events=[] (fine), timestamps with times, as_of mid-week (later cells NaN), as_of before all signups, duplicate signup rows, max_week=0, signup after as_of, datetime64 inputs: all sane; empty signups errors. Fenced block equals tested solution.",
+  "reasons": [
+   "Passes on pandas 3.0 and 2.3.3, so the answer's 'only executed on pandas 3.0.5' caveat is outdated provenance noise.",
+   "Own edge cases mostly robust; only empty signups fails."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "I ran it on a six-user fixture, including a duplicate-same-week event, a non-signup user, a pre-signup event and a user with no events; the test compares values via lists and np.allclose, uses strftime on the index, and avoids chained assignment, so it does not depend on pandas 2.x versus 3.x display or dtype choices (I only executed it on pandas 3.0.5).",
+    "problem": "Process narration, and the version caveat is outdated: it also passes on pandas 2.3.3 (Python 3.10 and 3.11).",
+    "replacement": "The code was checked on a six-user fixture that includes a duplicate same-week event, a non-signup user, a pre-signup event and a user with no events; it passes on pandas 2.3 and 3.0."
+   },
+   {
+    "severity": "minor",
+    "claim": "as_of handling (code)",
+    "problem": "Signups after as_of give a cohort row with all-NaN cells but nonzero cohort_size; empty signups raises ValueError 'cannot convert float NaN to integer'; nested .loc loop is O(cohorts x weeks).",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "precise definition": true,
+   "weekly_retention implemented": true,
+   "Monday weeks": true,
+   "cohort_size incl. inactive": true,
+   "pre-signup/non-signup ignored": true,
+   "censoring to NaN": true,
+   "example rows": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0034",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0043",
+  "plan_id": "P2-DA-09",
+  "domain": "Data Analysis",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 2,
+  "corrections_applied": 0,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Hard",
+  "difficulty_final": "Hard",
+  "code_findings": "All three interpreters pass. Own cases: new segment in period 1 only -> NaN; all-zero orders -> 0. Fenced block equals tested solution.",
+  "reasons": [
+   "Verified: mix -0.154 pt, rate -0.140 pt, total -0.294 pt, exact sum; z = 3.949 (answer 'about 3.9').",
+   "Midpoint decomposition is algebraically exact."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "question wording / answer convention",
+    "problem": "The question does not fix a decomposition convention, so per-segment numbers are convention-dependent; the answer does say to state the convention, which mitigates this.",
+    "replacement": null
+   },
+   {
+    "severity": "minor",
+    "claim": "segment present in only one period (code)",
+    "problem": "A zero-session segment gives NaN rates, so mix/rate/total silently skip it and no longer sum to the overall change (tested).",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "decompose_conversion_change": true,
+   "mix+rate sum exactly": true,
+   "numbers reported": true,
+   "significance": true,
+   "next diagnostic steps": true
+  },
+  "nearest_existing": {
+   "id": "smi-0172",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0044",
+  "plan_id": "P2-DA-10",
+  "domain": "Data Analysis",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "All three interpreters pass. Own cases: empty stratum (silent), NaN score (silent bias), NaN stratum label (silently weighted), populations not summing to 1 raise. Fenced block equals tested solution.",
+  "reasons": [
+   "All numbers verified: raw 4.14, weights 5/1/0.333, post-stratified 3.54, Kish n 174.4.",
+   "Limits are accurate and well hedged."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "every population stratum must have respondents; empty strata cannot be reweighted",
+    "problem": "Stated as a requirement but the code does not enforce it: a population stratum with no respondents is silently dropped and the others renormalised (pop a:.5,b:.3,c:.2 with only a,b -> 2.75, no error). NaN scores still count in w.sum() (2.98 vs 3.0).",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "name the bias": true,
+   "how to check": true,
+   "poststratify returns raw/weighted/weights/Kish": true,
+   "worked numbers": true,
+   "limits of reweighting": true
+  },
+  "nearest_existing": {
+   "id": "smi-0009",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0045",
+  "plan_id": "P2-DA-11",
+  "domain": "Data Analysis",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 3,
+  "corrections_applied": 1,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "All three interpreters pass. Own cases: n=2*period exactly (fine), Series with DatetimeIndex (index lost), period 2 and 3, constant series (seasonal 0, mult resid 1), NaN in y (no crash), float period -> TypeError. Fenced block equals tested solution. statsmodels not installed, so no cross-check against seasonal_decompose.",
+  "reasons": [
+   "Reproduced: seasonal max error 0.753 (answer 'about 0.8'), residual sd 0.640, multiplicative max |resid-1| 0.00053, additive max resid 2.99. Trend matches pandas rolling(12).rolling(2) to 3e-14."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "return value (code)",
+    "problem": "Input Series index (e.g. DatetimeIndex) is discarded; result has a RangeIndex though the docstring accepts a Series.",
+    "replacement": null
+   },
+   {
+    "severity": "minor",
+    "claim": "is also needed when data must be positive",
+    "problem": "Unclear sentence; the point is that multiplicative models and log transforms both require strictly positive data.",
+    "replacement": "and, like the multiplicative model, it requires strictly positive data."
+   },
+   {
+    "severity": "minor",
+    "claim": "Forgetting to re-centre the seasonal indices so the trend absorbs a bias",
+    "problem": "Without re-centring the leftover mean ends up in the seasonal/residual split, not in the trend.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "decompose_classical implemented": true,
+   "even/odd centred MA": true,
+   "seasonal re-centring add/mult": true,
+   "NaN ends": true,
+   "synthetic test": true,
+   "when multiplicative is better": true,
+   "what the method cannot do": true
+  },
+  "nearest_existing": {
+   "id": "smi-0319",
+   "same_intent": false
+  }
+ },
+ {
+  "id": "smi-h0046",
+  "plan_id": "P2-DA-12",
+  "domain": "Data Analysis",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 2,
+  "corrections_applied": 1,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Hard",
+  "difficulty_final": "Hard",
+  "code_findings": "All three interpreters pass; seeds 1-100 give naive 0.0035-0.0050, adjusted -0.0011..0.0011, randomised -0.0008..0.0012, so test bands are safe. Deterministic by seed. Fenced block equals tested solution.",
+  "reasons": [
+   "Reproduced (0.00457, 0.00072, 0.00038); over seeds 1-100 naive mean 0.0043 (theory 0.042/9.75), adjusted mean 1.7e-5 (sd 0.0004), randomised 3.6e-5 (sd 0.0004), so 'near zero within noise' holds.",
+   "One conceptual mislabel: page speed is a mediator, not a confounder."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Mechanism confounds exist too: more images can slow the page, which pushes the other way.",
+    "problem": "Page speed lies on the causal path (mediator), not a confounder; the later pitfall says so correctly.",
+    "replacement": "Mediators matter too: more images can slow the page, which pushes the other way, so do not adjust for page speed when estimating the total effect of images."
+   },
+   {
+    "severity": "minor",
+    "claim": "small n (code)",
+    "problem": "simulate_confounding(n=10) returns (0.0, 0.0, 0.0) because of a rank-deficient design; irrelevant at default n.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "why not causal": true,
+   "specific confounders": true,
+   "experiment design (what/unit/metric/analysis)": true,
+   "observational fallbacks with assumptions": true,
+   "simulate_confounding": true
+  },
+  "nearest_existing": {
+   "id": "smi-0311",
+   "same_intent": false
+  }
+ }
+]

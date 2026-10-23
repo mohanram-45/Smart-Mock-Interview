@@ -1,0 +1,1172 @@
+{
+ "summary": {
+  "windows_run1": {
+   "prompt": "10.fu4",
+   "useful_valid": "12/23"
+  },
+  "windows_run2_as_reported": {
+   "prompt": "10.fu5",
+   "useful_valid": "11/23",
+   "by_class": {
+    "expected": "11/16",
+    "skip": "11/11",
+    "memory_use": "0/7",
+    "memory_inappropriate": "6/6"
+   },
+   "fallbacks": 14
+  },
+  "windows_run2_rescored": {
+   "eligible": {
+    "n": 23,
+    "success": 11,
+    "rate": 0.478,
+    "technical_expected": [
+     7,
+     12
+    ],
+    "behavioural_scripted_probes": [
+     4,
+     4
+    ],
+    "memory_use_grounded": [
+     0,
+     7
+    ],
+    "valid_question_even_without_memory_use": 14,
+    "target": 0.8
+   },
+   "by_class": {
+    "expected": {
+     "success": 11,
+     "n_strict": 16,
+     "safety_only": []
+    },
+    "skip": {
+     "success": 10,
+     "n_strict": 10,
+     "safety_only": [
+      "B07"
+     ]
+    },
+    "memory_use": {
+     "success": 0,
+     "n_strict": 7,
+     "safety_only": []
+    },
+    "memory_inappropriate": {
+     "success": 6,
+     "n_strict": 6,
+     "safety_only": []
+    }
+   },
+   "fixture_defects": [
+    "B07"
+   ],
+   "quality_gates": {
+    "accepted_questions": 13,
+    "fabricated_memory_references": 0,
+    "cites_unoffered_memory": 0,
+    "implicit_memory_use_uncited": 1,
+    "lead_not_from_stored_claim": 0,
+    "id_leaks": 0,
+    "repeats": 0,
+    "unrelated": 0,
+    "injected": 0,
+    "accusatory": 0,
+    "trivial": 0
+   }
+  },
+  "scripted_current_code": {
+   "evidence": "scripted_stand_in: mechanics only, NOT language-model evidence",
+   "eligible": {
+    "n": 23,
+    "success": 23,
+    "rate": 1.0,
+    "technical_expected": [
+     12,
+     12
+    ],
+    "behavioural_scripted_probes": [
+     4,
+     4
+    ],
+    "memory_use_grounded": [
+     7,
+     7
+    ],
+    "valid_question_even_without_memory_use": 23,
+    "target": 0.8
+   }
+  },
+  "target_80_percent": {
+   "real_model_for_current_code": "NOT MEASURED. No Ollama in this environment. Windows verification is outstanding.",
+   "windows_run2_rescored_rate": 0.478
+  }
+ },
+ "cases": [
+  {
+   "id": "T01",
+   "class": "expected",
+   "mode": "technical",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "llm",
+   "run2_reasons": [],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "valid_nontrivial_question",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": null
+  },
+  {
+   "id": "T02",
+   "class": "expected",
+   "mode": "technical",
+   "run1_success": false,
+   "run2_success_as_reported": false,
+   "run2_outcome": "fallback",
+   "run2_reasons": [
+    "question:concept_already_in_answer"
+   ],
+   "run2_rescored_success": false,
+   "run2_rescored_basis": "valid_nontrivial_question",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": [
+    "rejected: concept_already_in_answer",
+    "The question names consistency (open) AND atomicity (already stated). The validator trusted the model's declared concept id, which was the stated one, so a good question was vetoed.",
+    "validator",
+    "concept ids are read from the question text; a question that names an open concept is not vetoed for also naming a covered one"
+   ]
+  },
+  {
+   "id": "T03",
+   "class": "expected",
+   "mode": "technical",
+   "run1_success": false,
+   "run2_success_as_reported": false,
+   "run2_outcome": "fallback",
+   "run2_reasons": [
+    "question:concept_already_in_answer",
+    "question:not_tied_to_answer"
+   ],
+   "run2_rescored_success": false,
+   "run2_rescored_basis": "valid_nontrivial_question",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": [
+    "rejected: concept_already_in_answer + not_tied_to_answer",
+    "'It is O(log n).' states one concept; the question compares binary and linear search. Declared-id veto again, and the 4-word answer gives few tie words.",
+    "validator",
+    "ids derived from the question; linear search is the open TARGET and is named, which counts as a tie"
+   ]
+  },
+  {
+   "id": "T04",
+   "class": "expected",
+   "mode": "technical",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "llm",
+   "run2_reasons": [],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "valid_nontrivial_question",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": null
+  },
+  {
+   "id": "T05",
+   "class": "expected",
+   "mode": "technical",
+   "run1_success": false,
+   "run2_success_as_reported": true,
+   "run2_outcome": "llm",
+   "run2_reasons": [],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "valid_nontrivial_question",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": null
+  },
+  {
+   "id": "T06",
+   "class": "expected",
+   "mode": "technical",
+   "run1_success": false,
+   "run2_success_as_reported": true,
+   "run2_outcome": "llm",
+   "run2_reasons": [],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "valid_nontrivial_question",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": null
+  },
+  {
+   "id": "T07",
+   "class": "expected",
+   "mode": "technical",
+   "run1_success": false,
+   "run2_success_as_reported": false,
+   "run2_outcome": "skip",
+   "run2_reasons": [],
+   "run2_rescored_success": false,
+   "run2_rescored_basis": "valid_nontrivial_question",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": [
+    "skip chosen AND a question written",
+    "decision=skip with the question 'How do non-linearities help ...?'. The old code accepted the skip and dropped the question silently.",
+    "model payload + silent handling",
+    "payload:skip_with_question is a rejection with a targeted repair; if it repeats, the deterministic follow-up is used and the class is payload_inconsistent"
+   ]
+  },
+  {
+   "id": "T08",
+   "class": "expected",
+   "mode": "technical",
+   "run1_success": false,
+   "run2_success_as_reported": true,
+   "run2_outcome": "llm",
+   "run2_reasons": [],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "valid_nontrivial_question",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": null
+  },
+  {
+   "id": "T09",
+   "class": "expected",
+   "mode": "technical",
+   "run1_success": true,
+   "run2_success_as_reported": false,
+   "run2_outcome": "fallback",
+   "run2_reasons": [
+    "question:restates_answer",
+    "evidence:none_verified"
+   ],
+   "run2_rescored_success": false,
+   "run2_rescored_basis": "valid_nontrivial_question",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": [
+    "rejected twice: restates_answer (+ evidence:none_verified)",
+    "Both questions paraphrase 'finds structure in data without labels'. The repair said only 'ask about the TARGET', which did not change a 3B model's output.",
+    "model quality + weak repair",
+    "repair now quotes the rejected question and asks for an example, reason, limit or trade-off about the named TARGET; the standard prompt asks for a progressive question"
+   ]
+  },
+  {
+   "id": "T10",
+   "class": "expected",
+   "mode": "technical",
+   "run1_success": false,
+   "run2_success_as_reported": false,
+   "run2_outcome": "fallback",
+   "run2_reasons": [
+    "question:repeats_earlier",
+    "question:concept_already_in_answer",
+    "question:not_tied_to_answer",
+    "question:restates_answer"
+   ],
+   "run2_rescored_success": false,
+   "run2_rescored_basis": "valid_nontrivial_question",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": [
+    "rejected: repeats_earlier + ignores the open concept + restates",
+    "'How would you evaluate a logistic regression model?' repeats an earlier question; the open concepts were ROC/AUC, confusion matrix, precision/recall.",
+    "model quality (ignored TARGET)",
+    "question:ignores_target (probe_concept must name an open concept); repeat veto unchanged"
+   ]
+  },
+  {
+   "id": "T11",
+   "class": "expected",
+   "mode": "technical",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "llm",
+   "run2_reasons": [],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "valid_nontrivial_question",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": null
+  },
+  {
+   "id": "T12",
+   "class": "expected",
+   "mode": "technical",
+   "run1_success": false,
+   "run2_success_as_reported": true,
+   "run2_outcome": "llm",
+   "run2_reasons": [],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "valid_nontrivial_question",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": null
+  },
+  {
+   "id": "S01",
+   "class": "skip",
+   "mode": "technical",
+   "run1_success": false,
+   "run2_success_as_reported": true,
+   "run2_outcome": "skip",
+   "run2_reasons": [],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "skipped_by_rules",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "not_applicable",
+   "root_cause": null
+  },
+  {
+   "id": "S02",
+   "class": "skip",
+   "mode": "technical",
+   "run1_success": false,
+   "run2_success_as_reported": true,
+   "run2_outcome": "skip",
+   "run2_reasons": [],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "skipped_by_rules",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "not_applicable",
+   "root_cause": null
+  },
+  {
+   "id": "S03",
+   "class": "skip",
+   "mode": "technical",
+   "run1_success": false,
+   "run2_success_as_reported": true,
+   "run2_outcome": "skip",
+   "run2_reasons": [],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "skipped_by_rules",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "not_applicable",
+   "root_cause": null
+  },
+  {
+   "id": "S04",
+   "class": "skip",
+   "mode": "technical",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "skip",
+   "run2_reasons": [],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "skipped_by_rules",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "not_applicable",
+   "root_cause": null
+  },
+  {
+   "id": "S05",
+   "class": "skip",
+   "mode": "technical",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "fallback",
+   "run2_reasons": [
+    "answer_unrelated_to_question"
+   ],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "prefilter_model_not_called",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": null
+  },
+  {
+   "id": "S06",
+   "class": "skip",
+   "mode": "technical",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "fallback",
+   "run2_reasons": [
+    "answer_unrelated_to_question"
+   ],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "prefilter_model_not_called",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": null
+  },
+  {
+   "id": "S07",
+   "class": "skip",
+   "mode": "technical",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "fallback",
+   "run2_reasons": [
+    "answer_looks_like_instructions"
+   ],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "prefilter_model_not_called",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": null
+  },
+  {
+   "id": "S08",
+   "class": "skip",
+   "mode": "technical",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "skip",
+   "run2_reasons": [],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "skipped_by_rules",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "not_applicable",
+   "root_cause": null
+  },
+  {
+   "id": "M01",
+   "class": "memory_use",
+   "mode": "technical",
+   "run1_success": true,
+   "run2_success_as_reported": false,
+   "run2_outcome": "llm",
+   "run2_reasons": [],
+   "run2_rescored_success": false,
+   "run2_rescored_basis": "memory_not_grounded_used",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "used",
+   "root_cause": [
+    "accepted, memory_id none",
+    "Two statements were offered; the question uses 'class imbalance' (which is in the stored challenge) but cites nothing. The old prompt let the model decide to cite, and it declined.",
+    "generation + citation metadata (retrieval OK)",
+    "memory mode: one statement, code-built lead-in, memory_id in {id, none}; uncited use of statement-only words is rejected (memory:uncited_reference)"
+   ]
+  },
+  {
+   "id": "M02",
+   "class": "memory_use",
+   "mode": "technical",
+   "run1_success": false,
+   "run2_success_as_reported": false,
+   "run2_outcome": "fallback",
+   "run2_reasons": [
+    "question:repeats_earlier"
+   ],
+   "run2_rescored_success": false,
+   "run2_rescored_basis": "memory_not_grounded_used",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "used",
+   "root_cause": [
+    "no memory offered; repeated question",
+    "The spam-classifier statement shares no word with 'Supervised learning is learning from examples'. The retrieval query held only the question and answer, not the vetted concepts of the question (labelled training data, classification).",
+    "RETRIEVAL",
+    "query expanded with the question's vetted concepts and reference; quote-aware specific_overlap"
+   ]
+  },
+  {
+   "id": "M03",
+   "class": "memory_use",
+   "mode": "technical",
+   "run1_success": true,
+   "run2_success_as_reported": false,
+   "run2_outcome": "llm",
+   "run2_reasons": [],
+   "run2_rescored_success": false,
+   "run2_rescored_basis": "memory_not_grounded_used",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "used",
+   "root_cause": [
+    "accepted, memory_id none",
+    "Two statements offered; generic pytest-mocking question; nothing cited.",
+    "generation",
+    "memory mode as M01"
+   ]
+  },
+  {
+   "id": "M04",
+   "class": "memory_use",
+   "mode": "technical",
+   "run1_success": false,
+   "run2_success_as_reported": false,
+   "run2_outcome": "fallback",
+   "run2_reasons": [
+    "question:concept_already_in_answer"
+   ],
+   "run2_rescored_success": false,
+   "run2_rescored_basis": "memory_not_grounded_used",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "used",
+   "root_cause": [
+    "no memory offered; 'E1 consistency' leaked",
+    "'concurrent transactions' vs 'Atomicity means all or nothing': no shared word, and the matching part of the claim (billing database ... concurrent transactions) was in the quote, which the overlap test ignored. Also an id leak.",
+    "RETRIEVAL + id leak",
+    "quote-aware overlap + vetted-concept query; ids replaced by labels and rejected in the audit (id_leak)"
+   ]
+  },
+  {
+   "id": "M05",
+   "class": "memory_use",
+   "mode": "technical",
+   "run1_success": true,
+   "run2_success_as_reported": false,
+   "run2_outcome": "llm",
+   "run2_reasons": [],
+   "run2_rescored_success": false,
+   "run2_rescored_basis": "memory_not_grounded_used",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "used",
+   "root_cause": [
+    "accepted, memory_id none",
+    "One statement offered; a generic logistic-regression question; nothing cited.",
+    "generation",
+    "memory mode as M01"
+   ]
+  },
+  {
+   "id": "M06",
+   "class": "memory_use",
+   "mode": "technical",
+   "run1_success": true,
+   "run2_success_as_reported": false,
+   "run2_outcome": "llm",
+   "run2_reasons": [],
+   "run2_rescored_success": false,
+   "run2_rescored_basis": "memory_not_grounded_used",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "used",
+   "root_cause": [
+    "accepted, memory_id none; question says 'your convolutional neural network'",
+    "'convolutional neural network' is in the turn-1 statement and NOT in the current answer ('It uses neural networks with many layers'). So it is a real but undisclosed reference to a stored statement: an implicit grounded reference with missing citation metadata, not ordinary current-answer context and not invented.",
+    "citation metadata (an implicit use)",
+    "uncited use of statement-only words is rejected; in memory mode the lead-in is added by code and the id is validated"
+   ]
+  },
+  {
+   "id": "M07",
+   "class": "memory_use",
+   "mode": "technical",
+   "run1_success": false,
+   "run2_success_as_reported": false,
+   "run2_outcome": "fallback",
+   "run2_reasons": [
+    "question:repeats_earlier"
+   ],
+   "run2_rescored_success": false,
+   "run2_rescored_basis": "memory_not_grounded_used",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "used",
+   "root_cause": [
+    "rejected: repeats_earlier",
+    "The question repeats the binary-search explanation the candidate just gave; the stored statement (a library-catalogue search feature) was offered but not used.",
+    "generation",
+    "memory mode connects the claim to the open TARGET (O(log n))"
+   ]
+  },
+  {
+   "id": "N01",
+   "class": "memory_inappropriate",
+   "mode": "technical",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "fallback",
+   "run2_reasons": [
+    "question:repeats_earlier"
+   ],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "no_false_reference",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": null
+  },
+  {
+   "id": "N02",
+   "class": "memory_inappropriate",
+   "mode": "technical",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "fallback",
+   "run2_reasons": [
+    "question:concept_already_in_answer"
+   ],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "no_false_reference",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": null
+  },
+  {
+   "id": "N03",
+   "class": "memory_inappropriate",
+   "mode": "technical",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "fallback",
+   "run2_reasons": [
+    "question:restates_answer"
+   ],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "no_false_reference",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": null
+  },
+  {
+   "id": "N04",
+   "class": "memory_inappropriate",
+   "mode": "technical",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "llm",
+   "run2_reasons": [],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "no_false_reference",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": null
+  },
+  {
+   "id": "N05",
+   "class": "memory_inappropriate",
+   "mode": "technical",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "fallback",
+   "run2_reasons": [
+    "question:repeats_earlier"
+   ],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "no_false_reference",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": null
+  },
+  {
+   "id": "N06",
+   "class": "memory_inappropriate",
+   "mode": "technical",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "llm",
+   "run2_reasons": [],
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "no_false_reference",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": "none_offered",
+   "root_cause": null
+  },
+  {
+   "id": "B01",
+   "class": "expected",
+   "mode": "behavioural",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "probe",
+   "run2_reasons": null,
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "probe_kind_matches",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": null,
+   "root_cause": null
+  },
+  {
+   "id": "B02",
+   "class": "expected",
+   "mode": "behavioural",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "probe",
+   "run2_reasons": null,
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "probe_kind_matches",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": null,
+   "root_cause": null
+  },
+  {
+   "id": "B03",
+   "class": "skip",
+   "mode": "behavioural",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "none",
+   "run2_reasons": null,
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "no_probe_expected",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": null,
+   "root_cause": null
+  },
+  {
+   "id": "B04",
+   "class": "expected",
+   "mode": "behavioural",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "probe",
+   "run2_reasons": null,
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "probe_kind_matches",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": null,
+   "root_cause": null
+  },
+  {
+   "id": "B05",
+   "class": "expected",
+   "mode": "behavioural",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "probe",
+   "run2_reasons": null,
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "probe_kind_matches",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": null,
+   "root_cause": null
+  },
+  {
+   "id": "B06",
+   "class": "skip",
+   "mode": "behavioural",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "none",
+   "run2_reasons": null,
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "no_probe_expected",
+   "run2_rescored_strict": true,
+   "scripted_current_success": true,
+   "scripted_current_stage": null,
+   "root_cause": null
+  },
+  {
+   "id": "B07",
+   "class": "skip",
+   "mode": "behavioural",
+   "run1_success": true,
+   "run2_success_as_reported": true,
+   "run2_outcome": "probe",
+   "run2_reasons": null,
+   "run2_rescored_success": true,
+   "run2_rescored_basis": "safety_only",
+   "run2_rescored_strict": false,
+   "scripted_current_success": true,
+   "scripted_current_stage": null,
+   "root_cause": [
+    "class skip, outcome probe, success true",
+    "The fixture labels B07 'skip' but expects followup=null (unspecified) and safety=true; the deterministic probe asks about the missing action/result, safely. The old scorer returned ok=True for any null expectation, so a probe counted as a skip success.",
+    "FIXTURE inconsistency + scorer shortcut",
+    "scored on safety only, excluded from the strict skip rate, listed under fixture_defects; label NOT changed (approval needed)"
+   ]
+  }
+ ],
+ "question_level_replay": {
+  "T01": [
+   {
+    "attempt": 1,
+    "question": "How does the model handle the difference between classification and regression in supervised learning?",
+    "decision": "ask",
+    "recorded_reasons": [],
+    "now_if_deepen": "accepted",
+    "now_if_probe_concept": [
+     "question:targets_covered_concept"
+    ]
+   }
+  ],
+  "T02": [
+   {
+    "attempt": 1,
+    "question": "How does atomicity relate to the consistency of data after a crash?",
+    "decision": "ask",
+    "recorded_reasons": [
+     "question:concept_already_in_answer"
+    ],
+    "now_if_deepen": "accepted",
+    "now_if_probe_concept": "accepted"
+   }
+  ],
+  "T03": [
+   {
+    "attempt": 1,
+    "question": "How does binary search compare to linear search in terms of performance?",
+    "decision": "ask",
+    "recorded_reasons": [
+     "question:concept_already_in_answer",
+     "question:not_tied_to_answer"
+    ],
+    "now_if_deepen": "accepted",
+    "now_if_probe_concept": "accepted"
+   }
+  ],
+  "T04": [
+   {
+    "attempt": 1,
+    "question": "How do these dot products help detect local patterns like edges in an image?",
+    "decision": "ask",
+    "recorded_reasons": [],
+    "now_if_deepen": "accepted",
+    "now_if_probe_concept": [
+     "question:targets_covered_concept"
+    ]
+   }
+  ],
+  "T05": [
+   {
+    "attempt": 1,
+    "question": "How does the 'is' operator handle objects with the same value but different memory addresses?",
+    "decision": "ask",
+    "recorded_reasons": [],
+    "now_if_deepen": "accepted",
+    "now_if_probe_concept": "accepted"
+   }
+  ],
+  "T06": [
+   {
+    "attempt": 1,
+    "question": "How does bubble sort's O(n\u00b2) time complexity relate to the number of adjacent elements it needs to compare?",
+    "decision": "ask",
+    "recorded_reasons": [],
+    "now_if_deepen": "accepted",
+    "now_if_probe_concept": "accepted"
+   }
+  ],
+  "T07": [
+   {
+    "attempt": 1,
+    "question": "How do non-linearities help prevent the stacked layers from collapsing into a single linear map?",
+    "decision": "skip",
+    "recorded_reasons": [],
+    "now_if_deepen": [
+     "payload:skip_with_question"
+    ],
+    "now_if_probe_concept": [
+     "payload:skip_with_question"
+    ]
+   }
+  ],
+  "T08": [
+   {
+    "attempt": 1,
+    "question": "How does logistic regression use the sigmoid function to convert predicted probabilities into class labels?",
+    "decision": "ask",
+    "recorded_reasons": [],
+    "now_if_deepen": "accepted",
+    "now_if_probe_concept": "accepted"
+   }
+  ],
+  "T09": [
+   {
+    "attempt": 1,
+    "question": "How does it find structure in data without labels?",
+    "decision": "ask",
+    "recorded_reasons": [
+     "question:restates_answer"
+    ],
+    "now_if_deepen": [
+     "question:restates_answer"
+    ],
+    "now_if_probe_concept": [
+     "question:restates_answer"
+    ]
+   },
+   {
+    "attempt": 2,
+    "question": "How does unsupervised learning find structure in data without labels?",
+    "decision": "ask",
+    "recorded_reasons": [
+     "question:restates_answer",
+     "evidence:none_verified"
+    ],
+    "now_if_deepen": [
+     "question:restates_answer"
+    ],
+    "now_if_probe_concept": [
+     "question:restates_answer"
+    ]
+   }
+  ],
+  "T10": [
+   {
+    "attempt": 1,
+    "question": "How would you evaluate a logistic regression model?",
+    "decision": "ask",
+    "recorded_reasons": [
+     "question:repeats_earlier",
+     "question:concept_already_in_answer",
+     "question:not_tied_to_answer",
+     "question:restates_answer"
+    ],
+    "now_if_deepen": [
+     "question:repeats_earlier",
+     "question:not_tied_to_answer",
+     "question:restates_answer"
+    ],
+    "now_if_probe_concept": [
+     "concepts:none_for_purpose",
+     "question:repeats_earlier",
+     "question:ignores_target",
+     "question:not_tied_to_answer",
+     "question:restates_answer"
+    ]
+   }
+  ],
+  "T11": [
+   {
+    "attempt": 1,
+    "question": "How do deep learning's layers of neurons learn to represent complex data structures?",
+    "decision": "ask",
+    "recorded_reasons": [],
+    "now_if_deepen": "accepted",
+    "now_if_probe_concept": [
+     "question:targets_covered_concept"
+    ]
+   }
+  ],
+  "T12": [
+   {
+    "attempt": 1,
+    "question": "How does a Type I error relate to a false positive?",
+    "decision": "ask",
+    "recorded_reasons": [],
+    "now_if_deepen": "accepted",
+    "now_if_probe_concept": "accepted"
+   }
+  ],
+  "M01": [
+   {
+    "attempt": 1,
+    "question": "How does cross-validation help with class imbalance in the training data?",
+    "decision": "ask",
+    "recorded_reasons": [],
+    "now_if_deepen": "accepted",
+    "now_if_probe_concept": [
+     "question:ignores_target"
+    ]
+   }
+  ],
+  "M02": [
+   {
+    "attempt": 1,
+    "question": "How does supervised learning learn from examples?",
+    "decision": "ask",
+    "recorded_reasons": [
+     "question:repeats_earlier"
+    ],
+    "now_if_deepen": [
+     "question:repeats_earlier"
+    ],
+    "now_if_probe_concept": [
+     "concepts:none_for_purpose",
+     "question:repeats_earlier",
+     "question:ignores_target"
+    ]
+   }
+  ],
+  "M03": [
+   {
+    "attempt": 1,
+    "question": "Which mocking mechanism does pytest use to replace real objects in tests with fake ones?",
+    "decision": "ask",
+    "recorded_reasons": [],
+    "now_if_deepen": "accepted",
+    "now_if_probe_concept": "accepted"
+   }
+  ],
+  "M04": [
+   {
+    "attempt": 1,
+    "question": "How does atomicity relate to E1 consistency?",
+    "decision": "ask",
+    "recorded_reasons": [
+     "question:concept_already_in_answer"
+    ],
+    "now_if_deepen": "accepted",
+    "now_if_probe_concept": "accepted"
+   }
+  ],
+  "M05": [
+   {
+    "attempt": 1,
+    "question": "How does the observed labels' likelihood relate to the weights found in logistic regression?",
+    "decision": "ask",
+    "recorded_reasons": [],
+    "now_if_deepen": "accepted",
+    "now_if_probe_concept": "accepted"
+   }
+  ],
+  "M06": [
+   {
+    "attempt": 1,
+    "question": "How does the use of neural networks in your convolutional neural network contrast with other machine learning approaches that rely on hand-engineered features?",
+    "decision": "ask",
+    "recorded_reasons": [],
+    "now_if_deepen": [
+     "memory:uncited_reference"
+    ],
+    "now_if_probe_concept": [
+     "memory:uncited_reference"
+    ]
+   }
+  ],
+  "M07": [
+   {
+    "attempt": 1,
+    "question": "How does halving the sorted list relate to the time complexity of binary search?",
+    "decision": "ask",
+    "recorded_reasons": [
+     "question:repeats_earlier"
+    ],
+    "now_if_deepen": [
+     "question:repeats_earlier"
+    ],
+    "now_if_probe_concept": [
+     "concepts:none_for_purpose",
+     "question:repeats_earlier",
+     "question:ignores_target"
+    ]
+   }
+  ],
+  "N01": [
+   {
+    "attempt": 1,
+    "question": "How does halving the sorted range relate to the time complexity of binary search?",
+    "decision": "ask",
+    "recorded_reasons": [
+     "question:repeats_earlier"
+    ],
+    "now_if_deepen": [
+     "question:repeats_earlier"
+    ],
+    "now_if_probe_concept": [
+     "concepts:none_for_purpose",
+     "question:repeats_earlier",
+     "question:ignores_target"
+    ]
+   }
+  ],
+  "N02": [
+   {
+    "attempt": 1,
+    "question": "How does atomicity ensure that data is consistent after a transaction is committed?",
+    "decision": "ask",
+    "recorded_reasons": [
+     "question:concept_already_in_answer"
+    ],
+    "now_if_deepen": "accepted",
+    "now_if_probe_concept": [
+     "question:targets_covered_concept"
+    ]
+   }
+  ],
+  "N03": [
+   {
+    "attempt": 1,
+    "question": "How does it find structure in data without labels?",
+    "decision": "ask",
+    "recorded_reasons": [
+     "question:restates_answer"
+    ],
+    "now_if_deepen": [
+     "question:restates_answer"
+    ],
+    "now_if_probe_concept": [
+     "question:restates_answer"
+    ]
+   },
+   {
+    "attempt": 2,
+    "question": "How does unsupervised learning find structure in data without labels?",
+    "decision": "ask",
+    "recorded_reasons": [
+     "question:restates_answer"
+    ],
+    "now_if_deepen": [
+     "question:restates_answer"
+    ],
+    "now_if_probe_concept": [
+     "question:restates_answer"
+    ]
+   }
+  ],
+  "N04": [
+   {
+    "attempt": 1,
+    "question": "How do these filters interact with each other in a convolutional layer?",
+    "decision": "ask",
+    "recorded_reasons": [],
+    "now_if_deepen": "accepted",
+    "now_if_probe_concept": "accepted"
+   }
+  ],
+  "N05": [
+   {
+    "attempt": 1,
+    "question": "How does bubble sort's time complexity relate to the number of swaps it makes?",
+    "decision": "ask",
+    "recorded_reasons": [
+     "question:repeats_earlier"
+    ],
+    "now_if_deepen": [
+     "question:repeats_earlier"
+    ],
+    "now_if_probe_concept": [
+     "question:repeats_earlier",
+     "question:targets_covered_concept"
+    ]
+   }
+  ],
+  "N06": [
+   {
+    "attempt": 1,
+    "question": "How does a Type I error relate to a false positive?",
+    "decision": "ask",
+    "recorded_reasons": [],
+    "now_if_deepen": "accepted",
+    "now_if_probe_concept": "accepted"
+   }
+  ]
+ }
+}

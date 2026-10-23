@@ -9,6 +9,7 @@ venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.ruff_cache/
 
 # Node dependencies
 frontend/node_modules/
@@ -35,3 +36,40 @@ Thumbs.db
 
 # Internal development prompts
 dataset_upgrade_prompt.md
+
+# Stage 2A retrieval: rebuildable index and embedding cache (the eval set and corpus manifest ARE tracked)
+data/retrieval/index/
+data/retrieval/cache/
+
+# Stage 4B demo sessions hold candidate answers: local only, never committed
+results/demo_sessions/
+
+# Stage 6B: MLflow store (SQLite + artifacts) is rebuilt by scripts/mlflow_import_history.py; local env files may hold local settings
+mlflow/
+mlruns/
+.dvc/cache
+.dvc/tmp
+
+# Stage 7A: hand-off bundles and archives are delivery/working artefacts, never source
+*.zip
+
+# Stage 7B: more local environments, DVC local-only files, generated model artifacts, journey screenshots
+*_venv/
+.dvc/config.local
+dvc_storage/
+.dvc-remote/
+*.faiss
+*.safetensors
+*.gguf
+*.ckpt
+*.onnx
+*.pt
+*.pth
+# (results/siamese_bilstm.pt was committed in the first commit and stays tracked: an ignore rule never affects a tracked file)
+*.sqlite
+*.sqlite3
+*.db
+# the browser-journey scripts write ~28 MB of regenerable PNG evidence here; the screenshots the README shows live in docs/screenshots/
+data/evaluation/**/screenshots/
+
+.claude/

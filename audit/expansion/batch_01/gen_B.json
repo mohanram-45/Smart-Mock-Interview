@@ -1,0 +1,759 @@
+[
+ {
+  "plan_id": "B1-GEN-02-1",
+  "cell_id": "GEN-02",
+  "topic": "Chunking and document ingestion",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "Your RAG team splits every document into 512-token chunks with no overlap and gets noticeably worse answers on questions whose answer straddles a paragraph boundary. A colleague says 'just raise the overlap to 128'. Estimate what that does to index size for a 10,000-token document, and describe how you would decide on chunk size and overlap using retrieval measurements rather than intuition.",
+  "answer_set": "concise+detailed+practical",
+  "answer": null,
+  "concise_answer": "Overlap helps boundary-straddling answers but costs index size and creates near-duplicate hits. For a 10,000-token document at 512 tokens, 0 overlap gives 20 chunks; 128 overlap gives 26 chunks and about 13,200 stored tokens, roughly 32% more. Choose size and overlap by sweeping a grid against a labelled query set and comparing recall@k and answer-bearing-chunk rank, plus downstream answer quality, not by intuition.",
+  "detailed_answer": "Overlap repeats the last o tokens of one chunk at the start of the next, so a sentence cut at a boundary appears whole in at least one chunk. With chunk size s and overlap o the stride is s - o, the chunk count for a document of L tokens is 1 + ceil((L - s) / (s - o)), and total stored tokens are about L + (chunks - 1) * o. For L = 10,000 and s = 512: o = 0 gives 20 chunks (10,000 tokens); o = 64 gives 23 chunks (about 11,400 tokens, +14%); o = 128 gives 26 chunks (about 13,200 tokens, +32%). Embedding cost, vector memory and index size scale with those counts.\n\nCosts beyond storage: neighbouring chunks now contain the same text, so one relevant passage can occupy several of the top-k slots, wasting context budget unless you deduplicate or merge adjacent hits. Overlap is also a blunt fix: it only rescues answers shorter than the overlap, and it does nothing when the answer needs a heading or table header that lives far away. Splitting on structure (sentences, paragraphs, headings) usually removes more boundary damage than blind overlap.\n\nChunk size itself is a trade-off: small chunks give precise embeddings and cheap context but lose surrounding meaning and raise the number of vectors; large chunks keep context but blur several topics into one vector and consume prompt tokens. There is no universal best value; it depends on the corpus, the embedding model's input behaviour and the question types (lookup versus synthesis).\n\nSo decide empirically: build a labelled query set where each query has the answer-bearing text span marked, re-chunk the corpus under each setting, and score retrieval by whether a retrieved chunk contains the span (recall@k, MRR), because chunk IDs change between configurations. Then check end-to-end answer quality on a sample, since a retrieval gain can vanish once duplicates crowd the prompt.",
+  "practical_answer": "Sweep procedure (hypothetical corpus, 300 labelled queries with answer spans):\n1. Fix the embedding model, retriever and k=5. Vary size in {256, 512, 1024} and overlap in {0, 10%, 25%} of size (9 runs).\n2. For each run, re-chunk, re-embed, and label a hit when any top-k chunk fully contains the answer span (chunk IDs differ per run, so match on text span).\n3. Record recall@5, MRR, mean distinct source passages in top-5 (to expose duplicate crowding), index token count and mean prompt tokens.\n4. Plot recall@5 against stored tokens. Take the cheapest configuration within noise of the best (with 300 queries, differences of a point or two are usually not significant; bootstrap a confidence interval).\n5. Re-read the failures that remain: if they are tables or answers needing a heading, change the splitter, not the overlap.",
+  "key_concepts": [
+   "chunk size",
+   "overlap",
+   "stride",
+   "index size growth",
+   "answer-span matching",
+   "recall@k",
+   "near-duplicate hits",
+   "structure-aware splitting"
+  ],
+  "common_mistakes": [
+   "Treating overlap as free and ignoring index growth and top-k crowding",
+   "Choosing chunk size from a blog post default instead of evaluating on own queries",
+   "Matching hits by chunk ID across configurations, which changes when chunking changes"
+  ],
+  "interview_style_note": "Candidate does the stride/chunk-count arithmetic, names duplicate crowding as a side effect, and proposes a measurement design that works when chunk IDs change.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "chunking",
+   "overlap",
+   "evaluation",
+   "index-size"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Concrete overlap arithmetic and an evaluation design for chunk parameters; nearest existing is smi-g0010 (broad semantic-search design), which has no chunk-parameter measurement angle.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-02-2",
+  "cell_id": "GEN-02",
+  "topic": "Chunking and document ingestion",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "debugging",
+  "difficulty": "Medium",
+  "question": "After ingesting 3,000 two-column PDF reports, your retrieval returns chunks that read like 'The revenue grew by Table 3 shows 12% in the Page 14 of 62 Confidential region'. Queries on the report body are poor, though simple title lookups work. Diagnose the likely extraction problems, how you would confirm each, and what you would change in the ingestion pipeline.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "The sentence shows interleaving: text from the left column, a caption or table, a running page footer and the right column are concatenated in the wrong order. Likely causes:\n\n1. Reading-order error. Many PDF text extractors emit text in the order objects were drawn or by y-coordinate, not by logical flow, so two columns are read line by line across the page. Fix: use an extractor or layout model that detects columns and reading order, or extract by text blocks and sort within columns.\n2. Repeated headers and footers ('Page 14 of 62', 'Confidential') injected into the body. They add noise to every chunk's embedding and make unrelated chunks look similar. Fix: detect strings that repeat at similar coordinates across many pages and strip them (or move them to metadata).\n3. Floating objects: tables, figure captions and footnotes placed mid-paragraph in the text stream. Fix: extract them as separate elements and attach them as their own chunks or linked metadata.\n4. Related artefacts worth checking: hyphenated line breaks splitting words, ligatures or odd Unicode, and scanned pages with no text layer (those need OCR, which has its own errors).\n\nWhy titles still work: a title is a single short line, unaffected by interleaving.\n\nConfirm by inspecting raw extracted text for a sample of pages side by side with rendered page images, and by measuring the fraction of chunks containing known boilerplate strings. Then compare retrieval recall on a small labelled query set before and after the fix; the extraction fix should move recall on body questions, which also verifies it was the cause. Always gate ingestion with automatic checks (boilerplate rate, average word length, share of non-alphanumeric characters) so a new document template cannot silently degrade the index.",
+  "practical_answer": "Triage on a 30-page sample:\n1. Render page 14 as an image and print the extractor's text for the same page; mark where order breaks.\n2. Count lines occurring on more than 30% of pages at nearly the same y position: those are header/footer candidates (here 'Page N of 62', 'Confidential'). Strip them with a normalisation step that replaces digits before comparing.\n3. Re-extract with column-aware block ordering; store tables as separate chunks with the caption as a prefix.\n4. Add a gate: reject a document if more than 2% of lines are boilerplate matches or the median word length is below 3 characters.\n5. Re-run 50 body-content queries and compare recall@5 before and after.",
+  "key_concepts": [
+   "reading order",
+   "multi-column layout",
+   "header and footer stripping",
+   "table extraction",
+   "OCR",
+   "hyphenation",
+   "extraction quality gate",
+   "layout-aware parsing"
+  ],
+  "common_mistakes": [
+   "Blaming the embedding model when the input text is already corrupted",
+   "Fixing it by shrinking chunks, which keeps the garbled text",
+   "Never inspecting raw extracted text next to the rendered page"
+  ],
+  "interview_style_note": "Candidate reads the symptom string, names reading order and boilerplate as separate causes, and proposes verification plus automatic quality gates.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "pdf",
+   "parsing",
+   "ingestion",
+   "debugging"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Debugging extraction artefacts from a concrete garbled string; no existing question covers parsing quality (nearest smi-g0010 is design-level).",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-02-3",
+  "cell_id": "GEN-02",
+  "topic": "Chunking and document ingestion",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Medium",
+  "question": "Your knowledge base is Markdown documentation containing headings, long tables (pricing tiers, parameter references) and fenced code blocks. A fixed-size splitter cuts a 40-row table in half and a code sample in the middle of a function. What goes wrong at retrieval and generation time, and how would you split each of the three content types?",
+  "answer_set": "concise+detailed",
+  "answer": null,
+  "concise_answer": "A fixed-size splitter produces fragments that lose their meaning: the second half of a table has no header row, so values cannot be interpreted, and half a function is unusable and embeds poorly. Split on structure: by heading hierarchy for prose (prefixing the heading path), tables by row groups that repeat the header row, and code by whole functions or blocks. Cap oversize units at a token limit, split them at logical boundaries and keep metadata linking the pieces.",
+  "detailed_answer": "What goes wrong. A table cut in half leaves rows with no column names: '49 | 500 | 5' is meaningless to the embedding model and to the LLM, which may then guess which column is the price. Questions about the first half can retrieve a chunk missing the second half of the table, producing a partial list stated as complete. A code block cut mid-function loses its signature or closing logic, so the model may complete it with invented code. Prose cut mid-section loses the heading that says what it is about.\n\nSplitting by type:\n- Prose: split on the heading hierarchy first, then on paragraphs and sentences until the chunk fits the size limit. Prepend the heading path ('Billing > Plans > Team plan') to each chunk, either in the embedded text or as metadata shown to the model; this is cheap and often helps retrieval for short sections.\n- Tables: keep a table whole when it fits. If not, split by row groups and repeat the header row (and caption) in every piece. For very wide, lookup-like tables, converting each row to a self-describing sentence or key-value record ('Team plan: seats 5, price ...') can retrieve better, at the cost of more vectors and the risk of conversion errors.\n- Code: split at function, class or logical block boundaries, keep the language and file path as metadata, and keep an explanatory comment or the preceding prose with the code. If a function exceeds the limit, split at statement boundaries and carry the signature.\n\nGeneral rules: structural units may exceed the target size slightly rather than be cut, but set a hard cap for embedding input limits; record the parent section ID so neighbours can be fetched; and verify with a handful of boundary-case queries (a question about the last table row, a question about a function's return value).",
+  "practical_answer": null,
+  "key_concepts": [
+   "structure-aware splitting",
+   "heading path",
+   "table header repetition",
+   "row-to-record conversion",
+   "code block boundaries",
+   "hard token cap",
+   "parent section metadata"
+  ],
+  "common_mistakes": [
+   "Using one recursive character splitter for every content type",
+   "Dropping the table header row from continuation chunks",
+   "Letting a structural unit grow without a hard cap so it is silently truncated at embedding time"
+  ],
+  "interview_style_note": "Candidate explains concretely why each content type breaks, gives a different rule per type, and mentions a cap and boundary test queries.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "chunking",
+   "markdown",
+   "tables",
+   "code"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Per-content-type splitting for tables and code; distinct from GEN-02-1 (size/overlap measurement) and smi-g0010.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-02-4",
+  "cell_id": "GEN-02",
+  "topic": "Chunking and document ingestion",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "debugging",
+  "difficulty": "Hard",
+  "question": "A nightly job re-ingests your wiki. Over three weeks, users report answers quoting removed policies, the same paragraph appearing three times in the cited sources, and the vector index growing about 4% a night even though the wiki barely grows. Explain the likely ingestion design bug and how you would redesign the update path so re-ingestion is idempotent, handles edits and deletions, and can be rolled back.",
+  "answer_set": "concise+detailed+practical",
+  "answer": null,
+  "concise_answer": "The job likely appends new chunks with fresh random IDs on every run and never removes chunks of changed or deleted pages, so old versions accumulate (stale answers, duplicates, growth). Make chunk IDs deterministic, for example a document ID plus a content hash, upsert only changed chunks, and delete chunks whose document or hash no longer exists. Version the index so a bad run can be rolled back.",
+  "detailed_answer": "Symptoms map to one cause: ingestion is append-only. Each night every page is re-chunked and inserted with a new ID (random UUID or counter). Unchanged pages therefore add exact duplicates (the paragraph appears three times after three runs), edited pages add a new version while the old chunks stay (stale content), and deleted pages are never removed (answers quoting removed policies). Index growth of a few percent a night comes from edits plus any chunks whose boundaries shift when text near the start of a document changes, which can alter every following chunk.\n\nRedesign:\n1. Stable identity. Key a document by its source URL/ID, and a chunk by (document ID, chunk position or section path, content hash). Re-running on unchanged content yields the same keys, so an upsert is a no-op: this is idempotency.\n2. Change detection. Store a document-level hash. If unchanged, skip entirely, saving embedding cost. If changed, re-chunk, compute chunk hashes, and diff against the stored set: insert new hashes, delete removed ones.\n3. Deletions. After each run, compare the set of source documents seen with those in the index and delete (or tombstone, then physically remove later) chunks of documents that no longer exist. Treat a failed crawl carefully: a partial crawl must not trigger mass deletion, so require the crawl to complete or apply a safety threshold.\n4. Visibility and rollback. Write to a new index version or collection and switch an alias after validation checks (chunk counts within an expected band, spot-check queries), so a bad run is rolled back by flipping the alias. Keep an ingestion version and timestamp in chunk metadata for debugging.\n5. Duplicate handling across documents. Identical text in different pages (boilerplate, copied sections) can be detected by hashing normalised text and kept once with a list of sources, or demoted at query time.\n\nPitfall: some vector stores do not physically free space on delete until compaction; monitor index size after the redesign, not just logical chunk counts.",
+  "practical_answer": "Nightly run, step by step (hypothetical pseudocode in words):\n- Crawl all pages -> {doc_id: text}. If pages found < 90% of last run's count, abort and alert (guards against a broken crawl).\n- For each doc: h = hash(normalised text). If h equals stored doc_hash, continue.\n- Chunk; for each chunk key = f\"{doc_id}:{sha1(normalised chunk)[:16]}\". Existing keys for the doc are read from the index.\n- to_add = new keys - existing keys (embed and upsert); to_delete = existing keys - new keys; delete them in the same batch.\n- Docs in the index but not in the crawl: delete all their chunks.\n- Run validation queries against the staged index; if recall on 40 canary queries drops by more than 3 points or chunk count changes by more than 10%, do not switch the alias.\nCheck after one week: chunk count should track wiki size, with zero duplicate keys.",
+  "key_concepts": [
+   "idempotent ingestion",
+   "deterministic chunk IDs",
+   "content hash",
+   "upsert",
+   "tombstone deletion",
+   "index alias",
+   "stale chunks",
+   "partial crawl safeguard"
+  ],
+  "common_mistakes": [
+   "Blaming the embedding model for stale answers",
+   "Using random IDs so upserts never match anything",
+   "Deleting based on a crawl that may have failed partway"
+  ],
+  "interview_style_note": "Candidate links each symptom to the append-only cause and designs identity, diffing, deletion safety and rollback.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "ingestion",
+   "idempotency",
+   "freshness",
+   "deduplication"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Stale/duplicate chunks after re-ingestion with an idempotent update design; smi-g0010 only mentions keeping the index fresh in a bullet.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-02-5",
+  "cell_id": "GEN-02",
+  "topic": "Chunking and document ingestion",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "concept",
+  "difficulty": "Medium",
+  "question": "Explain parent-child (small-to-big) retrieval. Using child chunks of 128 tokens and parent sections of 1,024 tokens, say what is embedded, what is returned to the LLM, and one situation where it helps and one where it can hurt.",
+  "answer_set": "concise+detailed",
+  "answer": null,
+  "concise_answer": "Embed and search small child chunks (128 tokens) for precise matching, but return their larger parent section (1,024 tokens) to the LLM for context. It helps when the answer needs surrounding text that a small chunk cuts off. It can hurt when several hits share a parent (duplicate context), or when the large parent adds mostly irrelevant text, spending prompt budget and diluting the evidence.",
+  "detailed_answer": "Motivation: a small chunk embeds a focused idea, so similarity is precise, but it often lacks the context needed to answer (the antecedent of 'it', the table header, the preceding condition). A big chunk preserves context but blurs several ideas into one vector. Small-to-big decouples the unit of search from the unit of reading.\n\nMechanics: split each document into parents (a section of about 1,024 tokens, so 8 children of 128 tokens each if split evenly). Embed only the children; each child stores its parent ID. At query time retrieve the top-k children, map to their parent IDs, deduplicate the parents (keeping the best child score or the count of matching children as the parent's rank signal), and pass the parents, or a window around the matching child, to the LLM. The parent text lives in a plain document store keyed by ID, not in the vector index.\n\nHelps: questions whose answer sentence is clear but depends on its section (exceptions listed two paragraphs later, a definition earlier in the section). Also reduces the risk that a boundary splits the answer.\n\nHurts: (1) the top-5 children may come from two parents, so the prompt contains 2 x 1,024 tokens, much of it irrelevant, which costs budget and may distract the model; if five children came from five parents the context is 5,120 tokens. (2) When parents are too large, the benefit of precise retrieval is thrown away at prompt time. (3) Adjacent parents or overlapping windows can duplicate text. Mitigations: cap total tokens, return a window around the child rather than the whole parent, merge adjacent hits, and tune parent size with answer-quality evaluation, not retrieval metrics alone.",
+  "practical_answer": null,
+  "key_concepts": [
+   "small-to-big retrieval",
+   "child chunk",
+   "parent chunk",
+   "parent deduplication",
+   "document store",
+   "context window cost",
+   "sentence-window retrieval"
+  ],
+  "common_mistakes": [
+   "Embedding the parents as well, which removes the precision benefit",
+   "Returning duplicate parents when several children match the same section",
+   "Assuming larger parents are always better for answer quality"
+  ],
+  "interview_style_note": "Candidate separates the search unit from the context unit and quantifies the prompt-cost downside.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "chunking",
+   "parent-child",
+   "retrieval"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Parent-child retrieval mechanism and failure modes; not covered by smi-g0010.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-02-6",
+  "cell_id": "GEN-02",
+  "topic": "Chunking and document ingestion",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "concept",
+  "difficulty": "Easy",
+  "question": "Besides the text itself, what metadata would you store with every chunk in a RAG index, and what is each field used for?",
+  "answer_set": "single",
+  "answer": "Store enough to filter, cite, refresh and debug. Core fields:\n- Source identity: document ID, URL or path, title. Used for citations and to delete or replace all chunks of a document when it changes.\n- Position: chunk index, section/heading path, page number. Used to show users where the text came from, to fetch neighbouring chunks, and to build parent-child context.\n- Version and time: document version or last-modified date, ingestion timestamp. Used to prefer current content, filter out superseded versions, and investigate when a bad answer appears.\n- Content hash: detects unchanged chunks so re-ingestion can skip them and deduplicate.\n- Access control: owner team, tenant or permission labels. Used as a retrieval-time filter so users never see text they should not; checking only after generation is too late.\n- Classification attributes: language/locale, document type, product or region. Used for pre-filtering to narrow the candidate set.\n- Pipeline info: chunker and embedding model version, so you know which vectors are comparable and can find stale ones after a model change.\n\nKeep the original raw text (not just a vector), and keep metadata small and well-typed since filter fields need consistent values. Common pitfalls: omitting version or permissions fields at first and then having to re-ingest everything, and storing free-form values (such as 'HR', 'hr', 'Human Resources') that break filters.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "document ID",
+   "section path",
+   "content hash",
+   "access-control metadata",
+   "embedding model version",
+   "last-modified date",
+   "metadata filtering"
+  ],
+  "common_mistakes": [
+   "Storing only text and vector, so citations and refresh are impossible",
+   "Applying access control after generation instead of at retrieval",
+   "Leaving out embedding-model version, making mixed-model indexes undetectable"
+  ],
+  "interview_style_note": "Candidate links each metadata field to a concrete operational need rather than listing generic fields.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "metadata",
+   "ingestion",
+   "access-control"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Per-chunk metadata checklist, an Easy recall item; distinct from smi-g0010 which does not enumerate metadata.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-04-1",
+  "cell_id": "GEN-04",
+  "topic": "Reranking and context assembly",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "concept",
+  "difficulty": "Medium",
+  "question": "Why can't you replace your first-stage vector search with a cross-encoder that scores every document against the query, even though cross-encoders are usually more accurate? Use a 1,000,000-chunk corpus and a hypothetical 4 ms per query-document pair to make the point, and say where a cross-encoder does fit.",
+  "answer_set": "concise+detailed",
+  "answer": null,
+  "concise_answer": "A cross-encoder reads query and document together, so nothing can be precomputed per document: scoring all 1,000,000 chunks costs 1,000,000 forward passes per query, about 4,000 seconds (roughly 67 minutes) at a hypothetical 4 ms each. A bi-encoder embeds documents offline and answers with one query encoding plus an ANN lookup. So use the bi-encoder to shortlist and the cross-encoder to rerank a few dozen candidates.",
+  "detailed_answer": "A bi-encoder maps query and document independently to vectors. Document vectors are computed once at indexing time and stored in an ANN index; at query time you encode only the query and search, so cost is roughly one model pass plus a sublinear lookup, independent of how expensive the model is per document.\n\nA cross-encoder feeds the concatenated pair (query, document) through the transformer and outputs a relevance score. Self-attention across both texts can model fine-grained interactions (negation, which entity a number belongs to, term order), which is why it is usually more accurate at ranking than comparing two independent vectors. The price is that the score depends on the query, so no document-side work can be cached. For N documents the cost per query is N forward passes: with N = 1,000,000 and a hypothetical 4 ms per pair, that is 1,000,000 x 0.004 s = 4,000 s, about 67 minutes. Batching and GPUs can reduce the constant substantially, but the cost still grows linearly with the corpus and is orders of magnitude beyond interactive latency budgets; the 4 ms figure is illustrative, not a benchmark.\n\nWhere it fits: as a second stage over a shortlist (for example 50 to 200 candidates from dense, BM25 or hybrid retrieval), since 50 pairs at 4 ms is 200 ms of sequential compute and less when batched. The reranker only reorders what the first stage returned, so the shortlist's recall is an upper bound on final recall. Also usable offline, for example to label training data or to evaluate retrieval, where latency does not matter.\n\nNote the middle option, late-interaction models, which store per-token document vectors and trade extra storage for better quality than single-vector bi-encoders while still avoiding per-pair transformer passes.",
+  "practical_answer": null,
+  "key_concepts": [
+   "bi-encoder",
+   "cross-encoder",
+   "two-stage retrieval",
+   "precomputation",
+   "query-dependent scoring",
+   "candidate shortlist",
+   "late interaction",
+   "linear scoring cost"
+  ],
+  "common_mistakes": [
+   "Saying cross-encoders are slower because they are bigger, rather than because nothing can be precomputed",
+   "Forgetting that reranking cannot recover documents the first stage missed",
+   "Presenting a latency number as a real benchmark"
+  ],
+  "interview_style_note": "Candidate explains the precomputation argument with arithmetic and places the cross-encoder correctly as a second stage.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "reranking",
+   "cross-encoder",
+   "bi-encoder",
+   "latency"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Cost-based explanation of why the two-stage design exists; no existing question on reranking (smi-g0010 only says 'whether and where to re-rank').",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-04-2",
+  "cell_id": "GEN-04",
+  "topic": "Reranking and context assembly",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Hard",
+  "question": "Your pipeline retrieves the top-N with hybrid search, reranks with a cross-encoder, and gives the top 5 to the LLM. On a labelled set, hypothetically, recall@50 of the first stage is 0.86 and recall@200 is 0.93; reranker cost is about 4 ms per pair when batched, and the product's retrieval budget is 400 ms. How do you choose N, and what other measurements would change your decision?",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Frame it as a trade-off between a ceiling and a cost. Reranking N candidates can at best reach recall@N of the first stage, and the final context takes only 5 of them, so what matters is the recall@5 after reranking, not recall@N alone.\n\nLatency: at 4 ms per pair (assuming it scales linearly with N once batches are full), N = 50 costs about 200 ms and N = 200 about 800 ms. The 800 ms exceeds the 400 ms budget on its own, so N = 200 is infeasible unless the reranker is made cheaper (a smaller model, shorter truncated passages, a GPU, quantisation). N = 100 would be about 400 ms, leaving nothing for the first stage and generation, so a practical ceiling is nearer 50 to 75 in this budget.\n\nBenefit: going from 50 to 200 raises the ceiling from 0.86 to 0.93, i.e. up to 7 points of recall, but only if the reranker can lift those extra answer-bearing documents (found at ranks 51 to 200 by a weaker first stage) into the top 5. Often a fraction of that is realised, because those documents are ones the first stage found hard, and the reranker also has to beat many distractors. So measure rather than assume.\n\nMeasurements to take: recall@5 and MRR after reranking for N in {20, 50, 100, 200} on the golden set; the rank distribution of answer-bearing documents in the first stage (how many fall between 51 and 200); the end-to-end answer quality, since recall@5 is only a proxy; p50 and p95 latency under production concurrency, because batching helps throughput but queueing hurts tail latency; and the effect of truncating long passages.\n\nDecision: choose the smallest N where the marginal gain in post-rerank recall@5 flattens, subject to p95 latency under budget. Cheaper alternatives to widening N: improve the first stage (hybrid, better query rewriting) so more answers already sit in the top 50, or rerank adaptively (rerank 30 first and extend only when scores look uncertain).",
+  "practical_answer": "Worked table (hypothetical measurements you would collect):\nN=20: latency 80 ms, post-rerank recall@5 0.74\nN=50: 200 ms, 0.79\nN=100: 400 ms, 0.80\nN=200: 800 ms, 0.81\nReading: from 50 to 100 the gain is 1 point for 200 ms extra; beyond 50 returns flatten. With a 400 ms budget shared with first-stage search and prompt assembly (say 120 ms), pick N=50 (200 ms) and use the remaining time on a second pass only for low-confidence queries. Validate the p95 under peak concurrency before shipping.",
+  "key_concepts": [
+   "rerank depth",
+   "recall ceiling",
+   "latency budget",
+   "marginal gain",
+   "post-rerank recall@5",
+   "p95 latency",
+   "batched inference",
+   "adaptive reranking"
+  ],
+  "common_mistakes": [
+   "Choosing N from recall@N alone without measuring post-rerank recall@5",
+   "Assuming latency is linear forever and ignoring queueing under concurrency",
+   "Treating the hypothetical numbers in the question as facts about real rerankers"
+  ],
+  "interview_style_note": "Candidate separates recall ceiling from realised gain, does the latency arithmetic, and proposes measurements that determine N.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "reranking",
+   "latency",
+   "recall",
+   "trade-offs"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Quantitative rerank-depth decision under latency budget; no existing reranking question (nearest smi-g0010).",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B1-GEN-04-3",
+  "cell_id": "GEN-04",
+  "topic": "Reranking and context assembly",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "concept",
+  "difficulty": "Medium",
+  "question": "You assemble 10 retrieved chunks into a prompt. The best evidence is usually chunk 1, but you notice answers degrade when the key chunk lands in the middle of a long context. What is this effect, how reliable is the evidence for it, and what would you do about ordering and context size?",
+  "answer_set": "concise+detailed",
+  "answer": null,
+  "concise_answer": "This is the 'lost in the middle' effect: in some models, information placed at the start or end of a long context is used more reliably than information in the middle. It is empirical and model- and length-dependent, so test your own model. Mitigate by sending fewer, better chunks, putting the strongest evidence at the start (and possibly end), and measuring answer accuracy against key-chunk position.",
+  "detailed_answer": "Observed behaviour: in several published evaluations, accuracy on questions needing one piece of information from a long input has been higher when that information is at the beginning or end and lower in the middle, giving a U-shaped curve. Treat this as an empirical tendency, not a law: it varies with model, context length, training and prompt format, and newer models may show it less. Do not assume it applies to your system; measure.\n\nWhy you might see it: attention can favour recency and the leading tokens, long inputs dilute attention, and irrelevant chunks compete for it. The practical lesson that holds regardless is that more context is not free: every additional low-relevance chunk is a distractor.\n\nWhat to do:\n1. Reduce first. Rerank and cut to the few chunks that matter (often 3 to 6) rather than filling the window. This improves cost and usually helps accuracy.\n2. Order deliberately. Place the highest-scored chunk first; if you use many, a common approach is to put the best at the beginning and the second best at the end, with weaker ones in between. Alternatively keep chunks in document order if sequence matters for coherence (a procedure's steps); relevance order is not always right.\n3. Make chunks easy to locate: label each with an ID and title, and tell the model to cite IDs, which also anchors attention and aids verification.\n4. Test: build an eval where the answer-bearing chunk is rotated through each position among distractors, and plot accuracy by position for your model and your typical chunk count. If the curve is flat, ordering is not worth engineering effort.",
+  "practical_answer": null,
+  "key_concepts": [
+   "lost in the middle",
+   "positional bias",
+   "context ordering",
+   "distractor chunks",
+   "position-rotation test",
+   "context reduction",
+   "chunk labels"
+  ],
+  "common_mistakes": [
+   "Stating the U-shaped effect as universal across all models",
+   "Stuffing the window to maximise recall without considering distractors",
+   "Reordering chunks without measuring whether it helps"
+  ],
+  "interview_style_note": "Candidate hedges the claim as empirical, prefers reducing context first, and designs a position-sweep test.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "context-assembly",
+   "lost-in-the-middle",
+   "ordering",
+   "evaluation"
+  ],
+  "time_sensitive": true,
+  "change_notes": "Context-ordering effect with a measurement protocol; no existing question on context assembly.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B1-GEN-04-4",
+  "cell_id": "GEN-04",
+  "topic": "Reranking and context assembly",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "Users report that the assistant's context often shows the same paragraph three times, or the same policy in three slightly different versions, and answers feel repetitive or inconsistent. The top-8 chunks come from an index with 15% overlap chunking and several document versions. Describe how you would deduplicate and compress retrieved context before the prompt is built, and what each technique risks.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Duplicates have three sources, each with a different fix:\n1. Overlap duplicates: adjacent chunks share text, so a relevant passage fills several slots. Fix: merge adjacent hits from the same document into one contiguous span, removing the overlapping part, or drop a chunk whose text is mostly contained in a higher-ranked chunk.\n2. Exact or near-exact copies across documents (boilerplate, copied sections, mirrored pages). Fix: hash normalised text for exact duplicates, and use near-duplicate detection (shingle overlap, or embedding similarity above a high threshold) for the rest, keeping the highest-ranked one and recording the other sources.\n3. Versions of the same document. Fix is not text similarity but metadata: keep only the current version unless the question asks about history, using a version or date filter at retrieval or a post-filter.\n\nDiversity-aware selection (for example MMR on top of reranked results) reduces redundancy but can also demote a genuinely repeated, corroborating fact; use it with a modest diversity weight.\n\nCompression, to fit more distinct evidence in the budget: (a) extractive, keep only sentences scored relevant to the query; (b) abstractive, have a model summarise or extract the relevant parts, which costs latency and an extra model call and can introduce errors or drop qualifiers; (c) truncate long chunks around the best-matching window. Risks: extractive pruning can cut the exception that reverses the rule ('unless ... '), summaries can alter numbers, and aggressive deduplication can remove corroboration or a region-specific variant that looks nearly identical. Keep source IDs through every step so citations still work, and evaluate answer correctness with and without each step instead of assuming compression helps.",
+  "practical_answer": "Pipeline order for the top-8 list:\n1. Filter to the current version (metadata: is_latest = true).\n2. Group by document; merge hits with adjacent or overlapping positions into one span.\n3. Drop any chunk with Jaccard overlap above 0.8 on word 5-grams against a higher-ranked chunk.\n4. Optionally apply MMR with lambda around 0.7 to the remaining list.\n5. Fill the budget in rank order; if the next chunk would overflow, trim it to its best-matching sentence window rather than skipping it.\nCheck on a labelled set: distinct-source count in the prompt should rise, tokens per prompt should fall, and answer accuracy must not drop. Log which step removed each chunk so surprising answers can be traced.",
+  "key_concepts": [
+   "near-duplicate detection",
+   "overlap merging",
+   "version filtering",
+   "MMR",
+   "extractive compression",
+   "abstractive compression",
+   "source ID preservation",
+   "corroboration"
+  ],
+  "common_mistakes": [
+   "Deduplicating by embedding similarity alone, which drops legitimately different near-identical clauses (regions, versions)",
+   "Summarising chunks with an LLM without checking it preserves numbers and qualifiers",
+   "Compressing and losing the source IDs needed for citations"
+  ],
+  "interview_style_note": "Candidate distinguishes the three causes of duplication, assigns the right fix to each, and names the risks of compression.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "deduplication",
+   "compression",
+   "context-assembly",
+   "MMR"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Context-assembly dedup/compression; relates to GEN-02-4 (ingestion-side stale chunks) but acts at query time. No existing equivalent.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-04-5",
+  "cell_id": "GEN-04",
+  "topic": "Reranking and context assembly",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Medium",
+  "question": "Compliance requires that every claim in the assistant's answer can be traced to a source passage the user can open. How would you implement citation and attribution in a RAG answer pipeline, and how do you check that a citation actually supports the claim it is attached to?",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Design in three layers.\n\nPrompt/context layer: give each retrieved chunk a short stable identifier ([1], [2] or doc-id plus section) with its title and keep a table from identifier to document, version and location. Instruct the model to cite identifiers for each claim and to say when the sources do not contain the answer.\n\nOutput layer: ask for structured output (answer sentences each with a list of source IDs), or parse inline markers. Validate mechanically: every cited ID must exist in the provided context (models can invent IDs), and every factual sentence should have at least one citation. Map IDs back to document links and quoted spans for display.\n\nSupport check layer: a valid ID does not mean the passage supports the claim. Common failures are a citation to a topically related chunk that does not say it, a correct claim attached to the wrong chunk, and a claim blended from several chunks with only one cited. Checks: (a) have the model return a short verbatim quote per claim and verify by string match that the quote appears in the cited chunk, which catches fabricated support; (b) run an entailment-style check, using an NLI model or an LLM judge, of claim versus cited passage; judges are imperfect, so calibrate on human-labelled pairs and treat the score as a signal; (c) sample outputs for human review.\n\nTrade-offs: sentence-level citation is more traceable but harder for the model to produce reliably than a list of sources at the end; quote verification adds output tokens; a post-hoc attribution step (find the best supporting passage for each generated sentence) works with any generator but may attach a plausible passage to a claim that came from the model's memory, so it cannot prove grounding on its own. Also citations should point to the version used at answer time.",
+  "practical_answer": "Output contract (hypothetical):\n{\"claims\":[{\"text\":\"Refunds are possible within 30 days.\",\"sources\":[\"P7#s3\"],\"quote\":\"within 30 days of purchase\"}],\"unanswerable\":false}\nValidation: 1) all source IDs in the context set; 2) quote is a substring of the chunk text after whitespace normalisation; 3) entailment score above a threshold calibrated on 200 human-labelled claim-passage pairs; 4) answers with any failing claim are regenerated once, then fall back to 'cannot confirm' with the sources listed. Track weekly: share of claims failing each check.",
+  "key_concepts": [
+   "source identifiers",
+   "structured citations",
+   "quote verification",
+   "entailment check",
+   "citation hallucination",
+   "post-hoc attribution",
+   "claim-level grounding"
+  ],
+  "common_mistakes": [
+   "Assuming a citation that exists in the context is a citation that supports the claim",
+   "Trusting an uncalibrated LLM judge as the only support check",
+   "Citing a document without its version or location"
+  ],
+  "interview_style_note": "Candidate separates ID validity from claim support and designs verifiable checks with their limits.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "citations",
+   "attribution",
+   "grounding",
+   "verification"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Citation/attribution mechanics and verification; no existing equivalent (smi-h0003 measures faithfulness but does not design attribution).",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-04-6",
+  "cell_id": "GEN-04",
+  "topic": "Reranking and context assembly",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Hard",
+  "question": "Your model has a hypothetical 8,192-token context window. The prompt has a 600-token system message, a 100-token user question and up to 1,200 tokens of conversation history, and you must reserve 1,000 tokens for the answer. Chunks average 450 tokens plus about 30 tokens of per-chunk formatting (ID and title). How many chunks fit, what happens when some chunks are much longer than average, and how would you design the token budget so it degrades gracefully?",
+  "answer_set": "concise+detailed+practical",
+  "answer": null,
+  "concise_answer": "Available for chunks: 8,192 - 600 - 100 - 1,200 - 1,000 = 5,292 tokens. At 480 tokens per chunk (450 + 30), 11 chunks fit (5,280 tokens), leaving 12. Because chunk lengths vary, fill by running token count, not by a fixed k, and use a priority order for what to cut: trim history first, then lowest-ranked chunks, never the system message or the answer reserve.",
+  "detailed_answer": "Arithmetic: 8,192 - 600 (system) - 100 (question) - 1,200 (history at its maximum) - 1,000 (answer reserve) = 5,292 tokens for retrieved context. Each chunk costs 450 + 30 = 480, and 5,292 / 480 = 11.025, so 11 chunks fit with 12 tokens to spare. Counts must come from the actual tokenizer of the target model, since estimates by word count can be off by tens of percent and the same text tokenises differently across models.\n\nWhy a fixed top-k fails: average length hides variance. If three of your top 11 chunks are 1,000 tokens, the prompt overflows and either the request fails or the provider/framework truncates silently, typically cutting the end of the prompt, which may include the question or instructions. Conversely, short chunks leave budget unused.\n\nBudget design:\n1. Fixed reservations first: system message and answer reserve (generous enough for the longest allowed answer), counted exactly.\n2. Elastic allocations: history gets a cap and is summarised or truncated oldest-first; the question is kept in full (or rejected if absurdly long).\n3. Fill chunks in ranked order while the running total plus the next chunk fits. If the next chunk does not fit, either trim it to its best passage window or skip it and try the next shorter one; do not exceed the cap.\n4. Use fewer chunks than fit when the reranker scores fall below a relevance threshold: extra low-score chunks add cost and distraction, so the budget is a ceiling, not a target.\n5. Put the question and key instructions where truncation cannot reach them, and always verify the final token count before the call.\n\nMonitor the share of requests that hit the cap and the distribution of truncated chunks; a high rate signals chunks that are too large or history that is too long.",
+  "practical_answer": "Greedy fill with hypothetical per-chunk costs (including formatting), budget 5,292: 480, 520, 1,020, 470, 480, 490, 610, 450, 480, 700, 470, 480.\nRunning totals after chunks 1 to 9: 480, 1,000, 2,020, 2,490, 2,970, 3,460, 4,070, 4,520, 5,000. Chunk 10 (700) would reach 5,700, over budget. Remaining room is 292 tokens. Options: trim chunk 10 to its best 292-token window (total exactly 5,292), or stop. Chunks 11 and 12 (470 and 480) are larger than 292, so skipping ahead finds nothing that fits. Final prompt: nine full chunks plus an optional trimmed tenth; recount the whole prompt with the model's tokenizer before sending.",
+  "key_concepts": [
+   "token budget",
+   "answer reserve",
+   "tokenizer-exact counting",
+   "greedy fill",
+   "chunk trimming",
+   "history truncation",
+   "relevance threshold",
+   "silent truncation"
+  ],
+  "common_mistakes": [
+   "Using a fixed top-k regardless of chunk lengths",
+   "Counting tokens by words or characters instead of the model's tokenizer",
+   "Forgetting to reserve output tokens, so the answer is cut off"
+  ],
+  "interview_style_note": "Candidate does the arithmetic, reserves output and fixed parts first, and handles variable chunk length with an explicit degradation policy.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "token-budget",
+   "context-window",
+   "prompt-assembly"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Concrete token-budget design; no existing context-assembly question.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-07-1",
+  "cell_id": "GEN-07",
+  "topic": "RAG failure diagnosis",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "debugging",
+  "difficulty": "Hard",
+  "question": "A RAG assistant answers 'What is the notice period for terminating the Enterprise plan?' with '30 days', but the policy says 60 days. Logging shows the correct policy chunk was retrieved at rank 2 and is in the prompt. Lay out a step-by-step triage to find out why the answer is wrong, with the experiment that separates each cause.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Retrieval is not the culprit if the correct chunk is truly in the prompt, so the question is why the generator did not use it correctly. Candidate causes and the discriminating checks:\n\n1. A conflicting chunk is also in the prompt (for example an older policy or a different plan saying 30 days). Check: read the whole prompt, not just rank 2. If another chunk says 30 days, this is a retrieval/versioning problem after all (stale or wrong-plan chunk), and the fix is filtering by version or plan.\n2. The chunk is present but the relevant sentence is truncated, mangled by extraction or separated from its table header (so '60' is not attached to 'Enterprise'). Check: print the exact chunk text as the model saw it.\n3. Parametric override: the model answers from memory or from a common default ('30 days' is a typical notice period) instead of the context. Check: run the same prompt with the chunk removed; if the answer is still '30 days', the model is ignoring the context or lacked it; also run with only the correct chunk. If it then answers 60, distractors are the problem.\n4. Position or distraction effects with many chunks: move the chunk to the first position and reduce k. A model-dependent effect, so test.\n5. Prompt instructions that allow or encourage outside knowledge, or conflict (for example 'be concise' leading to dropping conditions).\n6. Reasoning or reading error on a complex clause ('60 days, or 30 days for plans under 10 seats'): the model took the wrong branch. Check: ask for the supporting quote; if the quote is correct but the conclusion is wrong, it is a reasoning failure.\n\nRun these as controlled ablations on the failing example and then on a set of similar failures, since one example can mislead. The measure that separates generation from retrieval is faithfulness/correctness conditional on the gold chunk being supplied: if accuracy is high with the gold chunk alone and low with the production context, the context assembly is at fault.",
+  "practical_answer": "Ablation ladder on 20 similar failing queries (hypothetical results):\nA) Production prompt: 11/20 correct.\nB) Gold chunk only: 19/20 correct -> generator can read it; distractors or ordering hurt.\nC) Production prompt with gold chunk moved to position 1: 14/20 -> position matters somewhat.\nD) Production context minus any chunk from other plans/versions: 18/20 -> conflicting chunks are the main cause; fix with plan/version metadata filtering, then re-measure.\nIf B had stayed low, inspect extraction of the chunk and the prompt instruction instead.",
+  "key_concepts": [
+   "triage ladder",
+   "context ablation",
+   "conflicting evidence",
+   "parametric override",
+   "gold-chunk-only test",
+   "chunk position",
+   "quote-then-answer",
+   "faithfulness conditional on retrieval"
+  ],
+  "common_mistakes": [
+   "Concluding retrieval is fine and blaming the LLM without reading the whole prompt",
+   "Debugging from a single example instead of a set of similar failures",
+   "Changing the prompt wording first without any ablation"
+  ],
+  "interview_style_note": "Candidate builds an ordered diagnosis with a controlled experiment per hypothesis and states the decisive comparison (gold chunk alone versus production context).",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "debugging",
+   "ablation",
+   "generation",
+   "triage"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Right-document-wrong-answer diagnosis by ablation; smi-h0003 buckets failures by hand labels, whereas this designs per-case experiments.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B1-GEN-07-2",
+  "cell_id": "GEN-07",
+  "topic": "RAG failure diagnosis",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "debugging",
+  "difficulty": "Hard",
+  "question": "Answers are fluent and confident, but spot checks show many sentences are not in any retrieved chunk. Some are true, some are wrong. How do you determine whether the model is drawing on its own training knowledge, over-generalising from the chunks, or being fed irrelevant context, and what does each finding imply for the fix?",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "'Unsupported' is a property of claim versus context; the causes differ in where the claim came from, so the first step is to measure support at claim level, then run tests that vary the context.\n\nStep 1: split answers into atomic claims and label each as supported, contradicted or not found in the provided context (human labels on a sample, or a calibrated entailment judge). This gives the unsupported-claim rate, and shows whether unsupported claims are mostly true (suggesting parametric knowledge or sensible inference) or mostly wrong (confabulation or over-generalisation).\n\nStep 2: closed-book test. Ask the same questions with no retrieved context. If the unsupported claims in the RAG answer reappear in the closed-book answer, they come from the model's parametric knowledge. Fix: stronger instructions to answer only from context, a requirement to cite per claim, an abstain option, and possibly a verifier that removes unsupported claims.\n\nStep 3: relevance test. Measure whether the retrieved chunks actually contain the answer (context recall against a labelled answer span, or a manual check of 30 cases). If answer-bearing text is absent, the model fills gaps because the question cannot be answered from its context; the fix is retrieval, plus abstention when evidence is weak.\n\nStep 4: over-generalisation test. When the answer-bearing text is present but the output states more than it says (a rule extended to all regions, a number rounded or merged), check the claim against the cited quote. Fix: quote-first prompting, lower generation temperature (helps variability, not the cause), and a verifier step.\n\nInterpretation caution: a true but unsupported claim is still a policy risk when the system promises answers 'from the documents', and the correct fraction does not make the system faithful. The metrics to report are faithfulness (claims supported by context) separately from correctness (claims true), because the two diverge in exactly this scenario.",
+  "practical_answer": "Measurement plan on 100 sampled answers (hypothetical outcome): 640 atomic claims; 512 supported (80%), 128 unsupported. Of those 128, 70 reappear in a no-context run (parametric), 38 occur where retrieval lacks the answer span (missing evidence), 20 stretch a supported statement (over-generalisation). Priorities: add abstention and per-claim citation (addresses 70+20), then improve retrieval for the 38. Re-measure unsupported rate after each change on the same 100 questions plus a fresh set.",
+  "key_concepts": [
+   "atomic claims",
+   "faithfulness",
+   "closed-book test",
+   "parametric knowledge",
+   "over-generalisation",
+   "abstention",
+   "context recall",
+   "verifier step"
+  ],
+  "common_mistakes": [
+   "Treating a true unsupported claim as acceptable",
+   "Lowering temperature and expecting it to fix grounding",
+   "Relying on one metric that mixes faithfulness and correctness"
+  ],
+  "interview_style_note": "Candidate separates faithfulness from correctness and uses a closed-book control to identify the source of unsupported claims.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "hallucination",
+   "faithfulness",
+   "closed-book",
+   "diagnosis"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Source-attribution of unsupported claims via closed-book/relevance tests; differs from smi-h0003 (which sorts failures into retrieval vs generation buckets) and the NLP hallucination triage.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B1-GEN-07-3",
+  "cell_id": "GEN-07",
+  "topic": "RAG failure diagnosis",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "debugging",
+  "difficulty": "Hard",
+  "question": "Offline, your RAG system scores recall@5 of 0.92 and faithfulness 0.95 on the golden set, yet thumbs-down feedback is high, and users say answers are 'not what I asked' or 'outdated'. List the plausible reasons offline metrics and user feedback disagree and the analysis you would run to find which applies.",
+  "answer_set": "concise+detailed",
+  "answer": null,
+  "concise_answer": "Offline metrics only measure what the golden set covers. Likely gaps: the golden set does not match real queries (distribution shift, ambiguous or multi-turn queries), the corpus has changed since labelling, 'faithful' answers can still be unhelpful, and feedback may be noisy. Compare real query logs with the golden set, slice feedback by query type, and hand-review a sample of thumbs-down cases to classify the failures.",
+  "detailed_answer": "The two signals measure different things, so the mismatch is informative.\n\nPossible causes:\n1. Query distribution shift. Golden queries are often written by the team, clean and well-formed; real users write short, vague, typo-laden, multi-part or follow-up queries ('what about for contractors?') that need conversation context. Retrieval and answers on those can be much worse.\n2. Stale evaluation. The golden set labelled last quarter's corpus; new or changed documents are not represented, and 'outdated' complaints reflect freshness failures that offline sets cannot see.\n3. Metric blind spots. Recall@5 shows the evidence was retrieved, not that the answer was complete or well-formed; faithfulness measures support, not usefulness: a faithful but evasive or overly narrow answer scores well. Answer relevance and completeness may not be tracked.\n4. Coverage gaps. Users ask things the corpus cannot answer; the offline set may only include answerable questions, so abstention behaviour is untested.\n5. Feedback bias. Unhappy users are more likely to click, and thumbs-down can reflect latency, tone, UI or a missing feature, not answer quality.\n6. Judge or label issues: if faithfulness is scored by an LLM judge, it may be lenient and miscalibrated against humans.\n\nAnalysis: (a) sample 100 thumbs-down interactions and classify them (wrong retrieval, stale source, wrong intent, missing content, tone/format, unrelated to answer); (b) compare real query logs to the golden set by length, type, language and topic, and add a stratified slice of real queries (with consent and privacy handling) to the eval; (c) slice feedback rate by feature (conversation turn, doc type, age of source); (d) check whether the golden-set metrics predict feedback at the query level (do low-recall queries get more thumbs-down?). The change that comes out of it is usually a refreshed, production-sampled eval set, not a tweak to the model.",
+  "practical_answer": null,
+  "key_concepts": [
+   "distribution shift",
+   "golden set coverage",
+   "stale evaluation",
+   "user feedback bias",
+   "faithfulness versus usefulness",
+   "failure classification",
+   "production query sampling",
+   "multi-turn queries"
+  ],
+  "common_mistakes": [
+   "Trusting offline metrics over explicit user feedback",
+   "Treating all thumbs-down as answer-quality signals",
+   "Fixing the model before reviewing the failures"
+  ],
+  "interview_style_note": "Candidate lists several independent reasons for the gap and defines analyses that separate them rather than guessing.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "evaluation",
+   "user-feedback",
+   "distribution-shift",
+   "diagnosis"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Offline/online mismatch diagnosis; no existing question on production feedback vs golden set (smi-h0003 criticises a 60-sample hand-label set instead).",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-07-4",
+  "cell_id": "GEN-07",
+  "topic": "RAG failure diagnosis",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "debugging",
+  "difficulty": "Hard",
+  "question": "After a weekend re-index in which you also switched to a newer embedding model and changed chunk size from 512 to 256, answer quality drops and some previously working queries now fail. Without being able to blame one change by intuition, how do you isolate the cause, and what would you have done before the migration to make this easy?",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Three changes were made at once: embedding model, chunk size, and (implicitly) a full re-ingest that may have altered parsing, filters or metadata. Isolate by changing one factor at a time against a fixed labelled query set, and do not rely on intuition about which factor is likely.\n\nIsolation procedure:\n1. Reproduce with a regression set: take queries that worked before (from logs or the golden set) and measure recall@k and answer quality on the old and new index. Identify the queries that regressed; patterns (long queries, identifiers, tables) hint at the cause.\n2. Build a factor grid if the old index is still available: old model with 512 chunks (baseline), new model with 512, old model with 256, new model with 256. Compare each against baseline. The interaction is also visible: the new model may need a different query/document prefix or normalisation, and the embedding dimension or similarity metric may differ.\n3. Check for plain bugs unrelated to the factors: query and document embedded by different model versions (a mixed index or an unchanged query encoder), wrong distance metric for the new model, missing normalisation, lost metadata fields so filters match nothing, a truncated input exceeding the new model's token limit, different parsing, or an incomplete index (count of chunks versus expectation).\n4. Chunk size effect on the prompt: 256-token chunks double the chunk count per document, so the same top-k now covers half the text; if k and the context budget were not retuned, the model sees less evidence per query.\n5. Verify end-to-end separately from retrieval, since a retrieval gain can still reduce answer quality.\n\nPrevention: version the index (blue/green with an alias), keep the old index until the new one passes the regression set, change one thing per release, keep a frozen canary query set with expected sources, and log the model and chunker versions in the chunk metadata. Rolling back then takes one alias flip.",
+  "practical_answer": "2x2 result table (hypothetical recall@5 on 400 regression queries):\nold model / 512: 0.88\nnew model / 512: 0.90\nold model / 256: 0.81\nnew model / 256: 0.83\nReading: the new model helps by about 2 points; the smaller chunks cost about 7 points at the same k. Next steps: either return to 512, or at 256 raise k to cover the same text and add parent-child context, and re-measure. Also confirm the 12 queries that now return nothing are not caused by missing metadata or input truncation (inspect their filters and token counts).",
+  "key_concepts": [
+   "regression set",
+   "factor isolation",
+   "index versioning",
+   "embedding model change",
+   "chunk size effect on top-k",
+   "blue-green index",
+   "canary queries",
+   "metadata loss"
+  ],
+  "common_mistakes": [
+   "Assuming the newer embedding model must be better and looking elsewhere",
+   "Changing several variables in one release",
+   "Deleting the old index before the new one passes tests"
+  ],
+  "interview_style_note": "Candidate isolates variables experimentally, checks for plain pipeline bugs, and proposes a release process that makes rollback trivial.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "regression",
+   "reindexing",
+   "experiment-design",
+   "embedding-model-change"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Post-reindex regression diagnosis with factor isolation; distinct from GEN-01 (embedding model mixing) and smi-h0003.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B1-GEN-07-5",
+  "cell_id": "GEN-07",
+  "topic": "RAG failure diagnosis",
+  "domain": "Generative AI & RAG",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Hard",
+  "question": "Users of an internal assistant complain that questions containing acronyms and IDs ('What does SLA-7 cover?', 'Status of ticket INC-48213?', 'Is DPA required?') get wrong or irrelevant answers, while natural-language questions work well. The system uses dense retrieval only. Explain why, how you would confirm the diagnosis with measurements, and the fixes in order of cost.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Why: a dense embedding encodes semantic similarity of text pieces learned from training data. Rare strings such as 'INC-48213' or a company-specific acronym are tokenised into subword fragments with little meaning, so their embeddings are weakly informative and similar to many other IDs; 'SLA-7' may be close to 'SLA-8' or generic SLA text. Exact-match signals (BM25 or keyword search) handle these naturally because the token is rare and highly discriminative. Acronyms add ambiguity (DPA could mean data processing agreement or something else) which dense models may resolve using general-world knowledge, not your domain.\n\nConfirm: (1) split the query log into identifier/acronym queries and others (regex for IDs, a dictionary for acronyms), compare recall@k on the labelled subset of each; (2) run BM25 or hybrid on the same subset and check whether recall jumps; (3) inspect the top results for failures: if near-miss IDs (SLA-8) appear, that is the embedding conflation signature; (4) for acronyms, check whether the chunk uses the long form only (so the acronym never appears in the text) or the reverse.\n\nFixes in order of cost:\n1. Add lexical retrieval and fuse with dense (RRF or weighted fusion); cheap and usually effective for exact tokens. Make sure the analyser does not split or drop the ID format.\n2. Query-side handling: detect IDs and route them to exact lookup in a structured store or metadata filter (ticket status belongs in a ticket API, not a document index).\n3. Acronym expansion: glossary mapping applied to both queries and chunks at indexing time, or to the query by rewriting.\n4. Domain adaptation: fine-tune the embedder with domain pairs; the highest cost and least certain, and it still handles arbitrary IDs poorly.\n\nAlso note that live-status questions like ticket state need live data, so the answer should come from a tool call rather than a stale index.",
+  "practical_answer": "Triage table (hypothetical, 120 acronym/ID queries vs 400 natural-language queries):\ndense recall@5: IDs/acronyms 0.46, others 0.89\nBM25 recall@5: IDs/acronyms 0.78, others 0.71\nhybrid (RRF) recall@5: IDs/acronyms 0.81, others 0.90\nReading: dense fails specifically on exact tokens, hybrid recovers them without hurting the rest. Then route 'INC-xxxxx' patterns to the ticket system and add a glossary expansion; re-run the same table to confirm the remaining failures are acronyms with multiple meanings, which need disambiguation by team or document metadata.",
+  "key_concepts": [
+   "exact-match retrieval",
+   "subword tokenisation",
+   "BM25",
+   "hybrid retrieval",
+   "reciprocal rank fusion",
+   "acronym expansion",
+   "query routing",
+   "identifier lookup"
+  ],
+  "common_mistakes": [
+   "Reaching for fine-tuning the embedding model first",
+   "Assuming a bigger embedding model will memorise arbitrary IDs",
+   "Treating live-status questions as document retrieval problems"
+  ],
+  "interview_style_note": "Candidate explains the mechanism behind dense failure on rare tokens, proposes a per-slice measurement, and orders fixes by cost.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "NLP"
+  ],
+  "tags": [
+   "hybrid-search",
+   "identifiers",
+   "acronyms",
+   "slice-analysis"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Slice-based diagnosis for identifier/acronym queries; GEN-03 covers dense vs sparse conceptually, this one is a symptom-driven triage. No existing equivalent.",
+  "confidence": "high"
+ }
+]

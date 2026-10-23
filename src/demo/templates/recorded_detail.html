@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "_macros.html" import modular_panel %}
+{% block title %}{{ v.sample_id }} · recorded run{% endblock %}
+{% block body %}
+<p><a href="{{ url_for('demo.recorded_page') }}">&larr; Recorded run</a></p>
+<section class="hero"><h1>{{ v.sample_id }}</h1><p class="lead">{{ v.question }}</p></section>
+<div class="banner banner-adv"><strong>Recorded, read-only.</strong><span>Real local model output from the frozen experiment. Not validated by humans. {{ 'This question is scope-eligible for a numeric experimental score.' if v.requirements.penalty_mode == 'full' else 'This is an advisory-only question: no numeric score by design.' }}</span></div>
+<article class="card"><h2>Candidate answer</h2><pre class="plain answer">{{ v.answer }}</pre></article>
+<div class="cols">
+  {% for m in v.modular %}{{ modular_panel(m, v.answer, "Modular evaluation (repeat " ~ m.repeat ~ ")", open_details=(loop.first)) }}{% endfor %}
+  {% if v.legacy %}
+  <section class="panel panel-legacy"><header class="panel-head"><h4>Earlier single-prompt LLM evaluator</h4><div><span class="chip chip-real">REAL MODEL</span><span class="chip chip-nohv">NOT human-validated</span></div></header>
+    <p class="bigscore">{{ v.legacy.score }}<small>/100</small></p><p class="muted">{{ v.legacy.status }} · self-reported confidence {{ v.legacy.confidence }} (a model's own statement, not a measured probability)</p>
+    {% if v.legacy.missing %}<p><strong>Missing concepts it listed:</strong> {{ v.legacy.missing|join('; ') }}</p>{% endif %}
+    {% if v.legacy.errors %}<p><strong>Factual errors it listed:</strong></p><ul>{% for e in v.legacy.errors %}<li>{{ e.claim_quote[:140] }} <span class="muted">— {{ e.explanation[:160] }}</span></li>{% endfor %}</ul>{% endif %}
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

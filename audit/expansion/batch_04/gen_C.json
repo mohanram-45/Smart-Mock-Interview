@@ -1,0 +1,519 @@
+[
+ {
+  "plan_id": "B4-MLO-13-1",
+  "cell_id": "MLO-13",
+  "topic": "LLMOps specifics (prompt versioning, eval gates, token cost, guardrail monitoring)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Hard",
+  "question": "Your ticket-triage service calls a hosted LLM through a model name that the provider re-points to its newest release. One Monday the share of tickets routed to 'billing' drops from 31% to 22% and the thumbs-down rate rises, although you deployed no code and no prompt change. Design the release process so that a provider-side model change is handled like any other dependency upgrade: what you pin and record, what you test before switching, how you roll out, and what you do when the provider announces a retirement date for the model you use.",
+  "answer_set": "single",
+  "answer": "Stop treating the model identifier as a constant: in production, reference a specific dated snapshot where the provider offers one (not an alias that is re-pointed), and treat the tuple (model id, prompt version, decoding parameters, tool/JSON schemas, any guardrail versions) as one release unit that is logged on every request. The Monday drop is then diagnosable: you can see from the logged identifier whether the underlying model changed, and rolling back is a configuration change back to the previous pin (provided the provider still serves it).\n\nBefore switching to a new model, run the same prompt on a golden set, ideally including replayed, de-identified production tickets with human-confirmed routes, and compare per route, not only overall: a 9-point drop in one class can be invisible in an overall accuracy number. Also compare format validity, refusal rate, tokens per request and latency, because a newer model may be more verbose or slower.\n\nThen roll out like any model: mirror or shadow a slice of live traffic, canary by user hash at a small percentage with the routing distribution, schema-validity rate and feedback as guardrails, and keep the old pin ready for instant rollback. The ML Test Score treats dependency changes (it lists notification on dependency changes) and canarying models before production serving as tests a production ML system should have; a hosted model is a dependency you do not control.\n\nFor retirement notices: keep a calendar of every pinned model and its announced end date, start the migration with enough lead time to run the full gate and a canary, and keep a tested fallback model in config. Pitfalls: even a pinned snapshot may be retired, and provider-side serving changes can in some setups alter behaviour slightly, so keep a scheduled replay of the golden set (for example daily) as a drift alarm. Check what stability the provider actually documents rather than assuming it.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "model alias",
+   "pinned model snapshot",
+   "release unit",
+   "dependency change",
+   "golden set replay",
+   "canary rollout",
+   "retirement date",
+   "rollback by configuration"
+  ],
+  "common_mistakes": [
+   "Treating the model name as a constant and only versioning the prompt text",
+   "Judging the new model on the overall pass rate alone, so a routing shift in one class stays hidden",
+   "Assuming a pinned snapshot is permanent and never planning for retirement"
+  ],
+  "interview_style_note": "Treats a hosted model as a versioned dependency whose change needs the same gates as code: pin, replay, canary, rollback, and a migration calendar.",
+  "code": null,
+  "sources": [
+   {
+    "title": "The ML Test Score: A Rubric for ML Production Readiness and Technical Debt Reduction (Breck et al.)",
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "supports": "Lists 'Dependency changes result in notification' as a monitoring test and 'Models are tested via a canary process before they enter production serving environments' as an infrastructure test."
+   }
+  ],
+  "tags": [
+   "llmops",
+   "model-versioning",
+   "release-process",
+   "canary",
+   "dependency-management"
+  ],
+  "time_sensitive": true,
+  "change_notes": "Provider-side model change as a dependency incident (release process angle). Nearest: smi-k0006 (prompt versioning/regression gate for internal prompt edits) and smi-l0016/l0020 (registry); this one is about an external model changing under a fixed prompt.",
+  "confidence": "medium",
+  "configs": []
+ },
+ {
+  "plan_id": "B4-MLO-13-2",
+  "cell_id": "MLO-13",
+  "topic": "LLMOps specifics (prompt versioning, eval gates, token cost, guardrail monitoring)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "debugging",
+  "difficulty": "Medium",
+  "question": "Your assistant has an input filter and a separate output-moderation classifier, and the dashboard shows one number, 'blocked responses'. After Tuesday's release it goes from 1.2% to 3.9% of requests and p95 latency is also up 15%. No one has filed an incident. How do you decide whether this is real harmful traffic, a prompt or model change, or a mis-calibrated guardrail, and what must already be logged so that this is a 30-minute job rather than a 3-day one?",
+  "answer_set": "concise+detailed",
+  "answer": null,
+  "concise_answer": "Segment the jump by guardrail, reason code, prompt/model version, tenant and release time: a step change at the deploy implicates your change, gradual or single-tenant growth implicates traffic. Sample 50-100 blocked items for human review and replay them on the previous versions; check whether block-and-regenerate loops explain the latency. Log request id, resolved prompt version, model id, guardrail version, score, action and stage timings, and alert on a falling block rate too (fail-open).",
+  "detailed_answer": "Start from the dashboard, not the model. The headline 'blocked responses' mixes several things, so break the 1.2% to 3.9% jump down by guardrail (input filter vs output moderation), reason code or category, prompt version and model id, tenant, route and language, and time relative to the release. The pattern points to the cause: a step change exactly at the deploy implicates your change (prompt, model, classifier version or threshold); a gradual rise or a single-tenant concentration implicates traffic; a rise in one category only means either a real abuse campaign or a classifier that over-triggers on a new input pattern.\n\nThe latency increase is a clue. If the system regenerates or retries when the output moderator blocks, a higher block rate creates extra model calls and raises p95 by itself, so the two symptoms may share one cause. Compare per-stage timings with the block-and-retry count.\n\nThen sample. Pull 50 to 100 blocked items across categories, have a reviewer label each as correctly blocked or false positive, and replay the same inputs through the previous prompt, model and guardrail versions offline. This yields the share of the 2.7 extra points that is genuine policy-violating traffic versus over-blocking, and the replay shows which component changed behaviour.\n\nWhat to log so this takes 30 minutes: request id, tenant, the resolved prompt version number (not only an alias: an alias is a mutable pointer, while prompt versions in MLflow's prompt registry are immutable), model id, guardrail name and version, score and threshold, action taken (block, regenerate, redact, pass), and per-stage timings.\n\nAlert in both directions. A sudden fall in block rate can mean the guardrail is failing open (for example timeouts treated as pass), which is the more dangerous failure. Pitfalls: alerting only on a global rate, and tuning the threshold until the graph looks normal before establishing which blocked cases are false positives.",
+  "practical_answer": null,
+  "key_concepts": [
+   "guardrail trigger rate",
+   "block-and-regenerate loop",
+   "false-positive review",
+   "offline replay",
+   "prompt version logging",
+   "fail-open guardrail",
+   "per-stage latency"
+  ],
+  "common_mistakes": [
+   "Alerting on one global block rate and tuning the threshold until the graph looks normal",
+   "Assuming every blocked request is a genuine policy violation",
+   "Logging only the prompt alias, so the served version cannot be reconstructed"
+  ],
+  "interview_style_note": "Segments the metric, uses release timing and sampled human review to attribute the cause, and asks for the logging that makes attribution cheap.",
+  "code": null,
+  "sources": [
+   {
+    "title": "MLflow Prompt Registry documentation",
+    "url": "https://mlflow.org/docs/latest/genai/prompt-registry/",
+    "supports": "States that prompt versions in the registry are immutable once created and that an alias is a mutable named reference to a version."
+   }
+  ],
+  "tags": [
+   "llmops",
+   "guardrails",
+   "monitoring",
+   "incident-diagnosis",
+   "observability"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Operational diagnosis of a guardrail-rate jump. Nearest: smi-k0006 (prompt change control) and smi-j0029/k0017 (judge agreement); none covers guardrail-rate monitoring or logging design.",
+  "confidence": "high",
+  "configs": []
+ },
+ {
+  "plan_id": "B4-MLO-13-3",
+  "cell_id": "MLO-13",
+  "topic": "LLMOps specifics (prompt versioning, eval gates, token cost, guardrail monitoring)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "business_case",
+  "difficulty": "Medium",
+  "question": "A multi-tenant support assistant handles 300,000 requests/day. Each call sends about 2,400 tokens of fixed content (system prompt, policy text, tool definitions) plus about 800 variable tokens and produces about 350 output tokens. Finance reports that the LLM bill grew 40% in a month while traffic grew 8%, and one tenant looks responsible. Using relative units (1k input tokens = 1 unit, 1k output tokens = 4 units, hypothetical), compute the baseline cost per request, estimate the saving from an 80% prefix-cache hit rate (cached input at 0.5 units/1k) and from routing half the traffic to a smaller model at 0.25x cost, and describe the attribution, budget and alerting controls plus the release checks that stop quality loss.",
+  "answer_set": "concise+detailed+practical",
+  "answer": null,
+  "concise_answer": "Baseline is (2.4+0.8) x 1 + 0.35 x 4 = 4.6 units per request. With an 80% hit rate on the fixed prefix at 0.5 units/1k it is 3.64 (-21%); routing half the traffic to a 0.25x model on top gives 2.275 (-51%). The bill outgrew traffic because tokens per request rose, so attribute usage per tenant, set budgets and alerts, and gate routing with per-slice evals and a canary.",
+  "detailed_answer": "Baseline arithmetic (relative units, hypothetical ratios): input 3.2k tokens x 1 unit/1k = 3.2, output 0.35k x 4 = 1.4, so 4.6 units per request and 1.38 million units/day at 300,000 requests.\n\nWhy did the bill grow 40% on 8% more traffic? Cost scales with tokens per request, not with requests. Typical culprits are one tenant sending much longer variable context (pasting whole email threads), a longer system prompt or more tool definitions after a release, more tool-call rounds or retries, and more verbose outputs. Concretely, if one tenant's variable input goes from 800 to 2,400 tokens, its per-request cost goes from 4.6 to 6.2 units (+35%). You can only see this if every call is attributed to a tenant, feature and prompt version.\n\nPrefix caching: many providers reuse work only when the beginning of the prompt is byte-identical, so put the 2,400 fixed tokens first and per-request material last, and keep timestamps and user ids out of the prefix. If, hypothetically, 80% of requests hit a cache that charges 0.5 units/1k for cached input, the fixed part costs 2.4 x (0.8 x 0.5 + 0.2 x 1) = 1.44 instead of 2.4, so a request costs 3.64 units (-21%). Cache behaviour, discounts and retention are provider-specific and change, so read the provider's documentation and measure the cached-token counts it reports. Note that every prompt edit invalidates the prefix, which couples release cadence to cost.\n\nRouting half the traffic to a smaller model costing, say, 0.25x per token: with caching, 0.5 x 3.64 + 0.5 x 0.25 x 3.64 = 2.275 units (-51% vs baseline); routing alone gives 2.875 (-37.5%). These savings are only real if quality holds on the routed slice.",
+  "practical_answer": "Operational controls and release checks:\n\n1. Tag every model call with tenant, feature, prompt version and model id, and record input, cached-input and output token counts from the response usage data. Without this the 40% cannot be attributed.\n2. Track tokens per request per tenant against its own trailing median (for example the last 14 days). Alert when it exceeds 1.5x the median for a day, since a single tenant's behaviour change is the typical anomaly.\n3. Give each tenant a daily budget in units with warnings at 80% and 100%. Decide the over-budget behaviour with the product owner: truncate or summarise context, fall back to the small model, queue, or hard stop; do not default silently to a hard stop for a paying customer.\n4. Put a cost-per-resolved-ticket metric next to cost-per-request, so a cheaper but less effective path is not rewarded.\n5. Release gate for routing or shortened context: run the eval set per slice (by language, intent, tenant tier), canary 5% of traffic with resolution rate, escalation rate and thumbs-down as guardrails, and keep an instant switch back to the large model.\n6. Re-run the cost model after each prompt release, because the fixed prefix length and cacheability change with it.",
+  "key_concepts": [
+   "tokens per request",
+   "prefix caching",
+   "per-tenant attribution",
+   "budget alert",
+   "model routing",
+   "cost per resolved ticket",
+   "cached-token reporting"
+  ],
+  "common_mistakes": [
+   "Assuming cost follows request count, not tokens per request",
+   "Putting timestamps or user-specific text at the start of the prompt, which breaks prefix reuse",
+   "Routing to a smaller model without a per-slice eval gate and canary"
+  ],
+  "interview_style_note": "Does the unit arithmetic correctly, explains why the bill outgrew traffic, and ties cost controls to attribution and a quality gate.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Prompt caching (OpenAI API documentation)",
+    "url": "https://developers.openai.com/api/docs/guides/prompt-caching",
+    "supports": "Documents that prompt caching reuses work when requests share the same prompt prefix, that the entire rendered prefix must match, and that stable content should come first with variable content such as timestamps later."
+   }
+  ],
+  "tags": [
+   "llmops",
+   "token-cost",
+   "prompt-caching",
+   "routing",
+   "budgets"
+  ],
+  "time_sensitive": true,
+  "change_notes": "Cost operations and release process (attribution, budgets, routing gate). Nearest: smi-k0008 (agent-loop token blow-up) and smi-k0042 (long context vs RAG); this one is multi-tenant cost accounting with computed savings.",
+  "confidence": "medium",
+  "configs": []
+ },
+ {
+  "plan_id": "B4-MLO-13-4",
+  "cell_id": "MLO-13",
+  "topic": "LLMOps specifics (prompt versioning, eval gates, token cost, guardrail monitoring)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "evaluation",
+  "difficulty": "Medium",
+  "question": "A teammate proposes this release rule for prompt changes: 'run the 200-item regression set once at temperature 0 and ship if the new prompt scores higher than the old one'. The old prompt passes 160/200 and the new one 166/200. Is that evidence enough to ship? What would you change in the gate, and roughly how large would the evaluation set need to be to detect a true 3-point gain?",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Not enough as stated. 166/200 vs 160/200 is a 3-point difference on 200 items; the sampling error of a single 200-item pass rate near 80% is about 2.8 points (sqrt(0.8 x 0.2 / 200)), so each score alone is uncertain by roughly +/-5.5 points at 95%.\n\nBecause both prompts are scored on the same items, use the paired comparison. Suppose the new prompt fixed 14 items and broke 8 (net +6, which gives 166). An exact sign test on the 22 discordant items gives a two-sided p-value of about 0.29, and a paired 95% interval for the difference is roughly -1.6 to +7.6 points. The data are compatible with no gain, and with a modest regression on some items.\n\nTemperature 0 does not remove noise. In many hosted setups outputs are not guaranteed to be bitwise reproducible across calls, and if a rubric or LLM judge scores the output, the judge adds its own variability. Run each item several times (for example 3) for the candidate and baseline, or at least measure run-to-run variation once, and treat per-item flips as a separate signal.\n\nHow big must the set be? If the true gain is 3 points and about 11% of items change outcome between prompts (an assumption you should measure), the paired variance per item is about 0.11 - 0.03^2, and about 950 items give roughly 80% power at the 5% level. That is an approximation under those assumptions, not a fixed rule.\n\nBetter gate: (1) paired comparison with an interval; (2) ship only if the lower bound is above a no-worse margin you chose in advance (non-inferiority) when the goal is cost or latency, or above zero when claiming improvement; (3) hard constraints that cannot regress, such as JSON validity and refusal rate on safety cases, checked on slices; (4) every production failure added to the set so it grows.",
+  "practical_answer": "Worked decision rule for a prompt-change gate (illustrative thresholds, to be set by your risk tolerance):\n\n- Run baseline and candidate on the same N items, each repeated 3 times; use the majority outcome per item (or the mean pass rate) to reduce run noise.\n- Compute discordant counts: b = items the candidate fixes, c = items it breaks.\n- Report net gain (b - c)/N and an exact binomial (sign test) p-value or a paired interval. For N = 200, b = 14, c = 8: net +3.0 points, p about 0.29, interval about [-1.6, +7.6]: result 'inconclusive'.\n- Decision table: interval entirely above zero and no hard-constraint slice worse -> ship; interval spans zero but the candidate is cheaper or faster and the lower bound is above your tolerance of -2 points -> ship as a cost change with a canary; lower bound below the tolerance -> do not ship, enlarge the set or improve the prompt.\n- Read the 8 broken items by hand before deciding; two systematic failures matter more than the average.",
+  "key_concepts": [
+   "paired comparison",
+   "sign test",
+   "discordant pairs",
+   "run-to-run variance",
+   "non-inferiority margin",
+   "regression set size",
+   "hard constraint slices"
+  ],
+  "common_mistakes": [
+   "Treating 83% vs 80% on 200 items as a real improvement because 166 > 160",
+   "Believing temperature 0 makes a hosted LLM evaluation noise-free",
+   "Looking only at the overall pass rate and not at which items the change broke"
+  ],
+  "interview_style_note": "Uses a paired test on discordant items, quantifies sampling noise, and turns the result into an explicit gate with a pre-set margin.",
+  "code": null,
+  "sources": [],
+  "tags": [
+   "llmops",
+   "eval-gate",
+   "statistics",
+   "prompt-regression",
+   "sampling-error"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Statistical design of a prompt eval gate (computed). Nearest: smi-k0006 (gate exists, no stats), smi-k0018 (judge overfitting), smi-l0007 (seed variance in training), smi-l0011 (promotion_gate code).",
+  "confidence": "high",
+  "configs": []
+ },
+ {
+  "plan_id": "B4-MLO-14-1",
+  "cell_id": "MLO-14",
+  "topic": "MLOps case studies, deployment tests (canary/shadow/A-B) and online/offline consistency incidents",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "business_case",
+  "difficulty": "Hard",
+  "question": "A recommender model passes a 5% canary and a 2-week A/B test (click-through +4%, no latency or error regressions) and goes to 100%. Six weeks later, repeat purchases per active user are down 2% against the pre-launch trend while click-through is still up. List the plausible mechanisms, say what evidence would separate them, and explain what release practice would have caught this earlier or made it cheaper to resolve.",
+  "answer_set": "single",
+  "answer": "Likely mechanisms, which can overlap: (1) Proxy mismatch. The test optimised click-through, but the goal is repeat purchase. Google's Rules of Machine Learning note that metrics measurable in A/B tests are proxies for longer-term goals, and that launch decisions need several metrics. A model that attracts clicks with narrower or more clickable items can raise clicks and lower later satisfaction. (2) Horizon. A repeat purchase that happens 3 to 6 weeks later cannot show up in a 2-week test by construction; likewise a canary has to be long enough to be representative (the SRE workbook says so), which a slow outcome metric can never satisfy. (3) Novelty and exposure effects: early click lift may fade while a narrowing of what users see (less diversity, fewer discovery items) accumulates. (4) Confounding by trend or season: the 'down 2% against the pre-launch trend' comparison also contains seasonality, price changes, campaigns and a cohort mix shift. (5) Selection: after launch, the model's own recommendations shape what users buy and what data is logged next.\n\nSeparating them: only a concurrent control answers it. If a holdback group (say 2 to 5% of users kept on the old model) exists, compare repeat purchase, diversity of items seen and revenue per user between holdback and exposed users from the launch date. Without it, fall back to weaker evidence: difference-in-differences against a segment less exposed to the recommender, same-period-last-year comparison, and cohorts split by exposure date. Check that the metric definition and tracking did not change at the same time.\n\nPractice that would have caught this: a pre-agreed long-term guardrail (repeat purchase or a validated surrogate) with a holdback kept for the horizon that metric needs, the rollout kept reversible by a flag, and a review date. Cost of the holdback is the lost uplift on that slice; it buys the ability to measure the long-term effect. If the holdback shows a real harm, roll back or retune the objective, and consider adding diversity or downstream-conversion terms.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "proxy metric",
+   "long-term holdback",
+   "novelty effect",
+   "outcome horizon",
+   "difference-in-differences",
+   "seasonality confound",
+   "exposure narrowing"
+  ],
+  "common_mistakes": [
+   "Concluding the A/B test was wrong because the later metric fell, without checking trend, season and cohort mix",
+   "Comparing post-launch numbers only with the pre-launch period instead of a concurrent control",
+   "Rolling back at once without a holdback, so the effect of the rollback itself cannot be measured"
+  ],
+  "interview_style_note": "Separates proxy mismatch, horizon, novelty and confounding, and insists on a concurrent holdback as the clean counterfactual.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Rules of Machine Learning (Google for Developers)",
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "supports": "Rule #39 states that launch decisions are a proxy for longer-term product goals and that the metrics measurable in A/B tests are only proxies for them."
+   },
+   {
+    "title": "Canarying Releases (Google SRE Workbook)",
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "supports": "States the canary should be sizeable and last long enough to be representative of the overall deployment."
+   }
+  ],
+  "tags": [
+   "a-b-testing",
+   "holdback",
+   "long-term-metrics",
+   "canary",
+   "business-impact"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Post-launch long-horizon degradation after clean canary/A-B gates, and holdback design. Nearest: smi-l0013 (40-minute rollback criteria), smi-l0033 (novelty decay and randomisation unit), smi-l0031 (delayed labels in canary policy); this one adds the persistent holdback and proxy-vs-goal diagnosis.",
+  "confidence": "high",
+  "configs": []
+ },
+ {
+  "plan_id": "B4-MLO-14-2",
+  "cell_id": "MLO-14",
+  "topic": "MLOps case studies, deployment tests (canary/shadow/A-B) and online/offline consistency incidents",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "debugging",
+  "difficulty": "Hard",
+  "question": "A new fraud-scoring model ran in shadow for three weeks: the shadow logged scores for all mirrored requests, 99.9% of them agreed with the expected output computed offline, and the shadow call's p99 latency was 70 ms. After promotion, p99 for the live decision is 400 ms, customers get duplicate 'transaction held' notifications, and live scores for similar customers are noticeably lower than what the shadow had logged. Which properties of the shadow setup could have produced a clean pass that did not predict this, and what would you change in the next shadow?",
+  "answer_set": "single",
+  "answer": "The shadow comparison measured whether the model's output agreed with an expectation, not whether the system around it would behave the same once it is the live path. Four properties of a typical shadow setup explain the gap:\n\n1. Latency off the critical path. The shadow call is usually asynchronous, with its own connection pools, thread pool and capacity, and often on a mirrored sample. The 70 ms p99 says nothing about the live path where the call blocks the response, shares pools with the feature fetch, and meets peak-hour queueing. Check whether it included feature retrieval, serialisation, timeout and retry behaviour, and peak load.\n2. Side effects were disabled or not exercised. Shadow responses are normally discarded, and the notification, ledger and case-management calls are skipped. In production, a different decision rate (more 'hold' actions) triggers those downstream calls, and if the call is retried without an idempotency key you get duplicates. Shadow cannot reveal effects of acting on a decision.\n3. Feature freshness differs. If the shadow path read features from a replica, a cache or a snapshot taken at logging time, or the comparison recomputed features offline afterwards, it saw fresher or more complete values than the live path gets at decision time. Late events then make shadow scores look better than live scores. Log the exact feature values used at serving time and compare those; Google's Rules of Machine Learning recommend saving the features used at serving time for this reason.\n4. No feedback: shadow decisions do not change customer behaviour, so downstream effects are not exercised.\n\nFixes for the next shadow: run the candidate on the same synchronous code path as the live model (in parallel, with its own timeout and the same pools or an equal share of capacity) at full-peak load; replace downstream services with recording stubs and count the side effects the candidate would have caused, including retries; log serving-time features and compare them to the live model's; then use a canary with guardrails on latency, error and downstream-effect rates before ramping.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "shadow deployment",
+   "critical-path latency",
+   "side effects",
+   "idempotency key",
+   "feature freshness",
+   "serving-time feature logging",
+   "recording stubs"
+  ],
+  "common_mistakes": [
+   "Assuming agreement with offline scores proves the live path will behave the same",
+   "Measuring shadow latency on an async path with its own capacity and calling it the live latency",
+   "Ignoring downstream effects that only occur when decisions are acted upon"
+  ],
+  "interview_style_note": "Reads the incident as a gap between what shadow measures and what production depends on, and proposes concrete changes to the shadow design.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Rules of Machine Learning (Google for Developers)",
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "supports": "Rule #29 recommends saving the set of features used at serving time and logging them for use at training time, and notes this can be done on a small fraction of examples."
+   }
+  ],
+  "tags": [
+   "shadow-deployment",
+   "incident-diagnosis",
+   "idempotency",
+   "feature-freshness",
+   "latency"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Incident-style diagnosis of a shadow pass that failed to predict production. Nearest: smi-l0029 (what shadow can/can't tell and sequencing); this gives symptoms and asks for root causes and a redesigned shadow, overlapping only partly.",
+  "confidence": "medium",
+  "configs": []
+ },
+ {
+  "plan_id": "B4-MLO-14-3",
+  "cell_id": "MLO-14",
+  "topic": "MLOps case studies, deployment tests (canary/shadow/A-B) and online/offline consistency incidents",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "debugging",
+  "difficulty": "Hard",
+  "question": "An A/B test of a new ranking model (planned 50/50 by user hash) reports +3.1% conversion for treatment. A reviewer notices that assignment counts are 51,000 vs 49,000 users out of 100,000, and that the serving stack has (a) a result cache keyed by (query, locale) with a 10-minute TTL and (b) an online-learning component that updates one shared set of item-popularity weights from clicks in both arms. Explain what each of these can do to the experiment, how you would test for them, and how you would fix the setup.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Two separate problems show up in the description.\n\n1. Sample ratio mismatch (SRM). With 100,000 users and a 50/50 plan, you expect 50,000 per arm. The chi-square statistic for 51,000 vs 49,000 is (1000^2/50000) x 2 = 40.0 on 1 degree of freedom, and the p-value is about 2.5e-10 (computed). Chance does not explain that, so something in the pipeline treats the arms differently: for example a crash, redirect, bot filter or logging loss that affects one arm, or assignment happening after an event that differs by arm. Do not interpret the +3.1% until the SRM is explained, because the missing users are rarely missing at random.\n\n2. Interference between arms. The result cache keyed only by (query, locale) means whichever arm populates an entry first determines what the other arm's users receive for 10 minutes, so some control users see treatment rankings and vice versa. The shared online-learning weights mean treatment clicks update the model that also serves control, so the two arms are no longer independent systems; the test then measures a blend, which typically biases the estimated difference towards zero (direction is not guaranteed, for example when the learner favours the arm that generates more clicks). This is the stable-unit-treatment-value problem seen from the operations side. Hidden Technical Debt in ML Systems notes that a model may directly influence the selection of its own future training data; an online learner shared across arms is a version of that.\n\nFixes: include the experiment arm in the cache key (or bypass caching for the test); keep separate learner state per arm, or freeze learning during the test and compare fixed models; log both the assigned and the actually served variant per request and analyse by served arm only as a diagnostic; run an A/A test through the same stack to see whether the pipeline produces SRM or a non-zero difference with identical arms.",
+  "practical_answer": "Checklist for analysing a suspect test, in order:\n\n- Run the SRM check first. Computed: observed 51,000 vs 49,000 users, expected 50,000 each, chi-square 40.0 on 1 d.f., p about 2.5e-10. Treat any p below a strict threshold (many teams use something like 0.001) as 'results invalid until explained'.\n- Break the counts by day, platform, country and entry point; the segment where the ratio is off often names the cause (for example an app version that crashes only in treatment).\n- Look for an arm leak: for a sample of requests compare the assigned arm with the variant recorded on the served response. A non-trivial share of mismatches indicates cache or routing contamination.\n- Run an A/A test (both arms get the old model) through the same cache and learner. If it shows a difference or SRM, the platform is the problem, not the model.\n- Decide the design: per-arm cache namespaces and per-arm (or frozen) learner state. If the learner must be shared in production, accept that the test measures the new model inside the shared system and say so.\n- Re-run, then compare against the planned 50/50: a matching ratio and a null A/A are the conditions for reading the conversion lift.",
+  "key_concepts": [
+   "sample ratio mismatch",
+   "chi-square test",
+   "cache key contamination",
+   "shared online learner",
+   "interference (SUTVA)",
+   "A/A test",
+   "served versus assigned variant"
+  ],
+  "common_mistakes": [
+   "Reporting the +3.1% and treating the 51,000 vs 49,000 split as harmless noise",
+   "Assuming interference can only inflate the lift; it can also dilute or distort it",
+   "Keying a cache without the experiment arm"
+  ],
+  "interview_style_note": "Recognises SRM as a validity gate, identifies two operational interference channels, and proposes tests (A/A, assigned-vs-served) and architectural fixes.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Hidden Technical Debt in Machine Learning Systems (Sculley et al., NeurIPS 2015)",
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "supports": "Section 4 states that a model may directly influence the selection of its own future training data (direct feedback loop)."
+   }
+  ],
+  "tags": [
+   "a-b-testing",
+   "srm",
+   "interference",
+   "caching",
+   "online-learning"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Operational contamination of an experiment (cache key, shared online learner, SRM check; chi-square computed). Nearest: smi-l0033 (randomisation unit and carousel interference, novelty decay) and smi-0172/i0034 (A/B basics); this is about platform-induced contamination and SRM.",
+  "confidence": "medium",
+  "configs": []
+ },
+ {
+  "plan_id": "B4-MLO-14-4",
+  "cell_id": "MLO-14",
+  "topic": "MLOps case studies, deployment tests (canary/shadow/A-B) and online/offline consistency incidents",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "evaluation",
+  "difficulty": "Hard",
+  "question": "A product-search ranker trained on click logs raises offline AUC from 0.78 to 0.81 on a held-out week of logged impressions, but the online A/B test shows conversion of 3.10% vs 3.09% (not significant, with enough traffic that a 1% relative change would have been detectable). Give the explanations specific to logged-data evaluation that you would investigate, in the order you would check them, and how you would change the offline evaluation so it predicts the online result better.",
+  "answer_set": "single",
+  "answer": "Offline AUC measures how well the model separates clicked from non-clicked impressions in logged data. That is not the same as improving what users do when the new model controls the page, and several mechanisms can open that gap.\n\n1. Logged data come from the old policy. Items shown high up got more attention, so click labels mix item relevance with position and exposure. A new model can raise AUC partly by learning position-correlated features (item popularity under the old ranker, previous rank, cache or slot id) that predict clicks in the logs but do not move users' behaviour when the new model reorders items. The check is to compute AUC within position buckets, or on a small randomised-ranking slice if you have one, and to see whether AUC rises there.\n2. Selection bias: the logs contain only items the old system chose to show. The new model is evaluated and trained on that subset but must rank the whole candidate set live, including items never seen in training (a different distribution). Hidden Technical Debt in ML Systems describes this class of problem as a direct feedback loop, where a model influences the selection of its own training data; exploration traffic or counterfactual evaluation (inverse-propensity weighting from logged propensities) are the standard mitigations.\n3. Label and objective mismatch. AUC on clicks does not imply conversion; clickbait-style items raise click prediction without improving purchases. AUC also weighs the whole list equally, so a model can gain AUC in the tail without improving ranks 1 to 5, where the outcome is decided. Use a top-of-list metric (nDCG@5, or conversion-weighted) offline.\n4. Training-serving skew and saturation. Check features logged at serving time against offline values (Rules of Machine Learning rule 37), and check whether the conversion funnel simply has little headroom at the ranking step.\n\nPlan: reproduce the offline metric per position, replay with propensity weighting, check skew by logging serving-time features, then validate with a small online test using a primary metric tied to conversion.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "position bias",
+   "selection bias",
+   "logged propensities",
+   "inverse-propensity weighting",
+   "direct feedback loop",
+   "nDCG at top ranks",
+   "objective mismatch"
+  ],
+  "common_mistakes": [
+   "Assuming a higher AUC on any held-out data implies a better ranking in production",
+   "Evaluating on impressions produced by the old ranker and ignoring exposure and position",
+   "Using AUC alone when the business outcome depends on the top few ranks"
+  ],
+  "interview_style_note": "Explains why offline AUC on logged clicks can mislead and proposes concrete diagnostics (per-position AUC, propensity weighting, top-rank metrics).",
+  "code": null,
+  "sources": [
+   {
+    "title": "Hidden Technical Debt in Machine Learning Systems (Sculley et al., NeurIPS 2015)",
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "supports": "Section 4 states that a model may directly influence the selection of its own future training data."
+   },
+   {
+    "title": "Rules of Machine Learning (Google for Developers)",
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "supports": "Rule #37 discusses measuring training/serving skew, including that the same example should give the same result in training and serving and that a discrepancy probably indicates an engineering error."
+   }
+  ],
+  "tags": [
+   "offline-online-gap",
+   "ranking",
+   "position-bias",
+   "counterfactual-evaluation",
+   "evaluation"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Offline/online metric mismatch driven by logged-data bias and position effects. Nearest: smi-i0009 (churn model, training-serving skew causes) and smi-g0009 (threshold/metric choice); this one is about exposure and position bias in logged ranking data.",
+  "confidence": "medium",
+  "configs": []
+ },
+ {
+  "plan_id": "B4-MLO-14-5",
+  "cell_id": "MLO-14",
+  "topic": "MLOps case studies, deployment tests (canary/shadow/A-B) and online/offline consistency incidents",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Hard",
+  "question": "A real-time pricing model is served from an online store, while training features come from an offline pipeline. You are asked to build a consistency check that would have caught an incident where a deploy silently shifted one windowed count by one. Design the check: what you log at serving time, how and when you recompute offline, how you define tolerances for different feature types, how you use timestamps to root-cause a mismatch, and what you alert on. Show the comparison as SQL that you have executed.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Design in four parts.\n\nLog. For a sample of live requests (say 1%; at 2 million requests/day this is 20,000 comparisons), write the exact feature values the model received, with request id, entity id, served-at timestamp, model version and feature-pipeline version. Saving the features used at serving time is the approach Google's Rules of Machine Learning recommend, and doing it for a small fraction of examples is acceptable.\n\nRecompute. A scheduled job recomputes the same features with the offline pipeline, as of served_at (point-in-time, using only data that was available then, or with an explicit lateness allowance). Recomputing 'as of now' will report differences that are just late-arriving events and deletions, which swamps real bugs.\n\nCompare with per-feature tolerances. Integers, ids and categories: exact. Floats: absolute plus relative tolerance (to absorb floating-point and rounding order). Windowed counts that depend on event lateness: allow a documented tolerance or compare only rows whose window is older than the lateness bound. NULL versus non-NULL is always a mismatch. Requests with no recomputation are tracked separately.\n\nRoot-cause with time. Aggregate mismatch rate by feature and hour (and by model or pipeline version). A step beginning at a deploy time points to a code change; a daily spike at a fixed hour to a batch job or cache expiry; mismatches concentrated in new entities to cold-start defaults. Alert on a mismatch rate above a threshold you choose per feature, with the sample size in mind: if all 20,000 comparisons match, the 95% upper bound on the true mismatch rate is about 3/20,000 = 0.015% (the rule of three). The ML Test Score lists 'Training and serving features compute the same values' as a monitoring test.",
+  "practical_answer": "Executed example of the comparison query (SQLite dialect, run with Python's sqlite3 on a small in-memory dataset). It reports, per hour and feature, how many sampled requests had no offline recomputation and how many differed beyond that feature's tolerance. Clean hours are filtered out.\n\n```python\nimport sqlite3\n\nSQL = \"\"\"\nSELECT strftime('%Y-%m-%d %H:00', s.served_at) AS hour,\n       s.feature,\n       COUNT(*) AS n,\n       SUM(CASE WHEN r.request_id IS NULL THEN 1 ELSE 0 END) AS not_recomputed,\n       SUM(CASE WHEN r.request_id IS NOT NULL AND (\n             (s.value IS NULL) <> (r.value IS NULL)\n             OR ABS(s.value - r.value) > t.abs_tol + t.rel_tol * ABS(r.value)\n           ) THEN 1 ELSE 0 END) AS mismatched\nFROM served s\nJOIN tolerances t ON t.feature = s.feature\nLEFT JOIN recomputed r ON r.request_id = s.request_id AND r.feature = s.feature\nGROUP BY hour, s.feature\nHAVING mismatched > 0 OR not_recomputed > 0\nORDER BY hour, s.feature;\n\"\"\"\n\n\ndef consistency_report(conn):\n    return conn.execute(SQL).fetchall()\n```\n\nOn the test data (10 clean requests per hour plus a deploy-time fault in the 14:00 hour), the query returned: ('2026-03-01 14:00', 'avg_basket', 11, 0, 1) and ('2026-03-01 14:00', 'orders_24h', 11, 1, 4). Reading it: in the 14:00 hour, 4 of 11 orders_24h values were off by one and one request had no recomputation, and one avg_basket was NULL when served but 25.0 offline. The 13:00 hour does not appear because its avg_basket differences (0.004) are within tolerance and the other values match. A mismatch that begins in the hour after a deploy is where to start reading the diff.",
+  "key_concepts": [
+   "serving-time feature logging",
+   "point-in-time recomputation",
+   "per-feature tolerance",
+   "mismatch rate by hour",
+   "rule of three",
+   "late-arriving events",
+   "NULL mismatch"
+  ],
+  "common_mistakes": [
+   "Recomputing offline 'as of now', so late events appear as mismatches",
+   "Using one global tolerance for ids, counts and floats",
+   "Comparing only aggregate distributions and missing row-level mismatches"
+  ],
+  "interview_style_note": "Designs a row-level, point-in-time consistency check with typed tolerances and uses timestamps to attribute mismatches to deploys or batch jobs.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import sqlite3\n\nSQL = \"\"\"\nSELECT strftime('%Y-%m-%d %H:00', s.served_at) AS hour,\n       s.feature,\n       COUNT(*) AS n,\n       SUM(CASE WHEN r.request_id IS NULL THEN 1 ELSE 0 END) AS not_recomputed,\n       SUM(CASE WHEN r.request_id IS NOT NULL AND (\n             (s.value IS NULL) <> (r.value IS NULL)\n             OR ABS(s.value - r.value) > t.abs_tol + t.rel_tol * ABS(r.value)\n           ) THEN 1 ELSE 0 END) AS mismatched\nFROM served s\nJOIN tolerances t ON t.feature = s.feature\nLEFT JOIN recomputed r ON r.request_id = s.request_id AND r.feature = s.feature\nGROUP BY hour, s.feature\nHAVING mismatched > 0 OR not_recomputed > 0\nORDER BY hour, s.feature;\n\"\"\"\n\n\ndef consistency_report(conn):\n    return conn.execute(SQL).fetchall()\n",
+   "test": "def _build():\n    conn = sqlite3.connect(\":memory:\")\n    conn.executescript(\"\"\"\n    CREATE TABLE served (request_id TEXT, feature TEXT, value REAL, served_at TEXT);\n    CREATE TABLE recomputed (request_id TEXT, feature TEXT, value REAL);\n    CREATE TABLE tolerances (feature TEXT PRIMARY KEY, abs_tol REAL, rel_tol REAL);\n    INSERT INTO tolerances VALUES ('orders_24h', 0.0, 0.0), ('avg_basket', 0.01, 0.001);\n    \"\"\")\n    rows_s, rows_r = [], []\n    # 13:xx requests: served == recomputed (avg_basket differs by float noise only)\n    for i in range(10):\n        rid = \"a%d\" % i\n        rows_s += [(rid, \"orders_24h\", float(i), \"2026-03-01 13:%02d:00\" % (i * 5)),\n                   (rid, \"avg_basket\", 20.0 + i, \"2026-03-01 13:%02d:00\" % (i * 5))]\n        rows_r += [(rid, \"orders_24h\", float(i)), (rid, \"avg_basket\", 20.0 + i + 0.004)]\n    # 14:xx requests (after a hypothetical deploy): served orders_24h is off by 1 for 4 of 10\n    for i in range(10):\n        rid = \"b%d\" % i\n        served_val = float(i + (1 if i < 4 else 0))\n        rows_s += [(rid, \"orders_24h\", served_val, \"2026-03-01 14:%02d:00\" % (i * 5)),\n                   (rid, \"avg_basket\", 20.0 + i, \"2026-03-01 14:%02d:00\" % (i * 5))]\n        rows_r += [(rid, \"orders_24h\", float(i)), (rid, \"avg_basket\", 20.0 + i)]\n    # one 14:xx request whose avg_basket was NULL when served but is 25.0 offline,\n    # and one request that has no offline recomputation at all\n    rows_s += [(\"c0\", \"avg_basket\", None, \"2026-03-01 14:50:00\"),\n               (\"c1\", \"orders_24h\", 3.0, \"2026-03-01 14:55:00\")]\n    rows_r += [(\"c0\", \"avg_basket\", 25.0)]\n    conn.executemany(\"INSERT INTO served VALUES (?,?,?,?)\", rows_s)\n    conn.executemany(\"INSERT INTO recomputed VALUES (?,?,?)\", rows_r)\n    return conn\n\n\nout = consistency_report(_build())\nassert out == [(\"2026-03-01 14:00\", \"avg_basket\", 11, 0, 1),\n               (\"2026-03-01 14:00\", \"orders_24h\", 11, 1, 4)], out\nprint(out)\n",
+   "expected": null
+  },
+  "sources": [
+   {
+    "title": "Rules of Machine Learning (Google for Developers)",
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "supports": "Rule #29 recommends saving the features used at serving time and logging them for training, and says that doing it for a small fraction of examples is still useful."
+   },
+   {
+    "title": "The ML Test Score: A Rubric for ML Production Readiness and Technical Debt Reduction (Breck et al.)",
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "supports": "Lists 'Training and serving features compute the same values' among its monitoring tests."
+   }
+  ],
+  "tags": [
+   "training-serving-skew",
+   "feature-consistency",
+   "sql",
+   "observability",
+   "point-in-time-join"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Design of the log-and-compare consistency check. Nearest: smi-l0043 (shared definitions to prevent skew), smi-l0044 (late data in backfills) and smi-l0045 (categorical skew implementation); this one is the monitoring job with tolerances, SQL and timestamp root-causing.",
+  "confidence": "high",
+  "configs": [
+   {
+    "lang": "sql",
+    "content": "\nSELECT strftime('%Y-%m-%d %H:00', s.served_at) AS hour,\n       s.feature,\n       COUNT(*) AS n,\n       SUM(CASE WHEN r.request_id IS NULL THEN 1 ELSE 0 END) AS not_recomputed,\n       SUM(CASE WHEN r.request_id IS NOT NULL AND (\n             (s.value IS NULL) <> (r.value IS NULL)\n             OR ABS(s.value - r.value) > t.abs_tol + t.rel_tol * ABS(r.value)\n           ) THEN 1 ELSE 0 END) AS mismatched\nFROM served s\nJOIN tolerances t ON t.feature = s.feature\nLEFT JOIN recomputed r ON r.request_id = s.request_id AND r.feature = s.feature\nGROUP BY hour, s.feature\nHAVING mismatched > 0 OR not_recomputed > 0\nORDER BY hour, s.feature;\n",
+    "note": "Per-hour, per-feature served-vs-recomputed mismatch query (SQLite dialect), run against an in-memory dataset by the recorded test."
+   }
+  ]
+ },
+ {
+  "plan_id": "B4-MLO-14-6",
+  "cell_id": "MLO-14",
+  "topic": "MLOps case studies, deployment tests (canary/shadow/A-B) and online/offline consistency incidents",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "business_case",
+  "difficulty": "Hard",
+  "question": "Your team has a quarter to spend and must choose between (A) building a new model and (B) investing in monitoring and feature-consistency checks for the existing one. Hypothetical numbers: the model influences about 24 million per year of margin. A: offline estimate +1.5% relative uplift, past launches realised about half of the offline uplift, cost 5 engineer-months at 20,000 per engineer-month. B: history shows about 3 silent degradations a year, each costing about 2% of the model's margin until noticed, which takes about 6 weeks today; with monitoring about 3 days. B costs 3 engineer-months to build plus about 3 engineer-months of ongoing care per year. Work out the expected value of each, show the sensitivity to the assumptions you trust least, and give a recommendation.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "All figures are hypothetical and computed from the stated assumptions.\n\nOption A, the new model. Margin influenced by the model: 24 million/year. Offline estimate +1.5% relative; past launches realised about half of the offline uplift, so the expected gain is 0.015 x 0.5 x 24M = 180,000/year. Cost: 5 engineer-months x 20,000 = 100,000. Expected net about +80,000 in year 1. This is sensitive to the realisation factor: at 25% realisation the gain is 90,000 and the net is about -10,000. Variance is high, and you only learn the realised gain after an online test.\n\nOption B, monitoring and consistency checks. History: about 3 silent degradations per year, each costing about 2% of the model's margin until noticed. Detection currently takes about 6 weeks, so one incident costs 24M x 0.02 x 6/52 = 55,400. With monitoring, detection in about 3 days costs 24M x 0.02 x 3/365 = 3,900. Saving per incident about 51,400; 3 incidents save about 154,300/year. Cost: 3 engineer-months to build (60,000) plus about 3 engineer-months of ongoing care per year (60,000), so year 1 is 120,000 and net about +34,300; later years net about +94,300. Break-even in year 1 is about 2.3 incidents per year (120,000 / 51,400).\n\nReading the numbers. On these assumptions A has higher expected value in year 1 but much higher variance and a long payback uncertainty; B has a smaller but steadier return that is insurance against a loss you currently cannot see. Two further points matter more than the arithmetic. First, B also enables A: without serving-time feature logging and quality monitoring you cannot tell whether the new model's gain is real or whether an incident erased it, and the new model inherits the same blind spots. Second, the incident rate and cost per incident come from a small sample (three events) and should be treated as ranges. The Hidden Technical Debt paper says the external world is rarely stable, so the incident rate is unlikely to fall by itself.\n\nA defensible recommendation is to run the cheapest high-value monitoring first (feature consistency, prediction-distribution and freshness checks, which the ML Test Score lists among its monitoring tests) and to ship the model after it, with the monitoring used to read the A/B result. State the assumptions and ask which ones the business would challenge.",
+  "practical_answer": "Sensitivity table to bring to the decision meeting (same hypothetical inputs):\n\n- Option A, realised fraction of offline uplift: 25% -> gross 90,000, net -10,000; 50% -> gross 180,000, net 80,000; 75% -> gross 270,000, net 170,000.\n- Option B, silent incidents per year (saving 51,400 each, year-1 cost 120,000): 1 -> net -68,600; 2 -> net -17,100; 3 -> net +34,300; 4 -> net +85,800.\n- If the monitoring cost in later years is only the 60,000 ongoing part, break-even falls to about 1.2 incidents per year (60,000 / 51,400).\n\nQuestions that move the decision: How was '3 incidents a year' counted, and how many were found only by customers? What does a 2% margin loss look like in practice, and is it plausible that the new model would be hit by the same incidents? Can the first slice of B (for example the serving-feature consistency check) be done in one engineer-month and cover most of the historical incidents? If yes, do it first and treat the remainder of B and A as the next two decisions.",
+  "key_concepts": [
+   "expected value",
+   "detection delay",
+   "cost of silent degradation",
+   "realisation of offline uplift",
+   "sensitivity analysis",
+   "monitoring as enabler",
+   "break-even incident rate"
+  ],
+  "common_mistakes": [
+   "Comparing only the headline uplift of the model with the build cost of monitoring and ignoring avoided losses",
+   "Presenting point estimates without sensitivity to the realisation factor and incident rate",
+   "Treating monitoring and the new model as independent when monitoring is needed to read the new model's result"
+  ],
+  "interview_style_note": "Builds a simple expected-value model from stated assumptions, tests it with sensitivity, and ties the recommendation to risk, variance and sequencing.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Hidden Technical Debt in Machine Learning Systems (Sculley et al., NeurIPS 2015)",
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "supports": "Section 7 states that the external world is rarely stable, which creates ongoing monitoring and maintenance needs."
+   },
+   {
+    "title": "The ML Test Score: A Rubric for ML Production Readiness and Technical Debt Reduction (Breck et al.)",
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "supports": "Presents 28 specific tests and monitoring needs, including monitoring tests such as training/serving feature consistency and prediction-quality regression."
+   }
+  ],
+  "tags": [
+   "mlops-roi",
+   "monitoring",
+   "expected-value",
+   "prioritisation",
+   "detection-delay"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Business-impact comparison of monitoring versus a new model, with computed numbers. Nearest: smi-l0042 (feature store adoption for a small team) and smi-i0006 (monitoring plan with delayed labels); neither compares investments quantitatively.",
+  "confidence": "medium",
+  "configs": []
+ }
+]

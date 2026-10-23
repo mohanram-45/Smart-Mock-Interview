@@ -1,0 +1,734 @@
+[
+ {
+  "plan_id": "B3-MLO-01-1",
+  "cell_id": "MLO-01",
+  "topic": "ML lifecycle and reproducibility (data/model versioning, experiment tracking, environments)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "concept",
+  "difficulty": "Easy",
+  "question": "A teammate hands you a notebook that reported 0.87 F1 on the validation set and says 'just rerun it to get the same number'. Which pieces of information must have been recorded for the run so that someone else can re-create that result, and which of them are most often forgotten?",
+  "answer_set": "single",
+  "answer": "A reproducible run record has to pin down every input that influences the number, not just the model code. At minimum:\n\n1. Code identity: the commit hash, plus a note (or saved diff) if the working tree had uncommitted changes. A notebook with out-of-order cells is a classic way to lose this.\n2. Data identity: which dataset snapshot or content hash was read, and exactly how the train/validation split was made (rule, key and seed). 'The latest table' is not an identity.\n3. Configuration: hyperparameters, feature list, preprocessing options, and any defaults that were silently applied.\n4. Randomness: the seed(s) used for initialisation, shuffling, sampling and augmentation.\n5. Environment: interpreter and library versions (ideally a lockfile or image digest), and hardware/driver details when they can change numerics.\n6. Outputs: the metrics, the evaluation set used, and the fitted artifacts (model weights, but also scalers, vocabularies and encoders fitted on the training data).\n\nThe most commonly forgotten items are the data version and the split rule (data changed underneath a fixed query), uncommitted code changes, fitted preprocessing artifacts, and the library versions. Tracking tools exist to capture these automatically: for example, MLflow Tracking describes itself as an API and UI for logging parameters, code versions, metrics and output files. Even with all of this recorded, bit-exact reruns may still differ slightly because of hardware nondeterminism, so a good record also states the expected run-to-run spread.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "run record",
+   "code commit hash",
+   "dataset snapshot identity",
+   "split rule",
+   "random seed",
+   "environment lockfile",
+   "fitted preprocessing artifacts"
+  ],
+  "common_mistakes": [
+   "Recording only hyperparameters and the final metric, with no data or code identity",
+   "Pointing at a mutable 'latest' table or folder as the data version",
+   "Forgetting that scalers/encoders fitted on training data are part of the model"
+  ],
+  "interview_style_note": "Names all the input classes (code, data, config, randomness, environment) and spots the commonly forgotten ones rather than just 'save the seed'.",
+  "code": null,
+  "sources": [
+   {
+    "title": "MLflow Tracking documentation",
+    "url": "https://mlflow.org/docs/latest/ml/tracking/",
+    "supports": "Describes tracking as an API and UI for logging parameters, code versions, metrics and output files, and says a run records metadata (metrics, parameters, start and end times) plus artifacts such as model weights."
+   }
+  ],
+  "related_domains": [],
+  "tags": [
+   "reproducibility",
+   "experiment-tracking",
+   "lineage"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Introductory Easy: enumerates the content of a run record. Nearest existing items are generic ML debugging (smi-g0003) with a different intent; no existing item covers MLOps.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-01-2",
+  "cell_id": "MLO-01",
+  "topic": "ML lifecycle and reproducibility (data/model versioning, experiment tracking, environments)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "concept",
+  "difficulty": "Easy",
+  "question": "Why does 'it works on my machine' cause more trouble in machine-learning projects than in ordinary application code?",
+  "answer_set": "single",
+  "answer": "Because an ML result depends on more than the code, and most of the extra dependencies fail silently. In ordinary software a missing library or wrong version usually crashes or fails a test. In ML the program still runs and simply returns a slightly different number or a slightly different model.\n\nTypical sources of 'my machine vs yours' differences:\n- Data: your laptop has a sample or an older extract; the pipeline reads a table that has since been refreshed.\n- Library versions: an unpinned dependency can resolve to a newer release with changed defaults, a different tokeniser, a different numerical kernel or changed random-number behaviour.\n- Hardware and drivers: CPU versus GPU, different GPU generations, or different driver/runtime libraries can change floating-point results and which algorithm is chosen.\n- Randomness: unseeded shuffling, initialisation or dropout gives different runs even on one machine.\n- Hidden state: fitted preprocessors, cached features, and notebook cell execution order.\n\nSo 'it works' can mean 'accuracy was 0.91 here and 0.88 there' with nothing obviously broken, and nobody notices until a metric is compared. The remedies are to make the environment explicit (lockfile and container image, pinned by digest rather than a moving tag), version the data by identity rather than by path, record seeds and configuration with each run, and compare runs with a known noise level in mind so a real regression can be told apart from run-to-run variation.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "silent failure",
+   "unpinned dependencies",
+   "container image",
+   "data version",
+   "hardware nondeterminism",
+   "run-to-run variance"
+  ],
+  "common_mistakes": [
+   "Treating 'same code' as sufficient for the same result",
+   "Assuming a requirements file without versions is an environment definition",
+   "Blaming only randomness and ignoring changed data"
+  ],
+  "interview_style_note": "Explains the failure mode as silent metric drift across data, dependencies and hardware, and gives concrete containment steps.",
+  "code": null,
+  "sources": [],
+  "related_domains": [],
+  "tags": [
+   "reproducibility",
+   "environments",
+   "docker"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Introductory Easy on why environment, data and randomness make ML harder to reproduce. Differs from B3-MLO-01-1 (what to record) by focusing on why failures are silent.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-01-3",
+  "cell_id": "MLO-01",
+  "topic": "ML lifecycle and reproducibility (data/model versioning, experiment tracking, environments)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "debugging",
+  "difficulty": "Medium",
+  "question": "Three weeks ago a run on branch main reported 0.842 AUC on a fixed validation set. Today, the same script on main gives 0.829, and nobody changed the code on purpose. Give an ordered checklist for finding out why, and say how you would decide whether 0.829 is a real regression at all.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Work from the cheapest and most likely explanations to the most expensive, and change one factor at a time.\n\n0. Check the comparison itself. Is it the same evaluation set (same rows, same ordering of any sampling), the same metric code and the same threshold/averaging convention? A moved validation set explains many 'regressions'.\n1. Measure the noise first. Re-run the old configuration with several seeds. If run-to-run spread is, say, a standard deviation of 0.005 AUC, a 0.013 gap is roughly 2.6 standard deviations for a single comparison, which is suggestive but not conclusive; if the spread is 0.012, the gap may be noise. Only then chase causes.\n2. Code: confirm the commit actually used three weeks ago (the branch may have moved; uncommitted changes are not in the history). Diff that commit against today's HEAD, including config files and default values.\n3. Data: was the input a mutable path or a query that returns 'latest'? Compare row counts, null rates, label rates and a content hash with the recorded snapshot. Check whether the split is random per run or derived from a stable key.\n4. Environment: compare the resolved package versions (lockfile or a freeze listing) and the base image digest. Loose requirements and moving tags such as 'latest' are frequent culprits, because library defaults and numerical kernels change.\n5. Hardware and nondeterminism: different GPU type, driver, thread count, non-deterministic kernels and data-loader ordering.\n6. Only after the above, suspect the model: a real data shift or a real bug.\n\nDecision rule: call it a regression only if the gap exceeds the measured seed spread on the same data and environment, or if re-running the exact recorded configuration (old commit, old data snapshot, old environment) reproduces 0.842 while today's setup does not.",
+  "practical_answer": "Hypothetical bisection log, to show the one-factor-at-a-time method.\n\n| Step | Code | Data | Environment | 5-seed mean AUC (sd) |\n|---|---|---|---|---|\n| A | old commit | old snapshot | rebuilt from old lockfile | 0.841 (0.004) |\n| B | old commit | old snapshot | today's resolved packages | 0.840 (0.004) |\n| C | old commit | today's table | old lockfile | 0.830 (0.005) |\n| D | today's HEAD | today's table | today's packages | 0.829 (0.005) |\n\nReading it: A reproduces the original within noise, so the record is trustworthy. B changes only the packages and nothing moves, so dependencies are cleared. C changes only the data and drops by about 0.011, which is more than two standard deviations of the seed noise, so the data is the cause. D adds nothing beyond C. The next action is not 'revert code' but diffing the two data snapshots (for example the label rate and the fraction of null values in the main features) to see what the upstream refresh changed, and then deciding whether the new data is the new truth (retrain, update the baseline) or a pipeline fault (fix upstream).\n\nTo make this cheap next time, each run should write a manifest containing commit hash, data snapshot hash, config, seeds, lockfile hash and image digest, so steps A to D become a lookup instead of an investigation.",
+  "key_concepts": [
+   "run-to-run variance",
+   "bisecting one factor at a time",
+   "data snapshot hash",
+   "lockfile",
+   "moving image tag",
+   "moved validation set",
+   "run manifest"
+  ],
+  "common_mistakes": [
+   "Reverting code first without checking data or environment",
+   "Treating a 0.013 difference as meaningful before measuring seed spread",
+   "Changing several factors at once so the cause stays unknown"
+  ],
+  "interview_style_note": "Strong answers measure the noise floor, then isolate code, data, environment and hardware one at a time, and finish with a decision rule.",
+  "code": null,
+  "sources": [],
+  "related_domains": [],
+  "tags": [
+   "debugging",
+   "reproducibility",
+   "bisection"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Debugging checklist for an irreproducible metric. Nearest: smi-g0003 (offline vs production gap) is about evaluation leakage; this one is about re-running a recorded result.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-01-4",
+  "cell_id": "MLO-01",
+  "topic": "ML lifecycle and reproducibility (data/model versioning, experiment tracking, environments)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "concept",
+  "difficulty": "Medium",
+  "question": "You fix every random seed in a training script, yet two runs on the same GPU box differ in the third decimal of validation loss, and a colleague's run on a different machine differs more. Why is setting the seed necessary but not sufficient, and what else would you control or accept?",
+  "answer_set": "concise+detailed+practical",
+  "answer": null,
+  "concise_answer": "Seeding fixes only the pseudo-random streams you seeded. Floating-point addition is not associative, so anything that changes accumulation order (parallel reductions, algorithm auto-selection, different hardware or library builds) changes results, as can badly seeded data-loader workers. Control what is controllable (worker seeds, deterministic kernels where available, pinned stack), and for the rest report mean and spread over several seeds.",
+  "detailed_answer": "A seed only initialises pseudo-random generators. It does not make the rest of the computation identical.\n\n1. Floating-point order. Floating-point addition is not associative, so summing the same numbers in a different order can give a different result. Parallel reductions, tiled matrix multiplies and, in some GPU kernels, accumulation whose order depends on scheduling can change the order from run to run. Differences are tiny per operation but can compound over many training steps.\n2. Algorithm selection. Libraries may auto-tune and pick different convolution or matmul algorithms. PyTorch's reproducibility notes say that cuDNN benchmark mode may select different algorithms on subsequent runs even on the same machine, and that switching it off gives deterministic selection at a possible cost in performance.\n3. Platform and version. The same notes state that completely reproducible results are not guaranteed across releases, individual commits or platforms, and that CPU and GPU results may differ even with identical seeds.\n4. Data loading. Multi-process loaders need each worker to have a well-defined stream. PyTorch documents using a worker init function and a seeded generator for this. With NumPy, the documented approach is to derive child streams with SeedSequence.spawn rather than computing seeds such as root_seed + worker_id, because overlapping worker seeds across invocations can cause bias.\n5. Everything else: hash-randomised set or dict iteration order, multithreaded preprocessing, and data that changed.\n\nWhat to do: fix and record all seeds (framework, NumPy, Python, loader workers); enable deterministic algorithm modes where available and accept the slowdown and the errors they may raise for operations without a deterministic implementation; pin the whole stack (libraries, drivers, image digest) and the hardware class; keep batch order fixed. Where bit-exactness is not achievable, treat the noise as a property of the training procedure: run several seeds and report mean and spread, and compare candidates against that spread instead of expecting identical numbers.",
+  "practical_answer": "Two small demonstrations (run on three Python versions with NumPy; no GPU needed):\n\n```python\nimport numpy as np\n\n\ndef order_demo():\n    \"\"\"float32 addition is not associative: the same three numbers, two orders.\"\"\"\n    a, b, c = np.float32(1e8), np.float32(1.0), np.float32(-1e8)\n    return float((a + b) + c), float((a + c) + b)\n\n\ndef worker_draws(root_seed, n_workers, k=3):\n    \"\"\"Per-worker random streams derived from one root seed via SeedSequence.spawn.\"\"\"\n    children = np.random.SeedSequence(root_seed).spawn(n_workers)\n    return [np.random.default_rng(s).integers(0, 1000, k).tolist() for s in children]\n```\n\norder_demo() returns (0.0, 1.0): in float32, (1e8 + 1) - 1e8 loses the 1 because 1e8 + 1 rounds back to 1e8, while (1e8 - 1e8) + 1 keeps it. The same three numbers give different sums depending on order, which is exactly what a different reduction order does at scale.\n\nworker_draws(42, 4) returns four different, reproducible draw lists; asking for 2 workers returns the first two of those lists, so a worker's stream does not depend on how many workers exist. That property is useful when you change the number of loader processes between machines and still want the per-worker randomness to stay put.",
+  "key_concepts": [
+   "floating-point non-associativity",
+   "parallel reduction order",
+   "cuDNN algorithm selection",
+   "DataLoader worker seeding",
+   "SeedSequence.spawn",
+   "deterministic algorithms mode",
+   "seed variance"
+  ],
+  "common_mistakes": [
+   "Believing one global seed call makes any hardware give identical results",
+   "Seeding workers with root_seed + worker_id",
+   "Switching on deterministic mode and never checking the speed cost or unsupported ops"
+  ],
+  "interview_style_note": "Separates pseudo-random state from numerical nondeterminism, names concrete controls, and accepts residual noise by measuring it.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\n\ndef order_demo():\n    \"\"\"float32 addition is not associative: the same three numbers, two orders.\"\"\"\n    a, b, c = np.float32(1e8), np.float32(1.0), np.float32(-1e8)\n    return float((a + b) + c), float((a + c) + b)\n\n\ndef worker_draws(root_seed, n_workers, k=3):\n    \"\"\"Per-worker random streams derived from one root seed via SeedSequence.spawn.\"\"\"\n    children = np.random.SeedSequence(root_seed).spawn(n_workers)\n    return [np.random.default_rng(s).integers(0, 1000, k).tolist() for s in children]",
+   "test": "assert order_demo() == (0.0, 1.0)\nd1 = worker_draws(42, 4)\nassert d1 == worker_draws(42, 4)                     # reproducible\nassert len({tuple(x) for x in d1}) == 4              # workers get different streams\nassert d1 != worker_draws(43, 4)                     # a new root seed gives new streams\nassert worker_draws(42, 2) == d1[:2]                 # worker i's stream does not depend on worker count\nprint(d1)",
+   "expected": null
+  },
+  "sources": [
+   {
+    "title": "PyTorch reproducibility notes",
+    "url": "https://docs.pytorch.org/docs/stable/notes/randomness.html",
+    "supports": "States that completely reproducible results are not guaranteed across releases, individual commits or platforms; results may differ between CPU and GPU even with identical seeds; DataLoader workers need worker_init_fn and a generator for reproducibility; cuDNN benchmark mode may select different algorithms on subsequent runs; deterministic-algorithm mode exists and may raise an error for operations with no deterministic implementation."
+   },
+   {
+    "title": "NumPy parallel random number generation",
+    "url": "https://numpy.org/doc/stable/reference/random/parallel.html",
+    "supports": "Documents SeedSequence.spawn / Generator.spawn for creating (with very high probability) independent streams for parallel workers, and warns against deriving worker seeds as root_seed + worker_id."
+   }
+  ],
+  "related_domains": [
+   "Deep Learning"
+  ],
+  "tags": [
+   "seeds",
+   "determinism",
+   "gpu",
+   "numpy"
+  ],
+  "time_sensitive": true,
+  "change_notes": "Why seeds are not enough. Distinct from B3-MLO-01-3 (a debugging checklist) by focusing on mechanisms of nondeterminism.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-01-5",
+  "cell_id": "MLO-01",
+  "topic": "ML lifecycle and reproducibility (data/model versioning, experiment tracking, environments)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Medium",
+  "question": "Your team logs every training run to an experiment tracker and also keeps a model registry. A new hire asks why one of them is not enough. What belongs in each, and how would you answer 'which code, data and run produced the model that is serving traffic right now?'",
+  "answer_set": "concise+detailed",
+  "answer": null,
+  "concise_answer": "The tracker is the lab notebook: many runs, including failures, with parameters, metrics, curves and artifacts, used for exploration. The registry is the controlled catalogue of the few models that are candidates for release: immutable versions, a stage or alias such as 'production', approvals and a link back to the producing run. Lineage answers the serving question: the endpoint reports its model version, the version points to the run, and the run records commit, data hash and environment.",
+  "detailed_answer": "Different jobs, different lifecycles.\n\nExperiment tracker: high volume, mostly disposable. For each run it stores parameters, metrics over time, tags, evaluation plots and output artifacts, plus the identity of the inputs (code commit, data snapshot id, config, seeds, environment). MLflow Tracking, for instance, describes logging parameters, code versions, metrics and output files, with a run holding metadata and artifacts. Use it to compare, filter and debug experiments; runs that never get promoted are still valuable evidence of what was tried.\n\nModel registry: low volume, governed. It stores promoted model versions as immutable entries, with a name, a version number, a movable pointer (alias or stage) such as 'candidate' or 'production', the input/output signature, the validation results that justified promotion, who approved it, and a reference to the training run. The pointer move is the deployment-relevant event, and it can be audited and reversed. A plain file bucket has none of this: no immutability guarantee, no pointer semantics, no approval trail, no link to evidence.\n\nAnswering the serving question is a chain of links, and every link must be recorded: (1) the serving process logs the model version it loaded (and the artifact checksum) with each prediction or at least at start-up; (2) the registry entry for that version points to the training run; (3) the run holds the commit hash, the data snapshot hash, the config, the seeds, and the environment (lockfile hash, image digest). If any link is only a convention ('the file name has the date'), lineage breaks the first time someone copies a file by hand.\n\nPitfalls: registering a model without the preprocessing/fitted artifacts it needs; promoting by overwriting a file in place so that the version number no longer identifies bytes; and logging the run id in the tracker but not carrying it into the registry or into the serving logs.",
+  "practical_answer": null,
+  "key_concepts": [
+   "experiment tracker",
+   "model registry",
+   "immutable model version",
+   "alias or stage pointer",
+   "lineage",
+   "data snapshot hash",
+   "serving-time version logging"
+  ],
+  "common_mistakes": [
+   "Treating the registry as just a folder of pickles",
+   "Promoting by overwriting the artifact at a fixed path",
+   "Recording lineage only in the tracker, not in serving logs"
+  ],
+  "interview_style_note": "Separates exploration records from governed release records and can trace a live prediction back to code, data and environment.",
+  "code": null,
+  "sources": [
+   {
+    "title": "MLflow Tracking documentation",
+    "url": "https://mlflow.org/docs/latest/ml/tracking/",
+    "supports": "Describes tracking as an API and UI for logging parameters, code versions, metrics and output files, and says a run records metadata (metrics, parameters, start and end times) plus artifacts such as model weights."
+   }
+  ],
+  "related_domains": [],
+  "tags": [
+   "model-registry",
+   "lineage",
+   "experiment-tracking"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Tracker vs registry split and end-to-end lineage. No existing MLOps item; distinct from B3-MLO-01-1 (run record content) by asking about the release boundary.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-01-6",
+  "cell_id": "MLO-01",
+  "topic": "ML lifecycle and reproducibility (data/model versioning, experiment tracking, environments)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Hard",
+  "question": "Your training set is 400 GB of images plus a labels file. About 2% of the files are added or relabelled each week, and models from the last year must stay reproducible. Compare keeping a dated full copy of the dataset every week with content-hash versioning using small pointer files, say what each training run records, and name what can still go wrong.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Full dated copies are simple but scale linearly with the number of versions and give no cheap way to answer 'what changed'. Content-addressed versioning stores each distinct file once, keyed by a hash of its bytes, and a small manifest or pointer file maps names to hashes. The pointer file is what lives in version control, so a Git commit pins an exact dataset state.\n\nDVC is one concrete example: its documentation describes a small .dvc metadata file, kept in Git, that records an MD5 hash and acts as a placeholder for the data; the data lives in a hash-addressed cache, and checking out a Git commit followed by a data checkout restores the matching version. The same idea can be built with any object store plus manifests.\n\nWhat a training run records: the commit (which includes the pointer files), or equivalently the dataset manifest hash, plus the split rule. The aim is that the manifest hash alone identifies the exact bytes.\n\nProperties that matter:\n- Immutability: a version must never be modified in place. If someone fixes a label by overwriting a file in a shared bucket, every old manifest silently points to different content. Content addressing detects this because the hash of the new bytes differs; path-based copying does not.\n- Deduplication: only changed files take new space, and diffs between versions are cheap to compute.\n- Directory hashes: the hash of a directory is a hash of its listing, so adding one file changes the directory hash but leaves the other files' objects shared.\n\nWhat can go wrong: garbage collection deleting objects that old manifests still reference (keep retention rules tied to registered models); the pointer files being updated but the underlying objects never pushed to remote storage, so a colleague cannot fetch them; very many small files making hashing and checkout slow (pack them or use a manifest format designed for it); labels stored outside the versioned set; and legal deletion requests that require removing objects while old runs still reference them (record that the data is unavailable rather than silently failing).",
+  "practical_answer": "Storage arithmetic with the stated numbers, assuming changed files are written as new objects and old ones are kept:\n\n- Weekly full copies for a year: 52 x 400 GB = 20.8 TB, on top of the original 400 GB if the first copy is counted separately.\n- Content-addressed: 400 GB + 52 weeks x (2% of 400 GB = 8 GB) = 816 GB, about 0.8 TB, that is roughly 25 times less. If relabelling touches only a small labels file, the weekly increment is far smaller than 8 GB.\n\nSketch of a pointer file (illustrative format, not tied to a tool):\n\n    dataset: product-images\n    manifest_sha256: 9f2c...e1   # hash of the sorted list of (path, file_hash)\n    files: 183,400\n    split_rule: user_id hash mod 10, 8 train / 1 val / 1 test\n    created: 2026-03-02\n\nA run then stores manifest_sha256 and split_rule in its record. Reproducing it means fetching the objects named by that manifest, verifying the hash, and applying the same split rule. Verifying the manifest hash before training costs one pass over the file list (cheap) or over file bytes (expensive); a common compromise is to hash bytes when adding data and verify only sizes and manifest at training time.",
+  "key_concepts": [
+   "content-addressable storage",
+   "manifest hash",
+   "pointer file in Git",
+   "immutable snapshot",
+   "deduplication",
+   "garbage collection and retention",
+   "split rule"
+  ],
+  "common_mistakes": [
+   "Versioning by dated folder name in a mutable bucket",
+   "Overwriting labels in place and keeping the same version id",
+   "Forgetting that retention/garbage collection can remove objects an old model needs"
+  ],
+  "interview_style_note": "Compares storage and integrity trade-offs with arithmetic, and identifies immutability and retention as the real failure points.",
+  "code": null,
+  "sources": [
+   {
+    "title": "DVC data versioning",
+    "url": "https://doc.dvc.org/start/data-management/data-versioning",
+    "supports": "Describes a small .dvc metadata file, kept in Git, that records an MD5 hash of the data and acts as a placeholder; data goes to a hash-addressed cache and checking out a Git commit followed by dvc checkout restores the matching data version."
+   }
+  ],
+  "related_domains": [],
+  "tags": [
+   "data-versioning",
+   "dvc",
+   "storage"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Dataset versioning design with numbers. No existing item covers it (existing MLOps coverage is nil).",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-01-7",
+  "cell_id": "MLO-01",
+  "topic": "ML lifecycle and reproducibility (data/model versioning, experiment tracking, environments)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "evaluation",
+  "difficulty": "Medium",
+  "question": "Two training configurations, A and B, are each run with 5 seeds on the same data split. Validation accuracy for A is 0.912, 0.905, 0.918, 0.909, 0.915 and for B is 0.917, 0.908, 0.921, 0.913, 0.919 (seed i uses the same initial weights and data order in both). A teammate wants to ship B because 'it won in every seed'. How would you compare the two fairly, and how strong is the evidence?",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Principles for comparing runs: use the same data split and evaluation set for both; run several seeds because a single run mixes real differences with seed noise; report mean and spread (standard deviation), not the best run; and never pick the best of many runs for one configuration and compare it with a single run of the other, which builds in selection bias.\n\nHere, A has mean 0.9118 and sample standard deviation about 0.0051; B has mean 0.9156 and about 0.0052. The mean difference is 0.0038, which is smaller than the seed-to-seed spread of either configuration. Treating the runs as independent samples, the standard error of the difference is about 0.0032, so the difference is about 1.2 standard errors: not convincing.\n\nBut the setup is paired: seed i shares initial weights and data order across configurations, so a lucky seed tends to be lucky for both. Pairing removes that shared noise. The per-seed differences are 0.005, 0.003, 0.003, 0.004, 0.004: mean 0.0038, with a standard error of about 0.00037, i.e. about 10 standard errors. That is much stronger evidence that B is better on this split.\n\nCaveats keep this honest. (1) Pairing is only valid if the seed really controls shared sources of noise; otherwise the independent analysis applies. (2) Five pairs is a small sample; a sign test on 5 out of 5 wins has a two-sided p-value of 2 x (1/2)^5 = 0.0625, which cannot reach 0.05 at all. (3) Both configurations were evaluated on one validation split, so split noise is not captured; also, the gain of 0.0038 may be below what matters for the product. (4) If B was chosen after many trials, the effect is optimistic.\n\nA sensible recommendation: B is probably slightly better; confirm with more seeds and a different split or fold, check the practical size of the gain, then decide.",
+  "practical_answer": "Procedure for the team's tracker, with the numbers above:\n\n1. Log one row per (config, seed) with the split id, data hash and metric.\n2. Report: A 0.9118 (sd 0.0051, n=5), B 0.9156 (sd 0.0052, n=5), paired difference +0.0038 (se 0.00037).\n3. Decide the minimum worthwhile gain up front (say 0.002 accuracy); here the paired lower end is well above it, but the independent analysis would not be.\n4. Extend: 10 more seeds, and a second split. If the paired difference keeps its sign across splits, ship; if one split flips, treat the gap as split-dependent.\n5. Store the decision and the table in the run record so the claim can be audited.\n\nQuick check of the two readings: the independent view says 'inconclusive', the paired view says 'consistent small gain'. When they disagree, the pairing assumption is the thing to inspect, not the arithmetic.",
+  "key_concepts": [
+   "seed variance",
+   "paired comparison",
+   "standard error of a difference",
+   "best-of-n selection bias",
+   "sign test limits",
+   "minimum worthwhile effect"
+  ],
+  "common_mistakes": [
+   "Comparing the best seed of one config with a single seed of another",
+   "Concluding from 'won in every seed' without noting n=5 and one split",
+   "Using a paired analysis when seeds do not actually share noise sources"
+  ],
+  "interview_style_note": "Quantifies noise, distinguishes paired from independent comparison, and states what the sample can and cannot show.",
+  "code": null,
+  "sources": [],
+  "related_domains": [
+   "Data Analysis"
+  ],
+  "tags": [
+   "experiment-comparison",
+   "variance",
+   "evaluation"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Fair run comparison with computed numbers. Experiment-statistics beyond basics belongs to Data Analysis; this keeps to seed noise and pairing. Nearest existing: smi-k0015 (paired prompt-suite comparison) is LLM prompt regression with McNemar-style reasoning.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-02-1",
+  "cell_id": "MLO-02",
+  "topic": "CI/CD for ML (data and model tests, gating, rollback) - includes data and model validation",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "concept",
+  "difficulty": "Medium",
+  "question": "Where in an ML pipeline would you put data validation, and which kinds of failures would you block the pipeline on versus only warn about? Use training data and live serving requests separately in your answer.",
+  "answer_set": "concise+detailed",
+  "answer": null,
+  "concise_answer": "Validate at three points: when data enters the training pipeline, right before training (against a reference schema and statistics), and at serving on incoming requests. Block on hard contract breaks: missing columns, wrong types, impossible values, null rates far beyond the norm. Warn on softer statistical shifts, which need review. In training, fail closed; in serving, usually reject or fall back for a single bad request while alerting on the rate.",
+  "detailed_answer": "Think of validation as tests on data, placed where bad data does the most damage and is cheapest to stop.\n\nTraining side:\n1. At ingestion/feature build: structural and semantic checks derived from a schema: required columns, types, allowed categories, value ranges, null-rate limits, uniqueness of keys, row counts versus the previous run. These are contract checks, so a violation should block the pipeline; training on a feed that silently renamed a column or changed units wastes compute and can ship a worse model.\n2. Before training: statistical comparison with a reference (previous accepted data): distribution summaries, label rate, category frequencies. Large shifts are not always errors (seasonality, a campaign), so these usually warn or require sign-off, with thresholds tuned to keep false alarms low.\n\nServing side:\n3. On each request or batch: schema, type and range checks on the features. One malformed request should not crash the service: reject it with a clear error, or substitute a documented fallback, and count it. A rising rate of violations is the alerting signal (it often means an upstream change). Log the served features so that they can be compared with the training data; Google's Rules of ML recommends saving the features used at serving time to a log.\n4. The ML Test Score rubric lists these concerns explicitly: feature expectations captured in a schema, and data invariants holding in both training and serving inputs.\n\nFail versus warn is a cost judgement: block where an error is unambiguous and the downstream cost high; warn where the check is statistical and has a false-positive rate. Pitfalls: a schema never updated, so alerts get ignored; thresholds copied from one dataset; and checks that run only on a sample missing a rare corruption.",
+  "practical_answer": null,
+  "key_concepts": [
+   "data schema",
+   "contract checks vs statistical checks",
+   "fail closed in training",
+   "serving-time validation",
+   "null-rate threshold",
+   "reference statistics",
+   "feature logging"
+  ],
+  "common_mistakes": [
+   "Blocking serving on any single odd request",
+   "Using only statistical drift alerts and no hard schema checks",
+   "Validating training data but never serving inputs"
+  ],
+  "interview_style_note": "Places checks at ingestion, pre-training and serving, and justifies block vs warn by the cost of false positives and negatives.",
+  "code": null,
+  "sources": [
+   {
+    "title": "The ML Test Score: A Rubric for ML Production Readiness and Technical Debt Reduction",
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "supports": "Lists tests including 'Feature expectations are captured in a schema', 'Model quality is sufficient on important data slices', 'A simpler model is not better', 'The impact of model staleness is known', 'Offline and online metrics correlate', 'Training is reproducible', 'The ML pipeline is integration tested', 'Model quality is validated before serving', 'Models are canaried before serving', 'Serving models can be rolled back', 'Data invariants hold for inputs' and 'Training and serving are not skewed'."
+   },
+   {
+    "title": "Rules of Machine Learning (Google)",
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "supports": "Rule 5: test the infrastructure independently from the machine learning (check that feature columns are populated; check the exported model gives the same score as the training-environment model). Rule 8: know the freshness requirements of the system. Rule 9: do sanity checks right before exporting a model. Rule 29: log the features used at serving time."
+   }
+  ],
+  "related_domains": [],
+  "tags": [
+   "data-validation",
+   "schema",
+   "ci-cd"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Placement and severity policy of data validation. Drift detection itself is a later batch; no existing MLOps item.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-02-2",
+  "cell_id": "MLO-02",
+  "topic": "CI/CD for ML (data and model tests, gating, rollback) - includes data and model validation",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "coding",
+  "difficulty": "Medium",
+  "question": "Write validate_batch(rows, schema) in plain Python (standard library only) that checks a batch of feature rows before training or scoring and returns structured violations. rows is a list of dicts; schema maps a column name to a dict with optional keys type ('int', 'float' or 'str'), min, max, allowed, max_null_rate (default 0.0) and severity ('error' or 'warn', default 'error'). A missing key, None or NaN counts as null. Report: an empty batch, a column absent from every row, a null rate above its limit, a wrong type (bools are not ints; ints are acceptable as floats), values outside [min, max], and values not in allowed. Return a list of dicts with column, check, severity and detail, in a deterministic order, plus a has_errors(violations) helper. Then explain how you would wire it into a pipeline.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Design decisions behind the function:\n\n- Structure first, content second. A column missing from every row is reported as a single missing_column error and the other checks on that column are skipped, because null-rate and range failures would just repeat the same root cause (a renamed or dropped upstream field). Likewise, a type error stops the range/allowed checks for that column, since comparing strings to numeric bounds is meaningless.\n- Nulls are separated from bad values. Null rate is computed over all rows (a missing key, None or NaN), and range/allowed checks run on non-null values only, so a column with 5% nulls and 0 out-of-range values is reported only as a null-rate problem.\n- Severity is per column for statistical-looking checks (null rate, range, allowed), but structural problems (empty batch, missing column, wrong type) are always errors.\n- Bool is a subclass of int in Python, so isinstance(True, int) is True; the code excludes it explicitly. Otherwise a flag column accidentally passed as a feature would pass an int check.\n- Output is structured (column, check, severity, detail) and sorted by column so that tests, logs and alert grouping are stable.\n- Limitations: it is a batch check; it does not compare distributions with a reference (that is a separate, statistical step), does not check cross-column constraints, and a rate threshold of 0 on range violations is deliberately strict. Infinite floats are caught only if min/max is given.\n\nThe pipeline wiring is below; the function itself is in the practical answer.",
+  "practical_answer": "```python\nimport math\n\n\ndef _is_null(v):\n    return v is None or (isinstance(v, float) and math.isnan(v))\n\n\ndef _type_ok(v, t):\n    if t == \"int\":\n        return isinstance(v, int) and not isinstance(v, bool)\n    if t == \"float\":\n        return isinstance(v, (int, float)) and not isinstance(v, bool)\n    if t == \"str\":\n        return isinstance(v, str)\n    raise ValueError(\"unknown type: \" + str(t))\n\n\ndef validate_batch(rows, schema):\n    \"\"\"Return a list of violation dicts; an empty list means the batch is clean.\n\n    schema maps column -> dict with optional keys: type ('int'|'float'|'str'),\n    min, max, allowed (collection), max_null_rate (default 0.0),\n    severity ('error' or 'warn', default 'error').\n    A missing key or None/NaN counts as null.\n    \"\"\"\n    if not rows:\n        return [{\"column\": None, \"check\": \"empty_batch\", \"severity\": \"error\",\n                 \"detail\": \"no rows\"}]\n    out = []\n    n = len(rows)\n    for col in sorted(schema):\n        spec = schema[col]\n        sev = spec.get(\"severity\", \"error\")\n        if not any(col in r for r in rows):\n            out.append({\"column\": col, \"check\": \"missing_column\",\n                        \"severity\": \"error\", \"detail\": \"absent from every row\"})\n            continue\n        values = [r.get(col) for r in rows]\n        non_null = [v for v in values if not _is_null(v)]\n        null_rate = 1 - len(non_null) / n\n        if null_rate > spec.get(\"max_null_rate\", 0.0):\n            out.append({\"column\": col, \"check\": \"null_rate\", \"severity\": sev,\n                        \"detail\": \"null rate %.3f > %.3f\"\n                        % (null_rate, spec.get(\"max_null_rate\", 0.0))})\n        if \"type\" in spec:\n            bad = [v for v in non_null if not _type_ok(v, spec[\"type\"])]\n            if bad:\n                out.append({\"column\": col, \"check\": \"type\", \"severity\": \"error\",\n                            \"detail\": \"%d value(s) not %s\" % (len(bad), spec[\"type\"])})\n                continue\n        if \"min\" in spec or \"max\" in spec:\n            lo = spec.get(\"min\", -math.inf)\n            hi = spec.get(\"max\", math.inf)\n            bad = [v for v in non_null\n                   if not (isinstance(v, (int, float)) and not isinstance(v, bool)\n                           and lo <= v <= hi)]\n            if bad:\n                out.append({\"column\": col, \"check\": \"range\", \"severity\": sev,\n                            \"detail\": \"%d value(s) outside [%s, %s]\" % (len(bad), lo, hi)})\n        if \"allowed\" in spec:\n            allowed = set(spec[\"allowed\"])\n            bad = [v for v in non_null if v not in allowed]\n            if bad:\n                out.append({\"column\": col, \"check\": \"allowed\", \"severity\": sev,\n                            \"detail\": \"unseen values: %s\" % sorted(set(map(str, bad)))})\n    return out\n\n\ndef has_errors(violations):\n    return any(v[\"severity\"] == \"error\" for v in violations)\n```\n\nWiring: run it as the first step after ingestion and again just before training, with the schema stored in version control next to the code (so a schema change is a reviewed diff). In the orchestrator, treat has_errors(violations) as a task failure that stops downstream steps, and publish warn-level violations to a report and a dashboard counter without stopping. For serving, run the same function (or its row-level core) on each request or micro-batch, return a 4xx or a fallback for rows that fail, and alert on the rate of violations over a window rather than on single rows.\n\nExample of the output on a batch where 2 of 100 ages are outside [18, 100], one country is unseen, and 6% of basket values are null with a 2% limit (severity 'warn'): one range error on age, one allowed error on country, and one warn-level null_rate entry on basket; has_errors is True because of the first two.",
+  "key_concepts": [
+   "schema validation",
+   "null rate",
+   "bool-is-int pitfall",
+   "structured violations",
+   "severity levels",
+   "missing column detection",
+   "fail vs warn"
+  ],
+  "common_mistakes": [
+   "Letting bool pass an int check",
+   "Reporting a range failure for every row of a column that is actually missing",
+   "Returning free-text errors that cannot be aggregated or tested"
+  ],
+  "interview_style_note": "Writes correct, deterministic validation code, handles the bool/NaN/missing-key edge cases, and explains how it plugs into the pipeline.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import math\n\n\ndef _is_null(v):\n    return v is None or (isinstance(v, float) and math.isnan(v))\n\n\ndef _type_ok(v, t):\n    if t == \"int\":\n        return isinstance(v, int) and not isinstance(v, bool)\n    if t == \"float\":\n        return isinstance(v, (int, float)) and not isinstance(v, bool)\n    if t == \"str\":\n        return isinstance(v, str)\n    raise ValueError(\"unknown type: \" + str(t))\n\n\ndef validate_batch(rows, schema):\n    \"\"\"Return a list of violation dicts; an empty list means the batch is clean.\n\n    schema maps column -> dict with optional keys: type ('int'|'float'|'str'),\n    min, max, allowed (collection), max_null_rate (default 0.0),\n    severity ('error' or 'warn', default 'error').\n    A missing key or None/NaN counts as null.\n    \"\"\"\n    if not rows:\n        return [{\"column\": None, \"check\": \"empty_batch\", \"severity\": \"error\",\n                 \"detail\": \"no rows\"}]\n    out = []\n    n = len(rows)\n    for col in sorted(schema):\n        spec = schema[col]\n        sev = spec.get(\"severity\", \"error\")\n        if not any(col in r for r in rows):\n            out.append({\"column\": col, \"check\": \"missing_column\",\n                        \"severity\": \"error\", \"detail\": \"absent from every row\"})\n            continue\n        values = [r.get(col) for r in rows]\n        non_null = [v for v in values if not _is_null(v)]\n        null_rate = 1 - len(non_null) / n\n        if null_rate > spec.get(\"max_null_rate\", 0.0):\n            out.append({\"column\": col, \"check\": \"null_rate\", \"severity\": sev,\n                        \"detail\": \"null rate %.3f > %.3f\"\n                        % (null_rate, spec.get(\"max_null_rate\", 0.0))})\n        if \"type\" in spec:\n            bad = [v for v in non_null if not _type_ok(v, spec[\"type\"])]\n            if bad:\n                out.append({\"column\": col, \"check\": \"type\", \"severity\": \"error\",\n                            \"detail\": \"%d value(s) not %s\" % (len(bad), spec[\"type\"])})\n                continue\n        if \"min\" in spec or \"max\" in spec:\n            lo = spec.get(\"min\", -math.inf)\n            hi = spec.get(\"max\", math.inf)\n            bad = [v for v in non_null\n                   if not (isinstance(v, (int, float)) and not isinstance(v, bool)\n                           and lo <= v <= hi)]\n            if bad:\n                out.append({\"column\": col, \"check\": \"range\", \"severity\": sev,\n                            \"detail\": \"%d value(s) outside [%s, %s]\" % (len(bad), lo, hi)})\n        if \"allowed\" in spec:\n            allowed = set(spec[\"allowed\"])\n            bad = [v for v in non_null if v not in allowed]\n            if bad:\n                out.append({\"column\": col, \"check\": \"allowed\", \"severity\": sev,\n                            \"detail\": \"unseen values: %s\" % sorted(set(map(str, bad)))})\n    return out\n\n\ndef has_errors(violations):\n    return any(v[\"severity\"] == \"error\" for v in violations)",
+   "test": "SCHEMA = {\n    \"age\": {\"type\": \"int\", \"min\": 18, \"max\": 100},\n    \"basket\": {\"type\": \"float\", \"min\": 0.0, \"max_null_rate\": 0.02, \"severity\": \"warn\"},\n    \"country\": {\"type\": \"str\", \"allowed\": [\"GB\", \"FR\", \"DE\"]},\n}\ngood = [{\"age\": 30 + i % 20, \"basket\": 10.0 + i, \"country\": \"GB\"} for i in range(100)]\nassert validate_batch(good, SCHEMA) == []\nassert not has_errors([])\n\nbad = [dict(r) for r in good]\nbad[0][\"age\"] = -1\nbad[1][\"age\"] = 250\nbad[2][\"country\"] = \"XX\"\nfor i in range(3, 8):\n    bad[i][\"basket\"] = None\nbad[8][\"basket\"] = float(\"nan\")\nv = validate_batch(bad, SCHEMA)\nchecks = {(x[\"column\"], x[\"check\"]): x for x in v}\nassert set(checks) == {(\"age\", \"range\"), (\"country\", \"allowed\"), (\"basket\", \"null_rate\")}\nassert checks[(\"age\", \"range\")][\"detail\"].startswith(\"2 value(s)\")\nassert checks[(\"basket\", \"null_rate\")][\"severity\"] == \"warn\"\nassert \"0.060\" in checks[(\"basket\", \"null_rate\")][\"detail\"]\nassert has_errors(v)\nassert not has_errors([checks[(\"basket\", \"null_rate\")]])\n\n# a bool is not an int; a string in a numeric column is a type error\nt = [dict(r) for r in good]\nt[0][\"age\"] = True\nt[1][\"basket\"] = \"12\"\ntv = validate_batch(t, SCHEMA)\nassert {(x[\"column\"], x[\"check\"]) for x in tv} == {(\"age\", \"type\"), (\"basket\", \"type\")}\n\n# renamed column upstream: every row lacks it\nr = [{\"age\": 30, \"basket\": 1.0, \"nation\": \"GB\"} for _ in range(5)]\nrv = validate_batch(r, SCHEMA)\nassert [(x[\"column\"], x[\"check\"]) for x in rv] == [(\"country\", \"missing_column\")]\nassert validate_batch([], SCHEMA)[0][\"check\"] == \"empty_batch\"\n# no declared type: a string in a numeric-range column is flagged, not a crash\nnt = validate_batch([{\"x\": 1}, {\"x\": \"a\"}], {\"x\": {\"min\": 0, \"max\": 5}})\nassert [(v[\"column\"], v[\"check\"]) for v in nt] == [(\"x\", \"range\")]\nprint(\"ok\")",
+   "expected": null
+  },
+  "sources": [
+   {
+    "title": "The ML Test Score: A Rubric for ML Production Readiness and Technical Debt Reduction",
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "supports": "Lists tests including 'Feature expectations are captured in a schema', 'Model quality is sufficient on important data slices', 'A simpler model is not better', 'The impact of model staleness is known', 'Offline and online metrics correlate', 'Training is reproducible', 'The ML pipeline is integration tested', 'Model quality is validated before serving', 'Models are canaried before serving', 'Serving models can be rolled back', 'Data invariants hold for inputs' and 'Training and serving are not skewed'."
+   }
+  ],
+  "related_domains": [],
+  "tags": [
+   "data-validation",
+   "python",
+   "schema",
+   "coding"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Tested data-validation function. No existing question writes this; nearest generic coding items (smi-h0027 retry decorator) differ in purpose.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-02-3",
+  "cell_id": "MLO-02",
+  "topic": "CI/CD for ML (data and model tests, gating, rollback) - includes data and model validation",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Hard",
+  "question": "A retrained churn model scores 0.871 AUC against 0.866 for the production model on the same fresh holdout. The pipeline is about to promote it automatically. Besides the overall AUC, what would you require before promotion, and in what order would you run the checks? Give one concrete example of a check that overall AUC can hide.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Overall AUC on one holdout is necessary, not sufficient. A gain of 0.005 may be inside noise, and an aggregate can hide regressions where it matters. The checks I would require, cheapest first, so that failures stop the pipeline early:\n\n1. Sanity and integrity: the model loads, produces outputs of the right shape and range for a fixed smoke input set, with no NaN; its training/serving signature matches the endpoint (Google's Rules of ML advises sanity checks right before exporting a model).\n2. Budgets: size and latency on the target hardware against the budget (for example p95 under a stated limit), since a better but slower model can break the service.\n3. Comparison with the incumbent on the same data: a candidate-minus-baseline difference with an uncertainty estimate, and a minimum worthwhile improvement. 0.005 might not clear that bar or the confidence bound.\n4. Slices: metrics on important segments (new customers, regions, device types, high-value accounts) with a non-regression tolerance, and a minimum sample size so noisy small slices do not trigger or hide failures. The ML Test Score rubric lists model quality on important data slices and checking that a simpler model is not better.\n5. Calibration: if scores drive thresholds, budgets or expected-value calculations, compare reliability (for example expected calibration error or a reliability table). Two models with similar AUC can have very different probabilities.\n6. Behavioural tests: invariance and directional tests (changing a field that should be irrelevant does not change the score materially; increasing support tickets should not decrease predicted risk).\n7. Operational decision metric: at the operating threshold used in production (for example the top 10% of scores contacted), compare precision/recall or expected value, since AUC averages over thresholds nobody uses.\n8. Staging then canary before full traffic.\n\nExample hidden by AUC: the candidate improves on long-tenure customers (80% of the data) but loses 0.03 AUC on customers in their first 60 days (6% of the data), exactly the group the retention campaign targets. The overall number rises while the business-critical slice degrades.",
+  "practical_answer": "Hypothetical gate report to show the decision logic.\n\n| Check | Production | Candidate | Rule | Result |\n|---|---|---|---|---|\n| Overall AUC | 0.866 | 0.871 | gain at least 0.003 and confidence lower bound above 0 | pass if the interval is [0.001, 0.009]; fail if it includes 0 |\n| AUC, tenure under 60 days (n=4,800) | 0.790 | 0.760 | no drop larger than 0.01 | fail |\n| AUC, all other slices (n >= 2,000) | various | within 0.004 | no drop larger than 0.01 | pass |\n| Precision at top 10% | 0.41 | 0.43 | not lower | pass |\n| p95 latency | 38 ms | 44 ms | at most 50 ms | pass |\n| Artifact size | 210 MB | 230 MB | at most 300 MB | pass |\n| Calibration (ECE) | 0.020 | 0.045 | not worse by more than 0.01 | fail |\n\nOutcome: rejected on the new-customer slice and on calibration, even though the headline metric improved. The report is stored with the candidate in the registry so that a later reader can see why it was or was not promoted. A candidate rejected on a slice should come back with a diagnosis (data, features, loss weighting) instead of a lowered threshold.",
+  "key_concepts": [
+   "promotion gate",
+   "slice metrics",
+   "calibration",
+   "non-regression tolerance",
+   "operating-point metric",
+   "latency budget",
+   "behavioural tests"
+  ],
+  "common_mistakes": [
+   "Promoting on a 0.005 AUC gain without any uncertainty estimate",
+   "Checking only aggregate metrics",
+   "Comparing against a stale baseline number instead of the current production model on the same data"
+  ],
+  "interview_style_note": "Orders checks by cost, names a concrete hidden regression, and ties each gate to a rule that could be automated.",
+  "code": null,
+  "sources": [
+   {
+    "title": "The ML Test Score: A Rubric for ML Production Readiness and Technical Debt Reduction",
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "supports": "Lists tests including 'Feature expectations are captured in a schema', 'Model quality is sufficient on important data slices', 'A simpler model is not better', 'The impact of model staleness is known', 'Offline and online metrics correlate', 'Training is reproducible', 'The ML pipeline is integration tested', 'Model quality is validated before serving', 'Models are canaried before serving', 'Serving models can be rolled back', 'Data invariants hold for inputs' and 'Training and serving are not skewed'."
+   },
+   {
+    "title": "Rules of Machine Learning (Google)",
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "supports": "Rule 5: test the infrastructure independently from the machine learning (check that feature columns are populated; check the exported model gives the same score as the training-environment model). Rule 8: know the freshness requirements of the system. Rule 9: do sanity checks right before exporting a model. Rule 29: log the features used at serving time."
+   }
+  ],
+  "related_domains": [],
+  "tags": [
+   "model-validation",
+   "gating",
+   "slices",
+   "calibration"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Design of a multi-check model-validation gate. Differs from B3-MLO-02-4 (coding the statistical gate) by covering the whole set of checks. Nearest existing: smi-k0014 (benchmark vs production swap decision for LLMs) is about benchmark relevance.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B3-MLO-02-4",
+  "cell_id": "MLO-02",
+  "topic": "CI/CD for ML (data and model tests, gating, rollback) - includes data and model validation",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "coding",
+  "difficulty": "Hard",
+  "question": "Implement promotion_gate(candidate, baseline, min_improvement=0.002, slice_tolerance=0.01, min_slice_n=200, z=1.96) for a higher-is-better metric. Each side is {'overall': (value, std_err), 'slices': {name: (value, std_err, n)}}. Promote only if the overall gain is at least min_improvement and its lower confidence bound (using independent standard errors) is above zero; reject if any baseline slice with at least min_slice_n examples regresses by more than slice_tolerance or is missing from the candidate; if only small slices regress, return needs_review. Return {'decision': ..., 'reasons': [...]}. Then discuss what this rule does not protect against.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Design choices and why:\n\n- Two separate overall conditions. 'Gain at least min_improvement' is a business threshold (is it worth the operational risk of a change?). 'Lower confidence bound above zero' is a statistical condition (is the gain distinguishable from noise?). Either can fail alone: 0.0015 with tiny error bars fails the first; 0.005 with a standard error of 0.02 fails the second.\n- Independent standard errors: the standard error of the difference is sqrt(se_c^2 + se_b^2). If both models are scored on the same examples, their errors are positively correlated, so the true standard error of the difference is smaller; ignoring that makes this gate conservative. A paired bootstrap on per-example scores is better when the data is available.\n- Slice rule: the tolerance allows small, expected movements on a slice (otherwise a gate with many slices would reject nearly everything by chance); the minimum slice size stops a 40-example slice from deciding the outcome in either direction. Small regressing slices produce needs_review instead of silent promotion, so a human sees them.\n- A slice missing from the candidate's evaluation is a hard failure: fail closed, because a missing metric often means a broken evaluation job.\n- Three outcomes rather than two keep ambiguity visible.\n\nWhat it does not protect against: many slices tested at once raise the chance of a spurious slice failure (and a real one hiding inside the tolerance); a gain on the offline set that does not transfer online (the ML Test Score lists 'offline and online metrics correlate' as its own test); label leakage in the holdout; distribution shift between holdout and tomorrow's traffic; latency, size, and calibration limits (which need their own checks); and the baseline being a stale number rather than a re-evaluation of the current production model on the same data.",
+  "practical_answer": "```python\nimport math\n\n\ndef promotion_gate(candidate, baseline, min_improvement=0.002, slice_tolerance=0.01,\n                   min_slice_n=200, z=1.96):\n    \"\"\"Compare candidate vs baseline on a higher-is-better metric.\n\n    Each side: {\"overall\": (value, std_err),\n                \"slices\": {name: (value, std_err, n)}}.\n    Independent standard errors are assumed (conservative when both models are\n    scored on the same examples). Returns {\"decision\", \"reasons\"} where\n    decision is 'promote', 'reject' or 'needs_review'.\n    \"\"\"\n    reasons = []\n    hard_fail = False\n    review = False\n\n    c_val, c_se = candidate[\"overall\"]\n    b_val, b_se = baseline[\"overall\"]\n    diff = c_val - b_val\n    se = math.sqrt(c_se ** 2 + b_se ** 2)\n    lower = diff - z * se\n    if diff < min_improvement:\n        hard_fail = True\n        reasons.append(\"overall gain %.4f below minimum %.4f\" % (diff, min_improvement))\n    elif lower <= 0:\n        hard_fail = True\n        reasons.append(\"overall gain %.4f not distinguishable from 0 (lower bound %.4f)\"\n                       % (diff, lower))\n\n    cand_slices = candidate.get(\"slices\", {})\n    for name in sorted(baseline.get(\"slices\", {})):\n        b_s_val, _b_s_se, b_n = baseline[\"slices\"][name]\n        if name not in cand_slices:\n            hard_fail = True\n            reasons.append(\"slice %s missing from candidate\" % name)\n            continue\n        c_s_val, _c_s_se, c_n = cand_slices[name]\n        s_diff = c_s_val - b_s_val\n        if s_diff < -slice_tolerance:\n            if min(b_n, c_n) >= min_slice_n:\n                hard_fail = True\n                reasons.append(\"slice %s regressed by %.4f (n=%d)\" % (name, -s_diff, min(b_n, c_n)))\n            else:\n                review = True\n                reasons.append(\"slice %s regressed by %.4f but n=%d < %d: inconclusive\"\n                               % (name, -s_diff, min(b_n, c_n), min_slice_n))\n\n    if hard_fail:\n        return {\"decision\": \"reject\", \"reasons\": reasons}\n    if review:\n        return {\"decision\": \"needs_review\", \"reasons\": reasons}\n    return {\"decision\": \"promote\", \"reasons\": [\"all checks passed\"]}\n```\n\nUsage sketch: the evaluation job writes both models' numbers for the same holdout into a JSON file; the pipeline calls promotion_gate on it, stores the returned reasons next to the candidate in the registry, moves the alias only on 'promote', opens a ticket on 'needs_review', and fails the run on 'reject'. With the test-suite numbers: overall 0.910 vs 0.900 with se 0.002 each gives a lower bound of about 0.0045, so it passes; overall 0.905 with se 0.02 gives a lower bound of about -0.034, so it is rejected as indistinguishable from zero; a candidate whose 'new_users' slice (n=1,500) drops from 0.850 to 0.820 is rejected, while the same drop on a 90-example slice gives needs_review.",
+  "key_concepts": [
+   "promotion gate",
+   "minimum improvement",
+   "confidence lower bound",
+   "slice non-regression",
+   "minimum slice size",
+   "fail closed",
+   "multiple comparisons"
+  ],
+  "common_mistakes": [
+   "Gating on point estimates alone",
+   "Letting tiny slices trigger or hide failures",
+   "Treating a missing slice metric as a pass"
+  ],
+  "interview_style_note": "Encodes both a practical and a statistical threshold, handles small slices explicitly, and states what remains unchecked.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import math\n\n\ndef promotion_gate(candidate, baseline, min_improvement=0.002, slice_tolerance=0.01,\n                   min_slice_n=200, z=1.96):\n    \"\"\"Compare candidate vs baseline on a higher-is-better metric.\n\n    Each side: {\"overall\": (value, std_err),\n                \"slices\": {name: (value, std_err, n)}}.\n    Independent standard errors are assumed (conservative when both models are\n    scored on the same examples). Returns {\"decision\", \"reasons\"} where\n    decision is 'promote', 'reject' or 'needs_review'.\n    \"\"\"\n    reasons = []\n    hard_fail = False\n    review = False\n\n    c_val, c_se = candidate[\"overall\"]\n    b_val, b_se = baseline[\"overall\"]\n    diff = c_val - b_val\n    se = math.sqrt(c_se ** 2 + b_se ** 2)\n    lower = diff - z * se\n    if diff < min_improvement:\n        hard_fail = True\n        reasons.append(\"overall gain %.4f below minimum %.4f\" % (diff, min_improvement))\n    elif lower <= 0:\n        hard_fail = True\n        reasons.append(\"overall gain %.4f not distinguishable from 0 (lower bound %.4f)\"\n                       % (diff, lower))\n\n    cand_slices = candidate.get(\"slices\", {})\n    for name in sorted(baseline.get(\"slices\", {})):\n        b_s_val, _b_s_se, b_n = baseline[\"slices\"][name]\n        if name not in cand_slices:\n            hard_fail = True\n            reasons.append(\"slice %s missing from candidate\" % name)\n            continue\n        c_s_val, _c_s_se, c_n = cand_slices[name]\n        s_diff = c_s_val - b_s_val\n        if s_diff < -slice_tolerance:\n            if min(b_n, c_n) >= min_slice_n:\n                hard_fail = True\n                reasons.append(\"slice %s regressed by %.4f (n=%d)\" % (name, -s_diff, min(b_n, c_n)))\n            else:\n                review = True\n                reasons.append(\"slice %s regressed by %.4f but n=%d < %d: inconclusive\"\n                               % (name, -s_diff, min(b_n, c_n), min_slice_n))\n\n    if hard_fail:\n        return {\"decision\": \"reject\", \"reasons\": reasons}\n    if review:\n        return {\"decision\": \"needs_review\", \"reasons\": reasons}\n    return {\"decision\": \"promote\", \"reasons\": [\"all checks passed\"]}",
+   "test": "base = {\"overall\": (0.900, 0.002),\n        \"slices\": {\"new_users\": (0.850, 0.010, 1500), \"mobile\": (0.880, 0.008, 3000),\n                   \"rare_country\": (0.800, 0.040, 90)}}\n\ndef cand(overall, new_users=0.855, mobile=0.885, rare=0.805, se=0.002):\n    return {\"overall\": (overall, se),\n            \"slices\": {\"new_users\": (new_users, 0.010, 1500), \"mobile\": (mobile, 0.008, 3000),\n                       \"rare_country\": (rare, 0.040, 90)}}\n\nr = promotion_gate(cand(0.910), base)\nassert r[\"decision\"] == \"promote\", r\n\n# gain smaller than the minimum improvement\nr = promotion_gate(cand(0.9015), base)\nassert r[\"decision\"] == \"reject\" and \"below minimum\" in r[\"reasons\"][0]\n\n# gain above minimum but within noise (large standard errors)\nr = promotion_gate(cand(0.905, se=0.02), base)\nassert r[\"decision\"] == \"reject\" and \"not distinguishable\" in r[\"reasons\"][0]\n\n# good overall gain hides a regression on a large slice\nr = promotion_gate(cand(0.915, new_users=0.820), base)\nassert r[\"decision\"] == \"reject\" and \"new_users\" in r[\"reasons\"][0]\n\n# regression on a tiny slice is inconclusive, not an automatic reject\nr = promotion_gate(cand(0.915, rare=0.700), base)\nassert r[\"decision\"] == \"needs_review\" and \"inconclusive\" in r[\"reasons\"][0]\n\n# a regression inside the tolerance is allowed\nr = promotion_gate(cand(0.915, mobile=0.872), base)\nassert r[\"decision\"] == \"promote\"\n\n# a slice missing from the candidate's evaluation is a hard failure\nc = cand(0.915); del c[\"slices\"][\"mobile\"]\nr = promotion_gate(c, base)\nassert r[\"decision\"] == \"reject\" and \"missing\" in r[\"reasons\"][0]\nprint(\"ok\")",
+   "expected": null
+  },
+  "sources": [
+   {
+    "title": "The ML Test Score: A Rubric for ML Production Readiness and Technical Debt Reduction",
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "supports": "Lists tests including 'Feature expectations are captured in a schema', 'Model quality is sufficient on important data slices', 'A simpler model is not better', 'The impact of model staleness is known', 'Offline and online metrics correlate', 'Training is reproducible', 'The ML pipeline is integration tested', 'Model quality is validated before serving', 'Models are canaried before serving', 'Serving models can be rolled back', 'Data invariants hold for inputs' and 'Training and serving are not skewed'."
+   }
+  ],
+  "related_domains": [],
+  "tags": [
+   "promotion-gate",
+   "model-validation",
+   "python",
+   "coding"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Tested gate function. Distinct from B3-MLO-02-3 (which asks which checks to run) by requiring the confidence and slice logic to be implemented and justified.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-02-5",
+  "cell_id": "MLO-02",
+  "topic": "CI/CD for ML (data and model tests, gating, rollback) - includes data and model validation",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "debugging",
+  "difficulty": "Medium",
+  "question": "A pull-request check trains a small model on a 200-row fixture and asserts validation accuracy >= 0.75. It fails in roughly one build in seven even when no relevant code changed, and engineers have started re-running it until it is green. Diagnose the problem and redesign the check, saying what a PR-level test can and cannot establish about a model.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "The test asserts a statistical outcome of a stochastic process against a threshold that sits inside the process's own noise, so it is flaky by construction. Re-running until green trains the team to ignore the check, which is worse than having none.\n\nWhat a PR check can establish: the pipeline code runs end to end on a small fixture; shapes, dtypes and value ranges are right; the loss decreases on a few steps or the model can overfit a tiny batch (a strong signal the training loop and loss are wired correctly); the data-validation and feature code behave on edge cases (unseen categories, nulls); predictions are deterministic given fixed inputs and weights; saved and reloaded models give the same outputs; and invariants hold (probabilities in [0, 1], outputs sum to 1).\n\nWhat it cannot establish: that the model's quality on real data is acceptable. A 200-row fixture says almost nothing about that, and quality needs the full evaluation on a proper holdout in a scheduled or post-merge pipeline with a promotion gate.\n\nRedesign: (1) keep seeds fixed in tests, and measure the spread rather than guessing: train with many seeds and set the assertion well below the observed minimum, or assert a very loose sanity floor (for example better than the majority-class baseline by a margin). (2) Replace the metric assertion with property tests (overfit 16 examples to near-zero loss; loss at step 20 is below loss at step 0). (3) Keep fixtures tiny so the check runs in seconds; run the expensive training in a separate nightly or on-demand job. (4) Quarantine and fix flaky tests promptly. The ML Test Score rubric lists training reproducibility and pipeline integration tests among its infrastructure tests, and Google's Rules of ML recommends testing the infrastructure independently from the machine learning.",
+  "practical_answer": "I measured the spread in a toy setup (NumPy logistic regression trained by SGD for 3 epochs, 200 training rows and a fixed 100-row validation set, 200 different seeds for initial weights and sample order; numbers will differ for your model):\n\n- mean accuracy 0.762, standard deviation about 0.0135, minimum 0.72, maximum 0.79;\n- the share of seeds with accuracy below 0.75 was 14% (about one in seven, matching the reported flakiness);\n- below 0.74: 2%; below 0.73: 0.5%; below 0.72: 0%.\n\nSo 0.75 sits within one standard deviation of the mean and fails often, while a floor of 0.70 was never reached in 200 seeds. A workable check is: fixed seed, assert accuracy >= 0.70 as a smoke floor (this tells you that the wiring is not broken, not that the model is good), plus property tests (loss decreases; tiny batch can be overfit). If a stricter bound is wanted, set it from a larger multiple of the measured standard deviation below the mean, and re-measure when the fixture or the model changes. Real quality gating lives in the post-merge pipeline against the baseline and slices, not in the PR check.",
+  "key_concepts": [
+   "flaky test",
+   "seed variance",
+   "smoke test floor",
+   "overfit-a-tiny-batch test",
+   "small fixtures",
+   "PR check vs post-merge evaluation",
+   "quarantining flaky tests"
+  ],
+  "common_mistakes": [
+   "Re-running CI until green",
+   "Lowering the threshold arbitrarily without measuring the spread",
+   "Treating a small-fixture accuracy as evidence of model quality"
+  ],
+  "interview_style_note": "Explains flakiness as noise vs threshold, measures it, and separates what belongs in a PR check from what belongs in a gated pipeline.",
+  "code": null,
+  "sources": [
+   {
+    "title": "The ML Test Score: A Rubric for ML Production Readiness and Technical Debt Reduction",
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "supports": "Lists tests including 'Feature expectations are captured in a schema', 'Model quality is sufficient on important data slices', 'A simpler model is not better', 'The impact of model staleness is known', 'Offline and online metrics correlate', 'Training is reproducible', 'The ML pipeline is integration tested', 'Model quality is validated before serving', 'Models are canaried before serving', 'Serving models can be rolled back', 'Data invariants hold for inputs' and 'Training and serving are not skewed'."
+   },
+   {
+    "title": "Rules of Machine Learning (Google)",
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "supports": "Rule 5: test the infrastructure independently from the machine learning (check that feature columns are populated; check the exported model gives the same score as the training-environment model). Rule 8: know the freshness requirements of the system. Rule 9: do sanity checks right before exporting a model. Rule 29: log the features used at serving time."
+   }
+  ],
+  "related_domains": [],
+  "tags": [
+   "ci",
+   "testing",
+   "flaky-tests"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Debugging a flaky ML test with measured spread. No existing item overlaps (nearest: smi-h0036 repeated peeking, different topic).",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-02-6",
+  "cell_id": "MLO-02",
+  "topic": "CI/CD for ML (data and model tests, gating, rollback) - includes data and model validation",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "A newly promoted model passes every offline gate and goes to full traffic at 14:00. At 14:40 the endpoint's error rate is normal but the business metric 'orders per 1,000 sessions' looks 6% lower than the same hour last week. Define the rollback criteria you would have agreed in advance, and what has to be true for the rollback to be quick and safe.",
+  "answer_set": "concise+detailed",
+  "answer": null,
+  "concise_answer": "Agree triggers before launch: automatic rollback on hard signals (error rate, latency SLO burn, invalid or constant outputs), and a human-reviewed decision on soft business signals, which need a baseline and a minimum sample because hourly metrics are noisy. Rollback is quick only if the previous model artifact, environment and compatible features still exist and are deployable, and the switch is a pointer or traffic move that has been rehearsed.",
+  "detailed_answer": "Rollback criteria should be written, with thresholds, before the promotion, because deciding during an incident is when people rationalise.\n\nHard signals, automatic: error and timeout rate above a limit for N minutes; p95 or p99 latency breaching the SLO; prediction health checks such as a share of NaN, constant or out-of-range outputs; a sudden shift in the output score distribution against the previous model on the same traffic. These are cheap to evaluate and rarely ambiguous.\n\nSoft signals, human decision with a pre-agreed protocol: business or proxy metrics (conversion, click-through, orders per session). They are noisy, seasonal and sometimes delayed. A 6% drop in one hour may be within normal hour-to-hour variation, a time-of-day pattern, or a concurrent change (promotion, outage). Compare against a concurrent control (the old model on a slice of traffic, a canary) rather than against last week, and require a minimum sample before acting. The ML Test Score rubric lists canarying models before serving and being able to roll back to a previous serving version as distinct tests; in that setup the 14:00 launch would have been a canary first, which answers this question directly.\n\nWhat must hold for a fast, safe rollback:\n- The previous model version stays in the registry, immutable, with its container image or runtime and dependencies still available (do not garbage-collect it during the cooling-off period).\n- Its input features are still produced. If the new release also changed the feature pipeline or schema, rolling back the model alone can break serving; use backward-compatible (expand then contract) schema changes so that both versions can run.\n- Rollback is a pointer or traffic change, not a rebuild, and has been rehearsed in staging.\n- State is considered: caches keyed by model output, downstream consumers that stored scores from the new model, and any feature or embedding store the new model wrote.\n- The incident record keeps the data needed to diagnose: model version in each prediction log.\n\nDecision at 14:40 in this scenario: shift part of traffic back to the old model for a controlled comparison, rather than guessing from a single hour.",
+  "practical_answer": null,
+  "key_concepts": [
+   "rollback criteria",
+   "hard vs soft signals",
+   "canary before full traffic",
+   "concurrent control",
+   "previous artifact retention",
+   "expand-contract schema change",
+   "model version in logs"
+  ],
+  "common_mistakes": [
+   "Rolling back on any dip in a noisy business metric without a control",
+   "Having no deployable previous artifact",
+   "Rolling back the model but not a coupled feature or schema change"
+  ],
+  "interview_style_note": "Separates automatic technical triggers from judgement-based business triggers and names the preconditions that make rollback real.",
+  "code": null,
+  "sources": [
+   {
+    "title": "The ML Test Score: A Rubric for ML Production Readiness and Technical Debt Reduction",
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "supports": "Lists tests including 'Feature expectations are captured in a schema', 'Model quality is sufficient on important data slices', 'A simpler model is not better', 'The impact of model staleness is known', 'Offline and online metrics correlate', 'Training is reproducible', 'The ML pipeline is integration tested', 'Model quality is validated before serving', 'Models are canaried before serving', 'Serving models can be rolled back', 'Data invariants hold for inputs' and 'Training and serving are not skewed'."
+   }
+  ],
+  "related_domains": [],
+  "tags": [
+   "rollback",
+   "deployment",
+   "gating"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Rollback criteria and preconditions at the CI/CD level; the deployment-strategy angle (canary/shadow statistics) is a separate cell MLO-05.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B3-MLO-02-7",
+  "cell_id": "MLO-02",
+  "topic": "CI/CD for ML (data and model tests, gating, rollback) - includes data and model validation",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "debugging",
+  "difficulty": "Hard",
+  "question": "A nightly retraining DAG runs ingest -> validate -> build_features -> train -> evaluate -> register. After a transient failure in train, the orchestrator retried the whole run from build_features. The next morning the feature table has duplicated rows for 3 days, two models are registered under the same version tag, and a colleague's backfill of last week's partitions produced different features than the originals. List the design faults and how you would fix each, including how a step's cache key should be formed.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Each symptom points to a step that is not idempotent, or to an ambiguous identity of inputs.\n\n1. Duplicated rows after a retry: build_features appended to the table. A retried step must produce the same final state as a single successful run. Fix: write by partition key with overwrite or upsert (replace partition for date D), or write to a temporary location and atomically swap or commit on success, so a partial first attempt is discarded.\n2. Two models with the same version tag: register created a new entry with a caller-chosen name. Fix: derive identity from content or run (training run id plus input hashes), make registration idempotent (registering the same run twice returns the same version), and never let a step overwrite an existing version.\n3. Backfill produced different features: the step read something that is not a pure function of the partition: 'now', 'latest' reference tables, current code, or an unpinned join. Fix: pass the logical date as an explicit parameter; read versioned or as-of snapshots of reference data; pin code and environment versions; record them in the step's outputs.\n4. Retry granularity: restarting the whole run repeats successful steps. Fix: persist each step's output as an artifact addressed by its inputs, and let a retry resume from the failed step; cap retries and use backoff for transient errors, but fail fast on deterministic ones (a schema violation will fail identically every time).\n5. Validation and training were coupled to state of the first attempt: failed attempts left partial artifacts. Fix: commit outputs only on success.\n\nCache key: a step's output can be reused only if everything that influences it is unchanged. So the key is a hash of (step name, code version or hash of the step's code and its dependencies, parameters, and the content hashes of every input artifact), using a canonical serialisation (sorted keys). Do not include volatile values such as wall-clock time. Unhashable hidden inputs (an external table read by name, an unpinned model download) break caching correctness, so they must be turned into explicit versioned inputs.",
+  "practical_answer": "Worked example of keying and backfill (hypothetical values).\n\nStep build_features for logical date 2026-03-05:\n- key = hash(\"build_features\", code_hash=\"a41c\", params={\"window_days\": 28}, inputs={\"events\": \"sha:7e90\", \"users_asof\": \"sha:12bd\"})\n- Re-running with the same key returns the stored output without recomputation. Changing window_days to 14 changes the key, so this step and every downstream step is recomputed; changing nothing but the training seed changes only train and later steps' keys.\n- Writing: output goes to features/date=2026-03-05/ as an overwrite of that partition only.\n\nBackfill of 7 days (03-01 to 03-07): the 7 partitions are independent tasks, run with limited concurrency. Running it twice yields identical content because (a) each task reads as-of snapshots of reference data selected by its logical date, and (b) writes replace the partition. If the colleague's backfill gave different features, compare the two key tuples: differing inputs hashes show a snapshot problem, differing code_hash shows a code change, and identical keys with different outputs prove a hidden input or nondeterminism, which is then a bug to fix.\n\nAcceptance test for idempotency: run the step twice on the same input and diff the output hashes; kill the step midway and run again; both must leave identical final state.",
+  "key_concepts": [
+   "idempotent step",
+   "atomic commit of outputs",
+   "overwrite by partition",
+   "cache key from input hashes",
+   "logical date parameter",
+   "retry vs fail-fast",
+   "backfill",
+   "resume from failed step"
+  ],
+  "common_mistakes": [
+   "Appending to tables in a step that may be retried",
+   "Including timestamps or 'latest' references in a step's inputs",
+   "Retrying deterministic failures indefinitely"
+  ],
+  "interview_style_note": "Maps each symptom to a violated pipeline property and defines the cache key so reuse is provably safe.",
+  "code": null,
+  "sources": [],
+  "related_domains": [],
+  "tags": [
+   "pipelines",
+   "idempotency",
+   "caching",
+   "backfill"
+  ],
+  "time_sensitive": false,
+  "change_notes": "ML-pipeline step design (idempotency, cache key, backfill). Generic data orchestration is deferred to a later batch; this stays on ML-step identity and model registration.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B3-MLO-02-8",
+  "cell_id": "MLO-02",
+  "topic": "CI/CD for ML (data and model tests, gating, rollback) - includes data and model validation",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Medium",
+  "question": "Your team has: a feature-engineering code repository, a weekly-refreshed training table, a model that ages quickly, and a data-quality alert system. Which events would you let trigger which pipeline (PR checks, full retraining, evaluation only, redeploy), and what would each pipeline run versus skip?",
+  "answer_set": "concise+detailed",
+  "answer": null,
+  "concise_answer": "Match the trigger to what changed. Code change in a PR: fast checks only (lint, unit tests, tiny-fixture pipeline smoke test, schema tests). Merge to main: full integration run on a bounded sample and a gated evaluation. New data landing: validate, then retrain. Schedule: retrain at a cadence set by measured staleness cost. Quality alert: investigate or pause, not blindly retrain, since retraining on bad data makes things worse.",
+  "detailed_answer": "Think of triggers as events, each mapped to the cheapest pipeline that can detect the risk it brings.\n\n1. Pull request touching feature or model code: run in minutes. Static checks, unit tests of feature functions on edge cases, a pipeline smoke test on a tiny fixture (ingest through train through evaluate with a handful of rows), schema and config validation. It cannot judge model quality; do not train on full data here.\n2. Merge to main: heavier integration run on a fixed, versioned sample with a baseline comparison, producing a candidate and its report. This answers 'did the change alter metrics, latency or outputs'. Often only paths that matter (feature code, training code, config) should trigger it.\n3. New training data lands (weekly table): validation first (schema, null rates, row counts against the last accepted run). If it passes, retrain on the new snapshot, evaluate against the current production model on the same holdout, and apply the promotion gate. If it fails, stop and alert; do not retrain on data you do not trust.\n4. Schedule: Google's Rules of ML suggests knowing the system's freshness requirements, that is, measuring how quickly performance degrades as the model ages. A model that loses measurable value in a few days justifies a more frequent schedule; one that holds for months does not. Schedule is a floor, not the only trigger.\n5. Monitoring alerts (data quality, performance regression): usually trigger investigation or a protective action (switch to a fallback, pause automatic promotion), not an automatic retrain, because retraining does not fix a broken feed or a labelling issue. An automated retrain on drift can be appropriate when the process is mature and gated.\n6. Config or dependency change: treat like code (a pinned-dependency update triggers the integration run); a registry alias change triggers redeploy, not retraining.\n\nRule of thumb: each trigger gets a pipeline whose runtime is proportional to how often it fires, and every path that ends in production passes the same promotion gate.",
+  "practical_answer": null,
+  "key_concepts": [
+   "pipeline triggers",
+   "path-filtered triggers",
+   "smoke test on fixture",
+   "retrain on new data after validation",
+   "model staleness",
+   "promotion gate",
+   "alert-driven investigation"
+  ],
+  "common_mistakes": [
+   "Running full training on every pull request",
+   "Retraining automatically on every data-quality alert",
+   "Having a schedule without knowing how fast the model goes stale"
+  ],
+  "interview_style_note": "Maps events to proportionate pipelines and avoids retraining on untrusted data.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Rules of Machine Learning (Google)",
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "supports": "Rule 5: test the infrastructure independently from the machine learning (check that feature columns are populated; check the exported model gives the same score as the training-environment model). Rule 8: know the freshness requirements of the system. Rule 9: do sanity checks right before exporting a model. Rule 29: log the features used at serving time."
+   },
+   {
+    "title": "The ML Test Score: A Rubric for ML Production Readiness and Technical Debt Reduction",
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "supports": "Lists tests including 'Feature expectations are captured in a schema', 'Model quality is sufficient on important data slices', 'A simpler model is not better', 'The impact of model staleness is known', 'Offline and online metrics correlate', 'Training is reproducible', 'The ML pipeline is integration tested', 'Model quality is validated before serving', 'Models are canaried before serving', 'Serving models can be rolled back', 'Data invariants hold for inputs' and 'Training and serving are not skewed'."
+   }
+  ],
+  "related_domains": [],
+  "tags": [
+   "ci-cd",
+   "triggers",
+   "retraining"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Trigger-to-pipeline design. Complements B3-MLO-02-5 (what a PR check can test) and 02-3 (gate contents).",
+  "confidence": "medium"
+ }
+]

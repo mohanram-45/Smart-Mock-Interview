@@ -1,0 +1,619 @@
+[
+ {
+  "plan_id": "B4-MLO-11-5",
+  "verdict": "correct",
+  "reasons": [
+   "Central mechanism (membership inference via confidence/loss gap), the OWASP, Choquette-Choo and Carlini citations all check out as worded.",
+   "Major: the DP bullet lumps 'adding noise to outputs' with DP training and then calls the bullet the strongest option; output noise that leaves the label unchanged is exactly the confidence masking the answer itself says label-only attacks defeat.",
+   "Major: concise_answer lists 'return less / round outputs / authenticate and rate-limit' as mitigations without the limits that the canonical answer says are the point of the question (what they do NOT achieve).",
+   "Minor: the given 10,000 calls/key/day is never applied; risk factors stated as universal; measurement protocol omits same-distribution requirement; source title contains the stray text '(correct URL)'."
+  ],
+  "parts_answered": {
+   "plain-terms risk": true,
+   "training/model conditions that worsen it": true,
+   "ranked cheap mitigations with do/do-not achieve": "yes in canonical; concise omits the do-not-achieve part",
+   "use of 10,000 calls/day and six-decimal facts": "partly (six decimals via rounding; 10,000/day not applied)"
+  },
+  "evidence": [
+   {
+    "claim": "OWASP ML04 lists regularisation and noise/DP as prevention",
+    "method": "doc",
+    "evidence": "Page lists: randomized/shuffled training data; 'Obfuscating the model's predictions by adding random noise or using differential privacy techniques'; 'Regularisation techniques such as L1 or L2 ...'; reducing training set size/redundant features; testing and monitoring for anomalies. Supported. Note OWASP also lists 'reducing the size of the training dataset', which the record (rightly, empirically) does not follow."
+   },
+   {
+    "claim": "Label-only attacks defeat confidence-masking defences",
+    "method": "paper",
+    "evidence": "arXiv 2007.14321 abstract: label-only attacks 'break multiple defenses' that mask confidence; also says DP and (strong) L2 regularisation are the only known defences that prevented all attacks. Supported."
+   },
+   {
+    "claim": "Label-only attacks need 'a few augmented queries up to thousands for boundary-distance'",
+    "method": "paper",
+    "evidence": "Full text: rotation attack N=3 queries, translation N=4d+1 (d=2 gives 9), HopSkipJump boundary-distance default 2,500 queries (App. B.1). Paper also says 'Query limiting would likely not be a suitable defense' because of Sybil attacks. Supported as worded; the answer's 'sidestepped with many keys' is consistent."
+   },
+   {
+    "claim": "Evaluate at low FPR, not only average-case",
+    "method": "paper",
+    "evidence": "arXiv 2112.03570 abstract: attacks 'should instead be evaluated by computing their true-positive rate at low (e.g., <0.1%) false-positive rates', contrasting with average-case accuracy. Supported (abstract names accuracy, not AUC)."
+   },
+   {
+    "claim": "Output noise is a form of confidence masking",
+    "method": "derivation",
+    "evidence": "Noise added to scores leaves the argmax label unchanged in most cases, so a label-only attacker sees the same signal; this is the class of defence the Choquette-Choo abstract says is broken. Therefore listing 'adding noise to outputs' next to DP training under 'strongest option' is misleading."
+   },
+   {
+    "claim": "10,000 calls/day capacity",
+    "method": "derivation",
+    "evidence": "10,000 / 1 = 10,000 single-query tests; 10,000 / 3 = 3,333 records at 3 queries; 10,000 / 2,500 = 4 records at the paper's boundary-distance budget."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "detailed_answer",
+    "claim": "Differentially private training, or adding noise to outputs, which OWASP also lists. DP training gives a formal bound on how much any one record can influence the model, at a cost in accuracy, complexity and compute; it is the strongest option but not cheap.",
+    "problem": "'Adding noise to outputs' is grouped with DP training and then covered by 'the strongest option'. Output noise that leaves the label unchanged is confidence masking, which label-only attacks defeat (the answer says so two bullets earlier). Only DP training (and, per the same paper, strong L2 regularisation) stopped all attacks tested.",
+    "replacement": "Differentially private training. (OWASP also lists adding noise to predictions, but noise on scores that leaves the label unchanged is a form of confidence masking and does not stop label-only attacks.) DP training gives a formal bound on how much any one record can influence the model, at a cost in accuracy, complexity and compute; Choquette-Choo et al. report DP and strong L2 regularisation as the only defences that stopped all the attacks they tried. It is the strongest option but not cheap."
+   },
+   {
+    "severity": "major",
+    "field": "concise_answer",
+    "claim": "Cheap mitigations: reduce overfitting, return less (label or coarse score), round outputs, authenticate and rate-limit; stronger but costlier: differentially private training.",
+    "problem": "Presents score-masking and rate limits as mitigations without their limits; contradicts the canonical statement that they should not be relied on alone and omits the 'do not achieve' half of the question.",
+    "replacement": "Cheap mitigations: reduce overfitting (targets the root signal); return less or round scores (label-only attacks still work); authenticate and rate-limit (does not stop a single-query test; keys can be multiplied). Strongest but costlier: differentially private training."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "but do nothing against a single-query threshold test by an authorised caller, and per-key limits can be sidestepped with many keys.",
+    "problem": "The question gives 10,000 calls per key per day but the answer never says what that allows.",
+    "replacement": "but do nothing against a single-query threshold test by an authorised caller (at 10,000 calls a day one key could test up to 10,000 records, about 3,300 if each needs three augmented queries, but only about 4 at the 2,500 queries of the paper's boundary-distance attack), and per-key limits can be sidestepped with many keys (the paper notes Sybil attacks make query limiting an unlikely defence)."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "It is worse when the model overfits",
+    "problem": "Risk factors (overfitting, small data, outliers, rich outputs) are empirical tendencies, not universal, and are not stated in the cited OWASP page.",
+    "replacement": "It tends to be worse when the model overfits"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "1. Hold out a set of records that were never in training (non-members) and sample an equal number of training records (members).",
+    "problem": "If non-members come from a later period or different population the AUC will reflect drift, not membership.",
+    "replacement": "1. Hold out a set of records that were never in training (non-members), drawn from the same distribution as the training data (a random split, not a later period, or drift will inflate the AUC), and sample an equal number of training records (members)."
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "(for example 0.1%, which needs several thousand non-members to estimate)",
+    "problem": "Estimating a 0.1% FPR needs at least a few thousand non-members just to see a handful of false positives.",
+    "replacement": "(for example 0.1%, which needs at least several thousand non-members to estimate)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism explanation plus ranked trade-offs; no multi-step calculation or subtle debugging.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "63 words; shorter, but must carry the limits (see major issue). After the fix it is 78 words."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Identical to canonical_answer; apply every replacement to canonical_answer as well."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Measurement protocol not in the detailed answer."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "All seven are discussed. 'rate limiting' and 'output rounding' fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0030",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://owasp.github.io/www-project-machine-learning-security-top-10/docs/ML04_2023-Membership_Inference_Attack",
+    "status": "supported",
+    "evidence": "Lists regularisation and noise/differential privacy among prevention methods; also 'Regularly testing and monitoring the model's behavior for anomalies' (partly backs the monitoring bullet). Source title contains the stray text '(correct URL)'; remove it."
+   },
+   {
+    "url": "https://arxiv.org/abs/2007.14321",
+    "status": "supported",
+    "evidence": "Abstract: label-only attacks break multiple confidence-masking defences; DP and strong L2 are the only known defences preventing all attacks. Full text supports the query counts and the 'Query limiting would likely not be a suitable defense' remark."
+   },
+   {
+    "url": "https://arxiv.org/abs/2112.03570",
+    "status": "supported",
+    "evidence": "Abstract: attacks should be evaluated by TPR at low (<0.1%) FPR rather than average-case metrics."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Label-Only Membership Inference Attacks (full text, Choquette-Choo et al.)",
+    "url": "https://arxiv.org/pdf/2007.14321",
+    "supports": "Query budgets of label-only attacks and that query limiting is unlikely to be a suitable defence.",
+    "quote": "Query limiting would likely not be a suitable defense",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [
+   "Overfitting, small training set and outliers worsen membership inference (well-known empirically; not stated on the cited OWASP page)",
+   "Monitoring query patterns detects some probing (already listed as unverified)",
+   "Model inversion remark for tabular scorers (background)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-7",
+  "verdict": "correct",
+  "reasons": [
+   "SRE Book blameless/trigger sentences and Rules of ML Rule #10 check out.",
+   "Major: the counterfactual suggestion 'a holdout or shadow model that kept the old feature' is wrong for a CTR estimate: a shadow model is never shown, so it has no clicks. This also contradicts prior answer smi-l0029 (see contradictions).",
+   "Minor: speculative cause for the gradual ramp conflicts with the premise that the default applied to every user; two action/mitigation items would not have helped with this fault."
+  ],
+  "parts_answered": {
+   "quantify impact": true,
+   "why detection slow": true,
+   "action items": true,
+   "runbook": true,
+   "what to avoid": true
+  },
+  "evidence": [
+   {
+    "claim": "Blameless postmortem assumes good intentions; fix systems and processes; monitoring failure is a trigger",
+    "method": "doc",
+    "evidence": "sre.google postmortem-culture: 'A blamelessly written postmortem assumes that everyone involved in an incident had good intentions'; 'you can fix systems and processes to better support people making the right choices'; trigger list includes 'A monitoring failure (which usually implies manual incident discovery)'. Supported."
+   },
+   {
+    "claim": "Rule #10: joined table no longer updated degrades without errors",
+    "method": "doc",
+    "evidence": "Rules of ML Rule #10: if a joined table stops updating the system keeps running and behaviour 'decays gradually'; also mentions a feature's coverage dropping from 90% to 60% and tracking data statistics, which would support the per-feature default-rate alert. Supported."
+   },
+   {
+    "claim": "Shadow model cannot supply click outcomes",
+    "method": "derivation",
+    "evidence": "A shadow model's output is never shown to users, so no impressions or clicks exist for it; only score or ranking differences on logged requests can be computed. Same position as prior answer smi-l0029."
+   },
+   {
+    "claim": "Counterfactual: step vs ramp",
+    "method": "derivation",
+    "evidence": "If the feature fell back to its default for every user at the rename, CTR should step down at that time. A 19-day ramp therefore needs its own explanation; 'caches or cohorts refreshed' is speculation."
+   },
+   {
+    "claim": "Numbers",
+    "method": "derivation",
+    "evidence": "19 days, 7% relative, 'near 0% to 100%' default rate are consistent across detailed and practical fields."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "detailed_answer",
+    "claim": "or to a holdout or shadow model that kept the old feature",
+    "problem": "A shadow model has no click outcomes, so it cannot give a CTR counterfactual; contradicts smi-l0029. A holdout only exists if one was set up.",
+    "replacement": "or, if one existed, to a holdout slice still served with the old feature (a shadow model has no click outcomes; it can only show how scores and rankings would have differed on logged requests)"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "the drift was spread over time as user caches or cohorts refreshed",
+    "problem": "Unsupported explanation; if the default applied to every user at once the loss would normally be a step, so the ramp should be explained rather than assumed.",
+    "replacement": "a loss that ramps over 19 days when the default applied to every user needs its own explanation (for example cached recommendations or daily-refreshed features ageing out, or a staged rollout of the rename), which the postmortem should check rather than assume"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "a canary comparison against the previous model on live traffic",
+    "problem": "An upstream column rename breaks both the old and new model equally, so a canary against the previous model would not have detected this fault.",
+    "replacement": "a comparison of live feature values and scores against a logged reference (the training distribution or a frozen sample of earlier requests), since a canary against the previous model shares the same broken upstream data"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "disable the feature (so it is intentionally imputed and flagged)",
+    "problem": "In this incident the feature already falls back to a default, so disabling it only reproduces the degraded state unless the model was trained or validated with that feature missing.",
+    "replacement": "disable the feature only if the model was trained or validated with it missing (otherwise this reproduces the fault), so it is intentionally imputed and flagged"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Multi-part process answer; conceptual rather than computational.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Identical to canonical_answer; apply replacements to both."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Runbook and timeline template are not in the detailed answer."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All seven discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0013",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/postmortem-culture/",
+    "status": "supported",
+    "evidence": "Both quoted sentences present, including the monitoring-failure trigger."
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule #10 silent failures, joined table no longer updated, decays gradually. (Opened via WebFetch; paraphrased output only because of its quote limit.)"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Typical contributing factors (service-health-only monitoring, no data contract) are background"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-13-3",
+  "verdict": "correct",
+  "reasons": [
+   "All arithmetic recomputed and correct: 4.6, 1.38M, 3.64 (-20.9%), 2.275 (-50.5%), 2.875 (-37.5%), 6.2 (+34.8%), 4.92 (+7.0%), 1.40/1.08=1.296.",
+   "Minor: the detailed answer uses 'the 30% rise' before deriving it, states 'cost scales with tokens per request, not with requests', and says 'most of the traffic' where about 85% is needed; 'byte-identical' is stronger than the cited OpenAI wording."
+  ],
+  "parts_answered": {
+   "baseline cost per request": true,
+   "80% cache saving": true,
+   "routing saving": true,
+   "attribution": true,
+   "budget and alerting": true,
+   "release checks": true
+  },
+  "evidence": [
+   {
+    "claim": "Baseline 4.6 units, 1.38M units/day",
+    "method": "executed",
+    "evidence": "(2.4+0.8)*1+0.35*4=4.6; *300000=1,380,000."
+   },
+   {
+    "claim": "Cost per request must rise ~30%",
+    "method": "executed",
+    "evidence": "1.40/1.08=1.296."
+   },
+   {
+    "claim": "Tenant scenario 6.2 and blended 4.92",
+    "method": "executed",
+    "evidence": "2.4+2.4+1.4=6.2 (+34.8%); 0.8*4.6+0.2*6.2=4.92 (+6.96%). Tenant share needed for a 30% blended rise: 0.296/0.348 = 85%, so 'most of the traffic' is true but vague."
+   },
+   {
+    "claim": "Cache: 3.64 (-21%)",
+    "method": "executed",
+    "evidence": "2.4*(0.8*0.5+0.2*1)=1.44; 4.6-2.4+1.44=3.64; 1-3.64/4.6=20.9%."
+   },
+   {
+    "claim": "Routing: 2.275 (-51%) and 2.875 (-37.5%)",
+    "method": "executed",
+    "evidence": "0.5*3.64+0.5*0.25*3.64=2.275 (-50.5%, rounds to -51%); 0.5*4.6+0.125*4.6=2.875 (-37.5%)."
+   },
+   {
+    "claim": "Prefix must match; stable first, timestamps last; edits invalidate later cache",
+    "method": "doc",
+    "evidence": "OpenAI prompt-caching guide: 'Cache reuse requires the entire rendered prefix to match'; timestamps 'at the end rather than the beginning'; 'If content or a relevant setting changes before a breakpoint, the prefix after that change cannot match the existing cache entry.' Also now documents a 1.25x cache-write rate on newer models and up to 95% read discount, so the record's hedge about provider-specific discounts and the write surcharge is warranted (with a 1.25x write on the 20% misses the fixed part costs 2.4*(0.4+0.25)=1.56, request 3.76, -18%)."
+   },
+   {
+    "claim": "'byte-identical'",
+    "method": "doc",
+    "evidence": "Not in the cited page, which says the entire rendered prefix must match."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Cost scales with tokens per request, not with requests.",
+    "problem": "Cost scales with both; the point is that 8% more requests cannot explain +40%. The 30% figure used later is never derived in this field.",
+    "replacement": "Cost scales with total tokens (requests times tokens per request), so 8% more requests cannot explain a 40% rise: cost per request must have risen by about 30% (1.40 / 1.08 = 1.30)."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "That explains the 30% rise only if the tenant is most of the traffic",
+    "problem": "Quantify: under this hypothetical the tenant would need about 85% of traffic.",
+    "replacement": "That explains the 30% rise only if the tenant is about 85% of the traffic (0.30 / 0.35)"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "many providers reuse work only when the beginning of the prompt is byte-identical",
+    "problem": "'Byte-identical' and 'many providers' go beyond the cited OpenAI page.",
+    "replacement": "cache reuse typically requires the beginning of the prompt to match exactly (OpenAI's documentation says the entire rendered prefix must match)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Several-step unit arithmetic plus operational controls; no subtle trap once the cache applies only to the fixed prefix.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "78 words, consistent numbers (4.6, 3.64, 2.275, 30%)."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Identical to canonical_answer; apply replacements to both."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Controls and release gate; not repeated in detailed."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "All seven discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0042",
+   "same_intent": false
+  },
+  "code_findings": "No code; arithmetic re-run in Python.",
+  "sources_findings": [
+   {
+    "url": "https://developers.openai.com/api/docs/guides/prompt-caching",
+    "status": "supported",
+    "evidence": "'Cache reuse requires the entire rendered prefix to match'; keep stable content first, timestamps at the end; changes before a breakpoint invalidate the later prefix."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Alert at 1.5x trailing median and 80%/100% budget warnings are illustrative thresholds (worded as examples)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-4",
+  "verdict": "correct",
+  "reasons": [
+   "Mechanisms (old-policy logging, position/selection bias, objective mismatch, serving skew) are correct and consistent with prior answers smi-l0029 and smi-i0009; Sculley, Joachims and Rules #37 citations check out.",
+   "Minor: 'the clean mitigation' overstates Sculley et al., who say 'some amount of randomization' or isolating data; Sculley is a paper, not an official_doc.",
+   "Note: the record has canonical_answer only (answer_set single); replacements below use field 'answer' = canonical_answer."
+  ],
+  "parts_answered": {
+   "explanations specific to logged-data evaluation": true,
+   "order of checking": true,
+   "how to change offline evaluation": true
+  },
+  "evidence": [
+   {
+    "claim": "Direct feedback loop: a model may influence its own future training data",
+    "method": "paper",
+    "evidence": "Sculley et al. Section 4: 'A model may directly influence the selection of its own future training data'; suggested mitigations are some randomization or isolating parts of the data. Supported; 'clean mitigation' overstated."
+   },
+   {
+    "claim": "Position-bias propensities from a small swap intervention; logging ranker may be deterministic",
+    "method": "paper",
+    "evidence": "arXiv 1608.04468 Sec. 5.3: swap intervention 'only needs to be applied on a small subset of the data'; Sec. 2: 'the system can be deterministic'; Sec. 1: 'we do not require that the system randomizes rankings during data collection'. Supported."
+   },
+   {
+    "claim": "Rule #37: same example same result; discrepancy is probably an engineering error",
+    "method": "doc",
+    "evidence": "Rules of ML #37 text confirmed ('it should give you exactly the same result' ... 'a discrepancy here probably indicates an engineering error'); Rule #29 confirmed separately."
+   },
+   {
+    "claim": "Item-level IPS needs a stochastic logging policy with recorded propensities",
+    "method": "derivation",
+    "evidence": "Overlap/positivity requirement of IPS: items with zero logging probability cannot be reweighted. Correct; unsourced but standard."
+   },
+   {
+    "claim": "'Enough traffic to detect a 1% relative change'",
+    "method": "derivation",
+    "evidence": "Two-proportion test, p=3.1%, relative 1% = 0.031 pp: about 4.9 million users per arm at 80% power, alpha 0.05. The premise is large but self-consistent; the answer rightly treats the null as real."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "exploration or randomised-ranking traffic is the clean mitigation",
+    "problem": "Sculley et al. only suggest 'some amount of randomization' or isolating data; 'the clean mitigation' is stronger than the source.",
+    "replacement": "exploration or randomised-ranking traffic is one mitigation (Sculley et al. also mention isolating part of the data from the model's influence)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-step diagnostic reasoning across bias, estimation and metric choice; requires knowing IPS preconditions.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "canonical (single)",
+    "adds_distinct_value": true,
+    "note": "Single long answer; concise/detailed/practical empty, consistent with answer_set 'single'."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All seven discussed (nDCG at top ranks in item 3 and plan).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0009",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "supported",
+    "evidence": "Section 4: 'A model may directly influence the selection of its own future training data.' source_type should be paper, not official_doc."
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule #37 wording matches the supports field."
+   },
+   {
+    "url": "https://arxiv.org/pdf/1608.04468",
+    "status": "supported",
+    "evidence": "Swap intervention on a small subset (Sec. 5.3); deterministic logging system allowed (Sec. 2)."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Item-exposure IPS needs a stochastic logging policy (standard positivity condition, derivation)",
+   "Pooled AUC mixes between-query and within-query comparisons (derivation)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-5",
+  "verdict": "correct",
+  "reasons": [
+   "SQL and test re-executed on 3.13, 3.10 and 3.11; identical output and the fenced code equals code.solution; configs[0].content equals the SQL; the prose numbers match the output.",
+   "Major: the comparison is numeric only. For text ids and categories ABS(s.value - r.value) is 0, so a changed category is silently reported as a match (verified: 'red' vs 'blue' returns an empty report), yet the design says ids and categories are compared exactly. The caveats paragraph does not warn about it.",
+   "Minor: '4 of 11' misstates the denominator; '10 clean requests per hour' is imprecise; rubric point 6 mentions 'higher sampling during canary' which the answer never discusses."
+  ],
+  "parts_answered": {
+   "what to log": true,
+   "how and when to recompute": true,
+   "tolerances by feature type": "described, but SQL only implements numeric",
+   "timestamps for root-cause": true,
+   "what to alert on": true,
+   "SQL executed": true
+  },
+  "evidence": [
+   {
+    "claim": "Query output on test data",
+    "method": "executed",
+    "evidence": "[('2026-03-01 14:00','avg_basket',11,0,1),('2026-03-01 14:00','orders_24h',11,1,4)] on 3.13 (SQLite 3.45.1), 3.10 (SQLite 3.53.1) and 3.11 (SQLite 3.45.1)."
+   },
+   {
+    "claim": "Row counts",
+    "method": "derivation",
+    "evidence": "orders_24h at 14:00: b0..b9 plus c1 = 11 rows; c1 has no recompute (1); b0..b3 off by one (4). avg_basket: b0..b9 plus c0 = 11; c0 NULL vs 25.0 (1). 13:00 avg_basket diff 0.004 <= 0.01+0.001*|20..29|."
+   },
+   {
+    "claim": "Edge: categorical text value",
+    "method": "executed",
+    "evidence": "served 'red' vs recomputed 'blue' with tolerance 0/0 -> report []; ABS('red'-'blue') evaluates to 0. Silent false negative. s.value IS NOT r.value returns 1 for the same pair."
+   },
+   {
+    "claim": "Edge: duplicate recomputed rows",
+    "method": "executed",
+    "evidence": "two identical recomputed rows for one served row -> n=2, mismatched=2 (counts double), as the caveat says."
+   },
+   {
+    "claim": "Edge: feature without tolerance row",
+    "method": "executed",
+    "evidence": "report [] even though served 5 vs recomputed 9 (inner join drops it), as the caveat says."
+   },
+   {
+    "claim": "Edge: NULL vs NULL, boundary tolerance, ISO 'T..Z' timestamps",
+    "method": "executed",
+    "evidence": "NULL/NULL not a mismatch; 100 vs 100.11 within 0.01+0.001*100.11 but 100.12 outside; strftime handles 'T...Z' and groups to the hour."
+   },
+   {
+    "claim": "Rule of three",
+    "method": "derivation",
+    "evidence": "3/20,000 = 0.015%."
+   },
+   {
+    "claim": "Rules #29 / #37 and ML Test Score",
+    "method": "doc",
+    "evidence": "Rule #29 'do it for a small fraction, such that you can verify the consistency between serving and training'; ML Test Score Monitor 3 'Training and serving features compute the same values' (Section V)."
+   },
+   {
+    "claim": "Late events vs deletions",
+    "method": "derivation",
+    "evidence": "Consistent with prior smi-l0044 (late arrivals raise backfilled counts; deletions push the other way). The statement 'late events make offline counts exceed served ones' holds when late arrivals dominate."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "practical_answer",
+    "claim": "Caveats: the inner join to tolerances silently drops any feature that has no tolerance row, so require one per logged feature, and recomputed must be unique per (request_id, feature) or the counts double.",
+    "problem": "The query compares numbers only. For text ids or categories the subtraction yields 0 so a changed value is never counted as a mismatch, although the design requires exact comparison for ids and categories. This was reproduced.",
+    "replacement": "Caveats: the inner join to tolerances silently drops any feature that has no tolerance row, so require one per logged feature, and recomputed must be unique per (request_id, feature) or the counts double. The comparison is also numeric only: for text ids or categories ABS(s.value - r.value) is 0, so a changed value would be reported as a match. Encode such features as integers (for example a dictionary index) or add a null-safe exact test such as (t.abs_tol = 0 AND t.rel_tol = 0 AND s.value IS NOT r.value) before relying on the query for them."
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "Reading it: in the 14:00 hour, 4 of 11 orders_24h values were off by one and one request had no recomputation",
+    "problem": "Of the 11 sampled values one has no recomputation, so 4 of the 10 recomputed values were off by one.",
+    "replacement": "Reading it: in the 14:00 hour, 4 of the 10 recomputed orders_24h values were off by one and one more request had no recomputation"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "(10 clean requests per hour plus a deploy-time fault in the 14:00 hour)",
+    "problem": "The 14:00 hour contains 10 requests plus two extra requests (one NULL-served, one without recomputation), and 4 of the 10 are faulty.",
+    "replacement": "(10 requests per hour, with a deploy-time fault in 4 of the 10 in the 14:00 hour, plus one NULL-served value and one request without recomputation)"
+   },
+   {
+    "severity": "minor",
+    "field": "rubric_points",
+    "claim": " and higher sampling during canary",
+    "problem": "Rubric point is not discussed in the answer.",
+    "replacement": ""
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open-ended design with point-in-time semantics, typed tolerances, statistical alert reasoning and executed SQL.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Identical to canonical_answer."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Executed SQL and results are not in the detailed answer."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All seven discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0044",
+   "same_intent": false
+  },
+  "code_findings": "Ran solution plus test on /home/claude/work/dep/v/bin/python (3.13), v310 and v311 with python -I: identical outputs, assertion passes, stdlib only, no 3.11+ features. Fenced block equals code.solution; configs[0].content equals the SQL. Extra edge cases run: text categorical (missed, see major), duplicate recomputed rows (counts double), missing tolerance row (dropped), NULL vs NULL, tolerance boundary, ISO timestamps. SQL uses SQLite-specific HAVING on aliases and strftime, which the record labels as SQLite.",
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule #29: log serving-time features; if not for every example, 'do it for a small fraction' to verify consistency."
+   },
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Section V 'Monitoring Tests for ML', Monitor 3: Training and serving features compute the same values."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Cache-expiry/batch-job attribution heuristics (already listed)",
+   "The check cannot catch a bug that is shared by the serving and offline code paths (design limitation worth noting, background)"
+  ],
+  "code_patch": null
+ }
+]

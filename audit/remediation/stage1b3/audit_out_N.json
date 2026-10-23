@@ -1,0 +1,242 @@
+[
+ {
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "An unseen word is then segmented into known pieces",
+    "problem": "Scenario also names typos ('refundd') and SKU codes; typos are not addressed explicitly (SKUs only in the last line). Optional improvement, not an error.",
+    "replacement": "An unseen word is then segmented into known pieces (a typo such as 'refundd' similarly falls back to smaller pieces, with the exact split depending on the learned merges)"
+   }
+  ],
+  "suggested_key_concepts": null,
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://huggingface.co/docs/transformers/tokenizer_summary",
+    "status": "supported",
+    "evidence": "Page: 'Words not in the vocabulary map to an \"<unk>\" token'; 'The resulting embedding matrix is enormous'; 'BPE starts with individual characters and iteratively merges the most frequent adjacent pair... until it reaches the target vocabulary size'; byte-level BPE 'uses 256 byte values as the base vocabulary... without the <unk> token'; 'WordPiece merges pairs that maximize the likelihood of the training data' (score = freq(pair)/(freq(a)*freq(b))), consistent with 'likelihood-style score'."
+   }
+  ],
+  "id": "smi-g0001",
+  "verdict": "pass",
+  "reasons": [
+   "Self-contained, specific scenario; both parts (unseen word handling for each approach; 8k->128k change) answered; claims match the cited page."
+  ],
+  "parts_answered": {
+   "word-level handling of 'unrefundable'": true,
+   "BPE handling of 'unrefundable'": true,
+   "effect of 8k->128k BPE vocab": true
+  },
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Comparison of two tokenisation schemes plus a two-sided trade-off; no multi-step reasoning.",
+  "key_concepts_findings": "All 7 concepts are discussed in the answer (BPE, WordPiece, OOV/unk, byte-level base, vocab-size trade-off, sequence length). None weak.",
+  "nearest_existing": {
+   "id": "smi-0345",
+   "same_intent": false
+  }
+ },
+ {
+  "issues": [],
+  "suggested_key_concepts": null,
+  "code_findings": "No code.",
+  "sources_findings": [],
+  "id": "smi-g0003",
+  "verdict": "pass",
+  "reasons": [
+   "Concrete numbers and symptoms; answer gives an ordered list of five causes each with a concrete diagnostic; the fit-on-all-data TF-IDF red herring is correctly down-weighted and hedged ('usually a small inflation').",
+   "Not source-backed; claims are standard ML practice and none is overstated."
+  ],
+  "parts_answered": {
+   "likely causes": true,
+   "order to check": true,
+   "concrete diagnostic for each": true
+  },
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Prioritised multi-cause debugging with diagnostics and judgement about relative effect sizes.",
+  "key_concepts_findings": "All 8 concepts appear in the answer. No weak ones.",
+  "nearest_existing": {
+   "id": "smi-g0005",
+   "same_intent": false
+  }
+ },
+ {
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "cross-entropy",
+    "problem": "'cross-entropy' is a key_concept but the answer never uses the term (it describes mean negative log-likelihood). Optionally add 'i.e. the exponential of the cross-entropy in nats' after the formula.",
+    "replacement": null
+   }
+  ],
+  "suggested_key_concepts": null,
+  "code_findings": "Recorded test passes on Python 3.13, 3.11 and 3.12 (stdlib only; 3.10 not installed, no 3.10-only risk since no 3.11+ features). My edge cases: [0.5,0] -> ValueError math domain error (as the answer says); [1.5] -> returns 0.667 with no validation of p>1 (minor); [-0.1] ValueError; generator input -> TypeError (no len); [1e-320]*3 -> OverflowError from exp (true PPL exceeds float range); per_unit_perplexity(...,0) -> ZeroDivisionError; NaN propagates. None contradict the answer. The fenced block matches the tested code exactly.",
+  "sources_findings": [],
+  "id": "smi-g0005",
+  "verdict": "pass",
+  "reasons": [
+   "Arithmetic verified: total prob 1e-4 over 4 tokens gives PPL 10.0; over 12 tokens gives 2.1544. Answer addresses function, whether conclusion is justified, and fair comparison."
+  ],
+  "parts_answered": {
+   "perplexity function": true,
+   "is conclusion justified": true,
+   "fair comparison method": true
+  },
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short implementation plus a conceptual comparison pitfall.",
+  "key_concepts_findings": "'cross-entropy' not explicit in answer; others present.",
+  "nearest_existing": {
+   "id": "smi-0371",
+   "same_intent": false
+  }
+ },
+ {
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "very large scores stay finite thanks to the max-subtraction",
+    "problem": "True for the tested 1e3 scale, but with inputs ~1e200 the matmul itself overflows to inf (RuntimeWarning) and max-subtraction cannot help. Also T=0 raises ValueError. Boundary notes only.",
+    "replacement": null
+   }
+  ],
+  "suggested_key_concepts": null,
+  "code_findings": "Test passes on Python 3.13 with numpy 2.5.3 (python3.11/3.12 have no numpy here; Python 3.10 and numpy 2.2 not tested). Extra cases: T=1 gives weight [[1.]] and output V[0]; integer inputs give rows summing to 1; comparison against a per-row prefix softmax for T=6,d_k=5 matches; T=0 raises ValueError; 1e200-scale inputs overflow in matmul. Fenced code equals tested solution.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/pdf/1706.03762",
+    "status": "supported",
+    "evidence": "'assume that the components of q and k are independent random variables with mean 0 and variance 1. Then their dot product ... has mean 0 and variance d_k'; large d_k pushes softmax 'into regions where it has extremely small gradients'; decoder masking 'setting to -inf all values in the input of the softmax which correspond to illegal connections'."
+   }
+  ],
+  "id": "smi-g0006",
+  "verdict": "pass",
+  "reasons": [
+   "Implementation matches an independent per-row reference softmax over the prefix; variance claims reproduced (4.0 / 64.3 / 1028.5 unscaled; ~1.0 scaled); source supports claims, with the stated independence/zero-mean/unit-variance assumption."
+  ],
+  "parts_answered": {
+   "implementation returning outputs and weights": true,
+   "why divide by sqrt(d_k)": true,
+   "properties to assert in tests": true
+  },
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short NumPy implementation of a well-known mechanism with a masking detail.",
+  "key_concepts_findings": "All 6 concepts discussed.",
+  "nearest_existing": {
+   "id": "smi-0112",
+   "same_intent": false
+  }
+ },
+ {
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "the lenient convention used by the CoNLL evaluation script",
+    "problem": "Behaviour is consistent with conlleval (I-X after O or other type starts a chunk) but unsourced; tags with other prefixes (S-, E-) are silently ignored and a bare 'B' raises ValueError; length mismatch of the two outer lists is silently truncated by zip and inner mismatch uses assert. Only matters for edge input.",
+    "replacement": null
+   }
+  ],
+  "suggested_key_concepts": null,
+  "code_findings": "Test passes on Python 3.13, 3.11, 3.12 (stdlib only; 3.10 not installed). My edge cases: ['I-PER','B-PER','I-PER'] -> PER(0,1),PER(1,3); ['B-PER','I-ORG','I-ORG','O','I-ORG'] -> PER, ORG(1,3), ORG(4,5); ['B-ORG','I-ORG','B-ORG'] adjacency correct; empty -> (0,0,0); gold A+B vs pred A+C -> (0.5,0.5,0.5); 'B' raises ValueError, 'S-PER'/'E-PER' ignored. Fenced code equals tested code.",
+  "sources_findings": [],
+  "id": "smi-g0008",
+  "verdict": "pass",
+  "reasons": [
+   "Numbers verified: 20 tokens, 3 gold entities; token accuracy 0.90, all-O 0.70; entity P=0.5 R=1/3 F1=0.4. All three parts (extractor, P/R/F1, I- handling and why accuracy misleads) answered."
+  ],
+  "parts_answered": {
+   "extract_entities": true,
+   "entity_prf micro": true,
+   "why token accuracy misleads": true,
+   "treatment of stray I- tag": true
+  },
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short parsing implementation with a boundary-handling decision and metric reasoning.",
+  "key_concepts_findings": "All 7 concepts discussed.",
+  "nearest_existing": {
+   "id": "smi-0375",
+   "same_intent": false
+  }
+ },
+ {
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "into chunks of a few hundred tokens with small overlap (tune size on the eval set),",
+    "problem": "No trade-off stated for chunk size/overlap, which the question requires.",
+    "replacement": "into chunks of a few hundred tokens with small overlap (smaller chunks match more precisely but lose surrounding context and grow the index; larger chunks keep context but blur the embedding; overlap adds redundancy and storage; tune on the eval set),"
+   },
+   {
+    "severity": "major",
+    "claim": "Add BM25 and fuse the rankings (e.g. reciprocal rank fusion) because dense models can miss exact error codes and product names.",
+    "problem": "Cost side of hybrid retrieval not stated.",
+    "replacement": "Add BM25 and fuse the rankings (e.g. reciprocal rank fusion) because dense models can miss exact error codes and product names, at the cost of a second index and fusion parameters to tune."
+   },
+   {
+    "severity": "major",
+    "claim": "and re-embed everything if the embedding model changes.",
+    "problem": "No freshness trade-off (latency vs complexity, cost of full re-embed).",
+    "replacement": "and re-embed everything if the embedding model changes (build the new index alongside the old one and switch over). Trade-off: event-driven updates keep search minutes-fresh but need a queue and idempotent upserts, whereas a nightly batch is simpler but leaves edits unsearchable for up to a day."
+   },
+   {
+    "severity": "minor",
+    "claim": "At this scale (tens of thousands of chunks)",
+    "problem": "'About 8,000 articles' with 'several locales' is ambiguous (total or per locale); chunk count is an assumption.",
+    "replacement": "At this scale (roughly 8,000 articles at ~5-10 chunks each is tens of thousands of chunks, more if 8,000 is per locale)"
+   }
+  ],
+  "suggested_key_concepts": null,
+  "code_findings": "No code.",
+  "sources_findings": [],
+  "id": "smi-g0010",
+  "verdict": "correct",
+  "reasons": [
+   "Question asks to 'state the trade-offs of each choice', but the answer gives trade-offs only for ANN, re-ranking and (briefly) nothing for chunking, hybrid retrieval, evaluation or freshness. The scale assumption is also not hedged for the ambiguous '8,000 articles' (total vs per locale)."
+  ],
+  "parts_answered": {
+   "chunk and embed": true,
+   "index and retrieve": true,
+   "re-rank": true,
+   "offline and online evaluation": true,
+   "freshness": true,
+   "trade-offs of each choice": false
+  },
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open-ended system design across retrieval, ranking, evaluation and operations with trade-offs.",
+  "key_concepts_findings": "All 8 concepts appear. None weak.",
+  "nearest_existing": {
+   "id": "smi-g0011",
+   "same_intent": false
+  }
+ },
+ {
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "a candidate shorter than n (0/0), brevity-penalty values, and agreement with NLTK's modified_precision.",
+    "problem": "Test needs nltk, not available on the owner's machine (batch rule: stdlib/numpy/pandas only). Remove the NLTK block (the 'from nltk...' import through the Fraction(2,7) assertion, and the unused Fraction import) from the test too.",
+    "replacement": "a candidate shorter than n (0/0) and brevity-penalty values."
+   }
+  ],
+  "suggested_key_concepts": null,
+  "code_findings": "Passes on Python 3.13 (nltk 3.10.3 present in this sandbox) but fails on 3.11/3.12 here only because nltk is missing, as it would on the owner's machine; Python 3.10 not installed. Extra cases: empty candidate -> (0,0); empty references -> (0,2); brevity_penalty(3, []) -> ValueError; tie c=4 refs [3,5] -> BP 1.0 (shorter ref chosen, as NLTK); cand_len 0 -> 0.0; multi-ref clip ['a','a','b'] vs [a b],[a a c] -> (3,3); bigram ['a','b','a','b'] vs [a b a] -> (2,3). All correct. Fenced code equals tested solution.",
+  "sources_findings": [],
+  "id": "smi-g0012",
+  "verdict": "correct",
+  "reasons": [
+   "Algorithm and numbers verified (2/7, 5/7, 4/6, BP values, ties). Defect: the recorded test imports nltk, which the owner's machine lacks, so the test fails there (ModuleNotFoundError); the answer advertises the NLTK check."
+  ],
+  "parts_answered": {
+   "clipped_precision": true,
+   "brevity_penalty": true,
+   "how BLEU is computed": true,
+   "why repeated 'the' scores low": true,
+   "what BLEU cannot tell": true
+  },
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short implementation of well-defined counting plus conceptual explanation.",
+  "key_concepts_findings": "All 7 present; 'tokenisation sensitivity' and 'corpus-level BLEU' covered briefly but adequately.",
+  "nearest_existing": {
+   "id": "smi-g0005",
+   "same_intent": false
+  }
+ }
+]

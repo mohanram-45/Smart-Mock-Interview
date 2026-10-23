@@ -1,0 +1,383 @@
+[
+ {
+  "id": "smi-g0002",
+  "domain": "NLP",
+  "question_type": "coding",
+  "question": "Without calling scikit-learn in your solution, implement tfidf(docs) that returns (vocab, rows) reproducing TfidfVectorizer's default output (lowercasing, default token pattern, smooth idf, l2-normalised rows). Then explain why a word that appears in every document does not get weight zero, and how you would verify your implementation against sklearn on a tiny corpus.",
+  "answer": "Smoothed idf is idf(t) = ln((1+n)/(1+df(t))) + 1, tf is the raw count, tf-idf = tf*idf, and each row is then l2-normalised (sklearn defaults). A term in every document gets idf = 1, not 0, so it is down-weighted but never discarded; the textbook ln(n/df) would zero it. Default tokenisation is lowercase with tokens of 2+ word characters.\n```python\nimport math\nfrom collections import Counter\n\ndef tfidf(docs, token_pattern=r\"(?u)\\b\\w\\w+\\b\"):\n    \"\"\"sklearn-style: lowercase, tokens of 2+ word chars, smooth idf, l2 norm.\n    Returns (vocab, matrix) with vocab sorted alphabetically.\"\"\"\n    import re\n    toks = [re.findall(token_pattern, d.lower()) for d in docs]\n    vocab = sorted({t for ts in toks for t in ts})\n    n = len(docs)\n    df = Counter(t for ts in toks for t in set(ts))\n    idf = {t: math.log((1 + n) / (1 + df[t])) + 1 for t in vocab}\n    rows = []\n    for ts in toks:\n        c = Counter(ts)\n        row = [c[t] * idf[t] for t in vocab]\n        norm = math.sqrt(sum(x * x for x in row))\n        rows.append([x / norm if norm else 0.0 for x in row])\n    return vocab, rows\n```\nThe test builds a three-document corpus, asserts the vocabulary equals TfidfVectorizer's, that the matrix matches with np.allclose, and that every row has unit l2 norm. Note the sort order: sklearn sorts the vocabulary alphabetically, so columns line up only if you do too.",
+  "key_concepts": [
+   "smooth idf",
+   "l2 normalisation",
+   "term frequency",
+   "document frequency",
+   "token pattern",
+   "TfidfVectorizer"
+  ],
+  "common_mistakes": [
+   "Using textbook log(n/df) without smoothing so mismatch with sklearn",
+   "Forgetting l2 row normalisation",
+   "Using log10 or forgetting that the default tokenizer drops 1-character tokens"
+  ],
+  "interview_style_note": "Gets the +1 inside and outside the log right, normalises rows, and verifies against the library instead of trusting memory.",
+  "sources": [
+   {
+    "title": "scikit-learn TfidfTransformer",
+    "url": "https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.TfidfTransformer.html",
+    "supports": "With smooth_idf=True idf(t)=ln((1+n)/(1+df(t)))+1, tf-idf=tf*idf, and rows are l2-normalised by default.",
+    "verification": "independent_reviewer_supported"
+   },
+   {
+    "title": "scikit-learn: Feature extraction (text)",
+    "url": "https://scikit-learn.org/stable/modules/feature_extraction.html",
+    "supports": "CountVectorizer's default tokenizer keeps words of at least 2 characters, and the built-in 'english' stop-word list has known issues and may include informative words.",
+    "verification": "independent_reviewer_supported"
+   }
+  ],
+  "code": null,
+  "topic": "Text preprocessing and representation"
+ },
+ {
+  "id": "smi-g0004",
+  "domain": "NLP",
+  "question_type": "concept",
+  "question": "In word2vec skip-gram with negative sampling (SGNS), write the loss for one (centre, context) pair, explain why it is used instead of a full softmax and what the noise distribution and k control, and explain why 'bank' in 'river bank' and 'bank account' ends up with a single vector.",
+  "answer": "For centre word w and observed context c, SGNS maximises log \u03c3(u_c\u00b7v_w) + \u03a3_{i=1..k} E_{n~P_n}[log \u03c3(\u2212u_n\u00b7v_w)], with separate input vectors v and output vectors u. It is a binary task: real pairs against k sampled fake pairs. A full softmax needs a normaliser over the whole vocabulary V for every pair, cost O(|V|\u00b7d); negative sampling touches only k+1 output vectors, O(k\u00b7d). The noise distribution is the unigram distribution raised to the 3/4 power (it works better than plain unigram or uniform, per the original paper), which boosts rarer words relative to frequent ones. The paper suggests k of 5-20 for small corpora and 2-5 for large ones; more negatives give a stronger signal per pair at higher cost. Frequent-word subsampling is a separate speed/quality trick.\nVectors capture distributional similarity: words used in similar contexts get similar vectors. The model is type-level and context-independent, so 'bank' gets one vector that is a blend of its senses, weighted by corpus frequency. Contextual encoders (ELMo, BERT) assign token-level vectors instead.",
+  "key_concepts": [
+   "skip-gram",
+   "negative sampling",
+   "noise distribution",
+   "softmax normalisation cost",
+   "polysemy",
+   "distributional hypothesis",
+   "subsampling frequent words"
+  ],
+  "common_mistakes": [
+   "Saying negative sampling computes the exact softmax faster",
+   "Sampling negatives uniformly or from the raw unigram without mentioning the 3/4 power",
+   "Claiming word2vec gives different vectors per sense"
+  ],
+  "interview_style_note": "Writes the objective correctly, explains the cost argument concretely, and knows the single-vector limitation and how contextual models differ.",
+  "sources": [
+   {
+    "title": "Distributed Representations of Words and Phrases and their Compositionality (Mikolov et al., 2013)",
+    "url": "https://arxiv.org/pdf/1310.4546",
+    "supports": "The NEG objective is log sigma(v'_O . v_I) + sum over k noise words of log sigma(-v'_i . v_I); the noise distribution is unigram^(3/4); k of 5-20 is suggested for small datasets and 2-5 for large ones.",
+    "verification": "independent_reviewer_supported"
+   }
+  ],
+  "code": null,
+  "topic": "Word embeddings"
+ },
+ {
+  "id": "smi-g0007",
+  "domain": "NLP",
+  "question_type": "design",
+  "question": "You have three tasks: (a) route support emails into 12 queues using about 2,000 labelled examples, on CPU-only servers with a 50 ms budget, (b) pull invoice number, date and total from OCR text as exact character spans, (c) draft a reply to a customer. For each, would you reach for a BERT-style encoder or a GPT-style decoder (or something else), and why? How does the answer change with zero labelled data?",
+  "answer": "BERT-style encoders are trained with masked language modelling: roughly 15% of tokens are masked and predicted from both left and right context. GPT-style decoders are trained to predict the next token from the left context only, using a causal mask, so they can generate text autoregressively. Encoders give strong bidirectional token representations; they cannot natively generate free text.\n(a) Classification: fine-tune a small encoder with a classification head. It is cheap, fast on CPU, and works well with a few thousand labels; a TF-IDF + logistic regression baseline is also worth running first and easily meets 50 ms.\n(b) Extraction: use an encoder for token classification (BIO tags), which gives spans with character offsets and no hallucination; for highly regular fields (invoice numbers, dates, totals) start with regex/rules as a baseline. A decoder can output JSON, but values may not align to the source unless constrained or verified.\n(c) Generation: a decoder (or encoder-decoder such as T5) is the natural fit.\nWith zero labels, a large instruction-following decoder with a prompt or few-shot examples can do (a) and (b) without training, trading higher latency, cost and less controllable outputs; then bootstrap labels from it and distil into a small encoder. Choose by labels available, latency, cost and need for generation.",
+  "key_concepts": [
+   "masked language modelling",
+   "causal language modelling",
+   "bidirectional context",
+   "token classification",
+   "autoregressive generation",
+   "encoder-decoder",
+   "few-shot prompting"
+  ],
+  "common_mistakes": [
+   "Saying encoders cannot be used for anything but classification",
+   "Claiming decoders are strictly better because they are larger",
+   "Ignoring latency and labelled-data constraints"
+  ],
+  "interview_style_note": "Links objective to capability, picks per task with constraints in mind, and acknowledges that large decoders can do encoder tasks at a cost.",
+  "sources": [],
+  "code": null,
+  "topic": "Transformers and attention"
+ },
+ {
+  "id": "smi-g0009",
+  "domain": "NLP",
+  "question_type": "scenario",
+  "question": "You are classifying comments as toxic or not; about 2% are toxic. A first model reports 98% accuracy and 0.97 ROC-AUC, but moderators say the flagged queue is mostly clean comments. How do you evaluate, set the decision threshold, and use class weights or resampling here, and what do you monitor after launch?",
+  "answer": "98% accuracy is what a model that flags nothing gets. ROC-AUC can also mislead because the false-positive rate is divided by the huge negative class. Example: 10,000 comments, 200 toxic. At 90% TPR and 5% FPR the model flags 180 true and 490 false positives, so precision is about 27% and the queue is mostly clean, despite a good-looking ROC. Use the precision-recall curve and average precision, plus precision and recall at the operating point, and per-slice scores.\nThreshold: do not use 0.5. Pick it on a validation set with natural prevalence from the PR curve, driven by cost and moderator capacity (e.g. maximise recall subject to precision >= X, or fixed review volume). Calibrate if probabilities are consumed downstream.\nClass weights mostly shift the decision boundary, much like moving the threshold; resampling is done only inside the training fold, never before the split (duplicates leak), and validation/test keep natural prevalence. Oversampling can overfit duplicates; undersampling discards data; SMOTE on sparse TF-IDF is questionable.\nMonitor prevalence drift, precision via sampled human audits, recall via audits of unflagged comments, and false-positive rates across dialects and identity terms.",
+  "key_concepts": [
+   "precision-recall curve",
+   "average precision",
+   "ROC-AUC limitations",
+   "threshold selection",
+   "class weights",
+   "resampling inside folds",
+   "calibration",
+   "prevalence drift"
+  ],
+  "common_mistakes": [
+   "Resampling before the train/test split",
+   "Reporting accuracy or ROC-AUC alone",
+   "Leaving the threshold at 0.5 after reweighting"
+  ],
+  "interview_style_note": "Shows with arithmetic why ROC-AUC hides poor precision, ties threshold to operational cost, and keeps evaluation data at natural prevalence.",
+  "sources": [],
+  "code": null,
+  "topic": "Text classification"
+ },
+ {
+  "id": "smi-g0011",
+  "domain": "NLP",
+  "question_type": "scenario",
+  "question": "A company wants a QA assistant answering from internal policy documents (about 20,000 pages, changing weekly, with per-team access rules). Compare plain prompting, retrieval-augmented generation (RAG) and fine-tuning for this, state the main failure modes of your choice and how you would test for them, and say where a hybrid makes sense.",
+  "answer": "RAG is the primary fit: knowledge lives outside the model, so updating is re-indexing a changed document, answers can cite sources, and access control can be enforced at retrieval time (filter chunks the user may not see before they reach the prompt).\nPlain prompting only works if the whole corpus (or a small relevant slice) fits in context and is cheap to resend; 20,000 pages does not, and long contexts raise cost and latency and models can use them unevenly.\nFine-tuning is poor for facts that change weekly: it is slow to refresh, unreliable at recall of specific passages, cannot cite, and cannot easily unlearn removed or restricted documents. It suits style, format, terminology and behaviours (e.g. answering only from context, abstaining).\nRAG failure modes: retrieval misses (the answer is never fetched), chunks stripped of context, stale or conflicting document versions, the model ignoring or contradicting context, prompt injection in documents, and permission leaks. Test retrieval (recall@k) and generation (faithfulness to retrieved text, abstention when unsupported) separately, with an access-control test suite.\nHybrid: RAG plus a light fine-tune for output format and grounded behaviour, or a fine-tuned embedder/re-ranker on domain pairs.",
+  "key_concepts": [
+   "retrieval-augmented generation",
+   "fine-tuning",
+   "context window",
+   "access control at retrieval",
+   "faithfulness",
+   "prompt injection",
+   "abstention",
+   "re-ranker fine-tuning"
+  ],
+  "common_mistakes": [
+   "Proposing fine-tuning to inject frequently changing facts",
+   "Evaluating only final answers and not retrieval separately",
+   "Ignoring per-user permissions"
+  ],
+  "interview_style_note": "Matches each approach to what it is good at (knowledge vs behaviour), names concrete failure modes with tests, and keeps security in the design.",
+  "sources": [],
+  "code": null,
+  "topic": "Semantic search and LLM applications"
+ },
+ {
+  "id": "smi-g0013",
+  "domain": "NLP",
+  "question_type": "scenario",
+  "question": "You fit LDA with 20 topics on 50k news articles. Many topics are dominated by words like 'said' and 'would', and rerunning with another random seed gives noticeably different topics. Explain the generative model, what the inputs and outputs are, why you see this behaviour, and how you would choose the number of topics and make the results more reliable.",
+  "answer": "LDA's generative story: for each topic k draw a word distribution \u03c6_k ~ Dirichlet(\u03b2); for each document draw topic proportions \u03b8_d ~ Dirichlet(\u03b1); for each word position draw a topic z ~ Categorical(\u03b8_d), then the word w ~ Categorical(\u03c6_z). Input is a document-term count matrix (word order ignored). Outputs are \u03b8 (document-topic) and \u03c6 (topic-word), found by posterior inference such as variational Bayes or collapsed Gibbs sampling.\nFrequent function-like words ('said', 'would') appear in nearly every document, so they carry a lot of probability mass in some topics; remove stop words and use document-frequency pruning (min_df/max_df), lemmatisation and corpus-specific stop lists. The seed dependence arises because the posterior is non-convex, so inference lands in different local optima. Run several seeds and compare or align topics, use more iterations, and keep topics that recur.\nChoosing K: scan several values and combine a topic coherence measure (e.g. NPMI) with held-out likelihood or perplexity on unseen documents, plus manual inspection of top words. Held-out likelihood does not always track human-judged interpretability. Priors matter: smaller \u03b1 gives sparser document-topic mixtures (scikit-learn defaults both priors to 1/n_components).",
+  "key_concepts": [
+   "generative model",
+   "Dirichlet prior",
+   "bag of words",
+   "topic coherence",
+   "held-out perplexity",
+   "local optima",
+   "document-frequency pruning"
+  ],
+  "common_mistakes": [
+   "Treating topics as deterministic clusters",
+   "Choosing K by training perplexity alone",
+   "Feeding TF-IDF-weighted or order-aware text without noting LDA expects counts"
+  ],
+  "interview_style_note": "States the generative process correctly, explains seed instability as non-convex inference, and does not rely on a single metric for K.",
+  "sources": [
+   {
+    "title": "scikit-learn LatentDirichletAllocation",
+    "url": "https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.LatentDirichletAllocation.html",
+    "supports": "Priors doc_topic_prior and topic_word_prior default to 1/n_components, and perplexity is defined as exp(-log-likelihood per word) using an approximate bound.",
+    "verification": "independent_reviewer_supported"
+   }
+  ],
+  "code": null,
+  "topic": "Topic modelling"
+ },
+ {
+  "id": "smi-g0014",
+  "domain": "NLP",
+  "question_type": "debugging",
+  "question": "Your sentiment classifier (CountVectorizer + logistic regression) mislabels reviews like 'not good' and 'not bad'. The vectorizer is CountVectorizer(stop_words='english'). Demonstrate the root cause in code, fix it, and explain what you would do instead of aggressive text cleaning.",
+  "answer": "Cause: scikit-learn's built-in english stop-word list contains negators such as not, no, never, nor and cannot (asserted in the test), so with stop_words='english' the texts 'good' and 'not good' become the same feature vector, as do 'bad' and 'not bad'. The model cannot represent negation, and the opposite sentiments collide. The default tokenizer also drops single-character tokens and punctuation, so emoticons and '!' disappear.\n```python\nfrom sklearn.feature_extraction.text import CountVectorizer, ENGLISH_STOP_WORDS\nfrom sklearn.linear_model import LogisticRegression\n\ndef fit_predict(vec, train_texts, train_y, test_texts):\n    X = vec.fit_transform(train_texts)\n    clf = LogisticRegression(C=10, max_iter=1000).fit(X, train_y)\n    return clf.predict(vec.transform(test_texts))\n\ndef broken_vec():\n    return CountVectorizer(stop_words=\"english\")                  # drops \"not\", \"no\", \"never\", \"very\"...\n\ndef fixed_vec():\n    return CountVectorizer(ngram_range=(1, 2))                    # keeps negators; bigram \"not good\" is a feature\n```\nThe test shows the two vectors are identical under broken_vec, differ under fixed_vec, and that the broken pipeline gives the same prediction for 'good' and 'not good' (and for 'bad' and 'not bad') while the fixed one separates 'not good' (0) from 'not bad' (1) on this toy data. The toy corpus is only a demonstration, not a quality claim.\nWhat to do instead: do not blanket-remove stop words for sentiment; if you do, use a custom list that keeps negators and intensifiers. Add word bigrams, or mark negation scope (prefix tokens after a negator until punctuation). Keep case or punctuation features if they help. Decide by ablation on validation data; transformer models should not get stop-word removal at all.",
+  "key_concepts": [
+   "stop-word removal",
+   "negation handling",
+   "word bigrams",
+   "CountVectorizer",
+   "token pattern",
+   "ablation",
+   "feature collision"
+  ],
+  "common_mistakes": [
+   "Believing stop-word removal is always safe or helpful",
+   "Fixing only by adding more training data",
+   "Using bigrams but still removing 'not' via stop words"
+  ],
+  "interview_style_note": "Reproduces the bug in a test, fixes it with minimal change, and recommends validating preprocessing choices by ablation rather than habit.",
+  "sources": [
+   {
+    "title": "scikit-learn: Feature extraction (text)",
+    "url": "https://scikit-learn.org/stable/modules/feature_extraction.html",
+    "supports": "CountVectorizer's default tokenizer keeps words of at least 2 characters, and the built-in 'english' stop-word list has known issues and may include informative words.",
+    "verification": "independent_reviewer_supported"
+   }
+  ],
+  "code": null,
+  "topic": "Text preprocessing and representation"
+ },
+ {
+  "id": "smi-g0015",
+  "domain": "Deep Learning",
+  "question_type": "coding",
+  "question": "A single neuron computes a = sigmoid(X @ w + b) and is trained with L = (1/(2N)) * sum_i (a_i - y_i)^2. Derive dL/dw and dL/db, implement them in numpy, and write a numerical gradient check that would catch a forgotten sigmoid-derivative term. What step size and relative error do you expect for a correct implementation?",
+  "answer": "With z = Xw + b and a = sigmoid(z), the chain rule gives dL/dz_i = (a_i - y_i) * a_i * (1 - a_i) / N, because sigmoid'(z) = a(1 - a). Then dL/dw = X^T dL/dz and dL/db = sum_i dL/dz_i. The check compares these against central differences (L(theta + eps) - L(theta - eps)) / (2 eps) for each parameter, using float64 and eps around 1e-6, and reports a relative error ||g_a - g_n|| / (||g_a|| + ||g_n||). A correct implementation typically lands around 1e-7 or smaller (2.7e-10 in the run below); a missing a(1 - a) factor gave about 0.8, so the check catches it clearly.\n\n```python\nimport numpy as np\n\ndef sigmoid(z):\n    return 1.0 / (1.0 + np.exp(-z))\n\ndef forward(w, b, X, y):\n    a = sigmoid(X @ w + b)\n    loss = 0.5 * np.mean((a - y) ** 2)\n    return a, loss\n\ndef grads(w, b, X, y):\n    a, _ = forward(w, b, X, y)\n    n = X.shape[0]\n    dz = (a - y) * a * (1 - a) / n      # dL/dz_i, includes sigmoid'(z) = a(1-a)\n    return X.T @ dz, dz.sum()           # dL/dw, dL/db\n\ndef numeric_grads(w, b, X, y, eps=1e-6):\n    gw = np.zeros_like(w)\n    for i in range(w.size):\n        wp, wm = w.copy(), w.copy()\n        wp[i] += eps\n        wm[i] -= eps\n        gw[i] = (forward(wp, b, X, y)[1] - forward(wm, b, X, y)[1]) / (2 * eps)\n    gb = (forward(w, b + eps, X, y)[1] - forward(w, b - eps, X, y)[1]) / (2 * eps)\n    return gw, gb\n\ndef rel_error(a, b):\n    return np.linalg.norm(a - b) / max(np.linalg.norm(a) + np.linalg.norm(b), 1e-12)\n```\n\nPractical points: use float64 (float32 noise swamps the finite difference), check at a random non-saturated point, and perturb one parameter at a time. Note also that with MSE the a(1 - a) factor makes gradients vanish when the neuron saturates on a wrong answer, which is one reason cross-entropy is preferred for sigmoid outputs.",
+  "key_concepts": [
+   "chain rule",
+   "sigmoid derivative a(1-a)",
+   "central difference gradient check",
+   "relative error",
+   "MSE loss",
+   "vanishing gradient from saturation"
+  ],
+  "common_mistakes": [
+   "Forgetting sigmoid'(z) = a(1-a) in the gradient",
+   "Using a forward difference or float32 and then seeing relative errors around 1e-3 and wrongly declaring a bug (or none)",
+   "Comparing absolute rather than relative error"
+  ],
+  "interview_style_note": "Derives the gradient correctly, includes the 1/N factor, and knows to use central differences, float64 and relative error rather than absolute error.",
+  "sources": [],
+  "code": null,
+  "topic": "Backpropagation"
+ },
+ {
+  "id": "smi-g0017",
+  "domain": "Deep Learning",
+  "question_type": "coding",
+  "question": "Write out Adam's update rule and explain what m and v each track and why bias correction is needed. Implement one Adam step in numpy and test it against a hand-computed first step. Then say when SGD with momentum might still be a better choice.",
+  "answer": "Adam keeps two exponential moving averages per parameter: m = beta1*m + (1-beta1)*g (a smoothed gradient direction) and v = beta2*v + (1-beta2)*g^2 (a smoothed gradient scale). Both start at zero, so early on they are biased toward zero. Bias correction divides by (1 - beta^t): m_hat = m/(1-beta1^t), v_hat = v/(1-beta2^t). The update is theta -= lr * m_hat / (sqrt(v_hat) + eps). On step 1, m = 0.1g and v = 0.001g^2; after correction m_hat = g and v_hat = g^2, so the step is lr*g/(|g|+eps), essentially lr*sign(g) whatever the gradient scale. Without correction the first step would be about 3.16 times lr (0.1/sqrt(0.001)), which is why it matters, especially with beta2 = 0.999.\n\n```python\nimport numpy as np\n\ndef adam_step(theta, grad, m, v, t, lr=1e-3, beta1=0.9, beta2=0.999, eps=1e-8):\n    \"\"\"One Adam update; t is the 1-based step count. Returns new (theta, m, v).\"\"\"\n    m = beta1 * m + (1 - beta1) * grad\n    v = beta2 * v + (1 - beta2) * grad ** 2\n    m_hat = m / (1 - beta1 ** t)\n    v_hat = v / (1 - beta2 ** t)\n    theta = theta - lr * m_hat / (np.sqrt(v_hat) + eps)\n    return theta, m, v\n```\n\nThe test checks m, v and the update for gradient [0.5, -2, 0]: each nonzero coordinate moves by almost exactly lr and the zero-gradient coordinate does not move.\n\nSGD with momentum is worth trying when Adam fits training data fine but generalises worse, which some practitioners observe in certain vision tasks; this is empirical and not guaranteed, and it needs more learning-rate tuning. Also, adding L2 to the gradient under Adam is not the same as weight decay, because the term is rescaled by 1/sqrt(v); AdamW decouples decay from the adaptive step, which is usually the fairer comparison.",
+  "key_concepts": [
+   "Adam update rule",
+   "first moment (m)",
+   "second moment (v)",
+   "bias correction",
+   "per-parameter adaptive step",
+   "SGD with momentum",
+   "AdamW decoupled weight decay"
+  ],
+  "common_mistakes": [
+   "Omitting bias correction or using t=0 (division by zero)",
+   "Saying Adam always generalises worse (or better) than SGD",
+   "Treating L2 regularisation and weight decay as identical under Adam"
+  ],
+  "interview_style_note": "Can state and implement the update exactly, explain the bias-correction effect with the step-1 numbers, and discuss generalisation claims with appropriate hedging.",
+  "sources": [],
+  "code": null,
+  "topic": "Initialisation and optimisation"
+ },
+ {
+  "id": "smi-g0018",
+  "domain": "Deep Learning",
+  "question_type": "concept",
+  "question": "You move a model from a CNN with batch norm to a transformer and someone asks why the transformer uses layer norm. Over which axes does each compute its statistics, how does each behave at training versus inference, and what goes wrong with batch norm for small batches or variable-length sequences?",
+  "answer": "For an activation tensor, batch norm computes mean and variance per feature/channel across the batch (and spatial positions for a conv layer, i.e. over N, H, W for each channel). Layer norm computes them per sample across the feature dimension (for a transformer, over d_model of each token independently). Both then apply a learned scale and shift.\n\nTraining vs inference: batch norm normalises with the current mini-batch statistics during training while updating exponential moving averages of mean and variance; at inference it uses those running estimates so a prediction does not depend on the other examples in the batch. Layer norm uses the same computation in both modes, with no batch dependence and no running statistics.\n\nProblems for batch norm: with very small batches the statistics are noisy and the train-time (batch) and test-time (running) normalisation differ; with variable-length padded sequences the statistics are contaminated by padding positions; in autoregressive decoding with batch size 1 there is no meaningful batch statistic; in distributed training the statistics are per device unless synchronised. Layer norm avoids all of these, which is why it is the standard choice in transformers and recurrent models. For CNNs with small batches, group norm is a common alternative.",
+  "key_concepts": [
+   "batch normalisation",
+   "layer normalisation",
+   "normalisation axes",
+   "running mean and variance",
+   "train/inference discrepancy",
+   "small-batch noise",
+   "group normalisation"
+  ],
+  "common_mistakes": [
+   "Saying layer norm normalises across the batch",
+   "Claiming batch norm behaves identically in train and eval mode",
+   "Attributing the transformer choice only to speed"
+  ],
+  "interview_style_note": "Names the exact axes for each, explains running averages at inference, and links the transformer choice to batch-independence and sequence handling.",
+  "sources": [],
+  "code": null,
+  "topic": "Normalisation"
+ },
+ {
+  "id": "smi-g0019",
+  "domain": "Deep Learning",
+  "question_type": "scenario",
+  "question": "You train an image classifier on 15,000 labelled images and see three different runs. Run A: training loss keeps falling towards zero while validation loss bottoms out around epoch 8 and then rises; validation accuracy stalls near 71%. Run B: training and validation loss both flatten at similar, high values after 5 epochs. Run C: training loss is smooth, but validation accuracy swings by several points between epochs and the validation set has 300 images. Diagnose each run and give your actions in priority order.",
+  "answer": "Run A is overfitting. Priority: (1) checkpoint/early-stop at the best validation epoch; (2) more or stronger data augmentation, or more data; (3) regularise: weight decay, dropout, label smoothing, or a smaller or more heavily pretrained model; (4) confirm the validation split has no distribution shift from train. Rising validation loss with flat accuracy often means growing overconfidence rather than worse ranking, so judge by the metric you care about, and consider calibration.\n\nRun B is underfitting or an optimisation or data bug. Priority: (1) sanity check that the model can overfit a tiny subset (e.g. 32 examples) to near-zero loss; if not, look for bugs in labels, preprocessing, loss or learning rate; (2) tune the learning rate and optimiser and train longer; (3) increase capacity or reduce regularisation; (4) revisit features/inputs, since label noise or missing information can cap performance.\n\nRun C is a noisy evaluation, not necessarily a model problem. With 300 images and accuracy near 70%, the binomial standard error is sqrt(0.7*0.3/300), about 2.6 points, so swings of a few points are expected. Priority: (1) enlarge the validation set or use cross-validation; (2) average over seeds or use a weight moving average; (3) decay the learning rate; (4) do not pick epochs or hyperparameters from differences within the noise.",
+  "key_concepts": [
+   "overfitting",
+   "underfitting",
+   "early stopping",
+   "overfit a tiny batch sanity check",
+   "data augmentation",
+   "validation noise and standard error",
+   "loss versus accuracy divergence"
+  ],
+  "common_mistakes": [
+   "Adding more layers for Run A",
+   "Treating validation noise in Run C as a real trend",
+   "Skipping the cheap overfit-one-batch test in Run B"
+  ],
+  "interview_style_note": "Distinguishes variance, bias/optimisation and evaluation noise, and orders fixes by cost and diagnostic value (sanity checks before scaling up).",
+  "sources": [],
+  "code": null,
+  "topic": "Training diagnostics and debugging"
+ },
+ {
+  "id": "smi-g0022",
+  "domain": "Deep Learning",
+  "question_type": "concept",
+  "question": "Very deep plain convolutional networks were observed to get worse training error than shallower ones. How do residual (skip) connections address this, what is the gradient argument, and what do you do when the input and output of a residual block have different shapes?",
+  "answer": "That observation is the degradation problem: deeper plain networks can show higher training error than shallower ones, so it is an optimisation difficulty rather than overfitting. A residual block computes y = x + F(x). If an identity mapping is optimal, the layers only need to drive F towards zero, which is easier than making a stack of nonlinear layers approximate the identity.\n\nGradient argument: dy/dx = I + dF/dx, so the backward signal has a direct additive identity path from later layers to earlier ones instead of only a product of many layer Jacobians. This helps gradients reach early layers and eases optimisation, though it does not remove every training difficulty (normalisation, initialisation and learning rate still matter).\n\nWhen shapes differ, the element-wise addition needs matching dimensions: use a projection shortcut, typically a 1x1 convolution (with the same stride) on the skip path to match channels and spatial size, or in some designs pad extra channels with zeros and subsample. Concatenation (as in DenseNet) is a different design that grows the channel count instead of adding.",
+  "key_concepts": [
+   "residual connection",
+   "identity mapping",
+   "degradation problem",
+   "gradient path",
+   "projection shortcut (1x1 conv)",
+   "y = x + F(x)"
+  ],
+  "common_mistakes": [
+   "Saying skip connections prevent overfitting",
+   "Claiming they completely solve vanishing gradients",
+   "Confusing residual addition with DenseNet concatenation"
+  ],
+  "interview_style_note": "Explains that the issue is optimisation not overfitting, gives the I + dF/dx gradient argument, and handles shape mismatch with a projection.",
+  "sources": [],
+  "code": null,
+  "topic": "Architectures"
+ },
+ {
+  "id": "smi-g0024",
+  "domain": "Deep Learning",
+  "question_type": "coding",
+  "question": "Write a helper that computes the output spatial size of a convolution given input size, kernel size, padding, stride and dilation, and another that counts the parameters of a conv layer (with optional groups and bias). Test them on worked examples, including a 7x7 stride-2 stem on a 224x224 input and a depthwise-separable pair.",
+  "answer": "Effective kernel extent is d*(k-1)+1, and the output size is floor((n + 2p - d*(k-1) - 1)/s) + 1. Parameters: c_out * (c_in/groups) * k * k, plus c_out if there is a bias. The floor means trailing positions that do not fit a full window are ignored.\n\n```python\nimport numpy as np\n\ndef conv_out_size(n, k, padding=0, stride=1, dilation=1):\n    eff_k = dilation * (k - 1) + 1                 # effective kernel extent\n    if n + 2 * padding < eff_k:\n        raise ValueError(\"kernel larger than padded input\")\n    return (n + 2 * padding - eff_k) // stride + 1\n\ndef conv_params(c_in, c_out, k, groups=1, bias=True):\n    if c_in % groups or c_out % groups:\n        raise ValueError(\"groups must divide c_in and c_out\")\n    return c_out * (c_in // groups) * k * k + (c_out if bias else 0)\n```\n\nWorked results asserted by the test (each verified by brute-force counting of window positions): 224 with k=7, p=3, s=2 gives 112; then a 3x3, stride-2, pad-1 pool gives 56; a 3x3 kernel with dilation 2 and pad 2 keeps size 32; the same without padding gives 28; n=10, k=3, s=2 gives 4. Parameters: a 7x7 conv from 3 to 64 channels has 9,472; a 3x3 conv from 64 to 128 has 73,856; a depthwise 3x3 on 64 channels (groups=64) has 640 and a following 1x1 pointwise conv from 64 to 128 has 8,320, so the separable pair has 8,960 versus 73,856 for the standard conv. Parameter count does not depend on input size, unlike FLOPs.",
+  "key_concepts": [
+   "convolution output size formula",
+   "padding and stride",
+   "dilation and effective kernel",
+   "conv parameter count",
+   "depthwise separable convolution",
+   "floor in output size"
+  ],
+  "common_mistakes": [
+   "Omitting the +1 or the floor in the output formula",
+   "Ignoring dilation in the kernel extent",
+   "Counting the bias wrongly or including input size in the parameter count"
+  ],
+  "interview_style_note": "Applies the formula with dilation correctly, notes parameters are independent of input size, and validates against an independent brute-force count.",
+  "sources": [],
+  "code": null,
+  "topic": "Convolutional networks"
+ },
+ {
+  "id": "smi-g0025",
+  "domain": "Deep Learning",
+  "question_type": "coding",
+  "question": "An embedding layer is described as 'a lookup table'. Show in numpy that looking up rows of an embedding matrix equals multiplying one-hot vectors by that matrix, implement the gradient for both, and explain why the lookup form is used and how gradients reach only the rows that were used.",
+  "answer": "With E of shape (V, d) and token ids idx, E[idx] equals onehot(idx) @ E. In backward, with upstream gradient dout of shape (len(idx), d), dE = onehot^T @ dout: row v of dE is the sum of dout rows for positions where idx == v. Rows of tokens not in the batch get exactly zero gradient, and a token that appears several times gets the sum of its gradients, so use np.add.at (or an equivalent scatter-add) rather than assignment.\n\n```python\nimport numpy as np\n\ndef embed_lookup(E, idx):\n    return E[idx]                                   # row gather: O(len(idx) * d)\n\ndef embed_onehot(E, idx):\n    onehot = np.zeros((len(idx), E.shape[0]))\n    onehot[np.arange(len(idx)), idx] = 1.0\n    return onehot @ E                               # O(len(idx) * V * d)\n\ndef embed_grad_lookup(V, idx, dout):\n    dE = np.zeros((V, dout.shape[1]))\n    np.add.at(dE, idx, dout)                        # accumulates repeated indices\n    return dE\n\ndef embed_grad_onehot(V, idx, dout):\n    onehot = np.zeros((len(idx), V))\n    onehot[np.arange(len(idx)), idx] = 1.0\n    return onehot.T @ dout\n```\n\nThe test confirms the forward and backward results match, that repeated index 2 accumulates dout[0] + dout[2], that unused rows are exactly zero, and that naive assignment would overwrite instead of accumulate.\n\nWhy lookup is used: the one-hot matmul costs O(len(idx) * V * d) time and needs a (len(idx), V) matrix, which is infeasible for vocabularies of tens of thousands or more, while gathering rows costs O(len(idx) * d). The mathematics is identical. Practical consequence: the gradient is sparse, so optimisers with per-parameter state (Adam) or weight decay can behave differently on rarely seen rows, and some frameworks offer sparse-gradient options for embeddings (check the docs of the framework you use).",
+  "key_concepts": [
+   "embedding lookup",
+   "one-hot matrix multiplication equivalence",
+   "sparse gradient",
+   "scatter-add for repeated indices",
+   "vocabulary size cost",
+   "gradient flow to used rows"
+  ],
+  "common_mistakes": [
+   "Assigning dE[idx] = dout and losing gradients for repeated tokens",
+   "Claiming the lookup is an approximation of the one-hot product",
+   "Saying embeddings receive gradient for the whole table every step"
+  ],
+  "interview_style_note": "Shows the equivalence concretely, handles repeated indices in backward, and explains cost and sparsity.",
+  "sources": [],
+  "code": null,
+  "topic": "Embeddings"
+ }
+]

@@ -1,0 +1,1197 @@
+{
+ "smi-0045": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\n\ndef sigmoid(x):\n    x = np.atleast_1d(np.asarray(x, dtype=float))\n    out = np.empty_like(x)\n    pos = x >= 0\n    out[pos] = 1.0 / (1.0 + np.exp(-x[pos]))\n    e = np.exp(x[~pos])          # exp of a negative number cannot overflow\n    out[~pos] = e / (1.0 + e)\n    return out\n\ndef sigmoid_grad(x):\n    s = sigmoid(x)\n    return s * (1.0 - s)",
+  "test": "import warnings\nwarnings.simplefilter(\"error\")\nassert sigmoid(0.0)[0] == 0.5\nbig = sigmoid([1000.0, -1000.0])\nassert big[0] == 1.0 and big[1] == 0.0\nxs = np.linspace(-6, 6, 13)\nassert np.allclose(sigmoid(-xs), 1 - sigmoid(xs))\nassert np.isclose(sigmoid_grad(0.0)[0], 0.25)\nassert sigmoid_grad(10.0)[0] < 1e-4\nassert np.all(sigmoid_grad(xs) <= 0.25 + 1e-12)",
+  "expected": []
+ },
+ "smi-0128": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\n\ndef clip_by_norm(g, max_norm):\n    \"\"\"Rescale gradient g so its L2 norm is at most max_norm (direction preserved).\"\"\"\n    norm = np.linalg.norm(g)\n    return g if norm <= max_norm else g * (max_norm / norm)\n\ndef clip_by_value(g, m):\n    \"\"\"Clamp every component to [-m, m].\"\"\"\n    return np.clip(g, -m, m)",
+  "test": "import numpy as np\ng = np.array([30.0, 40.0])\nc = clip_by_norm(g, 5.0)\nassert np.isclose(np.linalg.norm(c), 5.0)\nassert np.allclose(c / np.linalg.norm(c), g / np.linalg.norm(g))\nassert np.allclose(clip_by_norm(np.array([1.0, 2.0]), 5.0), [1.0, 2.0])\nassert np.allclose(clip_by_value(np.array([-9.0, 0.5, 9.0]), 1.0), [-1.0, 0.5, 1.0])",
+  "expected": []
+ },
+ "smi-0143": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\nfrom sklearn.metrics.pairwise import rbf_kernel\n\ndef phi(x):                      # explicit feature map for the degree-2 polynomial kernel in 2D\n    return np.array([x[0] ** 2, np.sqrt(2) * x[0] * x[1], x[1] ** 2])\n\ndef poly2_kernel(x, z):          # same inner product, computed without building phi\n    return float(np.dot(x, z)) ** 2",
+  "test": "rng = np.random.default_rng(0)\nfor _ in range(20):\n    x, z = rng.normal(size=2), rng.normal(size=2)\n    assert np.isclose(np.dot(phi(x), phi(z)), poly2_kernel(x, z))\nX = rng.normal(size=(30, 2))\nK = rbf_kernel(X, gamma=0.5)\nassert np.allclose(K, K.T)\nassert np.linalg.eigvalsh(K).min() > -1e-10     # positive semi-definite Gram matrix",
+  "expected": []
+ },
+ "smi-0156": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\nfrom sklearn.cluster import KMeans\n\nX = np.array([[0, 0], [0, 1], [1, 0], [1, 1],\n              [10, 10], [10, 11], [11, 10], [11, 11]], dtype=float)\nkm = KMeans(n_clusters=2, init=\"k-means++\", n_init=10, random_state=0).fit(X)\ncenters = sorted(km.cluster_centers_.tolist())\nprint(centers, km.inertia_)",
+  "test": "assert len(set(km.labels_[:4])) == 1 and len(set(km.labels_[4:])) == 1\nassert km.labels_[0] != km.labels_[4]\nassert np.allclose(centers, [[0.5, 0.5], [10.5, 10.5]])\nassert abs(km.inertia_ - 4.0) < 1e-9",
+  "expected": [
+   [
+    [
+     0.5,
+     0.5
+    ],
+    [
+     10.5,
+     10.5
+    ]
+   ],
+   4.0
+  ]
+ },
+ "smi-0161": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\n\ndef pca_svd(X, k):\n    Xc = X - X.mean(axis=0)                      # centre (scale too if features have different units)\n    U, S, Vt = np.linalg.svd(Xc, full_matrices=False)\n    components = Vt[:k]                          # principal directions (unit vectors)\n    explained_var = S[:k] ** 2 / (len(X) - 1)    # variance along each direction\n    return Xc @ components.T, components, explained_var",
+  "test": "from sklearn.decomposition import PCA\nrng = np.random.default_rng(0)\nX = rng.normal(size=(200, 5)) @ rng.normal(size=(5, 5))\nZ, comps, ev = pca_svd(X, 2)\nref = PCA(n_components=2).fit(X)\nassert np.allclose(ev, ref.explained_variance_)\nassert np.allclose(np.abs(comps), np.abs(ref.components_))      # equal up to sign\nassert np.allclose(np.abs(Z), np.abs(ref.transform(X)))\neig = np.sort(np.linalg.eigvalsh(np.cov(X.T)))[::-1][:2]\nassert np.allclose(eig, ev)                                      # eigenvalues of covariance matrix\nassert np.allclose(Z.var(axis=0, ddof=1), ev)",
+  "expected": []
+ },
+ "smi-0162": {
+  "language": "python",
+  "setup": "",
+  "solution": "from sklearn.datasets import load_digits\nfrom sklearn.manifold import TSNE\n\nX, y = load_digits(return_X_y=True)\nX, y = X[:500], y[:500]\ntsne = TSNE(n_components=2, perplexity=30, init=\"pca\", random_state=0)\nemb = tsne.fit_transform(X)",
+  "test": "import numpy as np\nassert emb.shape == (500, 2)\nassert np.isfinite(emb).all()\nassert np.isfinite(tsne.kl_divergence_) and tsne.kl_divergence_ > 0\nassert not hasattr(tsne, \"transform\")     # sklearn's TSNE cannot embed new points after fitting",
+  "expected": []
+ },
+ "smi-0171": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\nfrom scipy import stats\n\ndef type1_rate(alpha=0.05, n=30, trials=4000, seed=0):\n    # both groups come from the SAME distribution, so the null hypothesis is true\n    rng = np.random.default_rng(seed)\n    a = rng.normal(0, 1, (trials, n))\n    b = rng.normal(0, 1, (trials, n))\n    p = stats.ttest_ind(a, b, axis=1).pvalue\n    return float((p <= alpha).mean())",
+  "test": "r = type1_rate()\nassert 0.035 < r < 0.065, r\nassert type1_rate(alpha=0.01, trials=6000) < 0.02",
+  "expected": []
+ },
+ "smi-0176": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\nfrom sklearn.linear_model import LinearRegression, Ridge, Lasso\nfrom sklearn.preprocessing import StandardScaler\n\nrng = np.random.default_rng(0)\nX = rng.normal(size=(60, 20))\ntrue_w = np.zeros(20)\ntrue_w[:3] = [3, -2, 1.5]                      # only 3 features matter\ny = X @ true_w + rng.normal(scale=1.0, size=60)\nXs = StandardScaler().fit_transform(X)         # penalties assume comparable feature scales\n\nols = LinearRegression().fit(Xs, y)\nridge = Ridge(alpha=10).fit(Xs, y)             # L2: shrinks coefficients\nlasso = Lasso(alpha=0.2).fit(Xs, y)            # L1: sets some coefficients exactly to 0",
+  "test": "assert np.linalg.norm(ridge.coef_) < np.linalg.norm(ols.coef_)\nassert (ridge.coef_ == 0).sum() == 0\nassert (lasso.coef_ == 0).sum() >= 10\nassert all(lasso.coef_[:3] != 0)",
+  "expected": []
+ },
+ "smi-0180": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\nfrom sklearn.linear_model import LogisticRegression\n\nrng = np.random.default_rng(0)\nx = rng.normal(size=(20000, 1))\ntrue_w, true_b = 1.0, 0.5\np = 1 / (1 + np.exp(-(true_b + true_w * x[:, 0])))\ny = rng.binomial(1, p)\nclf = LogisticRegression(C=1e10).fit(x, y)\nweight = float(clf.coef_[0, 0])                 # change in log-odds per +1 in x\nodds_ratio = float(np.exp(weight))              # multiplicative change in the odds per +1 in x",
+  "test": "assert abs(weight - 1.0) < 0.1, weight\nassert abs(odds_ratio - np.e) / np.e < 0.12, odds_ratio",
+  "expected": []
+ },
+ "smi-0181": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.preprocessing import StandardScaler\n\nrng = np.random.default_rng(0)\nn = 5000\nincome = rng.normal(50000, 15000, n)        # large numeric scale\nratio = rng.uniform(0, 1, n)                # small numeric scale\ny = 0.0002 * income + 3 * ratio + rng.normal(0, 0.5, n)\nX = np.column_stack([income, ratio])\n\nraw = LinearRegression().fit(X, y).coef_\nstd = LinearRegression().fit(StandardScaler().fit_transform(X), y).coef_",
+  "test": "assert abs(raw[1]) > 100 * abs(raw[0])        # raw weights make 'ratio' look far more important\nassert abs(std[0]) > 2 * abs(std[1])          # per-standard-deviation, income matters more\nassert np.allclose(std, [0.0002 * 15000, 3 * np.sqrt(1 / 12)], atol=0.1)",
+  "expected": []
+ },
+ "smi-0186": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\n\n# rows = users, columns = items, 0 means 'not rated'\nR = np.array([[5, 4, 0, 1],\n              [4, 5, 1, 0],\n              [1, 0, 5, 4],\n              [0, 1, 4, 5],\n              [5, 0, 0, 1]], dtype=float)\n\ndef cosine(u, v):\n    return u @ v / (np.linalg.norm(u) * np.linalg.norm(v))\n\ndef predict(R, user, item):\n    # similarity-weighted average of the ratings that similar users gave to this item\n    num = den = 0.0\n    for other in range(R.shape[0]):\n        if other != user and R[other, item] > 0:\n            s = cosine(R[user], R[other])\n            num += s * R[other, item]\n            den += s\n    return num / den",
+  "test": "p_item1 = predict(R, 4, 1)     # user 4 resembles users 0 and 1, who rated item 1 highly\np_item2 = predict(R, 4, 2)     # item 2 is liked mainly by users unlike user 4\nassert p_item1 > p_item2\nassert 1 <= p_item2 <= p_item1 <= 5\nassert p_item1 > 3.5 and p_item2 < 3.5, (p_item1, p_item2)",
+  "expected": []
+ },
+ "smi-0251": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\nfrom sklearn.datasets import make_classification\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.metrics import roc_auc_score, log_loss, confusion_matrix\n\nX, y = make_classification(n_samples=3000, n_features=10, n_informative=4,\n                           weights=[0.9, 0.1], random_state=0)\nXtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, stratify=y, random_state=0)\nclf = LogisticRegression(C=1e10, max_iter=2000).fit(Xtr, ytr)\n\nproba = clf.predict_proba(Xte)[:, 1]\nauc = roc_auc_score(yte, proba)                       # threshold-free ranking quality\nll = log_loss(yte, proba)                             # also rewards calibrated probabilities\ncm = confusion_matrix(yte, (proba >= 0.5).astype(int))   # depends on the chosen threshold\naccuracy = np.trace(cm) / cm.sum()\nbaseline = max(np.bincount(yte)) / len(yte)           # accuracy of always predicting the majority class\n\nk = clf.coef_.size + 1                                # parameters including the intercept\naic = 2 * k + 2 * len(ytr) * log_loss(ytr, clf.predict_proba(Xtr)[:, 1])   # 2k - 2*logL (C=1e10 ~ no penalty)",
+  "test": "pos, neg = proba[yte == 1], proba[yte == 0]\npairwise = (pos[:, None] > neg[None, :]).mean() + 0.5 * (pos[:, None] == neg[None, :]).mean()\nassert np.isclose(auc, pairwise)                      # AUC = P(random positive scores above random negative)\nassert baseline >= 0.88                               # accuracy must be compared with this baseline\nassert auc > 0.7 and np.isfinite(aic)",
+  "expected": []
+ },
+ "smi-0260": {
+  "language": "python",
+  "setup": "",
+  "solution": "from sklearn.feature_extraction.text import CountVectorizer\nfrom sklearn.naive_bayes import MultinomialNB\n\ntexts = [\"win free prize money now\", \"free money offer click now\", \"claim your free prize\",\n         \"meeting agenda for tomorrow\", \"please review the project report\", \"lunch tomorrow with the team\"]\nlabels = [\"spam\", \"spam\", \"spam\", \"ham\", \"ham\", \"ham\"]\nvec = CountVectorizer()\nclf = MultinomialNB(alpha=1.0).fit(vec.fit_transform(texts), labels)",
+  "test": "assert clf.predict(vec.transform([\"free prize money\"]))[0] == \"spam\"\nassert clf.predict(vec.transform([\"agenda for the project meeting\"]))[0] == \"ham\"\nassert clf.predict(vec.transform([\"zzz unseen words\"])).shape == (1,)   # unseen words are ignored, smoothing avoids zeros",
+  "expected": []
+ },
+ "smi-0265": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\nfrom sklearn.datasets import make_classification\nfrom sklearn.ensemble import RandomForestClassifier\nfrom sklearn.model_selection import train_test_split\n\n# 1) fraction of samples left out of a bootstrap sample of size n\nn = 10000\nrng = np.random.default_rng(0)\nidx = rng.integers(0, n, size=n)\noob_fraction = 1 - len(np.unique(idx)) / n          # tends to 1/e = 0.368 as n grows\n\n# 2) OOB score of a random forest vs a true held-out score\nX, y = make_classification(n_samples=3000, n_features=15, n_informative=6, random_state=0)\nXtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)\nrf = RandomForestClassifier(n_estimators=300, oob_score=True, random_state=0).fit(Xtr, ytr)\noob_acc, test_acc = rf.oob_score_, rf.score(Xte, yte)",
+  "test": "assert abs(oob_fraction - np.exp(-1)) < 0.01\nassert abs(oob_acc - test_acc) < 0.04, (oob_acc, test_acc)",
+  "expected": []
+ },
+ "smi-0267": {
+  "language": "python",
+  "setup": "",
+  "solution": "import pandas as pd\n\ndef iqr_outliers(s, k=1.5):\n    q1, q3 = s.quantile(0.25), s.quantile(0.75)\n    iqr = q3 - q1\n    return (s < q1 - k * iqr) | (s > q3 + k * iqr)\n\ndef winsorize_iqr(s, k=1.5):\n    q1, q3 = s.quantile(0.25), s.quantile(0.75)\n    iqr = q3 - q1\n    return s.clip(lower=q1 - k * iqr, upper=q3 + k * iqr)",
+  "test": "import pandas as pd\ns = pd.Series([10, 11, 12, 12, 13, 14, 15, 100])\nmask = iqr_outliers(s)\nassert mask.tolist() == [False]*7 + [True]\nw = winsorize_iqr(s)\nassert w.iloc[-1] < 100 and w.iloc[0] == 10",
+  "expected": []
+ },
+ "smi-0276": {
+  "language": "python",
+  "setup": "",
+  "solution": "import itertools\nimport numpy as np\nfrom scipy.optimize import linprog\n\ndef separable(X, y):\n    # is there a line (w, b) with y_i * (w.x_i + b) >= 1 for all i?  (feasibility LP)\n    A = -(y[:, None] * np.hstack([X, np.ones((len(X), 1))]))\n    res = linprog(c=np.zeros(X.shape[1] + 1), A_ub=A, b_ub=-np.ones(len(X)),\n                  bounds=[(None, None)] * (X.shape[1] + 1))\n    return res.status == 0\n\ndef shattered_by_lines(X):\n    X = np.asarray(X, dtype=float)\n    return all(separable(X, np.array(lab, dtype=float))\n               for lab in itertools.product([-1, 1], repeat=len(X)))",
+  "test": "assert shattered_by_lines([[0, 0], [1, 0], [0, 1]])                  # some 3 points in 2D can be shattered\nassert not shattered_by_lines([[0, 0], [1, 1], [1, 0], [0, 1]])      # the XOR labelling of a square fails\nassert not shattered_by_lines([[0, 0], [1, 1], [2, 2]])              # but collinear triples are not shattered\n# VC dimension of lines in 2D is 3 = d + 1: it needs only ONE shatterable set of size 3, and no set of size 4",
+  "expected": []
+ },
+ "smi-0292": {
+  "language": "python",
+  "setup": "",
+  "solution": "from sklearn.datasets import make_moons\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.svm import SVC\n\nX, y = make_moons(n_samples=400, noise=0.3, random_state=0)\nXtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.5, random_state=0)\n\ndef acc(**kw):\n    m = SVC(kernel=\"rbf\", **kw).fit(Xtr, ytr)\n    return m.score(Xtr, ytr), m.score(Xte, yte)\n\ngamma_small, gamma_mid, gamma_big = acc(gamma=0.01, C=1), acc(gamma=1, C=1), acc(gamma=100, C=1)\nc_small, c_big = acc(gamma=1, C=0.001), acc(gamma=1, C=1000)",
+  "test": "assert gamma_big[0] > 0.97 and gamma_big[1] < gamma_big[0] - 0.1     # huge gamma: memorises training set\nassert gamma_mid[1] > gamma_big[1]                                    # moderate gamma generalises better\nassert gamma_small[0] < gamma_mid[0]                                  # tiny gamma: too smooth, underfits\nassert c_small[0] < c_big[0]                                          # tiny C: heavy regularisation, underfits\nassert c_big[0] >= c_small[0] and c_big[0] >= gamma_mid[0] - 0.02",
+  "expected": []
+ },
+ "smi-0308": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\nfrom sklearn.datasets import make_regression\nfrom sklearn.feature_selection import SelectFromModel\nfrom sklearn.linear_model import LassoCV\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\n\nX, y = make_regression(n_samples=300, n_features=20, n_informative=4, noise=5.0,\n                       shuffle=False, random_state=0)       # features 0-3 are the informative ones\n# selection lives inside a pipeline so that, under cross-validation, it is refit on each training fold only\npipe = make_pipeline(StandardScaler(), SelectFromModel(LassoCV(cv=5, random_state=0)))\npipe.fit(X, y)\nselected = np.flatnonzero(pipe.named_steps[\"selectfrommodel\"].get_support())",
+  "test": "assert {0, 1, 2, 3} <= set(selected.tolist())\nassert len(selected) < 20",
+  "expected": []
+ },
+ "smi-0318": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\nimport pandas as pd\n\ndef clean(df):\n    df = df.copy()\n    df[\"age\"] = pd.to_numeric(df[\"age\"], errors=\"coerce\")      # corrupted text -> NaN\n    df.loc[(df[\"age\"] < 0) | (df[\"age\"] > 120), \"age\"] = np.nan  # impossible values -> NaN\n    df[\"age_missing\"] = df[\"age\"].isnull()                      # keep a missingness flag\n    df[\"age\"] = df[\"age\"].fillna(df[\"age\"].median())            # median imputation\n    return df.dropna(subset=[\"id\"])                             # drop rows with no key",
+  "test": "import numpy as np, pandas as pd\ndf = pd.DataFrame({\"id\": [1, 2, 3, None, 5], \"age\": [30, \"abc\", -4, 40, 50]})\nout = clean(df)\nassert len(out) == 4\nassert out[\"age\"].isnull().sum() == 0\nassert out[\"age_missing\"].sum() == 2\nassert out.loc[out[\"id\"] == 2, \"age\"].iloc[0] == 40.0",
+  "expected": []
+ },
+ "smi-0321": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\n\nrng = np.random.default_rng(0)\nX = np.column_stack([np.ones(500), rng.normal(size=500)])\ny = X @ np.array([2.0, -3.0]) + rng.normal(scale=0.5, size=500)\n\ndef gd(X, y, lr=0.1, steps=300):\n    w = np.zeros(X.shape[1])\n    for _ in range(steps):                                   # each update uses ALL samples\n        w -= lr * (2 / len(y)) * X.T @ (X @ w - y)\n    return w\n\ndef sgd(X, y, lr0=0.05, epochs=20, seed=0):\n    r = np.random.default_rng(seed)\n    w, t = np.zeros(X.shape[1]), 0\n    for _ in range(epochs):\n        for i in r.permutation(len(y)):                      # each update uses ONE sample\n            t += 1\n            lr = lr0 / (1 + 0.01 * t)                        # decaying step size tames the gradient noise\n            w -= lr * 2 * X[i] * (X[i] @ w - y[i])\n    return w",
+  "test": "w_ols = np.linalg.lstsq(X, y, rcond=None)[0]\nassert np.allclose(gd(X, y), w_ols, atol=1e-3)\nassert np.allclose(sgd(X, y), w_ols, atol=0.1)",
+  "expected": []
+ },
+ "smi-0345": {
+  "language": "python",
+  "setup": "",
+  "solution": "from nltk.tokenize import TreebankWordTokenizer, RegexpTokenizer\n\ntext = \"Hello, world! NLP is fun.\"\n\n# Word tokens, Penn Treebank conventions (punctuation split off); no downloads needed\nwords = TreebankWordTokenizer().tokenize(text)\n\n# Pure regex tokenizers: keep only word characters / split into crude sentences\nalnum = RegexpTokenizer(r\"\\w+\").tokenize(text)\nsentences = RegexpTokenizer(r\"[^.!?]+[.!?]\").tokenize(text)\nsentences = [s.strip() for s in sentences]\n\nprint(words)\nprint(alnum)\nprint(sentences)",
+  "test": "assert words == ['Hello', ',', 'world', '!', 'NLP', 'is', 'fun', '.']\nassert alnum == ['Hello', 'world', 'NLP', 'is', 'fun']\nassert sentences == ['Hello, world!', 'NLP is fun.']",
+  "expected": [
+   "['Hello', ',', 'world', '!', 'NLP', 'is', 'fun', '.']",
+   "['Hello', 'world', 'NLP', 'is', 'fun']",
+   "['Hello, world!', 'NLP is fun.']"
+  ]
+ },
+ "smi-0347": {
+  "language": "python",
+  "setup": "",
+  "solution": "from nltk.stem import PorterStemmer\n\np = PorterStemmer()\nstems = [p.stem(w) for w in ['running', 'cookies', 'flying', 'stemming']]\nprint(stems)",
+  "test": "assert stems == ['run', 'cooki', 'fli', 'stem']",
+  "expected": [
+   "['run', 'cooki', 'fli', 'stem']"
+  ]
+ },
+ "smi-0349": {
+  "language": "python",
+  "setup": "",
+  "solution": "import spacy\n\n# Needs a model that ships word vectors (md/lg), not the small 'sm' model\nnlp = spacy.load(\"en_core_web_md\")\n\ndoc1 = nlp(\"I like cats\")\ndoc2 = nlp(\"I love dogs\")\nsim = doc1.similarity(doc2)          # cosine similarity of averaged vectors\n\nw1, w2 = nlp(\"king\"), nlp(\"queen\")\nword_sim = w1.similarity(w2)\n\noov = nlp(\"xqzvk\")[0]\nprint(round(sim, 2), round(word_sim, 2), oov.has_vector)",
+  "test": "import numpy as np\nassert -1.0 <= sim <= 1.0 and -1.0 <= word_sim <= 1.0\nassert abs(nlp(\"king\").similarity(nlp(\"king\")) - 1.0) < 1e-4\nassert abs(w1.similarity(w2) - w2.similarity(w1)) < 1e-5\na, b = w1.vector, w2.vector\nmanual = float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))\nassert abs(manual - word_sim) < 1e-4\nassert oov.has_vector is False",
+  "expected": [
+   "has_vector False for out-of-vocabulary token; similarity values in [-1, 1]"
+  ]
+ },
+ "smi-0358": {
+  "language": "python",
+  "setup": "",
+  "solution": "from sklearn.feature_extraction.text import CountVectorizer\n\ndef ngrams(tokens, n):\n    # sliding window with stride 1, so consecutive n-grams overlap\n    return [tuple(tokens[i:i + n]) for i in range(len(tokens) - n + 1)]",
+  "test": "toks = \"the cat sat on the mat\".split()\nassert ngrams(toks, 1) == [(t,) for t in toks]\nassert ngrams(toks, 2) == [(\"the\", \"cat\"), (\"cat\", \"sat\"), (\"sat\", \"on\"), (\"on\", \"the\"), (\"the\", \"mat\")]\nassert len(ngrams(toks, 3)) == len(toks) - 3 + 1\nassert ngrams(toks, 7) == []\ncv = CountVectorizer(ngram_range=(2, 2)).fit([\"the cat sat on the mat\"])\nassert set(cv.vocabulary_) == {\" \".join(g) for g in ngrams(toks, 2)}",
+  "expected": []
+ },
+ "smi-0364": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\nfrom sklearn.feature_extraction.text import CountVectorizer\nfrom sklearn.naive_bayes import MultinomialNB\n\ndocs = [\"great movie loved it\", \"terrible film hated it\", \"loved the great acting\",\n        \"hated the terrible plot\", \"great plot\", \"terrible acting\"]\ny = np.array([1, 0, 1, 0, 1, 0])\nvec = CountVectorizer()\nX = vec.fit_transform(docs).toarray()\nV = X.shape[1]\n\ndef log_posterior(x, alpha=1.0):\n    # log P(c) + sum_w count_w * log P(w|c), with Laplace (add-alpha) smoothing\n    scores = []\n    for c in (0, 1):\n        counts = X[y == c].sum(axis=0)\n        logp_w = np.log((counts + alpha) / (counts.sum() + alpha * V))\n        scores.append(np.log((y == c).mean()) + x @ logp_w)\n    return np.array(scores)",
+  "test": "clf = MultinomialNB(alpha=1.0).fit(X, y)\nx = vec.transform([\"great acting loved it\"]).toarray()[0]\ns = log_posterior(x)\nmanual = np.exp(s - s.max()) / np.exp(s - s.max()).sum()\nassert np.allclose(manual, clf.predict_proba(x[None, :])[0])\nassert clf.predict(x[None, :])[0] == 1 and manual.argmax() == 1\n# incremental update: counts simply add up, so new data can be absorbed with partial_fit\ninc = MultinomialNB(alpha=1.0)\ninc.partial_fit(X[:3], y[:3], classes=[0, 1]); inc.partial_fit(X[3:], y[3:])\nassert np.allclose(inc.predict_log_proba(X), clf.predict_log_proba(X))",
+  "expected": []
+ },
+ "smi-0369": {
+  "language": "python",
+  "setup": "",
+  "solution": "from sklearn.feature_extraction.text import CountVectorizer\n\ndocs = [\"the cat sat\", \"the cat saw the cat\"]\nvec = CountVectorizer()\nX = vec.fit_transform(docs).toarray()\nvocab = list(vec.get_feature_names_out())\nprint(vocab)\nprint(X.tolist())",
+  "test": "assert vocab == [\"cat\", \"sat\", \"saw\", \"the\"]\nassert X.tolist() == [[1, 1, 0, 1], [2, 0, 1, 2]]",
+  "expected": [
+   [
+    "cat",
+    "sat",
+    "saw",
+    "the"
+   ],
+   [
+    [
+     1,
+     1,
+     0,
+     1
+    ],
+    [
+     2,
+     0,
+     1,
+     2
+    ]
+   ]
+  ]
+ },
+ "smi-0413": {
+  "language": "sql",
+  "setup": "CREATE TABLE orders(order_id INTEGER, customer_id INTEGER, status TEXT, amount REAL);\nINSERT INTO orders VALUES (1,1,'paid',60),(2,1,'paid',70),(3,1,'refunded',500),(4,2,'paid',80),(5,2,'paid',10),(6,3,'paid',200);",
+  "solution": "SELECT customer_id, SUM(amount) AS total_paid\nFROM orders\nWHERE status = 'paid'\nGROUP BY customer_id\nHAVING SUM(amount) > 100\nORDER BY customer_id;",
+  "test": "",
+  "expected": [
+   [
+    1,
+    130.0
+   ],
+   [
+    3,
+    200.0
+   ]
+  ]
+ },
+ "smi-0414": {
+  "language": "sql",
+  "setup": "CREATE TABLE customers(id INTEGER PRIMARY KEY, name TEXT);\nCREATE TABLE orders(id INTEGER PRIMARY KEY, customer_id INTEGER, amount INTEGER);\nINSERT INTO customers VALUES (1,'Ann'),(2,'Bob'),(3,'Cy');\nINSERT INTO orders VALUES (10,1,50),(11,1,20),(12,2,30),(13,NULL,99);",
+  "solution": "SELECT c.name, o.id AS order_id, o.amount\nFROM customers c\nINNER JOIN orders o ON o.customer_id = c.id\nORDER BY o.id;",
+  "expected": [
+   [
+    "Ann",
+    10,
+    50
+   ],
+   [
+    "Ann",
+    11,
+    20
+   ],
+   [
+    "Bob",
+    12,
+    30
+   ]
+  ],
+  "test": ""
+ },
+ "smi-0415": {
+  "language": "sql",
+  "setup": "CREATE TABLE customers(id INTEGER PRIMARY KEY, name TEXT);\nCREATE TABLE orders(id INTEGER PRIMARY KEY, customer_id INTEGER, amount INTEGER);\nINSERT INTO customers VALUES (1,'Ann'),(2,'Bob'),(3,'Cy');\nINSERT INTO orders VALUES (10,1,50),(11,1,20),(12,2,30);",
+  "solution": "SELECT c.name, COUNT(o.id) AS n_orders\nFROM customers c\nLEFT JOIN orders o ON o.customer_id = c.id\nGROUP BY c.id, c.name\nORDER BY c.id;",
+  "expected": [
+   [
+    "Ann",
+    2
+   ],
+   [
+    "Bob",
+    1
+   ],
+   [
+    "Cy",
+    0
+   ]
+  ],
+  "test": ""
+ },
+ "smi-0416": {
+  "language": "sql",
+  "setup": "CREATE TABLE emp(id INTEGER PRIMARY KEY, name TEXT, dept TEXT, salary INTEGER);\nINSERT INTO emp VALUES (1,'A','eng',100),(2,'B','eng',120),(3,'C','ops',80),(4,'D',NULL,70),(5,'E',NULL,90),(6,'F','hr',60);",
+  "solution": "SELECT dept, COUNT(*) AS n, AVG(salary) AS avg_salary\nFROM emp\nGROUP BY dept\nHAVING COUNT(*) > 1\nORDER BY dept;",
+  "expected": [
+   [
+    null,
+    2,
+    80.0
+   ],
+   [
+    "eng",
+    2,
+    110.0
+   ]
+  ],
+  "test": ""
+ },
+ "smi-0417": {
+  "language": "sql",
+  "setup": "CREATE TABLE visits(id INTEGER PRIMARY KEY, city TEXT);\nINSERT INTO visits(city) VALUES ('Leeds'),('Leeds'),('York'),(NULL),(NULL);",
+  "solution": "SELECT COUNT(*) AS total_rows,\n       COUNT(city) AS non_null,\n       COUNT(DISTINCT city) AS distinct_non_null,\n       (SELECT COUNT(*) FROM (SELECT DISTINCT city FROM visits)) AS distinct_rows\nFROM visits;",
+  "expected": [
+   [
+    5,
+    3,
+    2,
+    3
+   ]
+  ],
+  "test": ""
+ },
+ "smi-0418": {
+  "language": "sql",
+  "setup": "CREATE TABLE t(v INTEGER);\nINSERT INTO t VALUES (1),(2),(NULL);",
+  "solution": "SELECT\n  (SELECT COUNT(*) FROM t WHERE v = NULL) AS eq_null,\n  (SELECT COUNT(*) FROM t WHERE v IS NULL) AS is_null,\n  (SELECT COUNT(*) FROM t WHERE v NOT IN (1, NULL)) AS not_in_with_null,\n  (SELECT COUNT(*) FROM t) AS count_star,\n  (SELECT COUNT(v) FROM t) AS count_col,\n  (SELECT AVG(v) FROM t) AS avg_v,\n  (SELECT SUM(COALESCE(v, 0)) FROM t) AS sum_coalesce;",
+  "expected": [
+   [
+    0,
+    1,
+    0,
+    3,
+    2,
+    1.5,
+    3
+   ]
+  ],
+  "test": ""
+ },
+ "smi-0419": {
+  "language": "sql",
+  "setup": "CREATE TABLE emp(id INTEGER PRIMARY KEY, salary INTEGER);\nINSERT INTO emp VALUES (1,100),(2,200),(3,NULL);",
+  "solution": "SELECT COUNT(*) AS n_rows, COUNT(salary) AS n_salary, SUM(salary) AS total,\n       AVG(salary) AS avg_salary, MIN(salary) AS lo, MAX(salary) AS hi,\n       (SELECT SUM(salary) FROM emp WHERE id > 100) AS sum_of_empty\nFROM emp;",
+  "expected": [
+   [
+    3,
+    2,
+    300,
+    150.0,
+    100,
+    200,
+    null
+   ]
+  ],
+  "test": ""
+ },
+ "smi-0420": {
+  "language": "sql",
+  "setup": "CREATE TABLE emp(id INTEGER PRIMARY KEY, name TEXT, dept TEXT, salary INTEGER);\nINSERT INTO emp VALUES (1,'A','eng',100),(2,'B','eng',140),(3,'C','ops',80),(4,'D','ops',90),(5,'E','hr',60);",
+  "solution": "SELECT e.name, e.dept, e.salary\nFROM emp e\nWHERE e.salary > (SELECT AVG(x.salary) FROM emp x WHERE x.dept = e.dept)\nORDER BY e.name;",
+  "expected": [
+   [
+    "B",
+    "eng",
+    140
+   ],
+   [
+    "D",
+    "ops",
+    90
+   ]
+  ],
+  "test": ""
+ },
+ "smi-0421": {
+  "language": "sql",
+  "setup": "CREATE TABLE emp(id INTEGER PRIMARY KEY, name TEXT, dept TEXT, salary INTEGER);\nINSERT INTO emp VALUES (1,'A','eng',100),(2,'B','eng',140),(3,'C','ops',80),(4,'D','ops',90),(5,'E','hr',60);",
+  "solution": "WITH dept_avg AS (\n  SELECT dept, AVG(salary) AS avg_salary FROM emp GROUP BY dept\n)\nSELECT e.name, e.dept, e.salary, d.avg_salary\nFROM emp e\nJOIN dept_avg d ON d.dept = e.dept\nWHERE e.salary > d.avg_salary\nORDER BY e.name;",
+  "expected": [
+   [
+    "B",
+    "eng",
+    140,
+    120.0
+   ],
+   [
+    "D",
+    "ops",
+    90,
+    85.0
+   ]
+  ],
+  "test": ""
+ },
+ "smi-0424": {
+  "language": "sql",
+  "setup": "CREATE TABLE users(id INTEGER PRIMARY KEY, email TEXT, city TEXT);\nCREATE INDEX idx_users_email ON users(email);\nINSERT INTO users(email, city) VALUES ('a@x.com','Leeds'),('b@x.com','York'),('c@x.com','Hull');",
+  "solution": "EXPLAIN QUERY PLAN SELECT id, city FROM users WHERE email = 'b@x.com';",
+  "expected": [
+   [
+    3,
+    0,
+    0,
+    "SEARCH users USING INDEX idx_users_email (email=?)"
+   ]
+  ],
+  "test": ""
+ },
+ "smi-0425": {
+  "language": "sql",
+  "setup": "CREATE TABLE customers(id INTEGER PRIMARY KEY, name TEXT, email TEXT, active INTEGER);\nINSERT INTO customers VALUES (1,'Ann','a@x.com',1),(2,'Bob','b@x.com',0),(3,'Cy','c@x.com',1);\nCREATE VIEW active_customers AS\nSELECT id, name FROM customers WHERE active = 1;",
+  "solution": "SELECT * FROM active_customers ORDER BY id;",
+  "expected": [
+   [
+    1,
+    "Ann"
+   ],
+   [
+    3,
+    "Cy"
+   ]
+  ],
+  "test": ""
+ },
+ "smi-0426": {
+  "language": "sql",
+  "setup": "CREATE TABLE accounts(id INTEGER PRIMARY KEY, balance INTEGER);\nINSERT INTO accounts VALUES (1,100),(2,50);",
+  "solution": "BEGIN;\nUPDATE accounts SET balance = balance - 30 WHERE id = 1;\nUPDATE accounts SET balance = balance + 30 WHERE id = 2;\nROLLBACK;\nSELECT id, balance FROM accounts ORDER BY id;",
+  "expected": [
+   [
+    1,
+    100
+   ],
+   [
+    2,
+    50
+   ]
+  ],
+  "test": ""
+ },
+ "smi-0428": {
+  "language": "sql",
+  "setup": "CREATE TABLE emp(id INTEGER PRIMARY KEY, name TEXT, manager_id INTEGER);\nINSERT INTO emp VALUES (1,'Ceo',NULL),(2,'Mia',1),(3,'Raj',1),(4,'Zoe',2);",
+  "solution": "SELECT e.name AS employee, m.name AS manager\nFROM emp e\nLEFT JOIN emp m ON m.id = e.manager_id\nORDER BY e.id;",
+  "expected": [
+   [
+    "Ceo",
+    null
+   ],
+   [
+    "Mia",
+    "Ceo"
+   ],
+   [
+    "Raj",
+    "Ceo"
+   ],
+   [
+    "Zoe",
+    "Mia"
+   ]
+  ],
+  "test": ""
+ },
+ "smi-0430": {
+  "language": "sql",
+  "setup": "CREATE TABLE emp(id INTEGER PRIMARY KEY, name TEXT, dept TEXT, salary INTEGER);\nINSERT INTO emp VALUES (1,'A','eng',100),(2,'B','eng',140),(3,'C','eng',140),(4,'D','ops',80),(5,'E','ops',90);",
+  "solution": "SELECT name, dept, salary,\n       RANK() OVER (PARTITION BY dept ORDER BY salary DESC) AS rnk,\n       ROW_NUMBER() OVER (PARTITION BY dept ORDER BY salary DESC, id) AS rn,\n       SUM(salary) OVER (PARTITION BY dept ORDER BY id) AS running_total\nFROM emp\nORDER BY dept, id;",
+  "expected": [
+   [
+    "A",
+    "eng",
+    100,
+    3,
+    3,
+    100
+   ],
+   [
+    "B",
+    "eng",
+    140,
+    1,
+    1,
+    240
+   ],
+   [
+    "C",
+    "eng",
+    140,
+    1,
+    2,
+    380
+   ],
+   [
+    "D",
+    "ops",
+    80,
+    2,
+    2,
+    80
+   ],
+   [
+    "E",
+    "ops",
+    90,
+    1,
+    1,
+    170
+   ]
+  ],
+  "test": ""
+ },
+ "smi-0439": {
+  "language": "sql",
+  "setup": "CREATE TABLE orders(id INTEGER PRIMARY KEY, customer_id INTEGER, amount INTEGER);\nCREATE INDEX idx_orders_customer ON orders(customer_id);\nINSERT INTO orders(customer_id, amount) VALUES (1,10),(2,20),(1,30);",
+  "solution": "EXPLAIN QUERY PLAN SELECT amount FROM orders WHERE customer_id = 1;",
+  "expected": [
+   [
+    3,
+    0,
+    0,
+    "SEARCH orders USING INDEX idx_orders_customer (customer_id=?)"
+   ]
+  ],
+  "test": ""
+ },
+ "smi-0440": {
+  "language": "python",
+  "setup": "",
+  "solution": "import functools\n\ndef count_calls(func):\n    @functools.wraps(func)\n    def wrapper(*args, **kwargs):\n        wrapper.calls += 1\n        return func(*args, **kwargs)\n    wrapper.calls = 0\n    return wrapper\n\ndef repeat(times):            # decorator factory\n    def decorator(func):\n        @functools.wraps(func)\n        def wrapper(*args, **kwargs):\n            result = None\n            for _ in range(times):\n                result = func(*args, **kwargs)\n            return result\n        return wrapper\n    return decorator\n\n@count_calls\n@repeat(3)\ndef greet(name):\n    \"\"\"Say hi.\"\"\"\n    return f\"hi {name}\"\n",
+  "test": "assert greet(\"a\") == \"hi a\"\nassert greet.calls == 1\nassert greet.__name__ == \"greet\" and greet.__doc__ == \"Say hi.\"\ncalls = []\n@repeat(3)\ndef f():\n    calls.append(1)\nf()\nassert len(calls) == 3\n",
+  "expected": []
+ },
+ "smi-0444": {
+  "language": "python",
+  "setup": "",
+  "solution": "def parse_age(text, log):\n    try:\n        age = int(text)\n    except ValueError as err:\n        log.append(\"bad\")\n        raise ValueError(f\"invalid age: {text!r}\") from err\n    else:\n        log.append(\"ok\")\n        return age\n    finally:\n        log.append(\"done\")\n",
+  "test": "log = []\nassert parse_age(\"42\", log) == 42\nassert log == [\"ok\", \"done\"]\nlog = []\ntry:\n    parse_age(\"x\", log)\n    raise AssertionError(\"should raise\")\nexcept ValueError as e:\n    assert isinstance(e.__cause__, ValueError)\nassert log == [\"bad\", \"done\"]\n",
+  "expected": []
+ },
+ "smi-0445": {
+  "language": "python",
+  "setup": "",
+  "solution": "class Stack:\n    def __init__(self):\n        self._items = []\n\n    def push(self, item):\n        self._items.append(item)\n\n    def pop(self):\n        if not self._items:\n            raise IndexError(\"pop from empty stack\")\n        return self._items.pop()\n\n    def peek(self):\n        if not self._items:\n            raise IndexError(\"peek at empty stack\")\n        return self._items[-1]\n\n    def __len__(self):\n        return len(self._items)\n",
+  "test": "s = Stack()\ns.push(1); s.push(2); s.push(3)\nassert s.peek() == 3 and len(s) == 3\nassert [s.pop(), s.pop(), s.pop()] == [3, 2, 1]\ntry:\n    s.pop()\n    raise AssertionError\nexcept IndexError:\n    pass\n",
+  "expected": []
+ },
+ "smi-0446": {
+  "language": "python",
+  "setup": "",
+  "solution": "from collections import deque\n\nclass Queue:\n    def __init__(self):\n        self._items = deque()\n\n    def enqueue(self, item):\n        self._items.append(item)\n\n    def dequeue(self):\n        if not self._items:\n            raise IndexError(\"dequeue from empty queue\")\n        return self._items.popleft()\n\n    def __len__(self):\n        return len(self._items)\n",
+  "test": "q = Queue()\nfor i in (1, 2, 3):\n    q.enqueue(i)\nassert [q.dequeue(), q.dequeue()] == [1, 2]\nassert len(q) == 1\nq.dequeue()\ntry:\n    q.dequeue()\n    raise AssertionError\nexcept IndexError:\n    pass\nfrom collections import deque\nd = deque([1, 2, 3], maxlen=2)\nassert list(d) == [2, 3]\n",
+  "expected": []
+ },
+ "smi-0447": {
+  "language": "python",
+  "setup": "",
+  "solution": "a = [1, 2, 3]\nb = a[::-1]          # new reversed list; a unchanged\nc = list(reversed(a)) # iterator -> new list; a unchanged\na.reverse()          # in place; returns None\n\na=[1,2,3]; b=a[::-1]; c=list(reversed(a)); r=a.reverse()\nassert b==[3,2,1] and c==[3,2,1] and a==[3,2,1] and r is None\n",
+  "test": "",
+  "expected": []
+ },
+ "smi-0448": {
+  "language": "python",
+  "setup": "",
+  "solution": "class Node:\n    def __init__(self, key):\n        self.key, self.left, self.right = key, None, None\n\nclass BST:\n    def __init__(self):\n        self.root = None\n\n    def insert(self, key):\n        if self.root is None:\n            self.root = Node(key)\n            return\n        cur = self.root\n        while True:\n            if key < cur.key:\n                if cur.left is None:\n                    cur.left = Node(key); return\n                cur = cur.left\n            elif key > cur.key:\n                if cur.right is None:\n                    cur.right = Node(key); return\n                cur = cur.right\n            else:\n                return  # ignore duplicates\n\n    def search(self, key):\n        cur = self.root\n        while cur:\n            if key == cur.key:\n                return True\n            cur = cur.left if key < cur.key else cur.right\n        return False\n\n    def inorder(self):\n        out, stack, cur = [], [], self.root\n        while stack or cur:\n            while cur:\n                stack.append(cur); cur = cur.left\n            cur = stack.pop(); out.append(cur.key); cur = cur.right\n        return out\n\nimport random\nt=BST()\nvals=random.sample(range(1000),200)\nfor v in vals: t.insert(v)\nassert t.inorder()==sorted(vals)\nassert all(t.search(v) for v in vals) and not t.search(-5)\nt.insert(vals[0]); assert t.inorder()==sorted(vals)\n",
+  "test": "",
+  "expected": []
+ },
+ "smi-0450": {
+  "language": "python",
+  "setup": "",
+  "solution": "def fizzbuzz(n):\n    out = []\n    for i in range(1, n + 1):\n        if i % 15 == 0:\n            out.append(\"FizzBuzz\")\n        elif i % 3 == 0:\n            out.append(\"Fizz\")\n        elif i % 5 == 0:\n            out.append(\"Buzz\")\n        else:\n            out.append(str(i))\n    return out\n\nr=fizzbuzz(15)\nassert r[2]==\"Fizz\" and r[4]==\"Buzz\" and r[14]==\"FizzBuzz\" and r[0]==\"1\" and len(r)==15\nassert fizzbuzz(0)==[]\n",
+  "test": "",
+  "expected": []
+ },
+ "smi-0451": {
+  "language": "python",
+  "setup": "",
+  "solution": "import heapq\n\ndef dijkstra(graph, source):\n    \"\"\"graph: {node: [(neighbour, weight), ...]} with non-negative weights.\"\"\"\n    dist = {node: float(\"inf\") for node in graph}\n    dist[source] = 0\n    heap = [(0, source)]\n    while heap:\n        d, u = heapq.heappop(heap)\n        if d > dist[u]:\n            continue  # stale entry\n        for v, w in graph[u]:\n            nd = d + w\n            if nd < dist[v]:\n                dist[v] = nd\n                heapq.heappush(heap, (nd, v))\n    return dist\n\ng={\"A\":[(\"B\",1),(\"C\",4)],\"B\":[(\"C\",2),(\"D\",5)],\"C\":[(\"D\",1)],\"D\":[],\"E\":[]}\nd=dijkstra(g,\"A\")\nassert d[\"A\"]==0 and d[\"B\"]==1 and d[\"C\"]==3 and d[\"D\"]==4 and d[\"E\"]==float(\"inf\")\n",
+  "test": "",
+  "expected": []
+ },
+ "smi-0452": {
+  "language": "python",
+  "setup": "",
+  "solution": "def quicksort(arr):\n    if len(arr) <= 1:\n        return arr\n    pivot = arr[len(arr) // 2]\n    left = [x for x in arr if x < pivot]\n    mid = [x for x in arr if x == pivot]\n    right = [x for x in arr if x > pivot]\n    return quicksort(left) + mid + quicksort(right)\n\nimport random\nfor _ in range(50):\n    a=[random.randint(-50,50) for _ in range(random.randint(0,60))]\n    assert quicksort(a)==sorted(a)\n",
+  "test": "",
+  "expected": []
+ },
+ "smi-0455": {
+  "language": "python",
+  "setup": "",
+  "solution": "class Singleton:\n    _instance = None\n\n    def __new__(cls, *args, **kwargs):\n        if cls._instance is None:\n            cls._instance = super().__new__(cls)\n        return cls._instance\n\na=Singleton(); b=Singleton()\nassert a is b\n",
+  "test": "",
+  "expected": []
+ },
+ "smi-0456": {
+  "language": "python",
+  "setup": "",
+  "solution": "class Animal:\n    def __init__(self, name):\n        self.name = name\n\n    def speak(self):\n        return f\"{self.name} makes a sound\"\n\nclass Dog(Animal):\n    def speak(self):               # method overriding\n        return f\"{self.name} barks\"\n\nclass Cat(Animal):\n    def __init__(self, name, indoor=True):\n        super().__init__(name)     # reuse parent initialiser\n        self.indoor = indoor\n\nassert Dog(\"Rex\").speak()==\"Rex barks\"\nassert Cat(\"Tom\").speak()==\"Tom makes a sound\" and Cat(\"Tom\").indoor is True\nassert isinstance(Dog(\"a\"),Animal) and issubclass(Cat,Animal)\n",
+  "test": "",
+  "expected": []
+ },
+ "smi-0460": {
+  "language": "python",
+  "setup": "",
+  "solution": "import matplotlib.pyplot as plt\n\nx = [1, 2, 3, 4, 5]\ny = [2, 4, 5, 4, 5]\nplt.scatter(x, y, c=\"tab:blue\", s=40, alpha=0.8, label=\"samples\")\nplt.xlabel(\"x\"); plt.ylabel(\"y\"); plt.title(\"Scatter plot\")\nplt.legend()\nplt.show()\n\nimport matplotlib\nmatplotlib.use(\"Agg\")\nimport matplotlib.pyplot as plt\nfig,ax=plt.subplots()\nsc=ax.scatter([1,2,3],[3,2,1],s=40)\nassert len(sc.get_offsets())==3\n",
+  "test": "",
+  "expected": []
+ },
+ "smi-0461": {
+  "language": "python",
+  "setup": "",
+  "solution": "import pandas as pd\nimport numpy as np\n\ndf = pd.DataFrame({\"a\": [1.0, np.nan, 3.0, np.nan], \"b\": [\"x\", None, \"z\", \"w\"]})\nn_missing = df.isna().sum()\ndropped = df.dropna(subset=[\"a\"])\nfilled = df.assign(a=df[\"a\"].fillna(df[\"a\"].mean()), b=df[\"b\"].fillna(\"unknown\"))\nffilled = df[\"a\"].ffill()\ninterp = df[\"a\"].interpolate()\n",
+  "test": "assert n_missing[\"a\"] == 2 and n_missing[\"b\"] == 1\nassert len(dropped) == 2\nassert filled[\"a\"].tolist() == [1.0, 2.0, 3.0, 2.0]\nassert filled[\"b\"].tolist() == [\"x\", \"unknown\", \"z\", \"w\"]\nassert ffilled.tolist() == [1.0, 1.0, 3.0, 3.0]\nassert interp.tolist() == [1.0, 2.0, 3.0, 3.0]\n",
+  "expected": []
+ },
+ "smi-0462": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\n\ndef fit_linear_regression(X, y):\n    \"\"\"Ordinary least squares via the normal equation; adds an intercept.\"\"\"\n    X = np.asarray(X, dtype=float).reshape(len(X), -1)\n    Xb = np.c_[np.ones(len(X)), X]\n    theta = np.linalg.pinv(Xb.T @ Xb) @ Xb.T @ np.asarray(y, dtype=float)\n    return theta  # theta[0] = intercept, theta[1:] = coefficients\n\ndef predict(theta, X):\n    X = np.asarray(X, dtype=float).reshape(len(X), -1)\n    return np.c_[np.ones(len(X)), X] @ theta\n\nrng=np.random.default_rng(0)\nX=rng.normal(size=(200,2)); y=3+2*X[:,0]-1.5*X[:,1]+rng.normal(scale=0.01,size=200)\nth=fit_linear_regression(X,y)\nassert np.allclose(th,[3,2,-1.5],atol=0.05)\nassert np.allclose(predict(th,X),y,atol=0.05)\n",
+  "test": "",
+  "expected": []
+ },
+ "smi-0463": {
+  "language": "python",
+  "setup": "",
+  "solution": "import sys\nfrom unittest.mock import patch, create_autospec\nimport pytest\n\n\ndef fetch_json(url):\n    raise RuntimeError(\"real network call - must be mocked in unit tests\")\n\n\ndef get_username(user_id):\n    data = fetch_json(f\"https://api.example.com/users/{user_id}\")\n    return data[\"name\"].title()\n\n\nTHIS = sys.modules[__name__]\n\n\ndef test_with_unittest_mock_patch():\n    with patch.object(THIS, \"fetch_json\", return_value={\"name\": \"ada lovelace\"}) as m:\n        assert get_username(7) == \"Ada Lovelace\"\n        m.assert_called_once_with(\"https://api.example.com/users/7\")\n\n\ndef test_with_monkeypatch(monkeypatch):\n    monkeypatch.setattr(THIS, \"fetch_json\", lambda url: {\"name\": \"alan turing\"})\n    assert get_username(1) == \"Alan Turing\"\n\n\ndef test_error_path():\n    with patch.object(THIS, \"fetch_json\", side_effect=TimeoutError(\"slow\")):\n        with pytest.raises(TimeoutError):\n            get_username(2)\n\n\ndef test_autospec_rejects_wrong_signature():\n    m = create_autospec(fetch_json, return_value={\"name\": \"x\"})\n    m(\"url\")\n    with pytest.raises(TypeError):\n        m(\"url\", \"extra\")\n\n\ndef test_unpatched_call_hits_real_function():\n    with pytest.raises(RuntimeError):\n        get_username(3)",
+  "test": "import subprocess, sys, tempfile, os\nd = tempfile.mkdtemp()\nwith open(os.path.join(d, \"test_users.py\"), \"w\") as f:\n    f.write(SOLUTION_SRC)\nr = subprocess.run([sys.executable, \"-m\", \"pytest\", \"-q\", d], capture_output=True, text=True)\nassert r.returncode == 0, r.stdout + r.stderr\nassert \"5 passed\" in r.stdout",
+  "expected": [
+   "5 passed"
+  ]
+ },
+ "smi-0465": {
+  "language": "python",
+  "setup": "",
+  "solution": "import unittest\n\ndef add(a, b):\n    return a + b\n\nclass TestAdd(unittest.TestCase):\n    def test_add_positive(self):\n        self.assertEqual(add(2, 3), 5)\n\n    def test_add_negative(self):\n        self.assertEqual(add(-1, 1), 0)\n\nif __name__ == \"__main__\":\n    unittest.main()\n\nimport unittest\nsuite=unittest.defaultTestLoader.loadTestsFromTestCase(TestAdd)\nres=unittest.TextTestRunner(verbosity=0).run(suite)\nassert res.wasSuccessful() and res.testsRun==2\n",
+  "test": "",
+  "expected": []
+ },
+ "smi-0466": {
+  "language": "python",
+  "setup": "",
+  "solution": "import asyncio\n\nasync def fetch(name, delay):\n    await asyncio.sleep(delay)        # stands in for an I/O call\n    return f\"{name} done\"\n\nasync def main():\n    results = await asyncio.gather(\n        fetch(\"a\", 1), fetch(\"b\", 1), fetch(\"c\", 1)\n    )\n    return results                    # takes about 1 second, not 3\n\n# asyncio.run(main())\n\nimport time\nt=time.time()\nr=asyncio.run(main())\ndt=time.time()-t\nassert r==[\"a done\",\"b done\",\"c done\"] and dt<2.0\n",
+  "test": "",
+  "expected": []
+ },
+ "smi-0467": {
+  "language": "python",
+  "setup": "",
+  "solution": "def fibonacci(limit):\n    a, b = 0, 1\n    while a < limit:\n        yield a\n        a, b = b, a + b\n\nimport types\ng=fibonacci(50)\nassert isinstance(g,types.GeneratorType)\nassert list(g)==[0,1,1,2,3,5,8,13,21,34]\n",
+  "test": "",
+  "expected": []
+ },
+ "smi-g0002": {
+  "language": "python",
+  "setup": "",
+  "solution": "import math\nfrom collections import Counter\n\ndef tfidf(docs, token_pattern=r\"(?u)\\b\\w\\w+\\b\"):\n    \"\"\"sklearn-style: lowercase, tokens of 2+ word chars, smooth idf, l2 norm.\n    Returns (vocab, matrix) with vocab sorted alphabetically.\"\"\"\n    import re\n    toks = [re.findall(token_pattern, d.lower()) for d in docs]\n    vocab = sorted({t for ts in toks for t in ts})\n    n = len(docs)\n    df = Counter(t for ts in toks for t in set(ts))\n    idf = {t: math.log((1 + n) / (1 + df[t])) + 1 for t in vocab}\n    rows = []\n    for ts in toks:\n        c = Counter(ts)\n        row = [c[t] * idf[t] for t in vocab]\n        norm = math.sqrt(sum(x * x for x in row))\n        rows.append([x / norm if norm else 0.0 for x in row])\n    return vocab, rows",
+  "test": "import math\nfrom collections import Counter\n\ndef tfidf(docs, token_pattern=r\"(?u)\\b\\w\\w+\\b\"):\n    \"\"\"sklearn-style: lowercase, tokens of 2+ word chars, smooth idf, l2 norm.\n    Returns (vocab, matrix) with vocab sorted alphabetically.\"\"\"\n    import re\n    toks = [re.findall(token_pattern, d.lower()) for d in docs]\n    vocab = sorted({t for ts in toks for t in ts})\n    n = len(docs)\n    df = Counter(t for ts in toks for t in set(ts))\n    idf = {t: math.log((1 + n) / (1 + df[t])) + 1 for t in vocab}\n    rows = []\n    for ts in toks:\n        c = Counter(ts)\n        row = [c[t] * idf[t] for t in vocab]\n        norm = math.sqrt(sum(x * x for x in row))\n        rows.append([x / norm if norm else 0.0 for x in row])\n    return vocab, rows\n\nimport numpy as np\nfrom sklearn.feature_extraction.text import TfidfVectorizer\ndocs = [\"The cat sat on the mat\", \"The dog sat on the log\", \"Cats and dogs: the cat, the dog\"]\nvocab, rows = tfidf(docs)\nsk = TfidfVectorizer()\nX = sk.fit_transform(docs).toarray()\nassert vocab == list(sk.get_feature_names_out())\nassert np.allclose(np.array(rows), X)\nassert np.allclose(np.linalg.norm(np.array(rows), axis=1), 1.0)\nprint(vocab); print(np.round(X,3))\n# the term in all docs gets smallest idf = 1\ni = vocab.index(\"the\"); print(\"the idf\", sk.idf_[i])\nassert abs(sk.idf_[i]-1.0)<1e-12\nprint(\"ok\")",
+  "expected": []
+ },
+ "smi-g0005": {
+  "language": "python",
+  "setup": "",
+  "solution": "import math\n\ndef perplexity(token_probs):\n    \"\"\"exp of the mean negative natural-log probability per token.\"\"\"\n    if not token_probs:\n        raise ValueError(\"empty sequence\")\n    nll = -sum(math.log(p) for p in token_probs)\n    return math.exp(nll / len(token_probs))\n\ndef per_unit_perplexity(token_probs, n_units):\n    \"\"\"Same total log-likelihood, normalised by a tokeniser-independent unit\n    (words, characters or bytes of the original text).\"\"\"\n    nll = -sum(math.log(p) for p in token_probs)\n    return math.exp(nll / n_units)",
+  "test": "import math\n\ndef perplexity(token_probs):\n    \"\"\"exp of the mean negative natural-log probability per token.\"\"\"\n    if not token_probs:\n        raise ValueError(\"empty sequence\")\n    nll = -sum(math.log(p) for p in token_probs)\n    return math.exp(nll / len(token_probs))\n\ndef per_unit_perplexity(token_probs, n_units):\n    \"\"\"Same total log-likelihood, normalised by a tokeniser-independent unit\n    (words, characters or bytes of the original text).\"\"\"\n    nll = -sum(math.log(p) for p in token_probs)\n    return math.exp(nll / n_units)\n\nimport math\nassert abs(perplexity([0.25]*10)-4.0)<1e-9\nassert abs(perplexity([1.0,1.0])-1.0)<1e-12\n# mixture: geometric mean of inverse probs\nassert abs(perplexity([0.5,0.125]) - (1/(0.5*0.125))**0.5)<1e-9\n# same text, same total probability, two tokenisations\ntext_words = 4\ncoarse = [0.1,0.2,0.05,0.1]            # 4 tokens\ntotal = math.prod(coarse)\nfine = [total**(1/12)]*12               # 12 tokens, identical joint probability\npc, pf = perplexity(coarse), perplexity(fine)\nprint(pc, pf)\nassert pf < pc\nassert abs(per_unit_perplexity(coarse, text_words)-per_unit_perplexity(fine, text_words))<1e-9\nassert abs(per_unit_perplexity(coarse, text_words)-pc)<1e-9\ntry:\n    perplexity([]); raise SystemExit(\"no error\")\nexcept ValueError: pass\nprint(\"ok\")",
+  "expected": []
+ },
+ "smi-g0006": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\n\ndef causal_attention(Q, K, V):\n    \"\"\"Q, K: (T, d_k); V: (T, d_v). Returns (output (T, d_v), weights (T, T)).\"\"\"\n    d_k = Q.shape[-1]\n    scores = Q @ K.T / np.sqrt(d_k)\n    T = scores.shape[0]\n    mask = np.triu(np.ones((T, T), dtype=bool), k=1)   # True above the diagonal = future\n    scores = np.where(mask, -np.inf, scores)\n    scores = scores - scores.max(axis=-1, keepdims=True)  # stability\n    w = np.exp(scores)\n    w = w / w.sum(axis=-1, keepdims=True)\n    return w @ V, w",
+  "test": "import numpy as np\n\ndef causal_attention(Q, K, V):\n    \"\"\"Q, K: (T, d_k); V: (T, d_v). Returns (output (T, d_v), weights (T, T)).\"\"\"\n    d_k = Q.shape[-1]\n    scores = Q @ K.T / np.sqrt(d_k)\n    T = scores.shape[0]\n    mask = np.triu(np.ones((T, T), dtype=bool), k=1)   # True above the diagonal = future\n    scores = np.where(mask, -np.inf, scores)\n    scores = scores - scores.max(axis=-1, keepdims=True)  # stability\n    w = np.exp(scores)\n    w = w / w.sum(axis=-1, keepdims=True)\n    return w @ V, w\n\nimport numpy as np\nrng=np.random.default_rng(0)\nT,dk,dv=5,8,3\nQ=rng.normal(size=(T,dk));K=rng.normal(size=(T,dk));V=rng.normal(size=(T,dv))\nout,w=causal_attention(Q,K,V)\nassert out.shape==(T,dv) and w.shape==(T,T)\nassert np.allclose(w.sum(-1),1.0)\nassert np.all(w[np.triu_indices(T,1)]==0)\nassert np.allclose(out[0],V[0])           # first token can only attend to itself\n# changing future tokens must not change earlier outputs\nK2=K.copy();V2=V.copy();K2[3:]+=10;V2[3:]+=10\nout2,_=causal_attention(Q,K2,V2)\nassert np.allclose(out[:3],out2[:3]) and not np.allclose(out[3:],out2[3:])\n# large scores don't overflow\no,_=causal_attention(Q*1e3,K*1e3,V); assert np.isfinite(o).all()\n# variance of unscaled dot product grows with d_k\nfor d in (4,64,1024):\n    q=rng.normal(size=(20000,d));k=rng.normal(size=(20000,d))\n    dots=(q*k).sum(1); print(d, round(dots.var(),1), round((dots/np.sqrt(d)).var(),2))\nprint(\"ok\")",
+  "expected": []
+ },
+ "smi-g0008": {
+  "language": "python",
+  "setup": "",
+  "solution": "def extract_entities(tags):\n    \"\"\"BIO tags -> set of (type, start, end_exclusive).\n    An I-X that does not continue an open entity of type X starts a new entity\n    (conlleval-style leniency).\"\"\"\n    ents, start, etype = set(), None, None\n    for i, tag in enumerate(list(tags) + [\"O\"]):      # sentinel closes the last span\n        if tag == \"O\":\n            prefix, typ = \"O\", None\n        else:\n            prefix, typ = tag.split(\"-\", 1)\n        if etype is not None and (prefix in (\"O\", \"B\") or typ != etype):\n            ents.add((etype, start, i))\n            etype = None\n        if prefix == \"B\" or (prefix == \"I\" and etype is None):\n            start, etype = i, typ\n    return ents\n\ndef entity_prf(gold_seqs, pred_seqs):\n    tp = fp = fn = 0\n    for g, p in zip(gold_seqs, pred_seqs):\n        assert len(g) == len(p)\n        G, P = extract_entities(g), extract_entities(p)\n        tp += len(G & P); fp += len(P - G); fn += len(G - P)\n    prec = tp / (tp + fp) if tp + fp else 0.0\n    rec = tp / (tp + fn) if tp + fn else 0.0\n    f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0\n    return prec, rec, f1",
+  "test": "def extract_entities(tags):\n    \"\"\"BIO tags -> set of (type, start, end_exclusive).\n    An I-X that does not continue an open entity of type X starts a new entity\n    (conlleval-style leniency).\"\"\"\n    ents, start, etype = set(), None, None\n    for i, tag in enumerate(list(tags) + [\"O\"]):      # sentinel closes the last span\n        if tag == \"O\":\n            prefix, typ = \"O\", None\n        else:\n            prefix, typ = tag.split(\"-\", 1)\n        if etype is not None and (prefix in (\"O\", \"B\") or typ != etype):\n            ents.add((etype, start, i))\n            etype = None\n        if prefix == \"B\" or (prefix == \"I\" and etype is None):\n            start, etype = i, typ\n    return ents\n\ndef entity_prf(gold_seqs, pred_seqs):\n    tp = fp = fn = 0\n    for g, p in zip(gold_seqs, pred_seqs):\n        assert len(g) == len(p)\n        G, P = extract_entities(g), extract_entities(p)\n        tp += len(G & P); fp += len(P - G); fn += len(G - P)\n    prec = tp / (tp + fp) if tp + fp else 0.0\n    rec = tp / (tp + fn) if tp + fn else 0.0\n    f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0\n    return prec, rec, f1\n\nassert extract_entities([\"B-PER\",\"I-PER\",\"O\",\"B-LOC\"])=={(\"PER\",0,2),(\"LOC\",3,4)}\nassert extract_entities([\"B-PER\",\"B-PER\"])=={(\"PER\",0,1),(\"PER\",1,2)}\nassert extract_entities([\"B-PER\",\"I-LOC\"])=={(\"PER\",0,1),(\"LOC\",1,2)}\nassert extract_entities([\"O\",\"I-ORG\",\"I-ORG\"])=={(\"ORG\",1,3)}\nassert extract_entities([])==set()\npad=[\"O\"]*11\ngold=[[\"B-PER\",\"I-PER\",\"O\",\"O\",\"B-ORG\",\"I-ORG\",\"I-ORG\",\"O\",\"B-LOC\"]+pad]\npred=[[\"B-PER\",\"I-PER\",\"O\",\"O\",\"B-ORG\",\"I-ORG\",\"O\",\"O\",\"O\"]+pad]\np,r,f=entity_prf(gold,pred); print(p,r,f)\nassert (p,r)==(0.5,1/3) and abs(f-0.4)<1e-12\nacc=lambda g,q: sum(a==b for a,b in zip(g,q))/len(g)\nprint(acc(gold[0],pred[0]), acc(gold[0],[\"O\"]*20))\nassert abs(acc(gold[0],pred[0])-0.9)<1e-12 and abs(acc(gold[0],[\"O\"]*20)-0.7)<1e-12\nassert entity_prf(gold,gold)==(1.0,1.0,1.0)\nassert entity_prf([[\"O\",\"O\"]],[[\"O\",\"O\"]])==(0.0,0.0,0.0)\nassert entity_prf([[\"B-PER\",\"I-PER\",\"O\"]],[[\"B-PER\",\"O\",\"O\"]])==(0,0,0)\nprint(\"ok\")",
+  "expected": []
+ },
+ "smi-g0012": {
+  "language": "python",
+  "setup": "",
+  "solution": "import math\nfrom collections import Counter\n\ndef ngrams(tokens, n):\n    return Counter(tuple(tokens[i:i + n]) for i in range(len(tokens) - n + 1))\n\ndef clipped_precision(candidate, references, n):\n    \"\"\"Returns (clipped_matches, total_candidate_ngrams).\"\"\"\n    cand = ngrams(candidate, n)\n    max_ref = Counter()\n    for ref in references:\n        for g, c in ngrams(ref, n).items():\n            max_ref[g] = max(max_ref[g], c)\n    clipped = sum(min(c, max_ref[g]) for g, c in cand.items())\n    return clipped, sum(cand.values())\n\ndef brevity_penalty(cand_len, ref_lens):\n    r = min(ref_lens, key=lambda l: (abs(l - cand_len), l))   # closest reference length\n    if cand_len == 0:\n        return 0.0\n    return 1.0 if cand_len > r else math.exp(1 - r / cand_len)",
+  "test": "import math\nfrom collections import Counter\n\ndef ngrams(tokens, n):\n    return Counter(tuple(tokens[i:i + n]) for i in range(len(tokens) - n + 1))\n\ndef clipped_precision(candidate, references, n):\n    \"\"\"Returns (clipped_matches, total_candidate_ngrams).\"\"\"\n    cand = ngrams(candidate, n)\n    max_ref = Counter()\n    for ref in references:\n        for g, c in ngrams(ref, n).items():\n            max_ref[g] = max(max_ref[g], c)\n    clipped = sum(min(c, max_ref[g]) for g, c in cand.items())\n    return clipped, sum(cand.values())\n\ndef brevity_penalty(cand_len, ref_lens):\n    r = min(ref_lens, key=lambda l: (abs(l - cand_len), l))   # closest reference length\n    if cand_len == 0:\n        return 0.0\n    return 1.0 if cand_len > r else math.exp(1 - r / cand_len)\n\nfrom fractions import Fraction\nimport math\nc=\"the the the the the the the\".split()\nr1=\"the cat is on the mat\".split(); r2=\"there is a cat on the mat\".split()\nm,t=clipped_precision(c,[r1,r2],1); assert (m,t)==(2,7)\nc2=\"the cat the cat on the mat\".split()\nassert clipped_precision(c2,[r1,r2],1)==(5,7)\nassert clipped_precision(c2,[r1,r2],2)==(4,6)\nprint(clipped_precision(c2,[r1,r2],1),clipped_precision(c2,[r1,r2],2))\nassert clipped_precision([\"a\"],[[\"b\"]],2)==(0,0)    # candidate shorter than n\nassert brevity_penalty(7,[6,7])==1.0\nassert abs(brevity_penalty(3,[6])-math.exp(1-2))<1e-12\nassert brevity_penalty(8,[6])==1.0\n# agreement with nltk\nfrom nltk.translate.bleu_score import modified_precision\nfor n in (1,2):\n    f=modified_precision([r1,r2],c2,n); m,t=clipped_precision(c2,[r1,r2],n)\n    assert f==Fraction(m,t),(f,m,t)\nf=modified_precision([r1,r2],c,1); assert f==Fraction(2,7)\nprint(\"ok\")",
+  "expected": []
+ },
+ "smi-g0014": {
+  "language": "python",
+  "setup": "",
+  "solution": "from sklearn.feature_extraction.text import CountVectorizer, ENGLISH_STOP_WORDS\nfrom sklearn.linear_model import LogisticRegression\n\ndef fit_predict(vec, train_texts, train_y, test_texts):\n    X = vec.fit_transform(train_texts)\n    clf = LogisticRegression(C=10, max_iter=1000).fit(X, train_y)\n    return clf.predict(vec.transform(test_texts))\n\ndef broken_vec():\n    return CountVectorizer(stop_words=\"english\")                  # drops \"not\", \"no\", \"never\", \"very\"...\n\ndef fixed_vec():\n    return CountVectorizer(ngram_range=(1, 2))                    # keeps negators; bigram \"not good\" is a feature",
+  "test": "from sklearn.feature_extraction.text import CountVectorizer, ENGLISH_STOP_WORDS\nfrom sklearn.linear_model import LogisticRegression\n\ndef fit_predict(vec, train_texts, train_y, test_texts):\n    X = vec.fit_transform(train_texts)\n    clf = LogisticRegression(C=10, max_iter=1000).fit(X, train_y)\n    return clf.predict(vec.transform(test_texts))\n\ndef broken_vec():\n    return CountVectorizer(stop_words=\"english\")                  # drops \"not\", \"no\", \"never\", \"very\"...\n\ndef fixed_vec():\n    return CountVectorizer(ngram_range=(1, 2))                    # keeps negators; bigram \"not good\" is a feature\n\nfrom sklearn.feature_extraction.text import ENGLISH_STOP_WORDS\nfor w in [\"not\", \"no\", \"never\", \"nor\", \"cannot\"]:\n    assert w in ENGLISH_STOP_WORDS\ntx = [\"the food was good\", \"the service was good\", \"really good value\", \"not good at all\",\n      \"the room was not good\", \"good but not clean\", \"bad and rude\", \"the food was bad\",\n      \"not bad at all, quite nice\", \"not bad, enjoyed it\", \"never disappointing, great\",\n      \"great and not boring\"]\ny = [1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1]\nv = broken_vec().fit(tx)\na = v.transform([\"good\", \"not good\"]).toarray()\nassert (a[0] == a[1]).all()                      # negation is invisible to the model\nv2 = fixed_vec().fit(tx)\nb = v2.transform([\"good\", \"not good\"]).toarray()\nassert not (b[0] == b[1]).all()\nq = [\"good\", \"not good\", \"bad\", \"not bad\"]\npb = list(fit_predict(broken_vec(), tx, y, q))\npf = list(fit_predict(fixed_vec(), tx, y, q))\nprint(pb, pf)\nassert pb[0] == pb[1] and pb[2] == pb[3]         # broken: \"not X\" == \"X\"\nassert pf[1] == 0 and pf[3] == 1                 # fixed: negation handled\nprint(\"ok\")",
+  "expected": []
+ },
+ "smi-g0015": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\n\ndef sigmoid(z):\n    return 1.0 / (1.0 + np.exp(-z))\n\ndef forward(w, b, X, y):\n    a = sigmoid(X @ w + b)\n    loss = 0.5 * np.mean((a - y) ** 2)\n    return a, loss\n\ndef grads(w, b, X, y):\n    a, _ = forward(w, b, X, y)\n    n = X.shape[0]\n    dz = (a - y) * a * (1 - a) / n      # dL/dz_i, includes sigmoid'(z) = a(1-a)\n    return X.T @ dz, dz.sum()           # dL/dw, dL/db\n\ndef numeric_grads(w, b, X, y, eps=1e-6):\n    gw = np.zeros_like(w)\n    for i in range(w.size):\n        wp, wm = w.copy(), w.copy()\n        wp[i] += eps\n        wm[i] -= eps\n        gw[i] = (forward(wp, b, X, y)[1] - forward(wm, b, X, y)[1]) / (2 * eps)\n    gb = (forward(w, b + eps, X, y)[1] - forward(w, b - eps, X, y)[1]) / (2 * eps)\n    return gw, gb\n\ndef rel_error(a, b):\n    return np.linalg.norm(a - b) / max(np.linalg.norm(a) + np.linalg.norm(b), 1e-12)",
+  "test": "rng = np.random.default_rng(0)\nX = rng.normal(size=(20, 4))\ny = rng.integers(0, 2, size=20).astype(float)\nw = rng.normal(size=4)\nb = 0.3\ngw, gb = grads(w, b, X, y)\nnw, nb = numeric_grads(w, b, X, y)\nassert rel_error(gw, nw) < 1e-7, rel_error(gw, nw)\nassert abs(gb - nb) < 1e-8\n# a common bug: forgetting the sigmoid derivative a(1-a) must be caught by the check\na, _ = forward(w, b, X, y)\nbad_gw = X.T @ ((a - y) / 20)\nassert rel_error(bad_gw, nw) > 1e-2\nprint(\"rel_error correct:\", rel_error(gw, nw), \" buggy:\", rel_error(bad_gw, nw))",
+  "expected": []
+ },
+ "smi-g0016": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\n\ndef softmax(z):\n    z = z - np.max(z, axis=-1, keepdims=True)      # shift: largest exponent becomes 0\n    e = np.exp(z)\n    return e / e.sum(axis=-1, keepdims=True)\n\ndef log_softmax(z):\n    z = z - np.max(z, axis=-1, keepdims=True)\n    return z - np.log(np.exp(z).sum(axis=-1, keepdims=True))   # log-sum-exp trick\n\ndef cross_entropy_from_logits(z, y_idx):\n    ls = log_softmax(z)\n    return -ls[np.arange(len(y_idx)), y_idx].mean()\n\ndef naive_softmax(z):\n    e = np.exp(z)\n    return e / e.sum(axis=-1, keepdims=True)",
+  "test": "import warnings\nz = np.array([[1000.0, 1001.0, 1002.0]])\nwith warnings.catch_warnings():\n    warnings.simplefilter(\"ignore\")\n    assert np.isnan(naive_softmax(z)).all()          # inf/inf\n    assert np.isinf(np.log(naive_softmax(np.array([[0.0, -800.0]])))[0, 1])  # log(0)\np = softmax(z)\nassert np.isfinite(p).all() and abs(p.sum() - 1) < 1e-12\nassert np.allclose(p, softmax(z - 1000.0))           # shift invariance\n# extreme logit gap: log-softmax stays finite and exact, log(softmax) gives -inf\nz2 = np.array([[0.0, -800.0]])\nls = log_softmax(z2)\nassert np.isfinite(ls).all() and abs(ls[0, 1] - (-800.0)) < 1e-9\nwith warnings.catch_warnings():\n    warnings.simplefilter(\"ignore\")\n    assert np.isinf(np.log(softmax(z2))[0, 1])\n# loss for a confidently wrong prediction is large but finite\nloss = cross_entropy_from_logits(z2, np.array([1]))\nassert np.isfinite(loss) and abs(loss - 800.0) < 1e-9\nprint(\"p =\", p, \"loss =\", loss)",
+  "expected": []
+ },
+ "smi-g0017": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\n\ndef adam_step(theta, grad, m, v, t, lr=1e-3, beta1=0.9, beta2=0.999, eps=1e-8):\n    \"\"\"One Adam update; t is the 1-based step count. Returns new (theta, m, v).\"\"\"\n    m = beta1 * m + (1 - beta1) * grad\n    v = beta2 * v + (1 - beta2) * grad ** 2\n    m_hat = m / (1 - beta1 ** t)\n    v_hat = v / (1 - beta2 ** t)\n    theta = theta - lr * m_hat / (np.sqrt(v_hat) + eps)\n    return theta, m, v",
+  "test": "theta = np.array([1.0, -1.0, 0.5])\ng = np.array([0.5, -2.0, 0.0])\nm = np.zeros(3); v = np.zeros(3)\ntheta1, m1, v1 = adam_step(theta, g, m, v, t=1)\n# hand computation of step 1\nassert np.allclose(m1, 0.1 * g)\nassert np.allclose(v1, 0.001 * g ** 2)\n# bias-corrected m_hat = g, v_hat = g^2, so update = lr * g / (|g| + eps) ~ lr * sign(g)\nexpected = theta - 1e-3 * np.array([0.5 / (0.5 + 1e-8), -2.0 / (2.0 + 1e-8), 0.0])\nassert np.allclose(theta1, expected, atol=1e-15)\nassert np.allclose(theta - theta1, [1e-3, -1e-3, 0.0], atol=1e-9)\n# without bias correction the first step would be ~ lr * 0.1g / (sqrt(0.001)|g|) = ~3.16 * lr\nuncorrected = 1e-3 * (0.1 * g) / (np.sqrt(0.001 * g ** 2) + 1e-8)\nassert abs(uncorrected[0] / 1e-3 - 0.1 / np.sqrt(0.001)) < 1e-4\n# second step with a constant gradient: still ~lr per coordinate\ntheta2, m2, v2 = adam_step(theta1, g, m1, v1, t=2)\nassert np.allclose(theta1 - theta2, [1e-3, -1e-3, 0.0], atol=1e-8)\nprint(\"step1 delta:\", theta - theta1, \" uncorrected ratio:\", uncorrected[0] / 1e-3)",
+  "expected": []
+ },
+ "smi-g0020": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\n\ndef softmax(z):\n    z = z - z.max(axis=1, keepdims=True)\n    e = np.exp(z)\n    return e / e.sum(axis=1, keepdims=True)\n\ndef ce_loss(z, y_onehot):\n    zs = z - z.max(axis=1, keepdims=True)\n    log_p = zs - np.log(np.exp(zs).sum(axis=1, keepdims=True))\n    return -(y_onehot * log_p).sum(axis=1).mean()\n\ndef ce_grad(z, y_onehot):\n    \"\"\"dLoss/dlogits for the batch-mean loss: (p - y) / N.\"\"\"\n    return (softmax(z) - y_onehot) / z.shape[0]\n\ndef numeric_grad(z, y_onehot, eps=1e-6):\n    g = np.zeros_like(z)\n    for idx in np.ndindex(*z.shape):\n        zp, zm = z.copy(), z.copy()\n        zp[idx] += eps\n        zm[idx] -= eps\n        g[idx] = (ce_loss(zp, y_onehot) - ce_loss(zm, y_onehot)) / (2 * eps)\n    return g",
+  "test": "rng = np.random.default_rng(1)\nz = rng.normal(size=(5, 4)) * 3\ny = np.eye(4)[rng.integers(0, 4, size=5)]\ng = ce_grad(z, y)\nassert np.allclose(g, numeric_grad(z, y), atol=1e-8)\nassert np.allclose(g.sum(axis=1), 0, atol=1e-12)     # each row of p - y sums to 0\n# naive pipeline: separate softmax then log -> -inf/nan on extreme logits; fused loss stays finite\nz_ext = np.array([[0.0, -800.0]]); y_ext = np.array([[0.0, 1.0]])\nimport warnings\nwith warnings.catch_warnings():\n    warnings.simplefilter(\"ignore\")\n    naive = -(y_ext * np.log(softmax(z_ext))).sum()\nassert np.isinf(naive) or np.isnan(naive)\nassert np.isfinite(ce_loss(z_ext, y_ext)) and np.allclose(ce_grad(z_ext, y_ext), [[1.0, -1.0]], atol=1e-12)\nprint(\"max abs diff analytic vs numeric:\", np.abs(g - numeric_grad(z, y)).max())",
+  "expected": []
+ },
+ "smi-g0021": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\n\ndef dropout_forward(x, p, training, rng):\n    \"\"\"Inverted dropout. p = probability of dropping a unit. Returns (out, mask).\"\"\"\n    if not training or p == 0.0:\n        return x, None\n    if not 0.0 <= p < 1.0:\n        raise ValueError(\"p must be in [0, 1)\")\n    mask = (rng.random(x.shape) >= p) / (1.0 - p)   # 0 or 1/(1-p)\n    return x * mask, mask\n\ndef dropout_backward(dout, mask):\n    return dout if mask is None else dout * mask",
+  "test": "rng = np.random.default_rng(42)\nx = np.ones(1_000_000)\np = 0.3\nout, mask = dropout_forward(x, p, True, rng)\n# expectation preserved: E[out] = x\nassert abs(out.mean() - 1.0) < 0.005, out.mean()\nassert abs((out == 0).mean() - p) < 0.005\nassert set(np.unique(out)) == {0.0, 1.0 / 0.7}\n# eval mode: identity, no scaling needed\nout_eval, m_eval = dropout_forward(x, p, False, rng)\nassert out_eval is x and m_eval is None\n# non-inverted dropout (no scaling) would shrink the mean to 1-p at train time\nplain = x * (rng.random(x.shape) >= p)\nassert abs(plain.mean() - (1 - p)) < 0.005\n# backward uses the same mask\nd = dropout_backward(np.ones_like(x), mask)\nassert np.array_equal(d, mask)\nprint(\"train mean:\", out.mean(), \"drop fraction:\", (out == 0).mean(), \"plain mean:\", plain.mean())",
+  "expected": []
+ },
+ "smi-g0024": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\n\ndef conv_out_size(n, k, padding=0, stride=1, dilation=1):\n    eff_k = dilation * (k - 1) + 1                 # effective kernel extent\n    if n + 2 * padding < eff_k:\n        raise ValueError(\"kernel larger than padded input\")\n    return (n + 2 * padding - eff_k) // stride + 1\n\ndef conv_params(c_in, c_out, k, groups=1, bias=True):\n    if c_in % groups or c_out % groups:\n        raise ValueError(\"groups must divide c_in and c_out\")\n    return c_out * (c_in // groups) * k * k + (c_out if bias else 0)",
+  "test": "# independent check: count the window start positions by brute force\ndef brute(n, k, p, s, d):\n    eff = d * (k - 1) + 1\n    return len(range(0, n + 2 * p - eff + 1, s))\nfor n in (7, 8, 32, 224):\n    for k in (1, 3, 5, 7):\n        for p in (0, 1, 2, 3):\n            for s in (1, 2, 3):\n                for d in (1, 2):\n                    if n + 2 * p >= d * (k - 1) + 1:\n                        assert conv_out_size(n, k, p, s, d) == brute(n, k, p, s, d)\nassert conv_out_size(224, 7, 3, 2) == 112      # 7x7 stride-2 stem\nassert conv_out_size(112, 3, 1, 2) == 56       # 3x3 stride-2 pool, pad 1\nassert conv_out_size(32, 3, 2, 1, 2) == 32     # dilation 2, pad 2 keeps size\nassert conv_out_size(32, 3, 0, 1, 2) == 28\nassert conv_out_size(10, 3, 0, 2) == 4         # floor: last column ignored\nassert conv_params(3, 64, 7) == 9472\nassert conv_params(64, 128, 3) == 73856\nassert conv_params(64, 64, 3, groups=64) == 640                 # depthwise 3x3\nassert conv_params(64, 128, 1) == 8320                           # pointwise\nassert conv_params(64, 128, 3, bias=False) == 73728\nassert conv_params(64, 64, 3, groups=64) + conv_params(64, 128, 1) == 8960   # separable\nprint(\"ok\")",
+  "expected": []
+ },
+ "smi-g0025": {
+  "language": "python",
+  "setup": "",
+  "solution": "import numpy as np\n\ndef embed_lookup(E, idx):\n    return E[idx]                                   # row gather: O(len(idx) * d)\n\ndef embed_onehot(E, idx):\n    onehot = np.zeros((len(idx), E.shape[0]))\n    onehot[np.arange(len(idx)), idx] = 1.0\n    return onehot @ E                               # O(len(idx) * V * d)\n\ndef embed_grad_lookup(V, idx, dout):\n    dE = np.zeros((V, dout.shape[1]))\n    np.add.at(dE, idx, dout)                        # accumulates repeated indices\n    return dE\n\ndef embed_grad_onehot(V, idx, dout):\n    onehot = np.zeros((len(idx), V))\n    onehot[np.arange(len(idx)), idx] = 1.0\n    return onehot.T @ dout",
+  "test": "rng = np.random.default_rng(3)\nV, d = 10, 4\nE = rng.normal(size=(V, d))\nidx = np.array([2, 7, 2, 5])                       # note the repeated index 2\nassert np.allclose(embed_lookup(E, idx), embed_onehot(E, idx))\ndout = rng.normal(size=(4, d))\ng1 = embed_grad_lookup(V, idx, dout)\ng2 = embed_grad_onehot(V, idx, dout)\nassert np.allclose(g1, g2)\nassert np.allclose(g1[2], dout[0] + dout[2])       # repeated token: gradients add\nunused = [i for i in range(V) if i not in idx]\nassert np.all(g1[unused] == 0)                     # untouched rows get exactly zero gradient\n# the buggy version E_grad[idx] = dout overwrites instead of accumulating\nbad = np.zeros((V, d)); bad[idx] = dout\nassert not np.allclose(bad[2], g1[2])\nprint(\"ok\")",
+  "expected": []
+ },
+ "smi-g0027": {
+  "language": "sql",
+  "setup": "CREATE TABLE employees (id INTEGER PRIMARY KEY, name TEXT NOT NULL, dept TEXT NOT NULL, salary INTEGER NOT NULL);\nINSERT INTO employees VALUES\n(1,'Ana','Eng',150),(2,'Ben','Eng',140),(3,'Cy','Eng',140),(4,'Dee','Eng',130),(5,'Eli','Eng',120),\n(6,'Fay','Sales',100),(7,'Gus','Sales',100),(8,'Hal','Sales',100),(9,'Ivy','Sales',90),\n(10,'Jo','HR',80),(11,'Kim','HR',70);",
+  "solution": "SELECT dept, name, salary, rn, rnk, drnk\nFROM (\n  SELECT dept, name, salary,\n         ROW_NUMBER() OVER (PARTITION BY dept ORDER BY salary DESC, name) AS rn,\n         RANK()       OVER (PARTITION BY dept ORDER BY salary DESC)       AS rnk,\n         DENSE_RANK() OVER (PARTITION BY dept ORDER BY salary DESC)       AS drnk\n  FROM employees\n)\nWHERE drnk <= 3\nORDER BY dept, salary DESC, name;",
+  "expected": [
+   [
+    "Eng",
+    "Ana",
+    150,
+    1,
+    1,
+    1
+   ],
+   [
+    "Eng",
+    "Ben",
+    140,
+    2,
+    2,
+    2
+   ],
+   [
+    "Eng",
+    "Cy",
+    140,
+    3,
+    2,
+    2
+   ],
+   [
+    "Eng",
+    "Dee",
+    130,
+    4,
+    4,
+    3
+   ],
+   [
+    "HR",
+    "Jo",
+    80,
+    1,
+    1,
+    1
+   ],
+   [
+    "HR",
+    "Kim",
+    70,
+    2,
+    2,
+    2
+   ],
+   [
+    "Sales",
+    "Fay",
+    100,
+    1,
+    1,
+    1
+   ],
+   [
+    "Sales",
+    "Gus",
+    100,
+    2,
+    1,
+    1
+   ],
+   [
+    "Sales",
+    "Hal",
+    100,
+    3,
+    1,
+    1
+   ],
+   [
+    "Sales",
+    "Ivy",
+    90,
+    4,
+    4,
+    2
+   ]
+  ],
+  "test": "import sqlite3\nSETUP = \"CREATE TABLE employees (id INTEGER PRIMARY KEY, name TEXT NOT NULL, dept TEXT NOT NULL, salary INTEGER NOT NULL);\\nINSERT INTO employees VALUES\\n(1,'Ana','Eng',150),(2,'Ben','Eng',140),(3,'Cy','Eng',140),(4,'Dee','Eng',130),(5,'Eli','Eng',120),\\n(6,'Fay','Sales',100),(7,'Gus','Sales',100),(8,'Hal','Sales',100),(9,'Ivy','Sales',90),\\n(10,'Jo','HR',80),(11,'Kim','HR',70);\"\nSOLUTION = 'SELECT dept, name, salary, rn, rnk, drnk\\nFROM (\\n  SELECT dept, name, salary,\\n         ROW_NUMBER() OVER (PARTITION BY dept ORDER BY salary DESC, name) AS rn,\\n         RANK()       OVER (PARTITION BY dept ORDER BY salary DESC)       AS rnk,\\n         DENSE_RANK() OVER (PARTITION BY dept ORDER BY salary DESC)       AS drnk\\n  FROM employees\\n)\\nWHERE drnk <= 3\\nORDER BY dept, salary DESC, name;'\nEXPECTED = [['Eng', 'Ana', 150, 1, 1, 1], ['Eng', 'Ben', 140, 2, 2, 2], ['Eng', 'Cy', 140, 3, 2, 2], ['Eng', 'Dee', 130, 4, 4, 3], ['HR', 'Jo', 80, 1, 1, 1], ['HR', 'Kim', 70, 2, 2, 2], ['Sales', 'Fay', 100, 1, 1, 1], ['Sales', 'Gus', 100, 2, 1, 1], ['Sales', 'Hal', 100, 3, 1, 1], ['Sales', 'Ivy', 90, 4, 4, 2]]\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nparts = [p for p in SOLUTION.split(';') if p.strip()]\nfor p in parts[:-1]:\n    con.execute(p)\nrows = [list(r) for r in con.execute(parts[-1]).fetchall()]\nassert rows == EXPECTED, rows\n\ncon2 = sqlite3.connect(':memory:'); con2.executescript(SETUP)\ntry:\n    con2.execute(\"SELECT name FROM employees WHERE RANK() OVER (PARTITION BY dept ORDER BY salary DESC) <= 3\")\n    raise SystemExit('window function in WHERE unexpectedly allowed')\nexcept sqlite3.OperationalError:\n    pass\n"
+ },
+ "smi-g0028": {
+  "language": "sql",
+  "setup": "CREATE TABLE contacts (id INTEGER PRIMARY KEY, email TEXT, name TEXT, created_at TEXT NOT NULL);\nINSERT INTO contacts VALUES\n(1,'sam@example.com','Sam','2024-01-03 09:00:00'),\n(2,'Sam@Example.com','Sam T','2024-01-01 12:30:00'),\n(3,'lee@example.com','Lee','2024-01-05 10:00:00'),\n(4,'sam@example.com ','Sam again','2024-02-01 08:00:00'),\n(5,'lee@example.com','Lee dup','2024-01-05 10:00:00'),\n(6,NULL,'No email 1','2024-01-02 00:00:00'),\n(7,NULL,'No email 2','2024-01-04 00:00:00'),\n(8,'kai@example.com','Kai','2024-03-01 00:00:00');",
+  "solution": "DELETE FROM contacts\nWHERE id IN (\n  SELECT id\n  FROM (\n    SELECT id,\n           ROW_NUMBER() OVER (PARTITION BY lower(trim(email))\n                              ORDER BY created_at, id) AS rn\n    FROM contacts\n    WHERE email IS NOT NULL\n  )\n  WHERE rn > 1\n);\nSELECT id, email, created_at FROM contacts ORDER BY id;",
+  "expected": [
+   [
+    2,
+    "Sam@Example.com",
+    "2024-01-01 12:30:00"
+   ],
+   [
+    3,
+    "lee@example.com",
+    "2024-01-05 10:00:00"
+   ],
+   [
+    6,
+    null,
+    "2024-01-02 00:00:00"
+   ],
+   [
+    7,
+    null,
+    "2024-01-04 00:00:00"
+   ],
+   [
+    8,
+    "kai@example.com",
+    "2024-03-01 00:00:00"
+   ]
+  ],
+  "test": "import sqlite3\nSETUP = \"CREATE TABLE contacts (id INTEGER PRIMARY KEY, email TEXT, name TEXT, created_at TEXT NOT NULL);\\nINSERT INTO contacts VALUES\\n(1,'sam@example.com','Sam','2024-01-03 09:00:00'),\\n(2,'Sam@Example.com','Sam T','2024-01-01 12:30:00'),\\n(3,'lee@example.com','Lee','2024-01-05 10:00:00'),\\n(4,'sam@example.com ','Sam again','2024-02-01 08:00:00'),\\n(5,'lee@example.com','Lee dup','2024-01-05 10:00:00'),\\n(6,NULL,'No email 1','2024-01-02 00:00:00'),\\n(7,NULL,'No email 2','2024-01-04 00:00:00'),\\n(8,'kai@example.com','Kai','2024-03-01 00:00:00');\"\nSOLUTION = 'DELETE FROM contacts\\nWHERE id IN (\\n  SELECT id\\n  FROM (\\n    SELECT id,\\n           ROW_NUMBER() OVER (PARTITION BY lower(trim(email))\\n                              ORDER BY created_at, id) AS rn\\n    FROM contacts\\n    WHERE email IS NOT NULL\\n  )\\n  WHERE rn > 1\\n);\\nSELECT id, email, created_at FROM contacts ORDER BY id;'\nEXPECTED = [[2, 'Sam@Example.com', '2024-01-01 12:30:00'], [3, 'lee@example.com', '2024-01-05 10:00:00'], [6, None, '2024-01-02 00:00:00'], [7, None, '2024-01-04 00:00:00'], [8, 'kai@example.com', '2024-03-01 00:00:00']]\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nparts = [p for p in SOLUTION.split(';') if p.strip()]\nfor p in parts[:-1]:\n    con.execute(p)\nrows = [list(r) for r in con.execute(parts[-1]).fetchall()]\nassert rows == EXPECTED, rows\n\nc3 = sqlite3.connect(':memory:'); c3.executescript(SETUP)\nf = c3.execute(\"SELECT lower(trim(email)) AS norm_email, COUNT(*) AS copies FROM contacts WHERE email IS NOT NULL GROUP BY lower(trim(email)) HAVING COUNT(*) > 1 ORDER BY norm_email\").fetchall()\nassert f == [('lee@example.com', 2), ('sam@example.com', 3)], f\nassert [r[0] for r in rows] == [2, 3, 6, 7, 8]\n"
+ },
+ "smi-g0029": {
+  "language": "sql",
+  "setup": "CREATE TABLE daily_sales (day TEXT PRIMARY KEY, revenue INTEGER NOT NULL);\nINSERT INTO daily_sales VALUES\n('2024-03-01',100),('2024-03-02',200),('2024-03-03',150),('2024-03-06',300),('2024-03-07',250),('2024-03-08',50);",
+  "solution": "SELECT day, revenue,\n       SUM(revenue) OVER (ORDER BY day) AS cumulative_revenue,\n       ROUND(AVG(revenue) OVER (ORDER BY day\n             ROWS BETWEEN 2 PRECEDING AND CURRENT ROW), 2) AS avg_last_3_rows,\n       ROUND(AVG(revenue) OVER (ORDER BY julianday(day)\n             RANGE BETWEEN 2 PRECEDING AND CURRENT ROW), 2) AS avg_last_3_days\nFROM daily_sales\nORDER BY day;",
+  "expected": [
+   [
+    "2024-03-01",
+    100,
+    100,
+    100.0,
+    100.0
+   ],
+   [
+    "2024-03-02",
+    200,
+    300,
+    150.0,
+    150.0
+   ],
+   [
+    "2024-03-03",
+    150,
+    450,
+    150.0,
+    150.0
+   ],
+   [
+    "2024-03-06",
+    300,
+    750,
+    216.67,
+    300.0
+   ],
+   [
+    "2024-03-07",
+    250,
+    1000,
+    233.33,
+    275.0
+   ],
+   [
+    "2024-03-08",
+    50,
+    1050,
+    200.0,
+    200.0
+   ]
+  ],
+  "test": "import sqlite3\nSETUP = \"CREATE TABLE daily_sales (day TEXT PRIMARY KEY, revenue INTEGER NOT NULL);\\nINSERT INTO daily_sales VALUES\\n('2024-03-01',100),('2024-03-02',200),('2024-03-03',150),('2024-03-06',300),('2024-03-07',250),('2024-03-08',50);\"\nSOLUTION = 'SELECT day, revenue,\\n       SUM(revenue) OVER (ORDER BY day) AS cumulative_revenue,\\n       ROUND(AVG(revenue) OVER (ORDER BY day\\n             ROWS BETWEEN 2 PRECEDING AND CURRENT ROW), 2) AS avg_last_3_rows,\\n       ROUND(AVG(revenue) OVER (ORDER BY julianday(day)\\n             RANGE BETWEEN 2 PRECEDING AND CURRENT ROW), 2) AS avg_last_3_days\\nFROM daily_sales\\nORDER BY day;'\nEXPECTED = [['2024-03-01', 100, 100, 100.0, 100.0], ['2024-03-02', 200, 300, 150.0, 150.0], ['2024-03-03', 150, 450, 150.0, 150.0], ['2024-03-06', 300, 750, 216.67, 300.0], ['2024-03-07', 250, 1000, 233.33, 275.0], ['2024-03-08', 50, 1050, 200.0, 200.0]]\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nparts = [p for p in SOLUTION.split(';') if p.strip()]\nfor p in parts[:-1]:\n    con.execute(p)\nrows = [list(r) for r in con.execute(parts[-1]).fetchall()]\nassert rows == EXPECTED, rows\n\nc4 = sqlite3.connect(':memory:')\nc4.executescript(\"CREATE TABLE t(day TEXT, r INT); INSERT INTO t VALUES('d1',10),('d2',20),('d2',30),('d3',40);\")\ntied = c4.execute(\"SELECT SUM(r) OVER (ORDER BY day), SUM(r) OVER (ORDER BY day ROWS UNBOUNDED PRECEDING) FROM t ORDER BY day, r\").fetchall()\nassert tied == [(10, 10), (60, 30), (60, 60), (100, 100)], tied\n"
+ },
+ "smi-g0030": {
+  "language": "sql",
+  "setup": "CREATE TABLE logins (user_id INTEGER NOT NULL, login_date TEXT NOT NULL);\nINSERT INTO logins VALUES\n(1,'2024-05-01'),(1,'2024-05-02'),(1,'2024-05-02'),(1,'2024-05-03'),(1,'2024-05-05'),(1,'2024-05-06'),\n(2,'2024-05-01'),(2,'2024-05-03'),(2,'2024-05-04'),(2,'2024-05-06'),\n(3,'2024-04-29'),(3,'2024-04-30'),(3,'2024-05-01'),(3,'2024-05-02'),(3,'2024-05-10'),(3,'2024-05-11'),(3,'2024-05-12'),(3,'2024-05-13');",
+  "solution": "WITH days AS (\n  SELECT DISTINCT user_id, login_date FROM logins\n),\nnumbered AS (\n  SELECT user_id, login_date,\n         ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY login_date) AS rn\n  FROM days\n),\nislands AS (\n  SELECT user_id,\n         date(login_date, '-' || rn || ' days') AS grp,\n         MIN(login_date) AS streak_start,\n         MAX(login_date) AS streak_end,\n         COUNT(*)        AS streak_len\n  FROM numbered\n  GROUP BY user_id, grp\n),\nranked AS (\n  SELECT *, ROW_NUMBER() OVER (PARTITION BY user_id\n                               ORDER BY streak_len DESC, streak_start) AS pick\n  FROM islands\n)\nSELECT user_id, streak_len, streak_start, streak_end\nFROM ranked\nWHERE pick = 1\nORDER BY user_id;",
+  "expected": [
+   [
+    1,
+    3,
+    "2024-05-01",
+    "2024-05-03"
+   ],
+   [
+    2,
+    2,
+    "2024-05-03",
+    "2024-05-04"
+   ],
+   [
+    3,
+    4,
+    "2024-04-29",
+    "2024-05-02"
+   ]
+  ],
+  "test": "import sqlite3\nSETUP = \"CREATE TABLE logins (user_id INTEGER NOT NULL, login_date TEXT NOT NULL);\\nINSERT INTO logins VALUES\\n(1,'2024-05-01'),(1,'2024-05-02'),(1,'2024-05-02'),(1,'2024-05-03'),(1,'2024-05-05'),(1,'2024-05-06'),\\n(2,'2024-05-01'),(2,'2024-05-03'),(2,'2024-05-04'),(2,'2024-05-06'),\\n(3,'2024-04-29'),(3,'2024-04-30'),(3,'2024-05-01'),(3,'2024-05-02'),(3,'2024-05-10'),(3,'2024-05-11'),(3,'2024-05-12'),(3,'2024-05-13');\"\nSOLUTION = \"WITH days AS (\\n  SELECT DISTINCT user_id, login_date FROM logins\\n),\\nnumbered AS (\\n  SELECT user_id, login_date,\\n         ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY login_date) AS rn\\n  FROM days\\n),\\nislands AS (\\n  SELECT user_id,\\n         date(login_date, '-' || rn || ' days') AS grp,\\n         MIN(login_date) AS streak_start,\\n         MAX(login_date) AS streak_end,\\n         COUNT(*)        AS streak_len\\n  FROM numbered\\n  GROUP BY user_id, grp\\n),\\nranked AS (\\n  SELECT *, ROW_NUMBER() OVER (PARTITION BY user_id\\n                               ORDER BY streak_len DESC, streak_start) AS pick\\n  FROM islands\\n)\\nSELECT user_id, streak_len, streak_start, streak_end\\nFROM ranked\\nWHERE pick = 1\\nORDER BY user_id;\"\nEXPECTED = [[1, 3, '2024-05-01', '2024-05-03'], [2, 2, '2024-05-03', '2024-05-04'], [3, 4, '2024-04-29', '2024-05-02']]\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nparts = [p for p in SOLUTION.split(';') if p.strip()]\nfor p in parts[:-1]:\n    con.execute(p)\nrows = [list(r) for r in con.execute(parts[-1]).fetchall()]\nassert rows == EXPECTED, rows\n"
+ },
+ "smi-g0031": {
+  "language": "sql",
+  "setup": "CREATE TABLE products (id INTEGER PRIMARY KEY, name TEXT NOT NULL);\nCREATE TABLE discontinued (product_id INTEGER, reason TEXT);\nINSERT INTO products VALUES (1,'Aviator'),(2,'Wayfarer'),(3,'Round'),(4,'Cat-eye'),(5,'Shield');\nINSERT INTO discontinued VALUES (2,'low sales'),(4,'supplier closed'),(NULL,'legacy import, no id');",
+  "solution": "SELECT p.id, p.name\nFROM products AS p\nWHERE NOT EXISTS (\n  SELECT 1 FROM discontinued AS d WHERE d.product_id = p.id\n)\nORDER BY p.id;",
+  "expected": [
+   [
+    1,
+    "Aviator"
+   ],
+   [
+    3,
+    "Round"
+   ],
+   [
+    5,
+    "Shield"
+   ]
+  ],
+  "test": "import sqlite3\nSETUP = \"CREATE TABLE products (id INTEGER PRIMARY KEY, name TEXT NOT NULL);\\nCREATE TABLE discontinued (product_id INTEGER, reason TEXT);\\nINSERT INTO products VALUES (1,'Aviator'),(2,'Wayfarer'),(3,'Round'),(4,'Cat-eye'),(5,'Shield');\\nINSERT INTO discontinued VALUES (2,'low sales'),(4,'supplier closed'),(NULL,'legacy import, no id');\"\nSOLUTION = 'SELECT p.id, p.name\\nFROM products AS p\\nWHERE NOT EXISTS (\\n  SELECT 1 FROM discontinued AS d WHERE d.product_id = p.id\\n)\\nORDER BY p.id;'\nEXPECTED = [[1, 'Aviator'], [3, 'Round'], [5, 'Shield']]\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nparts = [p for p in SOLUTION.split(';') if p.strip()]\nfor p in parts[:-1]:\n    con.execute(p)\nrows = [list(r) for r in con.execute(parts[-1]).fetchall()]\nassert rows == EXPECTED, rows\n\nbuggy = \"SELECT id, name FROM products WHERE id NOT IN (SELECT product_id FROM discontinued) ORDER BY id\"\nassert con.execute(buggy).fetchall() == []\nalt = \"SELECT id, name FROM products WHERE id NOT IN (SELECT product_id FROM discontinued WHERE product_id IS NOT NULL) ORDER BY id\"\nassert [list(r) for r in con.execute(alt).fetchall()] == EXPECTED\n"
+ },
+ "smi-g0032": {
+  "language": "sql",
+  "setup": "CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT NOT NULL);\nCREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER NOT NULL REFERENCES customers(id), order_date TEXT NOT NULL, total INTEGER NOT NULL);\nINSERT INTO customers VALUES (1,'Asha'),(2,'Bruno'),(3,'Chloe'),(4,'Dev');\nINSERT INTO orders VALUES\n(1,1,'2024-02-10',50),(2,1,'2023-11-01',20),(3,2,'2023-06-15',80),(4,3,'2024-07-04',30),(5,3,'2024-08-09',45);",
+  "solution": "SELECT c.id, c.name\nFROM customers AS c\nWHERE NOT EXISTS (\n  SELECT 1\n  FROM orders AS o\n  WHERE o.customer_id = c.id\n    AND o.order_date >= '2024-01-01'\n    AND o.order_date <  '2025-01-01'\n)\nORDER BY c.id;",
+  "expected": [
+   [
+    2,
+    "Bruno"
+   ],
+   [
+    4,
+    "Dev"
+   ]
+  ],
+  "test": "import sqlite3\nSETUP = \"CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT NOT NULL);\\nCREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER NOT NULL REFERENCES customers(id), order_date TEXT NOT NULL, total INTEGER NOT NULL);\\nINSERT INTO customers VALUES (1,'Asha'),(2,'Bruno'),(3,'Chloe'),(4,'Dev');\\nINSERT INTO orders VALUES\\n(1,1,'2024-02-10',50),(2,1,'2023-11-01',20),(3,2,'2023-06-15',80),(4,3,'2024-07-04',30),(5,3,'2024-08-09',45);\"\nSOLUTION = \"SELECT c.id, c.name\\nFROM customers AS c\\nWHERE NOT EXISTS (\\n  SELECT 1\\n  FROM orders AS o\\n  WHERE o.customer_id = c.id\\n    AND o.order_date >= '2024-01-01'\\n    AND o.order_date <  '2025-01-01'\\n)\\nORDER BY c.id;\"\nEXPECTED = [[2, 'Bruno'], [4, 'Dev']]\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nparts = [p for p in SOLUTION.split(';') if p.strip()]\nfor p in parts[:-1]:\n    con.execute(p)\nrows = [list(r) for r in con.execute(parts[-1]).fetchall()]\nassert rows == EXPECTED, rows\n\nlj = \"\"\"SELECT c.id, c.name FROM customers AS c LEFT JOIN orders AS o ON o.customer_id = c.id AND o.order_date >= '2024-01-01' AND o.order_date < '2025-01-01' WHERE o.id IS NULL ORDER BY c.id\"\"\"\nassert [list(r) for r in con.execute(lj).fetchall()] == EXPECTED\nw1 = \"\"\"SELECT c.id FROM customers c LEFT JOIN orders o ON o.customer_id = c.id WHERE o.id IS NULL AND o.order_date >= '2024-01-01' AND o.order_date < '2025-01-01'\"\"\"\nassert con.execute(w1).fetchall() == []\nw2 = \"SELECT c.id FROM customers c LEFT JOIN orders o ON o.customer_id = c.id WHERE o.id IS NULL ORDER BY c.id\"\nassert con.execute(w2).fetchall() == [(4,)]\n"
+ },
+ "smi-g0033": {
+  "language": "sql",
+  "setup": "CREATE TABLE sales (id INTEGER PRIMARY KEY, sold_on TEXT NOT NULL, category TEXT NOT NULL, amount INTEGER NOT NULL);\nINSERT INTO sales VALUES\n(1,'2024-01-05','Sunglasses',120),(2,'2024-01-18','Sunglasses',80),(3,'2024-01-20','Frames',200),\n(4,'2024-02-02','Sunglasses',95),(5,'2024-02-14','Accessories',15),(6,'2024-02-15','Accessories',25),\n(7,'2024-03-01','Frames',150),(8,'2024-03-09','Sunglasses',60),(9,'2024-03-30','Frames',50);",
+  "solution": "SELECT strftime('%Y-%m', sold_on) AS month,\n       COALESCE(SUM(CASE WHEN category = 'Sunglasses'  THEN amount END), 0) AS sunglasses,\n       COALESCE(SUM(CASE WHEN category = 'Frames'      THEN amount END), 0) AS frames,\n       COALESCE(SUM(CASE WHEN category = 'Accessories' THEN amount END), 0) AS accessories,\n       SUM(amount) AS total\nFROM sales\nGROUP BY strftime('%Y-%m', sold_on)\nORDER BY month;",
+  "expected": [
+   [
+    "2024-01",
+    200,
+    200,
+    0,
+    400
+   ],
+   [
+    "2024-02",
+    95,
+    0,
+    40,
+    135
+   ],
+   [
+    "2024-03",
+    60,
+    200,
+    0,
+    260
+   ]
+  ],
+  "test": "import sqlite3\nSETUP = \"CREATE TABLE sales (id INTEGER PRIMARY KEY, sold_on TEXT NOT NULL, category TEXT NOT NULL, amount INTEGER NOT NULL);\\nINSERT INTO sales VALUES\\n(1,'2024-01-05','Sunglasses',120),(2,'2024-01-18','Sunglasses',80),(3,'2024-01-20','Frames',200),\\n(4,'2024-02-02','Sunglasses',95),(5,'2024-02-14','Accessories',15),(6,'2024-02-15','Accessories',25),\\n(7,'2024-03-01','Frames',150),(8,'2024-03-09','Sunglasses',60),(9,'2024-03-30','Frames',50);\"\nSOLUTION = \"SELECT strftime('%Y-%m', sold_on) AS month,\\n       COALESCE(SUM(CASE WHEN category = 'Sunglasses'  THEN amount END), 0) AS sunglasses,\\n       COALESCE(SUM(CASE WHEN category = 'Frames'      THEN amount END), 0) AS frames,\\n       COALESCE(SUM(CASE WHEN category = 'Accessories' THEN amount END), 0) AS accessories,\\n       SUM(amount) AS total\\nFROM sales\\nGROUP BY strftime('%Y-%m', sold_on)\\nORDER BY month;\"\nEXPECTED = [['2024-01', 200, 200, 0, 400], ['2024-02', 95, 0, 40, 135], ['2024-03', 60, 200, 0, 260]]\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nparts = [p for p in SOLUTION.split(';') if p.strip()]\nfor p in parts[:-1]:\n    con.execute(p)\nrows = [list(r) for r in con.execute(parts[-1]).fetchall()]\nassert rows == EXPECTED, rows\n\nnc = \"SELECT strftime('%Y-%m', sold_on), SUM(CASE WHEN category='Frames' THEN amount END) FROM sales GROUP BY 1 ORDER BY 1\"\nassert con.execute(nc).fetchall() == [('2024-01', 200), ('2024-02', None), ('2024-03', 200)]\nassert all(r[1] + r[2] + r[3] == r[4] for r in rows)\n"
+ },
+ "smi-g0034": {
+  "language": "sql",
+  "setup": "CREATE TABLE events (user_id INTEGER NOT NULL, event_ts TEXT NOT NULL, event_name TEXT NOT NULL);\nINSERT INTO events VALUES\n(1,'2024-06-01 09:00:00','open'),(1,'2024-06-01 09:05:00','open'),(1,'2024-06-02 20:00:00','open'),\n(2,'2024-06-01 23:59:00','open'),(2,'2024-06-03 08:00:00','open'),\n(3,'2024-06-01 10:00:00','open'),(3,'2024-06-02 10:00:00','open'),(3,'2024-06-02 11:00:00','open'),\n(4,'2024-06-02 12:00:00','open'),(4,'2024-06-03 12:00:00','open'),\n(5,'2024-06-02 07:00:00','open'),\n(6,'2024-06-03 07:00:00','open'),\n(7,'2024-06-03 08:00:00','open');",
+  "solution": "WITH activity AS (\n  SELECT DISTINCT user_id, date(event_ts) AS day FROM events\n),\ncohorts AS (\n  SELECT user_id, MIN(day) AS cohort_day FROM activity GROUP BY user_id\n),\nlast_day AS (\n  SELECT MAX(day) AS max_day FROM activity\n)\nSELECT c.cohort_day,\n       COUNT(*) AS cohort_size,\n       COUNT(a.user_id) AS retained_day1,\n       ROUND(100.0 * COUNT(a.user_id) / COUNT(*), 1) AS day1_retention_pct\nFROM cohorts AS c\nLEFT JOIN activity AS a\n       ON a.user_id = c.user_id\n      AND a.day = date(c.cohort_day, '+1 day')\nWHERE date(c.cohort_day, '+1 day') <= (SELECT max_day FROM last_day)\nGROUP BY c.cohort_day\nORDER BY c.cohort_day;",
+  "expected": [
+   [
+    "2024-06-01",
+    3,
+    2,
+    66.7
+   ],
+   [
+    "2024-06-02",
+    2,
+    1,
+    50.0
+   ]
+  ],
+  "test": "import sqlite3\nSETUP = \"CREATE TABLE events (user_id INTEGER NOT NULL, event_ts TEXT NOT NULL, event_name TEXT NOT NULL);\\nINSERT INTO events VALUES\\n(1,'2024-06-01 09:00:00','open'),(1,'2024-06-01 09:05:00','open'),(1,'2024-06-02 20:00:00','open'),\\n(2,'2024-06-01 23:59:00','open'),(2,'2024-06-03 08:00:00','open'),\\n(3,'2024-06-01 10:00:00','open'),(3,'2024-06-02 10:00:00','open'),(3,'2024-06-02 11:00:00','open'),\\n(4,'2024-06-02 12:00:00','open'),(4,'2024-06-03 12:00:00','open'),\\n(5,'2024-06-02 07:00:00','open'),\\n(6,'2024-06-03 07:00:00','open'),\\n(7,'2024-06-03 08:00:00','open');\"\nSOLUTION = \"WITH activity AS (\\n  SELECT DISTINCT user_id, date(event_ts) AS day FROM events\\n),\\ncohorts AS (\\n  SELECT user_id, MIN(day) AS cohort_day FROM activity GROUP BY user_id\\n),\\nlast_day AS (\\n  SELECT MAX(day) AS max_day FROM activity\\n)\\nSELECT c.cohort_day,\\n       COUNT(*) AS cohort_size,\\n       COUNT(a.user_id) AS retained_day1,\\n       ROUND(100.0 * COUNT(a.user_id) / COUNT(*), 1) AS day1_retention_pct\\nFROM cohorts AS c\\nLEFT JOIN activity AS a\\n       ON a.user_id = c.user_id\\n      AND a.day = date(c.cohort_day, '+1 day')\\nWHERE date(c.cohort_day, '+1 day') <= (SELECT max_day FROM last_day)\\nGROUP BY c.cohort_day\\nORDER BY c.cohort_day;\"\nEXPECTED = [['2024-06-01', 3, 2, 66.7], ['2024-06-02', 2, 1, 50.0]]\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nparts = [p for p in SOLUTION.split(';') if p.strip()]\nfor p in parts[:-1]:\n    con.execute(p)\nrows = [list(r) for r in con.execute(parts[-1]).fetchall()]\nassert rows == EXPECTED, rows\n"
+ },
+ "smi-g0035": {
+  "language": "sql",
+  "setup": "CREATE TABLE employees (id INTEGER PRIMARY KEY, name TEXT NOT NULL, salary INTEGER NOT NULL);\nINSERT INTO employees VALUES (1,'Ana',100),(2,'Ben',300),(3,'Cy',300),(4,'Dee',200),(5,'Eli',200);",
+  "solution": "SELECT (\n  SELECT salary\n  FROM (SELECT DISTINCT salary FROM employees)\n  ORDER BY salary DESC\n  LIMIT 1 OFFSET 1\n) AS second_highest_salary;",
+  "expected": [
+   [
+    200
+   ]
+  ],
+  "test": "import sqlite3\nSETUP = \"CREATE TABLE employees (id INTEGER PRIMARY KEY, name TEXT NOT NULL, salary INTEGER NOT NULL);\\nINSERT INTO employees VALUES (1,'Ana',100),(2,'Ben',300),(3,'Cy',300),(4,'Dee',200),(5,'Eli',200);\"\nSOLUTION = 'SELECT (\\n  SELECT salary\\n  FROM (SELECT DISTINCT salary FROM employees)\\n  ORDER BY salary DESC\\n  LIMIT 1 OFFSET 1\\n) AS second_highest_salary;'\nEXPECTED = [[200]]\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nparts = [p for p in SOLUTION.split(';') if p.strip()]\nfor p in parts[:-1]:\n    con.execute(p)\nrows = [list(r) for r in con.execute(parts[-1]).fetchall()]\nassert rows == EXPECTED, rows\n\ncases = {\n 'empty': \"\",\n 'one': \"INSERT INTO employees VALUES(1,'a',100);\",\n 'same': \"INSERT INTO employees VALUES(1,'a',100),(2,'b',100);\",\n}\nalts = [SOLUTION,\n \"SELECT MAX(salary) AS second_highest_salary FROM employees WHERE salary < (SELECT MAX(salary) FROM employees)\",\n \"SELECT MAX(salary) AS second_highest_salary FROM (SELECT salary, DENSE_RANK() OVER (ORDER BY salary DESC) AS r FROM employees) WHERE r = 2\"]\nfor name, data in cases.items():\n    c9 = sqlite3.connect(':memory:')\n    c9.executescript(\"CREATE TABLE employees (id INTEGER PRIMARY KEY, name TEXT NOT NULL, salary INTEGER NOT NULL);\" + data)\n    for a in alts:\n        assert c9.execute(a).fetchall() == [(None,)], (name, a)\nfor a in alts[1:]:\n    assert con.execute(a).fetchall() == [(200,)]\nnaive = \"SELECT salary FROM employees ORDER BY salary DESC LIMIT 1 OFFSET 1\"\nassert con.execute(naive).fetchall() == [(300,)]\n"
+ },
+ "smi-g0036": {
+  "language": "sql",
+  "setup": "CREATE TABLE staff (id INTEGER PRIMARY KEY, name TEXT NOT NULL, manager_id INTEGER REFERENCES staff(id));\nINSERT INTO staff VALUES\n(1,'Ava',NULL),(2,'Dana',7),(3,'Ben',2),(4,'Cy',2),(5,'Eli',3),(6,'Fay',5),(7,'Gus',6),(8,'Hana',1),(9,'Ian',8);",
+  "solution": "WITH RECURSIVE reports(id, name, depth, id_path, name_path) AS (\n  SELECT id, name, 0, '/' || id || '/', name\n  FROM staff\n  WHERE id = 2\n  UNION ALL\n  SELECT s.id, s.name, r.depth + 1,\n         r.id_path || s.id || '/',\n         r.name_path || ' > ' || s.name\n  FROM staff AS s\n  JOIN reports AS r ON s.manager_id = r.id\n  WHERE instr(r.id_path, '/' || s.id || '/') = 0\n)\nSELECT id, name, depth, name_path\nFROM reports\nWHERE depth > 0\nORDER BY depth, name;",
+  "expected": [
+   [
+    3,
+    "Ben",
+    1,
+    "Dana > Ben"
+   ],
+   [
+    4,
+    "Cy",
+    1,
+    "Dana > Cy"
+   ],
+   [
+    5,
+    "Eli",
+    2,
+    "Dana > Ben > Eli"
+   ],
+   [
+    6,
+    "Fay",
+    3,
+    "Dana > Ben > Eli > Fay"
+   ],
+   [
+    7,
+    "Gus",
+    4,
+    "Dana > Ben > Eli > Fay > Gus"
+   ]
+  ],
+  "test": "import sqlite3\nSETUP = \"CREATE TABLE staff (id INTEGER PRIMARY KEY, name TEXT NOT NULL, manager_id INTEGER REFERENCES staff(id));\\nINSERT INTO staff VALUES\\n(1,'Ava',NULL),(2,'Dana',7),(3,'Ben',2),(4,'Cy',2),(5,'Eli',3),(6,'Fay',5),(7,'Gus',6),(8,'Hana',1),(9,'Ian',8);\"\nSOLUTION = \"WITH RECURSIVE reports(id, name, depth, id_path, name_path) AS (\\n  SELECT id, name, 0, '/' || id || '/', name\\n  FROM staff\\n  WHERE id = 2\\n  UNION ALL\\n  SELECT s.id, s.name, r.depth + 1,\\n         r.id_path || s.id || '/',\\n         r.name_path || ' > ' || s.name\\n  FROM staff AS s\\n  JOIN reports AS r ON s.manager_id = r.id\\n  WHERE instr(r.id_path, '/' || s.id || '/') = 0\\n)\\nSELECT id, name, depth, name_path\\nFROM reports\\nWHERE depth > 0\\nORDER BY depth, name;\"\nEXPECTED = [[3, 'Ben', 1, 'Dana > Ben'], [4, 'Cy', 1, 'Dana > Cy'], [5, 'Eli', 2, 'Dana > Ben > Eli'], [6, 'Fay', 3, 'Dana > Ben > Eli > Fay'], [7, 'Gus', 4, 'Dana > Ben > Eli > Fay > Gus']]\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nparts = [p for p in SOLUTION.split(';') if p.strip()]\nfor p in parts[:-1]:\n    con.execute(p)\nrows = [list(r) for r in con.execute(parts[-1]).fetchall()]\nassert rows == EXPECTED, rows\n\nnoguard = \"\"\"WITH RECURSIVE reports(id, name, depth) AS (SELECT id, name, 0 FROM staff WHERE id = 2 UNION ALL SELECT s.id, s.name, r.depth + 1 FROM staff s JOIN reports r ON s.manager_id = r.id WHERE r.depth < 12) SELECT COUNT(*), MAX(depth) FROM reports\"\"\"\nassert con.execute(noguard).fetchall() == [(16, 12)]\nassert [r[1] for r in rows] == ['Ben', 'Cy', 'Eli', 'Fay', 'Gus']\n"
+ },
+ "smi-g0037": {
+  "language": "sql",
+  "setup": "CREATE TABLE purchases (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, purchased_on TEXT NOT NULL);\nINSERT INTO purchases VALUES\n(1,10,'2024-01-04'),(2,10,'2024-01-20'),(3,10,'2024-02-11'),\n(4,11,'2024-01-15'),\n(5,12,'2024-02-03'),(6,12,'2024-02-25'),\n(7,13,'2024-01-30'),(8,13,'2024-02-01'),\n(9,14,'2024-01-09'),(10,14,'2024-01-10'),\n(11,15,'2024-03-05');",
+  "solution": "WITH jan AS (\n  SELECT user_id FROM purchases WHERE purchased_on >= '2024-01-01' AND purchased_on < '2024-02-01'\n),\nfeb AS (\n  SELECT user_id FROM purchases WHERE purchased_on >= '2024-02-01' AND purchased_on < '2024-03-01'\n)\nSELECT 'jan_not_feb' AS segment, user_id FROM (SELECT user_id FROM jan EXCEPT SELECT user_id FROM feb)\nUNION ALL\nSELECT 'both', user_id FROM (SELECT user_id FROM jan INTERSECT SELECT user_id FROM feb)\nORDER BY segment, user_id;",
+  "expected": [
+   [
+    "both",
+    10
+   ],
+   [
+    "both",
+    13
+   ],
+   [
+    "jan_not_feb",
+    11
+   ],
+   [
+    "jan_not_feb",
+    14
+   ]
+  ],
+  "test": "import sqlite3\nSETUP = \"CREATE TABLE purchases (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, purchased_on TEXT NOT NULL);\\nINSERT INTO purchases VALUES\\n(1,10,'2024-01-04'),(2,10,'2024-01-20'),(3,10,'2024-02-11'),\\n(4,11,'2024-01-15'),\\n(5,12,'2024-02-03'),(6,12,'2024-02-25'),\\n(7,13,'2024-01-30'),(8,13,'2024-02-01'),\\n(9,14,'2024-01-09'),(10,14,'2024-01-10'),\\n(11,15,'2024-03-05');\"\nSOLUTION = \"WITH jan AS (\\n  SELECT user_id FROM purchases WHERE purchased_on >= '2024-01-01' AND purchased_on < '2024-02-01'\\n),\\nfeb AS (\\n  SELECT user_id FROM purchases WHERE purchased_on >= '2024-02-01' AND purchased_on < '2024-03-01'\\n)\\nSELECT 'jan_not_feb' AS segment, user_id FROM (SELECT user_id FROM jan EXCEPT SELECT user_id FROM feb)\\nUNION ALL\\nSELECT 'both', user_id FROM (SELECT user_id FROM jan INTERSECT SELECT user_id FROM feb)\\nORDER BY segment, user_id;\"\nEXPECTED = [['both', 10], ['both', 13], ['jan_not_feb', 11], ['jan_not_feb', 14]]\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nparts = [p for p in SOLUTION.split(';') if p.strip()]\nfor p in parts[:-1]:\n    con.execute(p)\nrows = [list(r) for r in con.execute(parts[-1]).fetchall()]\nassert rows == EXPECTED, rows\n\njan = \"SELECT user_id FROM purchases WHERE purchased_on >= '2024-01-01' AND purchased_on < '2024-02-01'\"\nfeb = \"SELECT user_id FROM purchases WHERE purchased_on >= '2024-02-01' AND purchased_on < '2024-03-01'\"\nassert con.execute(\"SELECT COUNT(*) FROM (%s UNION %s)\" % (jan, feb)).fetchone()[0] == 5\nassert con.execute(\"SELECT COUNT(*) FROM (%s UNION ALL %s)\" % (jan, feb)).fetchone()[0] == 10\nassert con.execute(\"SELECT COUNT(*) FROM (%s)\" % jan).fetchone()[0] == 6\nassert con.execute(\"SELECT COUNT(*) FROM (%s)\" % feb).fetchone()[0] == 4\n"
+ },
+ "smi-g0038": {
+  "language": "sql",
+  "setup": "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT NOT NULL);\nCREATE TABLE order_items (id INTEGER PRIMARY KEY, order_id INTEGER NOT NULL REFERENCES orders(id), qty INTEGER NOT NULL, unit_price INTEGER NOT NULL);\nCREATE TABLE payments (id INTEGER PRIMARY KEY, order_id INTEGER NOT NULL REFERENCES orders(id), amount INTEGER NOT NULL);\nINSERT INTO orders VALUES (1,'Asha'),(2,'Asha'),(3,'Bruno'),(4,'Chloe');\nINSERT INTO order_items VALUES (1,1,2,50),(2,1,1,30),(3,2,1,100),(4,3,3,20),(5,4,1,40);\nINSERT INTO payments VALUES (1,1,60),(2,1,50),(3,2,100),(4,3,60);",
+  "solution": "WITH item_totals AS (\n  SELECT order_id, SUM(qty * unit_price) AS item_total\n  FROM order_items\n  GROUP BY order_id\n),\npayment_totals AS (\n  SELECT order_id, SUM(amount) AS paid_total\n  FROM payments\n  GROUP BY order_id\n)\nSELECT o.customer,\n       COALESCE(SUM(i.item_total), 0) AS item_total,\n       COALESCE(SUM(p.paid_total), 0) AS paid_total\nFROM orders AS o\nLEFT JOIN item_totals    AS i ON i.order_id = o.id\nLEFT JOIN payment_totals AS p ON p.order_id = o.id\nGROUP BY o.customer\nORDER BY o.customer;",
+  "expected": [
+   [
+    "Asha",
+    230,
+    210
+   ],
+   [
+    "Bruno",
+    60,
+    60
+   ],
+   [
+    "Chloe",
+    40,
+    0
+   ]
+  ],
+  "test": "import sqlite3\nSETUP = \"CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT NOT NULL);\\nCREATE TABLE order_items (id INTEGER PRIMARY KEY, order_id INTEGER NOT NULL REFERENCES orders(id), qty INTEGER NOT NULL, unit_price INTEGER NOT NULL);\\nCREATE TABLE payments (id INTEGER PRIMARY KEY, order_id INTEGER NOT NULL REFERENCES orders(id), amount INTEGER NOT NULL);\\nINSERT INTO orders VALUES (1,'Asha'),(2,'Asha'),(3,'Bruno'),(4,'Chloe');\\nINSERT INTO order_items VALUES (1,1,2,50),(2,1,1,30),(3,2,1,100),(4,3,3,20),(5,4,1,40);\\nINSERT INTO payments VALUES (1,1,60),(2,1,50),(3,2,100),(4,3,60);\"\nSOLUTION = 'WITH item_totals AS (\\n  SELECT order_id, SUM(qty * unit_price) AS item_total\\n  FROM order_items\\n  GROUP BY order_id\\n),\\npayment_totals AS (\\n  SELECT order_id, SUM(amount) AS paid_total\\n  FROM payments\\n  GROUP BY order_id\\n)\\nSELECT o.customer,\\n       COALESCE(SUM(i.item_total), 0) AS item_total,\\n       COALESCE(SUM(p.paid_total), 0) AS paid_total\\nFROM orders AS o\\nLEFT JOIN item_totals    AS i ON i.order_id = o.id\\nLEFT JOIN payment_totals AS p ON p.order_id = o.id\\nGROUP BY o.customer\\nORDER BY o.customer;'\nEXPECTED = [['Asha', 230, 210], ['Bruno', 60, 60], ['Chloe', 40, 0]]\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nparts = [p for p in SOLUTION.split(';') if p.strip()]\nfor p in parts[:-1]:\n    con.execute(p)\nrows = [list(r) for r in con.execute(parts[-1]).fetchall()]\nassert rows == EXPECTED, rows\n\nbug = \"SELECT o.customer, SUM(oi.qty*oi.unit_price), SUM(p.amount) FROM orders o LEFT JOIN order_items oi ON oi.order_id=o.id LEFT JOIN payments p ON p.order_id=o.id GROUP BY o.customer ORDER BY o.customer\"\nassert con.execute(bug).fetchall() == [('Asha', 360, 320), ('Bruno', 60, 60), ('Chloe', 40, None)]\n"
+ },
+ "smi-g0039": {
+  "language": "sql",
+  "setup": "CREATE TABLE orders (id INTEGER PRIMARY KEY, created_at TEXT NOT NULL);\nINSERT INTO orders VALUES\n(1,'2024-01-03 10:00:00'),(2,'2024-01-15 11:00:00'),(3,'2024-01-20 12:00:00'),(4,'2024-01-31 23:59:59'),\n(5,'2024-02-01 00:00:00'),(6,'2024-02-07 09:30:00'),(7,'2024-02-14 14:00:00'),(8,'2024-02-20 16:45:00'),(9,'2024-02-25 08:00:00'),(10,'2024-02-29 18:00:00'),\n(11,'2024-04-02 10:00:00'),(12,'2024-04-18 10:00:00'),(13,'2024-04-30 10:00:00'),\n(14,'2024-05-01 10:00:00'),(15,'2024-05-05 10:00:00'),(16,'2024-05-09 10:00:00'),(17,'2024-05-12 10:00:00'),(18,'2024-05-20 10:00:00');",
+  "solution": "WITH RECURSIVE months(m) AS (\n  SELECT strftime('%Y-%m', MIN(created_at)) FROM orders\n  UNION ALL\n  SELECT strftime('%Y-%m', date(m || '-01', '+1 month'))\n  FROM months\n  WHERE m < (SELECT strftime('%Y-%m', MAX(created_at)) FROM orders)\n),\nmonthly AS (\n  SELECT m.m AS month, COUNT(o.id) AS orders\n  FROM months AS m\n  LEFT JOIN orders AS o ON strftime('%Y-%m', o.created_at) = m.m\n  GROUP BY m.m\n),\nwith_prev AS (\n  SELECT month, orders, LAG(orders) OVER (ORDER BY month) AS prev_orders\n  FROM monthly\n)\nSELECT month, orders, prev_orders,\n       ROUND(100.0 * (orders - prev_orders) / NULLIF(prev_orders, 0), 1) AS mom_pct\nFROM with_prev\nORDER BY month;",
+  "expected": [
+   [
+    "2024-01",
+    4,
+    null,
+    null
+   ],
+   [
+    "2024-02",
+    6,
+    4,
+    50.0
+   ],
+   [
+    "2024-03",
+    0,
+    6,
+    -100.0
+   ],
+   [
+    "2024-04",
+    3,
+    0,
+    null
+   ],
+   [
+    "2024-05",
+    5,
+    3,
+    66.7
+   ]
+  ],
+  "test": "import sqlite3\nSETUP = \"CREATE TABLE orders (id INTEGER PRIMARY KEY, created_at TEXT NOT NULL);\\nINSERT INTO orders VALUES\\n(1,'2024-01-03 10:00:00'),(2,'2024-01-15 11:00:00'),(3,'2024-01-20 12:00:00'),(4,'2024-01-31 23:59:59'),\\n(5,'2024-02-01 00:00:00'),(6,'2024-02-07 09:30:00'),(7,'2024-02-14 14:00:00'),(8,'2024-02-20 16:45:00'),(9,'2024-02-25 08:00:00'),(10,'2024-02-29 18:00:00'),\\n(11,'2024-04-02 10:00:00'),(12,'2024-04-18 10:00:00'),(13,'2024-04-30 10:00:00'),\\n(14,'2024-05-01 10:00:00'),(15,'2024-05-05 10:00:00'),(16,'2024-05-09 10:00:00'),(17,'2024-05-12 10:00:00'),(18,'2024-05-20 10:00:00');\"\nSOLUTION = \"WITH RECURSIVE months(m) AS (\\n  SELECT strftime('%Y-%m', MIN(created_at)) FROM orders\\n  UNION ALL\\n  SELECT strftime('%Y-%m', date(m || '-01', '+1 month'))\\n  FROM months\\n  WHERE m < (SELECT strftime('%Y-%m', MAX(created_at)) FROM orders)\\n),\\nmonthly AS (\\n  SELECT m.m AS month, COUNT(o.id) AS orders\\n  FROM months AS m\\n  LEFT JOIN orders AS o ON strftime('%Y-%m', o.created_at) = m.m\\n  GROUP BY m.m\\n),\\nwith_prev AS (\\n  SELECT month, orders, LAG(orders) OVER (ORDER BY month) AS prev_orders\\n  FROM monthly\\n)\\nSELECT month, orders, prev_orders,\\n       ROUND(100.0 * (orders - prev_orders) / NULLIF(prev_orders, 0), 1) AS mom_pct\\nFROM with_prev\\nORDER BY month;\"\nEXPECTED = [['2024-01', 4, None, None], ['2024-02', 6, 4, 50.0], ['2024-03', 0, 6, -100.0], ['2024-04', 3, 0, None], ['2024-05', 5, 3, 66.7]]\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nparts = [p for p in SOLUTION.split(';') if p.strip()]\nfor p in parts[:-1]:\n    con.execute(p)\nrows = [list(r) for r in con.execute(parts[-1]).fetchall()]\nassert rows == EXPECTED, rows\n\ng = \"SELECT strftime('%Y-%m', created_at), COUNT(*) FROM orders GROUP BY 1 ORDER BY 1\"\nassert [r[0] for r in con.execute(g).fetchall()] == ['2024-01', '2024-02', '2024-04', '2024-05']\n"
+ },
+ "smi-g0040": {
+  "language": "sql",
+  "setup": "PRAGMA foreign_keys = ON;\nCREATE TABLE customers (\n  id         INTEGER PRIMARY KEY,\n  email      TEXT NOT NULL UNIQUE,\n  full_name  TEXT NOT NULL,\n  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP\n);\nCREATE TABLE products (\n  id          INTEGER PRIMARY KEY,\n  sku         TEXT NOT NULL UNIQUE,\n  name        TEXT NOT NULL,\n  price_pence INTEGER NOT NULL CHECK (price_pence >= 0)\n);\nCREATE TABLE orders (\n  id          INTEGER PRIMARY KEY,\n  customer_id INTEGER NOT NULL REFERENCES customers(id),\n  status      TEXT NOT NULL DEFAULT 'pending'\n              CHECK (status IN ('pending','paid','shipped','cancelled')),\n  placed_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP\n);\nCREATE TABLE order_items (\n  order_id         INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,\n  product_id       INTEGER NOT NULL REFERENCES products(id),\n  quantity         INTEGER NOT NULL CHECK (quantity > 0),\n  unit_price_pence INTEGER NOT NULL CHECK (unit_price_pence >= 0),\n  PRIMARY KEY (order_id, product_id)\n);\nCREATE INDEX idx_orders_customer_placed ON orders (customer_id, placed_at);\nCREATE INDEX idx_order_items_product ON order_items (product_id);\nINSERT INTO customers (id, email, full_name, created_at) VALUES (1,'asha@example.com','Asha Rao','2024-01-01'),(2,'bruno@example.com','Bruno Diaz','2024-01-02');\nINSERT INTO products VALUES (1,'AV-01','Aviator',12000),(2,'WF-02','Wayfarer',9500);\nINSERT INTO orders VALUES (1,1,'paid','2024-02-01'),(2,1,'pending','2024-02-05'),(3,2,'paid','2024-02-06');\nINSERT INTO order_items VALUES (1,1,1,12000),(1,2,2,9500),(2,2,1,9000),(3,1,1,12000);",
+  "solution": "SELECT c.email,\n       COUNT(DISTINCT o.id) AS orders,\n       SUM(oi.quantity * oi.unit_price_pence) AS spend_pence\nFROM customers AS c\nJOIN orders AS o ON o.customer_id = c.id\nJOIN order_items AS oi ON oi.order_id = o.id\nWHERE o.status <> 'cancelled'\nGROUP BY c.id, c.email\nORDER BY c.email;",
+  "expected": [
+   [
+    "asha@example.com",
+    2,
+    40000
+   ],
+   [
+    "bruno@example.com",
+    1,
+    12000
+   ]
+  ],
+  "test": "import sqlite3\nSETUP = \"PRAGMA foreign_keys = ON;\\nCREATE TABLE customers (\\n  id         INTEGER PRIMARY KEY,\\n  email      TEXT NOT NULL UNIQUE,\\n  full_name  TEXT NOT NULL,\\n  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP\\n);\\nCREATE TABLE products (\\n  id          INTEGER PRIMARY KEY,\\n  sku         TEXT NOT NULL UNIQUE,\\n  name        TEXT NOT NULL,\\n  price_pence INTEGER NOT NULL CHECK (price_pence >= 0)\\n);\\nCREATE TABLE orders (\\n  id          INTEGER PRIMARY KEY,\\n  customer_id INTEGER NOT NULL REFERENCES customers(id),\\n  status      TEXT NOT NULL DEFAULT 'pending'\\n              CHECK (status IN ('pending','paid','shipped','cancelled')),\\n  placed_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP\\n);\\nCREATE TABLE order_items (\\n  order_id         INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,\\n  product_id       INTEGER NOT NULL REFERENCES products(id),\\n  quantity         INTEGER NOT NULL CHECK (quantity > 0),\\n  unit_price_pence INTEGER NOT NULL CHECK (unit_price_pence >= 0),\\n  PRIMARY KEY (order_id, product_id)\\n);\\nCREATE INDEX idx_orders_customer_placed ON orders (customer_id, placed_at);\\nCREATE INDEX idx_order_items_product ON order_items (product_id);\\nINSERT INTO customers (id, email, full_name, created_at) VALUES (1,'asha@example.com','Asha Rao','2024-01-01'),(2,'bruno@example.com','Bruno Diaz','2024-01-02');\\nINSERT INTO products VALUES (1,'AV-01','Aviator',12000),(2,'WF-02','Wayfarer',9500);\\nINSERT INTO orders VALUES (1,1,'paid','2024-02-01'),(2,1,'pending','2024-02-05'),(3,2,'paid','2024-02-06');\\nINSERT INTO order_items VALUES (1,1,1,12000),(1,2,2,9500),(2,2,1,9000),(3,1,1,12000);\"\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\nassert con.execute('PRAGMA foreign_keys').fetchone()[0] == 1\nrows = [tuple(r) for r in con.execute(\"SELECT c.email,\\n       COUNT(DISTINCT o.id) AS orders,\\n       SUM(oi.quantity * oi.unit_price_pence) AS spend_pence\\nFROM customers AS c\\nJOIN orders AS o ON o.customer_id = c.id\\nJOIN order_items AS oi ON oi.order_id = o.id\\nWHERE o.status <> 'cancelled'\\nGROUP BY c.id, c.email\\nORDER BY c.email;\").fetchall()]\nassert rows == [('asha@example.com', 2, 40000), ('bruno@example.com', 1, 12000)], rows\nbad = [\n \"INSERT INTO customers(email, full_name) VALUES ('asha@example.com', 'Dup')\",\n \"INSERT INTO customers(email, full_name) VALUES (NULL, 'No email')\",\n \"INSERT INTO products VALUES (3, 'XX-03', 'Neg', -1)\",\n \"INSERT INTO orders(customer_id) VALUES (99)\",\n \"INSERT INTO orders(customer_id, status) VALUES (1, 'lost')\",\n \"INSERT INTO order_items VALUES (1, 1, 0, 100)\",\n \"INSERT INTO order_items VALUES (1, 1, 1, 100)\",\n \"INSERT INTO order_items VALUES (1, 42, 1, 100)\",\n \"DELETE FROM products WHERE id = 1\",\n \"DELETE FROM customers WHERE id = 1\",\n]\nfor stmt in bad:\n    try:\n        con.execute(stmt)\n    except sqlite3.IntegrityError:\n        continue\n    raise AssertionError('not rejected: ' + stmt)\nbefore = con.execute('SELECT COUNT(*) FROM order_items').fetchone()[0]\ncon.execute('DELETE FROM orders WHERE id = 2')\nassert con.execute('SELECT COUNT(*) FROM order_items').fetchone()[0] == before - 1\n# Without the pragma (a fresh connection) the orphan order is accepted.\ncon2 = sqlite3.connect(':memory:')\ncon2.executescript(SETUP.replace('PRAGMA foreign_keys = ON;', ''))\ncon2.execute('INSERT INTO orders(customer_id) VALUES (99)')\n"
+ },
+ "smi-g0041": {
+  "language": "sql",
+  "setup": "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER NOT NULL, created_at TEXT NOT NULL);\nWITH RECURSIVE n(i) AS (SELECT 0 UNION ALL SELECT i+1 FROM n WHERE i < 999)\nINSERT INTO orders (customer_id, created_at)\nSELECT i % 50, strftime('%Y-%m-%d %H:%M:%S', '2024-01-01 00:00:00', '+' || (i * 7) || ' hours') FROM n;\nCREATE INDEX idx_orders_created_at ON orders (created_at);",
+  "solution": "SELECT id, created_at\nFROM orders\nWHERE created_at >= '2024-01-05'\n  AND created_at <  '2024-01-06'\nORDER BY id;",
+  "expected": [
+   [
+    15,
+    "2024-01-05 02:00:00"
+   ],
+   [
+    16,
+    "2024-01-05 09:00:00"
+   ],
+   [
+    17,
+    "2024-01-05 16:00:00"
+   ],
+   [
+    18,
+    "2024-01-05 23:00:00"
+   ]
+  ],
+  "test": "import sqlite3\nSETUP = \"CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER NOT NULL, created_at TEXT NOT NULL);\\nWITH RECURSIVE n(i) AS (SELECT 0 UNION ALL SELECT i+1 FROM n WHERE i < 999)\\nINSERT INTO orders (customer_id, created_at)\\nSELECT i % 50, strftime('%Y-%m-%d %H:%M:%S', '2024-01-01 00:00:00', '+' || (i * 7) || ' hours') FROM n;\\nCREATE INDEX idx_orders_created_at ON orders (created_at);\"\nFAST = \"SELECT id, created_at\\nFROM orders\\nWHERE created_at >= '2024-01-05'\\n  AND created_at <  '2024-01-06'\\nORDER BY id;\"\nSLOW = \"SELECT id, created_at FROM orders WHERE date(created_at) = '2024-01-05' ORDER BY id;\"\ncon = sqlite3.connect(':memory:')\ncon.executescript(SETUP)\ndef plan(sql):\n    return ' | '.join(r[3] for r in con.execute('EXPLAIN QUERY PLAN ' + sql))\nassert 'SCAN' in plan(SLOW) and 'SEARCH' not in plan(SLOW), plan(SLOW)\nassert 'SEARCH' in plan(FAST) and 'idx_orders_created_at' in plan(FAST), plan(FAST)\nassert con.execute(SLOW).fetchall() == con.execute(FAST).fetchall()\nassert [r[0] for r in con.execute(FAST)] == [15, 16, 17, 18]\ncon.execute('CREATE INDEX idx_orders_date_expr ON orders (date(created_at))')\nassert 'idx_orders_date_expr' in plan(SLOW), plan(SLOW)\n"
+ }
+}

@@ -1,0 +1,772 @@
+{
+ "version": "10n.1",
+ "note": "Hand-written candidate follow-up questions judged by the validator. 'fixture' items reuse the frozen Stage 10F cases (read only, the fixture is untouched); 'holdout' items are NEW answers/domains that no production code or prompt was tuned on. 'good' = a question an interviewer could reasonably ask (a rejection is a FALSE REJECTION); 'bad' = a question that repeats the answer, states the answer, affirms a wrong claim, or targets a covered/other concept (an acceptance is a FALSE ACCEPTANCE). 'known_gap' marks a bad question the rule-based validator cannot detect (it has no technical-truth oracle); the test pins the current behaviour so a change is noticed. These are author judgements, not human validation. Batch 'holdout' (H01-H10) was run once for diagnosis during Stage 10N; batch 'holdout2' (H11-H20) was written BEFORE any validator change and is the untouched confirmation set.",
+ "items": [
+  {
+   "id": "T01",
+   "src": "fixture",
+   "good": [
+    "How does minimising the loss on the training examples help the model generalise to new data?"
+   ],
+   "bad": [
+    {
+     "q": "What happens when the loss function is undefined for an unusual input?",
+     "why": "invents an edge case"
+    }
+   ]
+  },
+  {
+   "id": "T02",
+   "src": "fixture",
+   "good": [
+    "How would isolation matter when two transactions update the same row at the same time?"
+   ],
+   "bad": [
+    {
+     "q": "How does atomicity make sure a transaction either fully happens or not at all?",
+     "why": "repeats the explained atomicity"
+    },
+    {
+     "q": "How does a rollback make sure committed data survives a crash?",
+     "why": "confuses rollback with durability",
+     "known_gap": true
+    }
+   ]
+  },
+  {
+   "id": "T03",
+   "src": "fixture",
+   "good": [
+    "How does the cost of binary search compare with linear search as the list grows?"
+   ],
+   "bad": [
+    {
+     "q": "What is the time complexity of binary search?",
+     "why": "re-asks the original question"
+    }
+   ]
+  },
+  {
+   "id": "T04",
+   "src": "fixture",
+   "good": [
+    "How does stacking several convolutional layers change what the network can recognise?"
+   ],
+   "bad": [
+    {
+     "q": "How do the filters use dot products to detect edges in the image?",
+     "why": "repeats filters, dot products and edges"
+    }
+   ]
+  },
+  {
+   "id": "T05",
+   "src": "fixture",
+   "good": [
+    "What would you expect Python to print for two separate lists with equal contents compared with is, and with ==?"
+   ],
+   "bad": [
+    {
+     "q": "Why does is compare values while == compares memory addresses?",
+     "why": "affirms the reversed claim",
+     "known_gap": true
+    }
+   ]
+  },
+  {
+   "id": "T06",
+   "src": "fixture",
+   "good": [
+    "How many comparisons would bubble sort make on a list that is sorted in reverse order?"
+   ],
+   "bad": [
+    {
+     "q": "Why is bubble sort O(n²) in the worst case?",
+     "why": "hands over the value"
+    }
+   ]
+  },
+  {
+   "id": "T07",
+   "src": "fixture",
+   "good": [
+    "How do non-linear activations change the decision boundaries a network can represent?"
+   ],
+   "bad": [
+    {
+     "q": "Why do the stacked layers collapse into a single linear map without activation functions?",
+     "why": "repeats the answer"
+    }
+   ]
+  },
+  {
+   "id": "T08",
+   "src": "fixture",
+   "good": [
+    "How does the sigmoid function turn the weighted input features into a probability?"
+   ],
+   "bad": [
+    {
+     "q": "What is the sigmoid function?",
+     "why": "definition request"
+    }
+   ]
+  },
+  {
+   "id": "T09",
+   "src": "fixture",
+   "good": [
+    "How would you check whether a clustering result is meaningful when there are no labels?"
+   ],
+   "bad": [
+    {
+     "q": "Why does unsupervised learning find structure in data without labels?",
+     "why": "repeats the answer"
+    }
+   ]
+  },
+  {
+   "id": "T10",
+   "src": "fixture",
+   "good": [
+    "How would class imbalance change what the accuracy tells you, and which metric would you look at instead?"
+   ],
+   "bad": [
+    {
+     "q": "How well does the model perform on the data?",
+     "why": "generic performance question"
+    }
+   ]
+  },
+  {
+   "id": "T11",
+   "src": "fixture",
+   "good": [
+    "How do the hierarchical representations build up from one layer to the next?"
+   ],
+   "bad": [
+    {
+     "q": "How do learned representations differ from features designed by hand?",
+     "why": "repeats the explained distinction"
+    }
+   ]
+  },
+  {
+   "id": "T12",
+   "src": "fixture",
+   "good": [
+    "How does a Type II error arise in a hypothesis test?"
+   ],
+   "bad": [
+    {
+     "q": "How does a Type I error differ from a false positive?",
+     "why": "false premise: two names for one thing"
+    }
+   ]
+  },
+  {
+   "id": "H01",
+   "src": "holdout",
+   "domain": "databases",
+   "question": "What is an index in a relational database?",
+   "answer": "An index is a structure that lets the database find rows faster without scanning the whole table.",
+   "concepts": [
+    [
+     "E1",
+     "lookup speed"
+    ],
+    [
+     "S1",
+     "write overhead"
+    ],
+    [
+     "S2",
+     "B-tree"
+    ]
+   ],
+   "reference": "An index speeds lookups but every insert and update must also maintain it, which adds write overhead. Most are B-trees.",
+   "good": [
+    "How would adding several indexes affect a table that receives many inserts?"
+   ],
+   "bad": [
+    {
+     "q": "Why does an index find rows faster without scanning the whole table?",
+     "why": "repeats the answer"
+    },
+    {
+     "q": "What is a B-tree?",
+     "why": "definition request"
+    }
+   ]
+  },
+  {
+   "id": "H02",
+   "src": "holdout",
+   "domain": "algorithms",
+   "question": "Explain how a hash table works.",
+   "answer": "A hash table maps keys to buckets using a hash function, so lookups are usually constant time.",
+   "concepts": [
+    [
+     "E1",
+     "hash function"
+    ],
+    [
+     "E2",
+     "collision handling"
+    ],
+    [
+     "S1",
+     "load factor"
+    ]
+   ],
+   "reference": "Collisions are resolved by chaining or open addressing; as the load factor grows lookups slow down so tables resize.",
+   "good": [
+    "What happens to lookups when two different keys land in the same bucket?"
+   ],
+   "bad": [
+    {
+     "q": "How does the hash function map keys to buckets so lookups are constant time?",
+     "why": "repeats the answer"
+    },
+    {
+     "q": "Why is a hash table always O(1) in the worst case?",
+     "why": "false premise handed to the candidate"
+    }
+   ]
+  },
+  {
+   "id": "H03",
+   "src": "holdout",
+   "domain": "python",
+   "question": "What is a Python generator?",
+   "answer": "A generator is a function that uses yield to produce values one at a time instead of building a list.",
+   "concepts": [
+    [
+     "E1",
+     "lazy evaluation"
+    ],
+    [
+     "E2",
+     "memory use"
+    ],
+    [
+     "S1",
+     "one-shot iteration"
+    ]
+   ],
+   "reference": "Generators evaluate lazily, keep only the current state in memory and can be iterated only once.",
+   "good": [
+    "What would happen if you tried to loop over the same generator twice?"
+   ],
+   "bad": [
+    {
+     "q": "How does a generator use yield to produce values one at a time?",
+     "why": "repeats the answer"
+    }
+   ]
+  },
+  {
+   "id": "H04",
+   "src": "holdout",
+   "domain": "ml",
+   "question": "What is overfitting?",
+   "answer": "Overfitting is when a model does very well on training data but badly on new data.",
+   "concepts": [
+    [
+     "E1",
+     "train and test gap"
+    ],
+    [
+     "S1",
+     "regularisation"
+    ],
+    [
+     "S2",
+     "validation set"
+    ]
+   ],
+   "reference": "Regularisation, early stopping and more data reduce overfitting, which is detected on a held-out validation set.",
+   "good": [
+    "How would you decide when a model has started to overfit while it is still training?"
+   ],
+   "bad": [
+    {
+     "q": "Why does an overfit model do well on training data and badly on new data?",
+     "why": "repeats the answer"
+    }
+   ]
+  },
+  {
+   "id": "H05",
+   "src": "holdout",
+   "domain": "ml",
+   "question": "What does regularisation do?",
+   "answer": "It adds a penalty to the loss so the weights stay small and the model is less likely to overfit.",
+   "concepts": [
+    [
+     "E1",
+     "weight penalty"
+    ],
+    [
+     "S1",
+     "L1 versus L2"
+    ],
+    [
+     "S2",
+     "bias variance trade-off"
+    ]
+   ],
+   "reference": "L1 pushes weights to zero and gives sparse models; L2 shrinks them smoothly. Stronger penalties raise bias and lower variance.",
+   "good": [
+    "How would the choice between an L1 and an L2 penalty change the weights you end up with?"
+   ],
+   "bad": [
+    {
+     "q": "Why does a penalty on the loss keep the weights small?",
+     "why": "repeats the answer"
+    }
+   ]
+  },
+  {
+   "id": "H06",
+   "src": "holdout",
+   "domain": "databases",
+   "question": "What does a transaction isolation level control?",
+   "answer": "It controls how much one running transaction can see of another one's changes.",
+   "concepts": [
+    [
+     "E1",
+     "dirty reads"
+    ],
+    [
+     "S1",
+     "phantom reads"
+    ],
+    [
+     "S2",
+     "performance cost"
+    ]
+   ],
+   "reference": "Stronger isolation prevents dirty and phantom reads but costs concurrency and throughput.",
+   "good": [
+    "What kind of problem could appear if one transaction reads another's uncommitted changes?"
+   ],
+   "bad": [
+    {
+     "q": "How much can one running transaction see of another one's changes?",
+     "why": "repeats the answer"
+    }
+   ]
+  },
+  {
+   "id": "H07",
+   "src": "holdout",
+   "domain": "algorithms",
+   "question": "What is the complexity of merge sort?",
+   "answer": "Merge sort is O(n log n) because it splits the list in half and merges the halves.",
+   "concepts": [
+    [
+     "E1",
+     "extra memory"
+    ],
+    [
+     "S1",
+     "stability"
+    ]
+   ],
+   "reference": "Merge sort needs O(n) extra memory and is stable, unlike plain quicksort.",
+   "good": [
+    "What does merge sort need that an in-place sort does not?"
+   ],
+   "bad": [
+    {
+     "q": "Why is merge sort O(n log n) when it splits the list in half and merges the halves?",
+     "why": "repeats the answer"
+    }
+   ]
+  },
+  {
+   "id": "H08",
+   "src": "holdout",
+   "domain": "python",
+   "question": "What is the difference between a list and a tuple?",
+   "answer": "A list can be changed after it is created, but a tuple cannot.",
+   "concepts": [
+    [
+     "E1",
+     "immutability"
+    ],
+    [
+     "S1",
+     "hashability"
+    ],
+    [
+     "S2",
+     "use as dictionary keys"
+    ]
+   ],
+   "reference": "Tuples are immutable and therefore hashable when their items are, so they can be dictionary keys; lists cannot.",
+   "good": [
+    "Where would you choose a tuple over a list because it cannot change?"
+   ],
+   "bad": [
+    {
+     "q": "How is a list changed after it is created while a tuple cannot be?",
+     "why": "repeats the answer"
+    }
+   ]
+  },
+  {
+   "id": "H09",
+   "src": "holdout",
+   "domain": "ml",
+   "question": "What is gradient descent?",
+   "answer": "It updates the weights a little in the direction that reduces the loss, again and again.",
+   "concepts": [
+    [
+     "E1",
+     "learning rate"
+    ],
+    [
+     "S1",
+     "local minima"
+    ],
+    [
+     "S2",
+     "stochastic updates"
+    ]
+   ],
+   "reference": "A learning rate that is too large overshoots and one that is too small is slow; stochastic updates use mini-batches.",
+   "good": [
+    "What would you expect to see if the learning rate were set too high?"
+   ],
+   "bad": [
+    {
+     "q": "How does it update the weights in the direction that reduces the loss?",
+     "why": "repeats the answer"
+    }
+   ]
+  },
+  {
+   "id": "H10",
+   "src": "holdout",
+   "domain": "ml",
+   "question": "What is precision?",
+   "answer": "Precision is the share of predicted positives that are really positive.",
+   "concepts": [
+    [
+     "E1",
+     "recall"
+    ],
+    [
+     "S1",
+     "trade-off between precision and recall"
+    ]
+   ],
+   "reference": "Recall is the share of real positives that were found; raising the threshold usually raises precision and lowers recall.",
+   "good": [
+    "How would moving the decision threshold change precision and what would you give up?"
+   ],
+   "bad": [
+    {
+     "q": "What share of predicted positives are really positive?",
+     "why": "repeats the answer"
+    }
+   ]
+  },
+  {
+   "id": "H11",
+   "src": "holdout2",
+   "domain": "databases",
+   "question": "What is database normalisation?",
+   "answer": "Normalisation organises tables so the same fact is stored only once.",
+   "concepts": [
+    [
+     "E1",
+     "update anomalies"
+    ],
+    [
+     "S1",
+     "denormalisation for speed"
+    ],
+    [
+     "S2",
+     "normal forms"
+    ]
+   ],
+   "reference": "Storing a fact once avoids update anomalies, but joins get costlier so some systems denormalise for read speed.",
+   "good": [
+    "What problem could appear if a customer's address were copied into many rows?"
+   ],
+   "bad": [
+    {
+     "q": "Why is the same fact stored only once when tables are organised?",
+     "why": "repeats the answer"
+    }
+   ]
+  },
+  {
+   "id": "H12",
+   "src": "holdout2",
+   "domain": "algorithms",
+   "question": "How does depth-first search work?",
+   "answer": "It goes as deep as it can along one path before backing up and trying the next one.",
+   "concepts": [
+    [
+     "E1",
+     "stack or recursion"
+    ],
+    [
+     "S1",
+     "visited set"
+    ],
+    [
+     "S2",
+     "cycles in graphs"
+    ]
+   ],
+   "reference": "DFS uses a stack or recursion and a visited set so that cycles in a graph do not cause endless loops.",
+   "good": [
+    "What would go wrong if the graph contained a cycle and you kept no record of the nodes you had seen?"
+   ],
+   "bad": [
+    {
+     "q": "How does it go as deep as it can along one path before backing up?",
+     "why": "repeats the answer"
+    }
+   ]
+  },
+  {
+   "id": "H13",
+   "src": "holdout2",
+   "domain": "python",
+   "question": "What does the GIL do in CPython?",
+   "answer": "The GIL lets only one thread run Python bytecode at a time.",
+   "concepts": [
+    [
+     "E1",
+     "CPU-bound threads"
+    ],
+    [
+     "S1",
+     "multiprocessing"
+    ],
+    [
+     "S2",
+     "I/O-bound threads"
+    ]
+   ],
+   "reference": "CPU-bound code gains nothing from threads under the GIL, so multiprocessing is used, while I/O-bound threads still help because the lock is released while waiting.",
+   "good": [
+    "How would the GIL affect a program that spends most of its time waiting on network calls?"
+   ],
+   "bad": [
+    {
+     "q": "Why does the GIL let only one thread run Python bytecode at a time?",
+     "why": "repeats the answer"
+    }
+   ]
+  },
+  {
+   "id": "H14",
+   "src": "holdout2",
+   "domain": "ml",
+   "question": "What is cross-validation?",
+   "answer": "You split the data into folds and train several times, each time holding out a different fold.",
+   "concepts": [
+    [
+     "E1",
+     "variance of the estimate"
+    ],
+    [
+     "S1",
+     "data leakage"
+    ],
+    [
+     "S2",
+     "time series splits"
+    ]
+   ],
+   "reference": "Averaging over folds gives a steadier estimate; preprocessing must be fit inside each fold to avoid leakage, and time series need ordered splits.",
+   "good": [
+    "What could go wrong if you scaled the whole dataset before splitting it into folds?"
+   ],
+   "bad": [
+    {
+     "q": "How do you train several times and hold out a different fold each time?",
+     "why": "repeats the answer"
+    }
+   ]
+  },
+  {
+   "id": "H15",
+   "src": "holdout2",
+   "domain": "ml",
+   "question": "What is a decision tree?",
+   "answer": "It asks a series of yes or no questions about the features to reach a prediction.",
+   "concepts": [
+    [
+     "E1",
+     "overfitting of deep trees"
+    ],
+    [
+     "S1",
+     "pruning"
+    ],
+    [
+     "S2",
+     "information gain"
+    ]
+   ],
+   "reference": "Deep trees overfit, pruning limits depth, and splits are chosen by information gain or Gini impurity.",
+   "good": [
+    "What would happen to the tree if you let it keep splitting until every leaf held one example?"
+   ],
+   "bad": [
+    {
+     "q": "How does it ask a series of yes or no questions about the features?",
+     "why": "repeats the answer"
+    }
+   ]
+  },
+  {
+   "id": "H16",
+   "src": "holdout2",
+   "domain": "databases",
+   "question": "What is a primary key?",
+   "answer": "A primary key uniquely identifies each row in a table.",
+   "concepts": [
+    [
+     "E1",
+     "foreign key relationships"
+    ],
+    [
+     "S1",
+     "composite keys"
+    ]
+   ],
+   "reference": "A foreign key in another table refers to a primary key; a composite key uses several columns together when no single one is unique.",
+   "good": [
+    "How would another table refer to a row identified by that key?"
+   ],
+   "bad": [
+    {
+     "q": "How does a primary key uniquely identify each row in a table?",
+     "why": "repeats the answer"
+    }
+   ]
+  },
+  {
+   "id": "H17",
+   "src": "holdout2",
+   "domain": "algorithms",
+   "question": "What is dynamic programming?",
+   "answer": "It breaks a problem into smaller overlapping problems and stores their answers.",
+   "concepts": [
+    [
+     "E1",
+     "memoisation"
+    ],
+    [
+     "S1",
+     "optimal substructure"
+    ]
+   ],
+   "reference": "Stored answers are reused through memoisation or tabulation, and the method needs optimal substructure to be correct.",
+   "good": [
+    "What would happen to the running time of a recursive Fibonacci function if you did not store earlier results?"
+   ],
+   "bad": [
+    {
+     "q": "How does it break a problem into smaller overlapping problems and store their answers?",
+     "why": "repeats the answer"
+    }
+   ]
+  },
+  {
+   "id": "H18",
+   "src": "holdout2",
+   "domain": "python",
+   "question": "What is a decorator?",
+   "answer": "A decorator is a function that wraps another function to add behaviour.",
+   "concepts": [
+    [
+     "E1",
+     "closures"
+    ],
+    [
+     "S1",
+     "functools.wraps"
+    ],
+    [
+     "S2",
+     "use cases such as logging"
+    ]
+   ],
+   "reference": "A decorator relies on closures and should use functools.wraps to keep the wrapped function's name; common uses are logging and caching.",
+   "good": [
+    "Where in a real program would you wrap a function this way, and why?"
+   ],
+   "bad": [
+    {
+     "q": "How does a function wrap another function to add behaviour?",
+     "why": "repeats the answer"
+    }
+   ]
+  },
+  {
+   "id": "H19",
+   "src": "holdout2",
+   "domain": "ml",
+   "question": "What is a confusion matrix?",
+   "answer": "It is a table that counts correct and wrong predictions for each class.",
+   "concepts": [
+    [
+     "E1",
+     "false positives and false negatives"
+    ],
+    [
+     "S1",
+     "cost of different errors"
+    ]
+   ],
+   "reference": "The off-diagonal cells are false positives and false negatives, and their costs usually differ, for example in medical screening.",
+   "good": [
+    "Which kind of wrong prediction in the table would worry you more in a medical screening, and why?"
+   ],
+   "bad": [
+    {
+     "q": "What does the table count for each class?",
+     "why": "repeats the answer"
+    }
+   ]
+  },
+  {
+   "id": "H20",
+   "src": "holdout2",
+   "domain": "ml",
+   "question": "What is k-means?",
+   "answer": "K-means groups points into k clusters by moving centres to the average of their points.",
+   "concepts": [
+    [
+     "E1",
+     "choosing k"
+    ],
+    [
+     "S1",
+     "sensitivity to initialisation"
+    ]
+   ],
+   "reference": "The elbow method or silhouette score help choose k, and results depend on the random starting centres.",
+   "good": [
+    "How would you decide how many clusters to use for a dataset you had never seen?"
+   ],
+   "bad": [
+    {
+     "q": "How do the centres move to the average of their points?",
+     "why": "repeats the answer"
+    }
+   ]
+  }
+ ]
+}

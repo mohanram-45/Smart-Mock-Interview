@@ -1,0 +1,366 @@
+[
+ {
+  "id": "smi-h0003",
+  "plan_id": "P2-NLP-03",
+  "domain": "NLP",
+  "difficulty": "Hard",
+  "question": "A retrieval-augmented QA assistant answers employee questions from about 15,000 policy pages (chunked to ~512 tokens, dense retriever, top-5 chunks passed to an LLM). Users complain it gives confident, wrong answers. You pull 60 bad answers and hand-label them; hypothetically, you find: in 24 the answer-bearing chunk is not in the top-5 (in 15 of those it would appear in the top-50); in 21 the right chunk is in the context but the answer contradicts it or adds claims not in it; in 9 a superseded version of the policy was retrieved; in 6 the question cannot be answered from the corpus, yet the model answered anyway.\n\nDescribe how you separate retrieval failures from generation failures, which metrics (context recall, faithfulness/groundedness, answer relevance) you would compute and how, what each bucket suggests as a fix, and what is wrong with relying only on this 60-example sample.",
+  "answer": "Treat it as two systems and test each with the other held fixed.\n\n1. Label evidence. For each question record the answer-bearing chunk(s) (or 'unanswerable'). Without this you can only judge the final text.\n\n2. Retrieval diagnostics. Context recall: is the needed evidence present in the retrieved context (hit rate / recall@k against the labelled chunks; RAGAS-style tools define context recall relative to a reference answer, and definitions vary by tool, so state yours). Also recall@50 to see whether a reranker could rescue it, MRR for rank, and context precision (share of the top-5 that is useful). In your sample: 24/60 are retrieval misses, 15 of them are within the top-50, so a reranker over a 50-candidate set could rescue at most those 15; the other 9 point to chunking, vocabulary mismatch, or query phrasing.\n\n3. Generation diagnostics. Run an oracle test: give the model the gold chunk only. If it still errs, it is a generation or prompt problem. Faithfulness (groundedness): split the answer into claims and check each against the retrieved context with an NLI model or LLM judge; report the unsupported-claim rate. Answer relevance: does it address the question asked; compute it with an LLM judge (1-5 or yes/no against a rubric) or, as RAGAS does, by generating questions from the answer and measuring their embedding similarity to the user's question; validate on human labels. Faithfulness is not correctness: a faithful answer built on a stale or wrong chunk is still wrong, and a correct answer from the model's memory can be unfaithful. LLM judges are imperfect, so validate them on a human-labelled subset.\n\n4. Bucket to fix. Missing evidence (24): hybrid BM25 + dense retrieval, smaller or structure-aware chunks, query rewriting, larger candidate set plus reranker. Present but unfaithful (21): require citations or quotes, instruct abstention, lower temperature, trim the context, test reordering (long contexts can hurt use of mid-context evidence; this is reported empirically but model-dependent), fine-tune or switch model. Stale versions (9): version metadata and filtering, drop superseded documents at ingest. Unanswerable (6): a retrieval-score threshold or an explicit 'not found' path, measured as abstention precision/recall.\n\n5. Sample caveats. 60 hand-picked complaints is a selection-biased sample of failures: it gives no failure rate, and the proportions have wide uncertainty (21/60 has a 95% interval of roughly 24% to 48%). Build a stratified evaluation set from random production traffic plus known hard cases, track each metric per bucket after every change, and watch for regressions such as a higher abstention rate hurting answerable questions.",
+  "key_concepts": [
+   "context recall",
+   "faithfulness",
+   "answer relevance",
+   "oracle test",
+   "reranker",
+   "abstention",
+   "superseded documents",
+   "selection-biased sample"
+  ],
+  "common_mistakes": [
+   "Blaming the LLM without checking whether the gold chunk was retrieved",
+   "Using faithfulness as a proxy for correctness",
+   "Drawing rates from a hand-picked sample of complaints"
+  ],
+  "code": null,
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "problem": "Presence in the top-50 is only an upper bound on what a reranker could rescue; it does not mean they are recovered.",
+    "claim": "15 of them recoverable by a reranker over a top-50 candidate set"
+   },
+   {
+    "severity": "minor",
+    "problem": "Metric is named but not operationalised although the question asks how to compute it.",
+    "claim": "Answer relevance: does it address the question asked."
+   }
+  ]
+ },
+ {
+  "id": "smi-h0004",
+  "plan_id": "P2-NLP-04",
+  "domain": "NLP",
+  "difficulty": "Medium",
+  "question": "A 32-layer decoder has hidden size 4096. In every layer you attach LoRA adapters with rank r=8 and alpha=16 to the q_proj and v_proj weights only, each a 4096 x 4096 matrix.\n\n(a) How many trainable parameters does this add, and how does that compare with fully fine-tuning those same 64 matrices?\n(b) Write lora_param_counts(d_out, d_in, r) -> (lora_params, full_params, ratio), lora_forward(x, W, A, B, alpha, r) for the unmerged path y = x W^T + (alpha/r) (x A^T) B^T, and merge_lora(W, A, B, alpha, r) returning W + (alpha/r) B A. W is (d_out, d_in), A is (r, d_in), B is (d_out, r). Show with numpy that merged and unmerged outputs agree and that the update has rank <= r.\n(c) Why is B initialised to zero, what does alpha/r do, and when might LoRA be a poor choice?\n\nExample: lora_param_counts(4096, 4096, 8) -> (65536, 16777216, 0.00390625).",
+  "answer": "(a) One adapter on a 4096 x 4096 matrix has A (8 x 4096) and B (4096 x 8): 8 * (4096 + 4096) = 65,536 parameters versus 16,777,216 for the full matrix, i.e. 0.39%. Over 32 layers x 2 matrices that is 4,194,304 (about 4.2M) trainable parameters versus 1,073,741,824 (about 1.07B) for those matrices fully fine-tuned. The count is r(d_in + d_out), linear in r, against d_in * d_out.\n\n(b) LoRA freezes W and learns a low-rank update delta W = (alpha/r) B A. Because matrix multiplication is associative and linear, x (W + s B A)^T = x W^T + s (x A^T) B^T, so the merged weight gives the same outputs (up to floating-point error) with no extra inference latency, and the update has rank at most r even though W is full rank. Demonstration:\n```python\nrng = np.random.default_rng(0)\nd_out, d_in, r, alpha = 12, 20, 4, 8\nW = rng.normal(size=(d_out, d_in)); A = rng.normal(size=(r, d_in)) * 0.1; B = rng.normal(size=(d_out, r)) * 0.1\nx = rng.normal(size=(5, d_in))\nWm = merge_lora(W, A, B, alpha, r)\nassert np.allclose(x @ Wm.T, lora_forward(x, W, A, B, alpha, r), atol=1e-10)\nassert np.linalg.matrix_rank(Wm - W, tol=1e-9) == r  # <= r in general; == r for random A, B\n```\n\n```python\nimport numpy as np\n\ndef lora_param_counts(d_out, d_in, r):\n    \"\"\"Trainable parameters of one LoRA adapter vs. full fine-tuning of that weight (no bias).\"\"\"\n    lora = r * (d_in + d_out)          # A: (r, d_in), B: (d_out, r)\n    full = d_out * d_in\n    return lora, full, lora / full\n\ndef lora_forward(x, W, A, B, alpha, r):\n    \"\"\"Unmerged path: y = x W^T + (alpha/r) * (x A^T) B^T.  x: (n, d_in), W: (d_out, d_in).\"\"\"\n    return x @ W.T + (alpha / r) * (x @ A.T) @ B.T\n\ndef merge_lora(W, A, B, alpha, r):\n    \"\"\"Merged weight W' = W + (alpha/r) * B @ A, same shape as W.\"\"\"\n    return W + (alpha / r) * (B @ A)\n```\n\n(c) B starts at zero (A random) so delta W = 0 and training starts exactly from the pretrained model; if both were zero no gradient would reach either factor, and if both were large the start point would be perturbed. alpha/r is a constant scale on the update; it lets you change r without retuning the learning rate as much, though how well that holds is empirical.\n\nLimits (hedged): memory savings are smaller than the parameter ratio suggests, because activations must still be stored and the frozen base still has to be loaded; you do save gradients and optimiser state for the frozen weights. The original LoRA work reports quality close to full fine-tuning on several tasks, but this is task-dependent; tasks needing large behavioural change or substantial new knowledge may benefit from higher rank, more target modules, or full fine-tuning. Merging into fp16/bf16 weights rounds, and merging into a quantised base needs extra care. Merging also fixes one adapter into the weights; keep the unmerged adapters if you want to swap or compose them.",
+  "key_concepts": [
+   "LoRA",
+   "low-rank update",
+   "trainable parameters",
+   "merged weight",
+   "rank at most r",
+   "B starts at zero",
+   "alpha/r"
+  ],
+  "common_mistakes": [
+   "Using r*r or d*r instead of r*(d_in+d_out)",
+   "Initialising both A and B to zero (no gradient flows) or ignoring the alpha/r factor in the merge",
+   "Claiming LoRA cuts memory by the full parameter ratio"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\ndef lora_param_counts(d_out, d_in, r):\n    \"\"\"Trainable parameters of one LoRA adapter vs. full fine-tuning of that weight (no bias).\"\"\"\n    lora = r * (d_in + d_out)          # A: (r, d_in), B: (d_out, r)\n    full = d_out * d_in\n    return lora, full, lora / full\n\ndef lora_forward(x, W, A, B, alpha, r):\n    \"\"\"Unmerged path: y = x W^T + (alpha/r) * (x A^T) B^T.  x: (n, d_in), W: (d_out, d_in).\"\"\"\n    return x @ W.T + (alpha / r) * (x @ A.T) @ B.T\n\ndef merge_lora(W, A, B, alpha, r):\n    \"\"\"Merged weight W' = W + (alpha/r) * B @ A, same shape as W.\"\"\"\n    return W + (alpha / r) * (B @ A)",
+   "test": "\n# counts: one 4096x4096 projection, r=8\nlora, full, frac = lora_param_counts(4096, 4096, 8)\nassert (lora, full) == (65536, 16777216) and abs(frac - 65536 / 16777216) < 1e-15   # ~0.39 %\n# 32 layers x (q, v) projections\nassert 32 * 2 * lora == 4194304 and 32 * 2 * full == 1073741824\n# rectangular MLP weight 11008 x 4096, r=16\nl2, f2, _ = lora_param_counts(11008, 4096, 16)\nassert l2 == 16 * (4096 + 11008) == 241664 and f2 == 11008 * 4096\n\n# equivalence of merged and unmerged computation (float64)\nrng = np.random.default_rng(0)\nd_out, d_in, r, alpha = 12, 20, 4, 8\nW = rng.normal(size=(d_out, d_in))\nA = rng.normal(size=(r, d_in)) * 0.1\nB = rng.normal(size=(d_out, r)) * 0.1\nx = rng.normal(size=(5, d_in))\nWm = merge_lora(W, A, B, alpha, r)\nassert Wm.shape == W.shape\nassert np.allclose(x @ Wm.T, lora_forward(x, W, A, B, alpha, r), atol=1e-10)\n\n# the update has rank <= r, even though the weight is full rank\ndelta = Wm - W\nassert np.linalg.matrix_rank(delta, tol=1e-9) == r\nassert np.linalg.matrix_rank(W) == min(d_out, d_in)\n\n# standard init: B = 0 so the adapted model starts identical to the base model\nB0 = np.zeros((d_out, r))\nassert np.array_equal(merge_lora(W, A, B0, alpha, r), W)\nassert np.allclose(lora_forward(x, W, A, B0, alpha, r), x @ W.T)\n\n# un-merging recovers the base weights (up to float error), useful for swapping adapters\nassert np.allclose(Wm - (alpha / r) * (B @ A), W)\n# alpha/r only rescales the update: doubling alpha doubles the delta\nassert np.allclose(merge_lora(W, A, B, 2 * alpha, r) - W, 2 * delta)\n\n# demonstration shown in the answer\nrng = np.random.default_rng(0)\nd_out, d_in, r, alpha = 12, 20, 4, 8\nW = rng.normal(size=(d_out, d_in)); A = rng.normal(size=(r, d_in)) * 0.1; B = rng.normal(size=(d_out, r)) * 0.1\nx = rng.normal(size=(5, d_in))\nWm = merge_lora(W, A, B, alpha, r)\nassert np.allclose(x @ Wm.T, lora_forward(x, W, A, B, alpha, r), atol=1e-10)\nassert np.linalg.matrix_rank(Wm - W, tol=1e-9) == r  # <= r in general; == r for random A, B\n",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "major",
+    "problem": "The question explicitly asks to show merge equivalence and rank <= r with numpy; no demonstration code appears in the answer.",
+    "claim": "the update has rank at most r even though W is full rank."
+   }
+  ]
+ },
+ {
+  "id": "smi-h0006",
+  "plan_id": "P2-NLP-06",
+  "domain": "NLP",
+  "difficulty": "Hard",
+  "question": "An extractive QA model (BERT-style) outputs, for each of 10 input tokens, a start logit and an end logit. Token 0 is [CLS], tokens 1-8 are the context, token 9 is [SEP]. The answer is a span (i, j) inside the context with i <= j and j - i + 1 <= max_answer_len, scored start[i] + end[j].\n\n(a) Explain why taking argmax(start) and argmax(end) independently is wrong.\n(b) Implement best_span(start_logits, end_logits, max_answer_len, context_mask) -> (i, j, score) or None, vectorised with numpy, ties resolved to the smaller start then smaller end.\n(c) Add predict(start_logits, end_logits, max_answer_len, context_mask, null_threshold=0.0) for unanswerable questions (SQuAD v2 style: the [CLS] span has score start[0]+end[0]; return None when null_score - best_score > null_threshold).\n(d) For contexts longer than the model's window, implement sliding_windows(n_tokens, window_len, overlap) -> [(start, end_exclusive), ...] and merge_windows(per_window) for combining per-window answers; state which answers are guaranteed to fit in one window.\n\nExample: start = [0, .1, 3, .2, 0, 2, 0, 0, .1, 0], end = [0, 0, 0, .3, 2.5, .2, 1, .1, 0, 0], context_mask true for tokens 1-8. best_span(..., max_answer_len=10) -> (2, 4, 5.5); max_answer_len=2 -> (2, 3, 3.3). sliding_windows(10, 4, 2) -> [(0, 4), (2, 6), (4, 8), (6, 10)].",
+  "answer": "(a) The two argmaxes can give end < start (an invalid span), a span spanning most of the passage, or tokens outside the context. The model scores starts and ends separately, so you must search pairs under constraints and take the best joint score start[i] + end[j] (a sum of logits, i.e. the log of an unnormalised product).\n\n(b) Build the n x n score matrix, mask invalid pairs with -inf (j < i, length over max_answer_len, either token not in the context so [CLS], question and padding are excluded), and take the argmax. That is O(n^2) memory, fine for windows of a few hundred tokens; for longer inputs restrict to the top-k starts and ends or use the band j - i < max_answer_len.\n\n(c) For unanswerable questions, compare the null span's score with the best real span; null_threshold shifts the decision and is tuned on a dev set to trade false answers against false abstentions. It is not 0 by principle.\n\n(d) Windows overlap by `overlap` tokens. A span of length <= overlap + 1 always lies completely inside at least one window (the window starting at the last start <= i extends far enough), so choose overlap above your longest expected answer. Logits from different windows come from separate forward passes that see different context, so they are not strictly calibrated against each other; taking the highest-scoring span across windows is the common practical rule. How to combine the per-window null scores differs between implementations (for example, using the smallest null score across windows and comparing it with the best merged span score); merge_windows below only merges real spans, so apply the null_threshold decision on its result yourself and tune the threshold on dev data.\n\n```python\nimport numpy as np\n\ndef best_span(start_logits, end_logits, max_answer_len, context_mask):\n    \"\"\"Best (start, end, score) with start <= end < start + max_answer_len, both tokens\n    inside the context (context_mask True). score = start_logit + end_logit.\n    Returns None if the context has no tokens.\"\"\"\n    s = np.asarray(start_logits, dtype=np.float64)\n    e = np.asarray(end_logits, dtype=np.float64)\n    ctx = np.asarray(context_mask, dtype=bool)\n    n = len(s)\n    scores = s[:, None] + e[None, :]                       # scores[i, j] = s_i + e_j\n    i, j = np.indices((n, n))\n    valid = (j >= i) & (j - i < max_answer_len) & ctx[:, None] & ctx[None, :]\n    if not valid.any():\n        return None\n    scores = np.where(valid, scores, -np.inf)\n    flat = int(np.argmax(scores))                          # ties: smallest start, then end\n    a, b = divmod(flat, n)\n    return a, b, float(scores[a, b])\n\ndef predict(start_logits, end_logits, max_answer_len, context_mask, null_threshold=0.0):\n    \"\"\"SQuAD-v2 style: position 0 ([CLS]) is the no-answer span.\n    Return (start, end) or None (= unanswerable) if null_score - best_score > threshold.\"\"\"\n    null_score = float(start_logits[0] + end_logits[0])\n    best = best_span(start_logits, end_logits, max_answer_len, context_mask)\n    if best is None or null_score - best[2] > null_threshold:\n        return None\n    return best[0], best[1]\n\ndef sliding_windows(n_tokens, window_len, overlap):\n    \"\"\"(start, end_exclusive) windows over n_tokens; consecutive windows share `overlap` tokens.\"\"\"\n    if overlap >= window_len:\n        raise ValueError(\"overlap must be smaller than window_len\")\n    step = window_len - overlap\n    out, start = [], 0\n    while True:\n        end = min(start + window_len, n_tokens)\n        out.append((start, end))\n        if end == n_tokens:\n            return out\n        start += step\n\ndef merge_windows(per_window):\n    \"\"\"per_window: list of (window_start, (local_start, local_end, score) or None).\n    Return (global_start, global_end, score) of the highest-scoring span, or None.\"\"\"\n    best = None\n    for w0, span in per_window:\n        if span is not None and (best is None or span[2] > best[2]):\n            best = (w0 + span[0], w0 + span[1], span[2])\n    return best\n```\n\nPitfalls: forgetting to shift window-local indices to global token positions (merge_windows does this); letting the context mask include [SEP]; mapping tokens back to characters with offset mappings (sub-word boundaries) before returning the text; ties between equal scores should be deterministic; a null_threshold tuned on one domain may not transfer.",
+  "key_concepts": [
+   "joint score",
+   "max_answer_len",
+   "unanswerable questions",
+   "null_threshold",
+   "overlap",
+   "context_mask"
+  ],
+  "common_mistakes": [
+   "Using argmax(start) and argmax(end) separately",
+   "Letting [CLS]/question/[SEP] tokens appear in the answer",
+   "Forgetting to add the window offset when merging, or assuming logits are calibrated across windows"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\ndef best_span(start_logits, end_logits, max_answer_len, context_mask):\n    \"\"\"Best (start, end, score) with start <= end < start + max_answer_len, both tokens\n    inside the context (context_mask True). score = start_logit + end_logit.\n    Returns None if the context has no tokens.\"\"\"\n    s = np.asarray(start_logits, dtype=np.float64)\n    e = np.asarray(end_logits, dtype=np.float64)\n    ctx = np.asarray(context_mask, dtype=bool)\n    n = len(s)\n    scores = s[:, None] + e[None, :]                       # scores[i, j] = s_i + e_j\n    i, j = np.indices((n, n))\n    valid = (j >= i) & (j - i < max_answer_len) & ctx[:, None] & ctx[None, :]\n    if not valid.any():\n        return None\n    scores = np.where(valid, scores, -np.inf)\n    flat = int(np.argmax(scores))                          # ties: smallest start, then end\n    a, b = divmod(flat, n)\n    return a, b, float(scores[a, b])\n\ndef predict(start_logits, end_logits, max_answer_len, context_mask, null_threshold=0.0):\n    \"\"\"SQuAD-v2 style: position 0 ([CLS]) is the no-answer span.\n    Return (start, end) or None (= unanswerable) if null_score - best_score > threshold.\"\"\"\n    null_score = float(start_logits[0] + end_logits[0])\n    best = best_span(start_logits, end_logits, max_answer_len, context_mask)\n    if best is None or null_score - best[2] > null_threshold:\n        return None\n    return best[0], best[1]\n\ndef sliding_windows(n_tokens, window_len, overlap):\n    \"\"\"(start, end_exclusive) windows over n_tokens; consecutive windows share `overlap` tokens.\"\"\"\n    if overlap >= window_len:\n        raise ValueError(\"overlap must be smaller than window_len\")\n    step = window_len - overlap\n    out, start = [], 0\n    while True:\n        end = min(start + window_len, n_tokens)\n        out.append((start, end))\n        if end == n_tokens:\n            return out\n        start += step\n\ndef merge_windows(per_window):\n    \"\"\"per_window: list of (window_start, (local_start, local_end, score) or None).\n    Return (global_start, global_end, score) of the highest-scoring span, or None.\"\"\"\n    best = None\n    for w0, span in per_window:\n        if span is not None and (best is None or span[2] > best[2]):\n            best = (w0 + span[0], w0 + span[1], span[2])\n    return best",
+   "test": "\n# tokens: 0=[CLS], 1..8 = context, 9 = [SEP]\nctx = np.array([0, 1, 1, 1, 1, 1, 1, 1, 1, 0], dtype=bool)\ns = np.array([0.0, 0.1, 3.0, 0.2, 0.0, 2.0, 0.0, 0.0, 0.1, 0.0])\ne = np.array([0.0, 0.0, 0.0, 0.3, 2.5, 0.2, 1.0, 0.1, 0.0, 0.0])\n\n# unconstrained: start=2 (3.0) with end=4 (2.5) -> 5.5\nassert best_span(s, e, 10, ctx) == (2, 4, 5.5)\n# max length 2 forbids (2,4); best allowed is start=2,end=3 (3.3) vs (5,6) (3.0)\nassert best_span(s, e, 2, ctx)[:2] == (2, 3)\n# start <= end is enforced: a huge end logit before the start is ignored\ns2 = s.copy(); s2[1] = -100.0           # token 1 cannot start an answer\ne2 = e.copy(); e2[1] = 50.0            # but looks like a perfect end\nassert best_span(s2, e2, 10, ctx)[:2] == (2, 4)\n# question/special tokens can never be an answer, even with a huge logit\ns3 = s.copy(); s3[9] = 99.0\nassert best_span(s3, e, 10, ctx)[:2] == (2, 4)\nassert best_span(s, e, 10, np.zeros(10, dtype=bool)) is None\n\n# unanswerable questions: compare the [CLS] span with the best real span\ns_null = s.copy(); e_null = e.copy(); s_null[0] = 4.0; e_null[0] = 4.0   # null score 8.0 > 5.5\nassert predict(s_null, e_null, 10, ctx) is None\nassert predict(s, e, 10, ctx) == (2, 4)\nassert predict(s_null, e_null, 10, ctx, null_threshold=3.0) == (2, 4)   # tuned bias toward answering\n\n# sliding windows\nassert sliding_windows(10, 4, 2) == [(0, 4), (2, 6), (4, 8), (6, 10)]\nassert sliding_windows(3, 4, 1) == [(0, 3)]\nassert sliding_windows(7, 4, 1) == [(0, 4), (3, 7)]\n# every span of length <= overlap + 1 lies completely inside at least one window\nn, wl, ov = 23, 8, 3\nwins = sliding_windows(n, wl, ov)\nfor a in range(n):\n    for b in range(a, min(n, a + ov + 1)):\n        assert any(ws <= a and b < we for ws, we in wins), (a, b)\n# merging: local spans are shifted to global coordinates, best score wins\nassert merge_windows([(0, (1, 2, 4.0)), (6, (0, 1, 7.5)), (12, None)]) == (6, 7, 7.5)\nassert merge_windows([(0, None)]) is None",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "problem": "As written, merge_windows silently drops windows without an answer, so any window with a spurious span overrides windows that preferred null; the code never applies the part (c) null decision across windows.",
+    "claim": "How to combine the per-window null scores differs between implementations (for example, using the smallest null score across windows), so define it explicitly and tune the threshold on dev data."
+   },
+   {
+    "severity": "minor",
+    "problem": "The question does not state the input format of merge_windows, so the reference format ((window_start, (i, j, score) or None)) is one arbitrary choice.",
+    "claim": "merge_windows(per_window)"
+   }
+  ]
+ },
+ {
+  "id": "smi-h0007",
+  "plan_id": "P2-NLP-07",
+  "domain": "NLP",
+  "difficulty": "Medium",
+  "question": "A support-ticket classifier uses 300-d word-level embeddings with a 50,000-word vocabulary. About 8% of tokens in new tickets are out-of-vocabulary: typos ('refundd', 'recieve'), Hinglish ('paisa wapas chahiye') and SKU-like strings. Explain how fastText-style character n-gram embeddings give such words a vector, then implement:\n\nchar_ngrams(word, n_min=3, n_max=6) -> list of subword strings from '<word>' (boundary markers added, every n-gram of length n_min..n_max by code point, plus the whole marked word once);\nfnv1a_32(text) -> 32-bit FNV-1a hash of the UTF-8 bytes;\nngram_buckets(word, n_min, n_max, num_buckets) -> list of bucket ids;\nword_vector(word, table, n_min, n_max) -> mean of the bucket embeddings from table (shape (num_buckets, dim)).\n\nExample: char_ngrams('where', 3, 3) == ['<wh', 'whe', 'her', 'ere', 're>', '<where>']; fnv1a_32('a') == 0xE40C292C. Finally, say what this approach does not fix.",
+  "answer": "A word-level model gives every OOV word the same 'unknown' vector. fastText instead represents a word as the sum (or mean) of embeddings of its character n-grams (plus the word itself if it is in the vocabulary). A misspelling like 'refundd' shares most n-grams with 'refund' ('<re', 'ref', 'efu', 'fun', 'und', ...), so its vector lands near the correct word, and morphological variants ('refunds', 'refunded') also share units. The boundary markers '<' and '>' distinguish a prefix or suffix from the same letters inside a word: '<her>' (the word 'her') differs from 'her' inside 'where'.\n\nMemory is bounded by hashing each n-gram into a fixed number of buckets, so there is no n-gram dictionary and any unseen word can be embedded. The cost is collisions: different n-grams share a row. fastText's default is, to my knowledge, around two million buckets and n-gram lengths 3 to 6, but check your version; its hash is an FNV-1a variant, and the exact bucket ids of this implementation will not match a pre-trained fastText model, so never mix them.\n\n```python\ndef char_ngrams(word, n_min=3, n_max=6):\n    \"\"\"fastText-style subwords: n-grams of '<word>' for n_min..n_max (by code point),\n    plus the whole marked word '<word>' itself as one extra unit.\"\"\"\n    marked = \"<\" + word + \">\"\n    grams = []\n    for n in range(n_min, n_max + 1):\n        for i in range(len(marked) - n + 1):\n            grams.append(marked[i:i + n])\n    if marked not in grams:\n        grams.append(marked)\n    return grams\n\ndef fnv1a_32(text):\n    h = 2166136261\n    for byte in text.encode(\"utf-8\"):\n        h = ((h ^ byte) * 16777619) & 0xFFFFFFFF\n    return h\n\ndef ngram_buckets(word, n_min=3, n_max=6, num_buckets=2_000_000):\n    \"\"\"Bucket id for every subword unit of `word` (collisions are possible and accepted).\"\"\"\n    return [fnv1a_32(g) % num_buckets for g in char_ngrams(word, n_min, n_max)]\n\ndef word_vector(word, table, n_min=3, n_max=6):\n    \"\"\"Mean of the bucket embeddings; table has shape (num_buckets, dim).\"\"\"\n    ids = ngram_buckets(word, n_min, n_max, table.shape[0])\n    return sum(table[i] for i in ids) / len(ids)\n```\n\nSlice by code points (Python str), not bytes, so non-ASCII text is not split mid-character. In the test, a doubled letter keeps a Jaccard overlap of 0.5 of subword units with the right word, while a transposition ('refnud') keeps only about 0.09.\n\nWhat it does not fix: (1) vectors for n-grams never seen in training are random rows, so OOV quality depends on the n-grams having been trained; (2) transpositions and heavy phonetic spelling destroy many units; (3) a typo that is another real word ('form' for 'from') is not corrected; (4) romanised Hindi shares letters with English words, so n-grams can mix meanings unless the training data contained such text; (5) short words and IDs/SKUs carry little n-gram signal; (6) it adds no semantics for code-mixed phrases beyond what training saw. Alternatives are spelling normalisation, sub-word tokenisers (BPE/WordPiece) in a transformer, or a char-level CNN; none is universally better, so compare on a held-out set of noisy tickets.",
+  "key_concepts": [
+   "character n-grams",
+   "fastText",
+   "boundary markers",
+   "hashing",
+   "collisions",
+   "OOV",
+   "FNV-1a"
+  ],
+  "common_mistakes": [
+   "Omitting '<' and '>' so prefixes and suffixes are indistinguishable from word-internal n-grams",
+   "Using Python's built-in hash(), which is randomised per process for strings",
+   "Claiming subword vectors fix all typos or code-mixed text"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "def char_ngrams(word, n_min=3, n_max=6):\n    \"\"\"fastText-style subwords: n-grams of '<word>' for n_min..n_max (by code point),\n    plus the whole marked word '<word>' itself as one extra unit.\"\"\"\n    marked = \"<\" + word + \">\"\n    grams = []\n    for n in range(n_min, n_max + 1):\n        for i in range(len(marked) - n + 1):\n            grams.append(marked[i:i + n])\n    if marked not in grams:\n        grams.append(marked)\n    return grams\n\ndef fnv1a_32(text):\n    h = 2166136261\n    for byte in text.encode(\"utf-8\"):\n        h = ((h ^ byte) * 16777619) & 0xFFFFFFFF\n    return h\n\ndef ngram_buckets(word, n_min=3, n_max=6, num_buckets=2_000_000):\n    \"\"\"Bucket id for every subword unit of `word` (collisions are possible and accepted).\"\"\"\n    return [fnv1a_32(g) % num_buckets for g in char_ngrams(word, n_min, n_max)]\n\ndef word_vector(word, table, n_min=3, n_max=6):\n    \"\"\"Mean of the bucket embeddings; table has shape (num_buckets, dim).\"\"\"\n    ids = ngram_buckets(word, n_min, n_max, table.shape[0])\n    return sum(table[i] for i in ids) / len(ids)",
+   "test": "\n# the example from the fastText paper, n = 3 only\nassert char_ngrams(\"where\", 3, 3) == [\"<wh\", \"whe\", \"her\", \"ere\", \"re>\", \"<where>\"]\n# \"<where>\" has 7 chars: 5 + 4 + 3 + 2 n-grams of length 3..6, and the length-7 whole word is added once\ng = char_ngrams(\"where\")\nassert len(g) == 5 + 4 + 3 + 2 + 1 and g[-1] == \"<where>\"\n# boundary markers distinguish \"her\" the word from \"her\" inside \"where\"\nassert \"<her>\" in char_ngrams(\"her\")\nassert \"her\" in char_ngrams(\"where\") and \"<he\" in char_ngrams(\"her\") and \"<he\" not in char_ngrams(\"where\")\n# short words: no n-gram longer than the marked word, whole word kept once\nassert char_ngrams(\"a\") == [\"<a>\"]\nassert char_ngrams(\"an\", 3, 6) == [\"<an\", \"an>\", \"<an>\"]\n# non-ASCII works per code point, not per byte\nassert char_ngrams(\"\u00e9\", 3, 3) == [\"<\u00e9>\"] and len(char_ngrams(\"na\u00efve\", 3, 3)) == 5 + 1\n\n# FNV-1a reference values (32-bit)\nassert fnv1a_32(\"\") == 2166136261\nassert fnv1a_32(\"a\") == 0xE40C292C\nassert fnv1a_32(\"foobar\") == 0xBF9CF968\n\n# stable, in-range buckets\nb = ngram_buckets(\"refundd\", num_buckets=1000)\nassert b == ngram_buckets(\"refundd\", num_buckets=1000) and all(0 <= i < 1000 for i in b)\n\n# a typo shares most units with the correct word, an unrelated word shares few\ndef jacc(a, b):\n    a, b = set(char_ngrams(a)), set(char_ngrams(b))\n    return len(a & b) / len(a | b)\nassert jacc(\"refund\", \"refundd\") >= 0.5 > jacc(\"refund\", \"invoice\")\n# a transposition (\"refnud\") destroys many more units than a doubled letter does\nassert jacc(\"refund\", \"refnud\") < 0.15\nassert jacc(\"refund\", \"refunds\") > jacc(\"refund\", \"reform\")\n\n# an unseen (OOV) typo still gets a vector close to the in-vocabulary word\nimport numpy as np\nrng = np.random.default_rng(0)\ntable = rng.normal(size=(5000, 32))\ndef cos(u, v):\n    return float(u @ v / np.linalg.norm(u) / np.linalg.norm(v))\nv = word_vector(\"refund\", table)\nassert v.shape == (32,)\nassert cos(v, word_vector(\"refundd\", table)) > 0.5\nassert abs(cos(v, word_vector(\"invoice\", table))) < 0.4",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "problem": "No 2-gram 'he' is produced with n_min=3. The distinction the markers make is between the word 'her' ('<her>') and 'her' inside 'where'.",
+    "claim": "'<he' (start of 'her') differs from 'he' within 'where'"
+   },
+   {
+    "severity": "minor",
+    "problem": "Hedged and matches my recollection (bucket=2000000, minn=3, maxn=6) but I could not open the fastText docs to confirm.",
+    "claim": "fastText's default is, to my knowledge, around two million buckets and n-gram lengths 3 to 6"
+   },
+   {
+    "severity": "minor",
+    "problem": "In real fastText the in-vocabulary word has its own embedding row, not a hashed bucket; for an OOV word the hashed '<word>' bucket is an untrained random row adding noise. Answer already says untrained n-grams are random, but not that this unit is a deviation.",
+    "claim": "plus the whole marked word '<word>' as a hashed unit"
+   }
+  ]
+ },
+ {
+  "id": "smi-h0008",
+  "plan_id": "P2-NLP-08",
+  "domain": "NLP",
+  "difficulty": "Medium",
+  "question": "You have about 5,000 labelled product reviews with 1-5 star labels (roughly 6% 1-star, 9% 2-star, 20% 3-star, 30% 4-star, 35% 5-star). The service must classify each review in under 30 ms p95 on a single CPU core, and the team wants to jump straight to fine-tuning a large pretrained transformer. How would you proceed? Cover the baseline, evaluation protocol and metric choice, error analysis and label noise, the test that decides whether a transformer fine-tune is justified, and the latency check.",
+  "answer": "Start with a cheap, strong baseline and let evidence justify anything heavier.\n\nBaseline: word 1-2-gram TF-IDF (optionally plus character n-grams for typos) with logistic regression or a linear SVM; it trains in seconds and normally has p95 latency of a few milliseconds on CPU (confirm with the latency check below). Also try frozen sentence embeddings with a linear head.\n\nProtocol: stratified 5-fold cross-validation on the 5,000 examples (or a fixed 80/10/10 split) after removing near-duplicate reviews, and group by product or reviewer if they repeat, otherwise duplicates leak between folds. With 5 classes and 35% majority, accuracy of 0.35 is the trivial floor, so report macro-F1 plus the confusion matrix. Stars are ordinal, so also track mean absolute error or quadratic weighted kappa: predicting 4 for a 5 is a milder error than predicting 1. Give bootstrap confidence intervals; with a 500-review test split holding only ~30 one-star reviews, per-class scores are noisy and small differences between models are not significant.\n\nError analysis: read ~100 errors and categorise them (adjacent-star ambiguity, sarcasm or negation, mixed aspects, wrong language, label noise). Estimate label noise by having a second annotator relabel ~200 items; if agreement is low between neighbouring stars, that limits the achievable score no matter the model, and cleaning labels or merging classes may help more than a bigger model.\n\nIs a transformer justified? Check the learning curve (train on 25/50/75/100% of data): if the baseline has plateaued and errors are semantic (negation, sarcasm, context), a fine-tuned pretrained encoder often helps on small sentiment datasets, but decide with a paired comparison on identical folds: fine-tune with several seeds, bootstrap the macro-F1 / QWK difference against the baseline, and adopt the transformer only if the lower confidence bound of the gain exceeds a threshold agreed in advance (and its distilled or quantised form still meets the 30 ms p95). If most errors are label noise or adjacent-star ambiguity, expect little gain.\n\nLatency: measure p95 on the target CPU including tokenisation, batch size 1, and realistic review length. A base-sized encoder can be marginal on one core; distilled or quantised smaller models are candidates, and the large model can instead serve as an offline teacher or labeller. Decide with a table: metric, CI, p95 latency, cost. Ship the simplest model that meets the quality bar inside the budget, and keep monitoring drift.",
+  "key_concepts": [
+   "TF-IDF",
+   "macro-F1",
+   "ordinal",
+   "label noise",
+   "learning curve",
+   "near-duplicate",
+   "bootstrap",
+   "p95"
+  ],
+  "common_mistakes": [
+   "Reporting accuracy on an imbalanced ordinal task",
+   "Fine-tuning a large model first without a baseline or learning curve",
+   "Ignoring duplicate/near-duplicate leakage and the noise of small-class scores"
+  ],
+  "code": null,
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "problem": "Plausible but unmeasured; should be hedged and tied to the later latency check.",
+    "claim": "it trains in seconds and has p95 latency far below 30 ms on CPU"
+   },
+   {
+    "severity": "minor",
+    "problem": "The decision rule is not explicit: no paired comparison or minimum gain.",
+    "claim": "but this should be shown on your data with several random seeds, since small-data fine-tunes vary run to run."
+   }
+  ]
+ },
+ {
+  "id": "smi-h0009",
+  "plan_id": "P2-NLP-09",
+  "domain": "NLP",
+  "difficulty": "Medium",
+  "question": "A product-search service stores 1,000,000 bi-encoder embeddings (768-d, float32) and ranks by raw dot product. After a model upgrade, a few 'long-vector' documents appear in the top results for many unrelated short queries, and a colleague suggests 'just switch to Euclidean distance'.\n\n(a) Explain how dot product, cosine similarity and Euclidean distance relate, and when they give identical rankings.\n(b) Implement topk_cosine(query, matrix, k) -> (indices, scores) with numpy: vectorised, best first, ties broken by lower index, k larger than n clipped, a zero-norm row scoring 0.0 (not NaN), and without sorting all n scores if you can avoid it. Show it matches a pre-normalised dot product.\n(c) Mention hubness and anisotropy as caveats (hedged).\n\nExample: query = [1, 0.9], matrix = [[10, 0], [10, 10], [0.5, 0.45]], k=3. Raw dot-product order is [1, 0, 2]; topk_cosine returns indices [2, 1, 0].",
+  "answer": "For vectors a and b: dot = |a||b|cos, and |a-b|^2 = |a|^2 + |b|^2 - 2 a.b. Cosine removes the norms. If every vector is L2-normalised (or, for a fixed query, all documents merely share one norm), |a-b|^2 = 2 - 2cos up to constants, so cosine, dot product and Euclidean distance produce identical rankings (Euclidean is just reversed). On raw vectors they differ: dot product rewards large norms, Euclidean penalises norm differences, cosine ignores scale. In the example the raw dot product prefers [10, 10] (19.0) over the exactly parallel short vector [0.5, 0.45] (0.9), whereas cosine ranks the parallel one first (cos = 1.0). So switching to Euclidean does not reproduce cosine: it penalises any norm mismatch with the query (here it ranks [0.5, 0.45], then [10, 0], then [10, 10], whereas cosine ranks [10, 10] second), so it can demote the long vectors but also demotes legitimate documents whose norm differs from the query's; normalising is the targeted fix. Whether a model's norms carry useful signal (some models are trained with dot product, and norm may correlate with things like term frequency or document 'popularity') depends on the model, so check its documentation rather than normalising blindly.\n\nImplementation: normalise rows (guarding zero norms), then one matrix-vector product. For top-k without a full sort, np.partition finds the k-th best score; keeping every row at or above that threshold preserves ties, and a final lexsort orders by (-score, index). Plain argpartition could drop one of several equal scores arbitrarily.\n\n```python\nimport numpy as np\n\ndef topk_cosine(query, matrix, k):\n    \"\"\"Top-k rows of `matrix` (n, d) by cosine similarity to `query` (d,).\n    Returns (indices, scores), best first, ties broken by lower index.\n    Zero-norm rows get similarity 0 (cosine is undefined for them).\"\"\"\n    q = np.asarray(query, dtype=np.float64)\n    M = np.asarray(matrix, dtype=np.float64)\n    qn = np.linalg.norm(q)\n    norms = np.linalg.norm(M, axis=1)\n    if qn == 0:\n        raise ValueError(\"query has zero norm\")\n    safe = np.where(norms == 0, 1.0, norms)\n    scores = (M / safe[:, None]) @ (q / qn)           # == normalised dot product\n    scores = np.where(norms == 0, 0.0, scores)\n    k = min(k, len(scores))\n    # threshold = k-th best score; keep every row >= threshold so ties are not cut arbitrarily\n    thr = np.partition(-scores, k - 1)[k - 1]\n    cand = np.flatnonzero(-scores <= thr)\n    order = np.lexsort((cand, -scores[cand]))[:k]     # score desc, index asc\n    idx = cand[order]\n    return idx, scores[idx]\n```\n\nAt 1M x 768 float32 the matrix is about 3.07 GB, so normalise once at indexing time, store the normalised copy, and search with an inner-product index; make sure an approximate-NN index uses the same metric you intend.\n\nCaveats (hedged, observed empirically in many embedding spaces rather than guaranteed): anisotropy means embeddings can occupy a narrow cone, so cosines between unrelated texts can be surprisingly high, so absolute thresholds are model-specific and only relative ranking is safe to compare; hubness means a few points appear in many queries' nearest-neighbour lists in high dimensions, which can look like the 'popular document' symptom. Mitigations to test: reranking with a cross-encoder, centring or whitening embeddings, or local-scaling corrections, validated on labelled queries.",
+  "key_concepts": [
+   "cosine similarity",
+   "dot product",
+   "Euclidean distance",
+   "L2-normalised",
+   "np.partition",
+   "ties",
+   "anisotropy",
+   "hubness"
+  ],
+  "common_mistakes": [
+   "Switching to Euclidean distance to fix a norm problem on un-normalised vectors",
+   "Using argpartition and silently dropping tied scores",
+   "Dividing by a zero norm and returning NaN, or treating absolute cosine values as comparable across models"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\ndef topk_cosine(query, matrix, k):\n    \"\"\"Top-k rows of `matrix` (n, d) by cosine similarity to `query` (d,).\n    Returns (indices, scores), best first, ties broken by lower index.\n    Zero-norm rows get similarity 0 (cosine is undefined for them).\"\"\"\n    q = np.asarray(query, dtype=np.float64)\n    M = np.asarray(matrix, dtype=np.float64)\n    qn = np.linalg.norm(q)\n    norms = np.linalg.norm(M, axis=1)\n    if qn == 0:\n        raise ValueError(\"query has zero norm\")\n    safe = np.where(norms == 0, 1.0, norms)\n    scores = (M / safe[:, None]) @ (q / qn)           # == normalised dot product\n    scores = np.where(norms == 0, 0.0, scores)\n    k = min(k, len(scores))\n    # threshold = k-th best score; keep every row >= threshold so ties are not cut arbitrarily\n    thr = np.partition(-scores, k - 1)[k - 1]\n    cand = np.flatnonzero(-scores <= thr)\n    order = np.lexsort((cand, -scores[cand]))[:k]     # score desc, index asc\n    idx = cand[order]\n    return idx, scores[idx]",
+   "test": "\n# dot product and cosine disagree when norms differ\ndocs = np.array([[10.0, 0.0],      # long vector, about 42 degrees away from the query\n                 [10.0, 10.0],     # long vector, about 3 degrees away\n                 [0.5, 0.45]])     # short vector, exactly parallel to the query\nq = np.array([1.0, 0.9])\nassert int(np.argmax(docs @ q)) == 1                 # raw dot product is dominated by the norm of doc 1\nidx, sc = topk_cosine(q, docs, 3)\nassert idx.tolist() == [2, 1, 0]                     # cosine ranks the exactly parallel short doc first\nassert abs(sc[0] - 1.0) < 1e-12\n\n# equivalence with a pre-normalised dot product, and with Euclidean distance on unit vectors\nrng = np.random.default_rng(1)\nM = rng.normal(size=(200, 16)); q = rng.normal(size=16)\nMu = M / np.linalg.norm(M, axis=1, keepdims=True); qu = q / np.linalg.norm(q)\nidx, sc = topk_cosine(q, M, 5)\nfull = Mu @ qu\nassert idx.tolist() == np.argsort(-full, kind=\"stable\")[:5].tolist()\nassert np.allclose(sc, full[idx])\nd2 = ((Mu - qu) ** 2).sum(axis=1)                    # squared L2 on unit vectors = 2 - 2 cos\nassert np.allclose(d2, 2 - 2 * full)\nassert idx.tolist() == np.argsort(d2, kind=\"stable\")[:5].tolist()\n# cosine ignores scale of the document vectors\nidx2, _ = topk_cosine(q, M * rng.uniform(0.1, 10, size=(200, 1)), 5)\nassert idx2.tolist() == idx.tolist()\n\n# ties: duplicates are all kept in index order; k larger than n is clipped\nT = np.array([[1.0, 0.0], [2.0, 0.0], [0.0, 1.0], [3.0, 0.0]])\nidx, sc = topk_cosine([1.0, 0.0], T, 2)\nassert idx.tolist() == [0, 1] and np.allclose(sc, 1.0)\nassert topk_cosine([1.0, 0.0], T, 10)[0].tolist() == [0, 1, 3, 2]\n# zero vector row scores 0 instead of NaN\nZ = np.array([[0.0, 0.0], [1.0, 1.0]])\nidx, sc = topk_cosine([1.0, 1.0], Z, 2)\nassert idx.tolist() == [1, 0] and sc.tolist()[1] == 0.0 and not np.isnan(sc).any()",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "major",
+    "problem": "Euclidean distance is norm-sensitive and in the example ranks [2, 0, 1] (squared distances 0.45, 81.8, 163.8 vs the long vector [10,10]), so it demotes the long vector; it just differs from cosine by penalising any norm mismatch (including short, correct documents) instead of ignoring norm.",
+    "claim": "So switching to Euclidean does not address a norm effect; normalising does."
+   },
+   {
+    "severity": "minor",
+    "problem": "Sufficient but not necessary: equal document norms already make all three rankings identical for a given query.",
+    "claim": "If every vector is L2-normalised, |a-b|^2 = 2 - 2cos, so cosine, dot product and Euclidean distance produce identical rankings"
+   },
+   {
+    "severity": "minor",
+    "problem": "Builds a float64 copy of the whole matrix per query (about 6 GB for 1M x 768, plus another normalised copy), contrary to the answer's own advice to normalise once; also exactly parallel rows scaled by different factors differ by an ulp so 'ties by lower index' only holds for bit-identical scores.",
+    "claim": "scores = (M / safe[:, None]) @ (q / qn)"
+   }
+  ]
+ },
+ {
+  "id": "smi-h0010",
+  "plan_id": "P2-NLP-10",
+  "domain": "NLP",
+  "difficulty": "Medium",
+  "question": "Implement four retrieval-evaluation functions in plain Python (no libraries):\n\nrecall_at_k(ranked, relevant, k) -> float\nreciprocal_rank(ranked, relevant) -> float, and mrr(runs) for runs = [(ranked, relevant), ...]\nndcg_at_k(ranked, gains, k, exponential=False) -> float, where gains = {doc: graded relevance >= 0}, DCG = sum g_i / log2(i+1) with g = rel (or 2**rel - 1 if exponential), and the ideal ranking is built from all judged documents.\n\nConventions to implement: ranked lists may contain duplicates (drop every repeat after a document's first occurrence before ranking, so later documents move up one position per dropped repeat); a query with no relevant documents scores 0.0; unjudged documents count as non-relevant.\n\nExample: ranked = ['d3','d1','d7','d2','d5'], relevant = {'d1','d2','d9'}, gains = {'d1': 3, 'd2': 2, 'd9': 1}. recall@3 = 1/3, recall@5 = 2/3, RR = 0.5, nDCG@5 = 0.578 (linear gain) or 0.608 (exponential gain).\n\nThen say what each metric hides.",
+  "answer": "```python\nimport math\n\ndef _dedupe(ranked):\n    seen, out = set(), []\n    for d in ranked:\n        if d not in seen:\n            seen.add(d)\n            out.append(d)\n    return out\n\ndef recall_at_k(ranked, relevant, k):\n    \"\"\"Fraction of the relevant set found in the top k. 0.0 if there are no relevant docs.\"\"\"\n    relevant = set(relevant)\n    if not relevant:\n        return 0.0\n    return len(relevant & set(_dedupe(ranked)[:k])) / len(relevant)\n\ndef reciprocal_rank(ranked, relevant):\n    relevant = set(relevant)\n    for pos, d in enumerate(_dedupe(ranked), 1):\n        if d in relevant:\n            return 1.0 / pos\n    return 0.0\n\ndef mrr(runs):\n    \"\"\"runs: list of (ranked, relevant) pairs, one per query.\"\"\"\n    return sum(reciprocal_rank(r, rel) for r, rel in runs) / len(runs) if runs else 0.0\n\ndef ndcg_at_k(ranked, gains, k, exponential=False):\n    \"\"\"gains: {doc: graded relevance >= 0}; unlisted docs have gain 0.\n    DCG = sum g_i / log2(i + 1) with g = 2**rel - 1 if exponential else rel.\n    Ideal ranking uses ALL judged docs, not just the retrieved ones. 0.0 if nothing relevant.\"\"\"\n    def g(rel):\n        return (2 ** rel - 1) if exponential else rel\n    def dcg(rels):\n        return sum(g(r) / math.log2(i + 2) for i, r in enumerate(rels))\n    got = [gains.get(d, 0) for d in _dedupe(ranked)[:k]]\n    ideal = sorted(gains.values(), reverse=True)[:k]\n    denom = dcg(ideal)\n    return dcg(got) / denom if denom > 0 else 0.0\n```\n\nWorked example: top-3 is d3, d1, d7 so one of three relevant documents is found (recall@3 = 1/3); the top-5 adds d2 (2/3). d9 is never retrieved, so recall cannot reach 1. The first relevant document is at rank 2, so RR = 0.5. For nDCG the ideal order is d1(3), d2(2), d9(1), and the actual list has d1 at rank 2 and d2 at rank 4; the computed values are 0.578 (linear) and 0.608 (exponential gain), and the two differ because 2^rel - 1 weights highly relevant documents more heavily.\n\nWhat each hides:\n- recall@k ignores order inside the top k and how many relevant documents exist: with more than k relevant documents the maximum is below 1, so compare across queries with care. It is the natural metric for a first-stage retriever feeding a reranker, because it bounds what the reranker can recover.\n- MRR looks only at the first relevant hit. It suits 'one right answer' tasks and ignores everything after it; a system whose first relevant document is at rank 1 scores 1.0 whether or not it also retrieves the remaining relevant documents.\n- nDCG uses graded judgments and rank discounts, but its value depends on choices: linear versus exponential gain, the log2 discount, k, and which documents were judged. If judgments were pooled from earlier systems, unjudged documents are scored as irrelevant and new systems are penalised. nDCG@k equals 1.0 only when the gains of the top k, in order, equal the best possible gain sequence from the judged set, and the ideal list is truncated at k too, so returning fewer relevant documents than the judgments allow in the top k is penalised.\n\nEdge cases need an explicit policy: no relevant documents (here 0.0; some evaluations drop such queries instead, and the choice moves the average), duplicates in the ranking (deduplicate or recall can exceed 1), and ties in the retriever's scores (the order of equal-score documents is arbitrary, so results can change between runs unless you sort deterministically). Report the mean over queries with a confidence interval, because a few queries can dominate small evaluation sets.",
+  "key_concepts": [
+   "recall@k",
+   "MRR",
+   "nDCG",
+   "graded judgments",
+   "unjudged documents",
+   "ties",
+   "duplicates"
+  ],
+  "common_mistakes": [
+   "Computing ideal DCG from only the retrieved documents",
+   "Dividing by zero when no relevant documents exist",
+   "Using MRR when several relevant documents matter, or treating recall@k as order-sensitive"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import math\n\ndef _dedupe(ranked):\n    seen, out = set(), []\n    for d in ranked:\n        if d not in seen:\n            seen.add(d)\n            out.append(d)\n    return out\n\ndef recall_at_k(ranked, relevant, k):\n    \"\"\"Fraction of the relevant set found in the top k. 0.0 if there are no relevant docs.\"\"\"\n    relevant = set(relevant)\n    if not relevant:\n        return 0.0\n    return len(relevant & set(_dedupe(ranked)[:k])) / len(relevant)\n\ndef reciprocal_rank(ranked, relevant):\n    relevant = set(relevant)\n    for pos, d in enumerate(_dedupe(ranked), 1):\n        if d in relevant:\n            return 1.0 / pos\n    return 0.0\n\ndef mrr(runs):\n    \"\"\"runs: list of (ranked, relevant) pairs, one per query.\"\"\"\n    return sum(reciprocal_rank(r, rel) for r, rel in runs) / len(runs) if runs else 0.0\n\ndef ndcg_at_k(ranked, gains, k, exponential=False):\n    \"\"\"gains: {doc: graded relevance >= 0}; unlisted docs have gain 0.\n    DCG = sum g_i / log2(i + 1) with g = 2**rel - 1 if exponential else rel.\n    Ideal ranking uses ALL judged docs, not just the retrieved ones. 0.0 if nothing relevant.\"\"\"\n    def g(rel):\n        return (2 ** rel - 1) if exponential else rel\n    def dcg(rels):\n        return sum(g(r) / math.log2(i + 2) for i, r in enumerate(rels))\n    got = [gains.get(d, 0) for d in _dedupe(ranked)[:k]]\n    ideal = sorted(gains.values(), reverse=True)[:k]\n    denom = dcg(ideal)\n    return dcg(got) / denom if denom > 0 else 0.0",
+   "test": "\nranked = [\"d3\", \"d1\", \"d7\", \"d2\", \"d5\"]\nrelevant = {\"d1\", \"d2\", \"d9\"}            # d9 is never retrieved\nassert recall_at_k(ranked, relevant, 1) == 0.0\nassert abs(recall_at_k(ranked, relevant, 2) - 1 / 3) < 1e-12\nassert abs(recall_at_k(ranked, relevant, 5) - 2 / 3) < 1e-12     # d9 caps recall below 1\nassert recall_at_k(ranked, set(), 5) == 0.0                       # no relevant docs: defined as 0\nassert recall_at_k([\"a\", \"a\", \"a\"], {\"a\", \"b\"}, 3) == 0.5         # duplicates counted once\n\nassert reciprocal_rank(ranked, relevant) == 0.5\nassert reciprocal_rank([\"x\", \"y\"], {\"z\"}) == 0.0\nruns = [(ranked, relevant), ([\"a\", \"b\"], {\"a\"}), ([\"x\", \"y\", \"z\"], {\"z\"})]\nassert abs(mrr(runs) - (0.5 + 1.0 + 1 / 3) / 3) < 1e-12\nassert mrr([]) == 0.0\n\n# binary nDCG: relevant at ranks 2 and 4, two relevant docs exist\nbin_gains = {\"d1\": 1, \"d2\": 1}\ndcg = 1 / math.log2(3) + 1 / math.log2(5)\nidcg = 1 / math.log2(2) + 1 / math.log2(3)\nassert abs(ndcg_at_k(ranked, bin_gains, 5) - dcg / idcg) < 1e-12\n# perfect ordering scores 1, and so does ordering that only swaps equal-gain docs\nassert abs(ndcg_at_k([\"d1\", \"d2\"], bin_gains, 2) - 1.0) < 1e-12\nassert abs(ndcg_at_k([\"d2\", \"d1\"], bin_gains, 2) - 1.0) < 1e-12\n\n# graded relevance: gains 3 / 2 / 1; linear vs exponential gain give different values\ngr = {\"d1\": 3, \"d2\": 2, \"d9\": 1}\nlin = (3 / math.log2(3) + 2 / math.log2(5)) / (3 / 1 + 2 / math.log2(3) + 1 / math.log2(4))\nassert abs(ndcg_at_k(ranked, gr, 5) - lin) < 1e-12\nexp = (7 / math.log2(3) + 3 / math.log2(5)) / (7 / 1 + 3 / math.log2(3) + 1 / math.log2(4))\nassert abs(ndcg_at_k(ranked, gr, 5, exponential=True) - exp) < 1e-12\nassert abs(lin - exp) > 1e-3\n# truncation: the ideal list is cut at k as well\nassert abs(ndcg_at_k([\"d1\", \"d2\"], gr, 1) - 1.0) < 1e-12\n# nothing relevant: defined as 0.0 rather than a division by zero\nassert ndcg_at_k(ranked, {}, 5) == 0.0 and ndcg_at_k(ranked, {\"q\": 0}, 5) == 0.0\n# unjudged docs count as non-relevant: a single hit at rank 3 vs. ideal rank 1\nassert abs(ndcg_at_k([\"u\", \"v\", \"d1\"], {\"d1\": 1}, 3) - 0.5) < 1e-12",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "major",
+    "problem": "Ambiguous: 'at its first position' suggests positions are preserved, but the code deletes repeats and shifts later documents up (reciprocal_rank(['a','a','b'],{'b'}) = 0.5, not 1/3; recall_at_k(['a','a','b'],{'b'},2) = 1.0). Two defensible readings give different scores.",
+    "claim": "ranked lists may contain duplicates (count a document once, at its first position)"
+   },
+   {
+    "severity": "minor",
+    "problem": "Confusing: the point is that MRR depends only on the rank of the first relevant document.",
+    "claim": "a system that finds the second and third relevant documents at ranks 2 and 3 scores the same as one that finds nothing else."
+   },
+   {
+    "severity": "minor",
+    "problem": "Documents with equal gain can be swapped (the test shows this) so it is the gain sequence that must match.",
+    "claim": "nDCG@k equals 1.0 only when the top k matches the best possible top k from the judged set"
+   }
+  ]
+ },
+ {
+  "id": "smi-h0011",
+  "plan_id": "P2-NLP-11",
+  "domain": "NLP",
+  "difficulty": "Hard",
+  "question": "A team fine-tuned a decoder-only LLM to classify support tickets by reading the logits at the last position of each sequence. Offline macro-F1 was 0.84. After they (1) upgraded their tokenizer library, (2) switched from batch size 1 to padded batches of 32 sorted by length, and (3) raised max_length from 512 to 1024, evaluation macro-F1 fell to 0.61, training loss still looks normal, and short tickets are hit hardest. Generation runs for some outputs never stop. Give an ordered diagnostic checklist (cheapest and most informative checks first), name the likely causes behind each symptom, and say how you would confirm the fix. No framework code is needed.",
+  "answer": "Diagnose by making each change falsifiable, starting with checks that cost minutes.\n\n1. Batch-invariance test (single most informative). Run the same 20 tickets one at a time and inside padded batches, in fp32. Logits should agree to roughly 1e-4 or better (looser in fp16/bf16); if short tickets differ, the problem is padding, masking or positions, not the model. This matches the symptom that short examples, which receive the most padding, suffer most.\n\n2. Padding side versus the pooling position. With last-token readout, right padding makes 'the last position' a pad token. Fix by reading the logits at the last non-pad index computed from the attention mask (or left-pad consistently). Check how the model was trained: if it saw right-padded data with a different readout index, evaluation must match. With left padding, also confirm position ids are derived from the mask rather than from raw array position; otherwise real tokens get shifted positions (implementation-dependent, so inspect yours).\n\n3. Attention mask. Confirm 1 marks real tokens, 0 padding, that it is passed to the model, and that it is not inverted or broadcast over the wrong axis. Mean pooling must exclude pad positions.\n\n4. Tokeniser diff. Tokenise 50 fixed strings with old and new versions and compare ids, not text. Look for added or missing BOS/EOS, doubled BOS, a changed chat or prompt template, different whitespace or normalisation, a different pad token, a different default padding side or truncation side, and a vocabulary size that no longer matches the model's embedding rows. If the checkpoint was fine-tuned with one tokenizer revision, the evaluation tokenizer must be identical.\n\n5. Pad id equals EOS id. Common setup when a model has no pad token. If padding labels are masked from the loss by token id, real EOS tokens are masked too, so the model never learns to stop, which explains runs that never end. Mask by attention mask or a separate pad id.\n\n6. Truncation. Count how many examples exceed max_length and which side is truncated. Truncating the right can remove the instruction suffix, answer slot or label verbalizer; truncating only the prompt may leave a mismatched target. Changing 512 to 1024 can also alter which examples were cut off between training and evaluation, so the data seen at test time differs from training; keep them consistent. Also check that 1024 does not exceed the model's trained context (max_position_embeddings / rotary scaling), and whether padding to a fixed 1024 turns short tickets into mostly pad tokens.\n\n7. Sorting by length. Sorted batches can correlate batch composition with class or length. Shuffle buckets, and check that labels follow their examples through the sort.\n\nConfirm the fix by restoring each change alone (an ablation: old tokenizer + new batching, new tokenizer + old batching, and so on), then rerun the batch-invariance test and re-score on the same held-out set, with a regression test on the tokenised ids of fixed strings.",
+  "key_concepts": [
+   "padding side",
+   "attention mask",
+   "last non-pad",
+   "tokeniser",
+   "pad id",
+   "EOS",
+   "truncation",
+   "batch-invariance"
+  ],
+  "common_mistakes": [
+   "Retraining or tuning hyperparameters before checking tokenisation and masking",
+   "Reading the logits at position -1 under right padding",
+   "Masking pad labels by token id when pad id equals EOS id"
+  ],
+  "code": null,
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "problem": "Does not check that 1024 is within the model's trained context / max_position_embeddings; exceeding it errors or gives degraded positional behaviour, and padding to a fixed 1024 adds many pad tokens for short tickets.",
+    "claim": "Changing 512 to 1024 can also alter which examples were cut off between training and evaluation, so the data seen at test time differs from training; keep them consistent."
+   },
+   {
+    "severity": "minor",
+    "problem": "Tokenizer upgrades can also change default padding_side, truncation_side or special-token insertion; this should be on the diff list (hedged, version dependent).",
+    "claim": "a different pad token"
+   }
+  ]
+ },
+ {
+  "id": "smi-h0012",
+  "plan_id": "P2-NLP-12",
+  "domain": "NLP",
+  "difficulty": "Medium",
+  "question": "You are auditing an LLM benchmark of short questions against a corpus of training documents. Implement contamination_report(train_docs, test_items, n=8, threshold=0.5) -> list of (item_id, overlap, flagged), where test_items = {item_id: text}. Tokenise by lower-casing and taking [a-z0-9]+ runs; overlap is the fraction of an item's word n-grams that appear anywhere in the training documents; flagged = overlap >= threshold. Items with fewer than n tokens cannot be checked: return overlap None and flagged False.\n\nExample: if a training document contains the benchmark question verbatim inside a longer forum post, its overlap is 1.0 and it is flagged; a paraphrase of the question gets overlap near 0.0.\n\nThen explain what n-gram overlap detection cannot catch, how n and the threshold trade off, and what you would do at web scale.",
+  "answer": "```python\nimport re\n\ndef tokens(text):\n    return re.findall(r\"[a-z0-9]+\", text.lower())\n\ndef ngram_set(toks, n):\n    return {tuple(toks[i:i + n]) for i in range(len(toks) - n + 1)}\n\ndef contamination_report(train_docs, test_items, n=8, threshold=0.5):\n    \"\"\"test_items: {item_id: text}. For every item return\n    (item_id, overlap, flagged) where overlap is the share of the item's word n-grams\n    that also occur anywhere in train_docs. Items with fewer than n tokens cannot be\n    checked: overlap is None and flagged False.\"\"\"\n    train = set()\n    for doc in train_docs:\n        train |= ngram_set(tokens(doc), n)\n    rows = []\n    for item_id, text in test_items.items():\n        grams = ngram_set(tokens(text), n)\n        if not grams:\n            rows.append((item_id, None, False))\n            continue\n        overlap = len(grams & train) / len(grams)\n        rows.append((item_id, overlap, overlap >= threshold))\n    return rows\n```\n\nThe function builds the set of all word n-grams in the training text once, then for each test item computes the share of its own n-grams found in that set. Normalising case and punctuation prevents trivial formatting differences from hiding a copy (but this [a-z0-9]+ tokeniser yields no tokens for non-Latin scripts, so multilingual benchmarks need a different tokeniser), and the None result for too-short items makes 'unchecked' distinguishable from 'clean'.\n\nChoosing n and the threshold: small n (3-5) matches common phrases ('in the form of a single word'), producing false positives from boilerplate, licence text and templated prompts; large n misses near-duplicates with a few changed words. Some LLM reports have used long windows (the GPT-3 paper is often cited for 13-gram overlap), but the right value depends on the item length and language, so check it on known leaked and known clean examples. A full match of a 40-token question is strong evidence of exposure; 10% overlap on an 8-token question is not. Raising the threshold flags only near-verbatim copies (fewer false positives, misses partial leaks such as question-only or lightly edited items); lowering it catches partial leaks but flags templated or boilerplate-heavy items, so pick it on known leaked and clean examples. Also run the check on question and answer separately: leaked questions without answers are different from leaked answers.\n\nWhat it cannot catch: paraphrases, translations, reformatted items (a multiple-choice version of a leaked free-text question), and indirect leakage such as the same facts, solutions or code appearing in different words. It also cannot see data the auditor does not have: closed training sets, later fine-tuning data, or contamination through synthetic data generated from the benchmark. And overlap alone does not prove the score was inflated: compare accuracy on flagged and unflagged items, remembering that flagged items may differ in difficulty or source, so the comparison is suggestive, not causal. Other signals (canary strings, perplexity or memorisation probes, comparing against a freshly written held-out variant of the benchmark) complement n-gram checks, with their own error rates.\n\nAt scale, a Python set of tuples is too memory-hungry: hash n-grams to 64-bit integers, use a Bloom filter or sorted/suffix-array index over the corpus, shard by hash, and report which documents matched so humans can review. Report the n, normalisation and threshold alongside any contamination claim, and publish the clean subset's score next to the full score.",
+  "key_concepts": [
+   "contamination",
+   "word n-grams",
+   "normalisation",
+   "paraphrases",
+   "threshold",
+   "Bloom filter",
+   "boilerplate"
+  ],
+  "common_mistakes": [
+   "Using an n so small that boilerplate is flagged, or so large that light edits escape",
+   "Reading a high overlap as proof of inflated accuracy without a clean-subset comparison",
+   "Assuming no n-gram overlap means no contamination"
+  ],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import re\n\ndef tokens(text):\n    return re.findall(r\"[a-z0-9]+\", text.lower())\n\ndef ngram_set(toks, n):\n    return {tuple(toks[i:i + n]) for i in range(len(toks) - n + 1)}\n\ndef contamination_report(train_docs, test_items, n=8, threshold=0.5):\n    \"\"\"test_items: {item_id: text}. For every item return\n    (item_id, overlap, flagged) where overlap is the share of the item's word n-grams\n    that also occur anywhere in train_docs. Items with fewer than n tokens cannot be\n    checked: overlap is None and flagged False.\"\"\"\n    train = set()\n    for doc in train_docs:\n        train |= ngram_set(tokens(doc), n)\n    rows = []\n    for item_id, text in test_items.items():\n        grams = ngram_set(tokens(text), n)\n        if not grams:\n            rows.append((item_id, None, False))\n            continue\n        overlap = len(grams & train) / len(grams)\n        rows.append((item_id, overlap, overlap >= threshold))\n    return rows",
+   "test": "\nq_copied = \"Which planet in our solar system has the shortest orbital period around the Sun? Answer: Mercury\"\nq_clean = \"A train leaves the station at noon travelling at sixty miles per hour toward a distant city\"\nq_para = \"Around the Sun, which world of our solar system completes an orbit fastest? It is Mercury\"\nq_short = \"What is 2 + 2?\"\ntrain = [\n    \"Intro text about astronomy. \" + q_copied + \" ... more unrelated forum text about telescopes and stars.\",\n    \"Totally different cooking blog post about bread, flour, yeast and slow fermentation in cold kitchens.\",\n]\nitems = {\"copied\": q_copied, \"clean\": q_clean, \"paraphrase\": q_para, \"short\": q_short}\nrep = {r[0]: r for r in contamination_report(train, items, n=6)}\nassert rep[\"copied\"][1] == 1.0 and rep[\"copied\"][2] is True        # verbatim leak\nassert rep[\"clean\"][1] == 0.0 and rep[\"clean\"][2] is False\nassert rep[\"paraphrase\"][1] < 0.2 and rep[\"paraphrase\"][2] is False   # paraphrase evades n-gram match\nassert rep[\"short\"][1] is None and rep[\"short\"][2] is False           # too short to check\n\n# partial leak: only the question half is in the training data, not the answer\nhalf = \"Which planet in our solar system has the shortest orbital period around the Sun?\"\nr = contamination_report([half], {\"x\": q_copied}, n=6)[0]\nassert 0.5 < r[1] < 1.0\n\n# casing and punctuation are normalised away\nr = contamination_report([\"WHICH planet, in our solar-system has the shortest orbital period\"],\n                         {\"x\": \"which planet in our solar system has the shortest orbital period\"}, n=5)[0]\nassert r[1] == 1.0\n\n# smaller n raises both true and false positives: unrelated texts sharing a stock phrase\na = \"please note that the following answer is given in the form of a single word\"\nb = \"in the form of a single word please note that nothing else is needed here\"\nassert contamination_report([a], {\"b\": b}, n=3)[0][1] > contamination_report([a], {\"b\": b}, n=8)[0][1]\nassert contamination_report([], {\"b\": b}, n=3)[0][1] == 0.0",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "problem": "The threshold's own trade-off (what raising or lowering overlap >= threshold does) is not stated although the question asks for it.",
+    "claim": "A full match of a 40-token question is strong evidence of exposure; 10% overlap on an 8-token question is not."
+   },
+   {
+    "severity": "minor",
+    "problem": "The mandated [a-z0-9]+ tokeniser drops all non-Latin scripts, so non-English items return None (unchecked) rather than a score (verified with a Chinese example).",
+    "claim": "Normalising case and punctuation prevents trivial formatting differences from hiding a copy"
+   }
+  ]
+ }
+]

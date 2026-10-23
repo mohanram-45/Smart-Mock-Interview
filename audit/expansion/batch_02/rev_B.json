@@ -1,0 +1,1201 @@
+[
+ {
+  "plan_id": "B2-GEN-11-1",
+  "verdict": "correct",
+  "reasons": [
+   "One overclaim (prompts survive a model swap); LIMA source is not tied to any sentence."
+  ],
+  "parts_answered": {
+   "recommendation": true,
+   "what would change my mind": true,
+   "why not fine-tune first": true
+  },
+  "evidence": [
+   {
+    "claim": "60% layout success is a format gap not a knowledge gap",
+    "method": "derivation",
+    "evidence": "Follows from the stem: content usually accurate, layout wrong ~40%."
+   },
+   {
+    "claim": "validator + one retry, few-shot are cheap levers",
+    "method": "background_only",
+    "evidence": "Standard engineering practice; no authoritative page opened for it."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "they keep working if the underlying model is swapped",
+    "problem": "Overstated: prompts and validators are portable but behaviour changes across models, so they need re-testing.",
+    "replacement": "they are easier to carry across a model swap, although they still need re-testing"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Application of a decision framework with a measurable baseline; no calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Reasoning and escalation criteria."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete 3-arm experiment and decision rule; step 3 partly restates escalation criteria but adds the comparison target."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All 7 concepts discussed. 'plateau criterion' is the weakest label but is explained.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none (closest: any prompt-vs-finetune generic item)",
+   "same_intent": false
+  },
+  "code_findings": "No code in this record.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2305.11206",
+    "status": "partially",
+    "evidence": "Abstract supports the 1,000-example/pretraining statement, but no sentence in the answer cites LIMA, so it is padding here."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Format-adherence gaps are 'often closed' by instructions/examples/validators (reasonable, hedged, no source).",
+   "Fine-tuned models can regress on untested behaviour (see 11-4 source)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-11-2",
+  "verdict": "correct",
+  "reasons": [
+   "Type is scenario/design-like rather than concept.",
+   "(C) reads scans: a text LLM needs OCR or a vision model; mentioned only in passing."
+  ],
+  "parts_answered": {
+   "map A": true,
+   "map B": true,
+   "map C": true,
+   "weakest choice": true
+  },
+  "evidence": [
+   {
+    "claim": "RAG beat unsupervised fine-tuning in Ovadia et al.",
+    "method": "paper",
+    "evidence": "Opened abstract: 'unsupervised fine-tuning offers some improvement, RAG consistently outperforms it'; LLMs struggle to learn new facts via fine-tuning. Answer correctly hedges 'setup-dependent'."
+   },
+   {
+    "claim": "LIMA: limited curated data can suffice for style",
+    "method": "paper",
+    "evidence": "Opened abstract: 1,000 curated pairs; answer hedges 'in their setup'."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "and an OCR or layout step upstream may matter as much as the language model",
+    "problem": "(C) inputs are scans; the answer should say the model must be vision-capable or fed OCR text, since this is the first dependency.",
+    "replacement": "and the first decision is how the scan becomes input: a vision-capable model or an OCR/layout step upstream, which may matter as much as the language model"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mapping three needs with justification; one judgement call (weakest).",
+  "type_ok": false,
+  "suggested_type": "scenario",
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single field, appropriate."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Fine; 'evaluation per need' is covered in the (C) paragraph.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close",
+   "same_intent": false
+  },
+  "code_findings": "No code in this record.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2312.05934",
+    "status": "supported",
+    "evidence": "'while unsupervised fine-tuning offers some improvement, RAG consistently outperforms it'; also struggles to learn new facts."
+   },
+   {
+    "url": "https://arxiv.org/abs/2305.11206",
+    "status": "supported",
+    "evidence": "Opened. Abstract: 'almost all knowledge in large language models is learned during pretraining'; LIMA is trained on 1,000 curated prompt-response pairs."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Fine-tuning weights make updates 'unverifiable' and prevent per-user access filtering (engineering reasoning, unsourced)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-11-3",
+  "verdict": "correct",
+  "reasons": [
+   "Case 2 (net 8) does not illustrate the stated 6-point gap; replace with a case where the same 24-item net gap is not significant."
+  ],
+  "parts_answered": {
+   "what to check": true,
+   "is 6 points real": true,
+   "paired test": true,
+   "leakage/fair baseline": true
+  },
+  "evidence": [
+   {
+    "claim": "exact McNemar p for b=44,c=20 is 0.0037",
+    "method": "executed",
+    "evidence": "Exact two-sided binomial on 64 discordant pairs: 0.003690."
+   },
+   {
+    "claim": "b=30,c=22 gives p=0.33",
+    "method": "executed",
+    "evidence": "0.3317; net 8 items."
+   },
+   {
+    "claim": "b=120,c=96 (net 24) gives p=0.117",
+    "method": "executed",
+    "evidence": "0.11739; shows same 6-point gap can be noise."
+   },
+   {
+    "claim": "74% of 400 = 296, 80% = 320, difference 24",
+    "method": "derivation",
+    "evidence": "296,320,24 correct."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "With b=30 and c=22 the net gain is only 8 items (2 points) and p is about 0.33.",
+    "problem": "Counter-case does not match the 6-point gap in the stem, so it does not answer 'is a 6-point gap real'.",
+    "replacement": "With b=120 and c=96 the net gain is still 24 items (6 points), but the systems disagree on 216 items and p is about 0.12."
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "Case 2: a different split with b=30, c=22 (net 8 items, 2 points, so it would not match the 6-point gap above). Exact p = 0.33. Not distinguishable from noise at this sample size.",
+    "problem": "Same: use a case consistent with the stem.",
+    "replacement": "Case 2: b=120, c=96 (b-c=24, the same 6-point gap). Exact p = 0.117. Not distinguishable from noise at the 5% level, even though the headline gap is identical."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Paired inference, discordant pairs, leakage, effect vs cost; requires computation and judgement.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Reasoning."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked numbers and procedure; it repeats the two cases from the detailed answer, so keep the cases in only one place if length matters."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Good. 'confidence interval' is only a one-line mention in practical step 3; acceptable.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none (no paired-test item found)",
+   "same_intent": false
+  },
+  "code_findings": "No code in this record.",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "McNemar exact test is the right paired test for same-item accuracy (standard statistics; derivation executed, no page cited)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-11-4",
+  "verdict": "correct",
+  "reasons": [
+   "Missing a common alternative cause (chat template / missing system prompt in training data).",
+   "Awkward wording 'a calibration of your pass criteria'."
+  ],
+  "parts_answered": {
+   "what happened": true,
+   "checks that should have caught it": true,
+   "pipeline changes": true
+  },
+  "evidence": [
+   {
+    "claim": "LoRA learns less and forgets less than full FT in code/math",
+    "method": "paper",
+    "evidence": "Opened abstract: 'in the standard low-rank settings, LoRA substantially underperforms full finetuning'; forgets less outside target domain; beats weight decay/dropout. Answer states it as one study, with trade-off."
+   },
+   {
+    "claim": "1,500 / (6,000+1,500) = 20% of the mixture",
+    "method": "executed",
+    "evidence": "0.2 exactly."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "and (4) a calibration of your pass criteria, e.g. no more than a few points of drop on any slice, decided before training.",
+    "problem": "Wording unclear; practical uses 2-3 point thresholds.",
+    "replacement": "and (4) explicit pass criteria, e.g. no more than 2 to 3 points of drop on any slice, decided before training."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Mix in replay data:",
+    "problem": "Ignores a very common cause of 'ignores the system prompt': training examples without the system prompt or with a different chat template.",
+    "replacement": "Check that training examples use the same chat template and include realistic system prompts, otherwise the model never practises following them. Mix in replay data:"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Diagnosis plus mitigation list; no computation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Cause, checks, remedies."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete gate with thresholds and bisect order."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Good; 'safety behaviour regression' is covered via the deflection check.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none",
+   "same_intent": false
+  },
+  "code_findings": "No code in this record.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2405.09673",
+    "status": "supported",
+    "evidence": "Opened: LoRA 'substantially underperforms full finetuning' in standard low-rank settings, forgets less on out-of-domain tasks, better than weight decay and dropout."
+   },
+   {
+    "url": "https://arxiv.org/abs/2106.09685",
+    "status": "partially",
+    "evidence": "Opened: LoRA freezes pretrained weights and trains low-rank matrices; no sentence in the answer depends on it beyond that."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Replay/data mixing reduces forgetting (common practice; no page opened).",
+   "Lower LR and early stopping reduce drift (background)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-11-5",
+  "verdict": "pass",
+  "reasons": [
+   "Accurate and hedged; nothing worth changing."
+  ],
+  "parts_answered": {
+   "what QLoRA changes": true,
+   "what you give up": true,
+   "what to verify": true
+  },
+  "evidence": [
+   {
+    "claim": "4-bit frozen base, grads into low-rank adapters, NF4, double quantisation, paged optimisers",
+    "method": "paper",
+    "evidence": "Opened abstract: backprop through a frozen 4-bit quantised model into LoRA; new 4-bit data type, double quantisation, paged optimisers."
+   },
+   {
+    "claim": "~4x reduction vs 16-bit base weights",
+    "method": "derivation",
+    "evidence": "16/4 = 4, slightly less after quantisation constants; answer says roughly."
+   },
+   {
+    "claim": "Merging into a 16-bit base changes the weights relative to training",
+    "method": "derivation",
+    "evidence": "Training saw dequantised-4-bit weights; merged weights differ by the quantisation error. PEFT quantization guide opened: gives no QLoRA merge guidance, so this is reasoning not documentation."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism comparison with deployment caveat.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single field, fine."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All concepts discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none",
+   "same_intent": false
+  },
+  "code_findings": "No code in this record.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2305.14314",
+    "status": "supported",
+    "evidence": "Opened: 'efficient finetuning approach'; backpropagates through frozen 4-bit quantized model into LoRA adapters; 4-bit data type, double quantization, paged optimizers. The 16-bit-parity statement is in the abstract per my knowledge but the fetched summary did not quote it; answer hedges it as the authors' report."
+   },
+   {
+    "url": "https://arxiv.org/abs/2106.09685",
+    "status": "supported",
+    "evidence": "Opened: freezes pretrained weights, low-rank matrices."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'Dequantisation makes steps often slower' (hedged, no page opened).",
+   "Merge mismatch caution (derivation only)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-11-6",
+  "verdict": "correct",
+  "reasons": [
+   "Needs rubric_points (design).",
+   "Universal-sounding 'fine-tuning mostly teaches style and format'.",
+   "One-sided: distilling a stronger model is common and often helpful."
+  ],
+  "parts_answered": {
+   "risks": true,
+   "controls": true,
+   "how to decide if it helped": true
+  },
+  "evidence": [
+   {
+    "claim": "5% of 20,000 = 1,000 faulty examples",
+    "method": "derivation",
+    "evidence": "Correct."
+   },
+   {
+    "claim": "Model collapse: indiscriminate training on generated data loses tails",
+    "method": "paper",
+    "evidence": "Opened abstract excerpt: 'use of model-generated content in training causes irreversible defects'; tails disappear. Answer correctly notes the recursive setting differs."
+   },
+   {
+    "claim": "LIMA: 1,000 curated examples can suffice",
+    "method": "paper",
+    "evidence": "Opened; hedged 'in their setup'."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "Fine-tuning mostly teaches style and format, and some work (for example LIMA) argues",
+    "problem": "Stated as universal; it is a hypothesis (LIMA's) and model/task dependent. Synthetic data from a stronger model also often helps.",
+    "replacement": "Fine-tuning on a modest set often mostly shifts style and format, and some work (for example LIMA) argues"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Trade-off design with experimental decision criteria.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Keep the 200 human examples in every run, possibly upweighted",
+    "tradeoff": "Anchors real phrasing vs overfitting to a tiny set"
+   },
+   {
+    "decision": "Generate from varied, real ticket seeds and deduplicate",
+    "tradeoff": "Diversity and less duplication vs extra pipeline cost"
+   },
+   {
+    "decision": "Rule checks plus human audit of a random sample (about 200)",
+    "tradeoff": "Catches invented policy and tone errors vs reviewer time"
+   },
+   {
+    "decision": "Evaluate only on human-written, human-graded held-out tickets",
+    "tradeoff": "Avoids circular evaluation vs cost of grading"
+   },
+   {
+    "decision": "Ablate human-only, +small synthetic slice, +full set at same hyperparameters",
+    "tradeoff": "Evidence on marginal value vs training runs"
+   },
+   {
+    "decision": "Check generator usage terms and licensing",
+    "tradeoff": "Legal safety vs availability of the best generator"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single field suitable."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Good; 'data licence and terms review' discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none",
+   "same_intent": false
+  },
+  "code_findings": "No code in this record.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2305.11206",
+    "status": "supported",
+    "evidence": "Opened. Abstract: 'almost all knowledge in large language models is learned during pretraining'; LIMA is trained on 1,000 curated prompt-response pairs."
+   },
+   {
+    "url": "https://arxiv.org/abs/2305.17493",
+    "status": "supported",
+    "evidence": "Opened: 'use of model-generated content in training causes irreversible defects'; rare/tail data disappears."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Generator usage terms may restrict training other models (hedged, no page opened).",
+   "Synthetic data helps in many distillation settings (not mentioned; unsourced)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-12-1",
+  "verdict": "correct",
+  "reasons": [
+   "Model-behaviour claim stated as universal; hedge."
+  ],
+  "parts_answered": {
+   "direct vs indirect": true,
+   "why filter is weak": true
+  },
+  "evidence": [
+   {
+    "claim": "LLM-integrated apps blur data and instructions",
+    "method": "paper",
+    "evidence": "Opened: 'We argue that LLM-Integrated Applications blur the line between data and instructions.'"
+   },
+   {
+    "claim": "Least privilege, human confirmation, restricting outputs reduce impact",
+    "method": "background_only",
+    "evidence": "Industry guidance (e.g. OWASP LLM01) \u2014 fetch was refused, so not verified."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "A language model has no hard channel separating",
+    "problem": "Universal about current models; research on instruction hierarchy and spotlighting reduces but does not remove the issue.",
+    "replacement": "Current language models have no enforced channel separating"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Concept with reasoning about defences.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single field."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Good.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none verified; likely overlaps GEN security items in v5 but not same scenario",
+   "same_intent": false
+  },
+  "code_findings": "No code in this record.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2302.12173",
+    "status": "supported",
+    "evidence": "'We argue that LLM-Integrated Applications blur the line between data and instructions'; indirect injection via retrieved data."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Best-practice mitigation list (OWASP page not openable; background_only)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-12-2",
+  "verdict": "correct",
+  "reasons": [
+   "Acceptance test contradicts the policy table (create_event auto-allowed).",
+   "Cross-reference to another question breaks self-containment.",
+   "Web-search queries are an egress channel not covered."
+  ],
+  "parts_answered": {
+   "layers": true,
+   "what each stops": true,
+   "what each cannot stop": true,
+   "residual risk": true
+  },
+  "evidence": [
+   {
+    "claim": "Greshake: effective mitigations lacking",
+    "method": "paper",
+    "evidence": "Opened; 'few effective defenses' per summary."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "practical_answer",
+    "claim": "require zero side-effecting calls without a human approval",
+    "problem": "create_event is allowed without confirmation for empty or known attendees, so the test as written fails the designed system.",
+    "replacement": "require zero side-effecting calls outside the policy table above (every send_email and any other create_event) without a human approval"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "run 100 red-team scenarios (see the red-team plan question)",
+    "problem": "Refers to a different record.",
+    "replacement": "run 100 red-team scenarios that cover indirect injection via mail, web pages and calendar invites"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Restrict what rendered output can fetch.",
+    "problem": "Misses that web-search queries and URL fetches can carry conversation text out.",
+    "replacement": "Restrict what rendered output can fetch, and treat web-search queries and URL fetches as outbound channels too, since an injected instruction can place private text in a query string."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Layered design with limits of each layer.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Least privilege, read and write tools separated",
+    "tradeoff": "Limits hijack power vs less convenient assistant"
+   },
+   {
+    "decision": "Human confirmation of side effects built from structured arguments",
+    "tradeoff": "Stops silent actions vs approval fatigue"
+   },
+   {
+    "decision": "Untrusted content handled by a tool-less model, constrained output passed on",
+    "tradeoff": "Cuts injection reach vs lost fidelity and extra latency; not a guarantee"
+   },
+   {
+    "decision": "Output validation and egress allowlists (recipients, URLs, queries)",
+    "tradeoff": "Blocks exfiltration vs false blocks"
+   },
+   {
+    "decision": "Provenance logging, anomaly alerts, token revocation",
+    "tradeoff": "Detection and recovery vs it only acts after the fact"
+   },
+   {
+    "decision": "State residual risk and test with red team",
+    "tradeoff": "Honest bound vs no proof of safety"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "About 60 words; genuinely shorter."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Per-layer stops/cannot-stop."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Policy table and acceptance test."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "Good.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none verified",
+   "same_intent": false
+  },
+  "code_findings": "No code in this record.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2302.12173",
+    "status": "partially",
+    "evidence": "Supports the data/instruction blur and lack of defences, not the specific layers listed."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Each layer's recommendation is engineering best practice; OWASP page could not be opened (permission refused)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-12-3",
+  "verdict": "pass",
+  "reasons": [
+   "Mechanism and fixes correct; source covers only the injection step."
+  ],
+  "parts_answered": {
+   "how it happens": true,
+   "why hard to notice": true,
+   "changes": true
+  },
+  "evidence": [
+   {
+    "claim": "Markdown image in rendered output triggers GET to remote URL, carrying text in URL",
+    "method": "derivation",
+    "evidence": "Standard HTML/browser behaviour of img src; no page opened for the attack class."
+   },
+   {
+    "claim": "CSP img-src or proxy allowlist blocks it",
+    "method": "background_only",
+    "evidence": "Standard web security control; not opened."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism recognition plus deterministic fixes.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single field."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Good.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none verified",
+   "same_intent": false
+  },
+  "code_findings": "No code in this record.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2302.12173",
+    "status": "partially",
+    "evidence": "Supports indirect injection from documents; says nothing about markdown image exfiltration or CSP."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Markdown-image exfiltration channel and CSP img-src mitigation (no authoritative page opened)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-12-4",
+  "verdict": "correct",
+  "reasons": [
+   "Embedding-leakage claim unsourced; I found a paper.",
+   "Hosted model provider is a fourth data recipient not mentioned.",
+   "Needs rubric_points."
+  ],
+  "parts_answered": {
+   "prompts": true,
+   "logs": true,
+   "retrieval": true,
+   "deletion": true,
+   "weakest points": true
+  },
+  "evidence": [
+   {
+    "claim": "Embeddings can leak source text",
+    "method": "paper",
+    "evidence": "Opened arXiv 2310.06816: iterative method recovers 92% of 32-token inputs exactly; recovers names from clinical notes."
+   },
+   {
+    "claim": "Retention/redaction/canary numbers hypothetical and internally consistent",
+    "method": "derivation",
+    "evidence": "7 d raw vs 90 d metadata, 500-chunk sample, 1,000 queries: no conflicts."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Treat PII as data that flows through four places: the index, the prompt, the model output and the logs.",
+    "problem": "Omits the model provider (retention, training use), a recipient of every prompt.",
+    "replacement": "Treat PII as data that flows through four places: the index, the prompt, the model output and the logs, plus the model provider's own retention and training terms if the model is hosted."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-stage privacy design with enforcement points.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Minimise and redact at ingestion with measured detector recall",
+    "tradeoff": "Less PII exposure vs lost detail and missed identifiers"
+   },
+   {
+    "decision": "Authorise inside the retrieval call, tenant_id from session",
+    "tradeoff": "Leaks impossible by construction vs filtered-search cost; separate indexes cost more"
+   },
+   {
+    "decision": "Metadata-only logs by default, short encrypted raw retention",
+    "tradeoff": "Privacy vs debuggability"
+   },
+   {
+    "decision": "Segregate health-related content",
+    "tradeoff": "Reduced blast radius vs weaker answers on those tickets"
+   },
+   {
+    "decision": "Deletion pipeline across store, vectors, caches, logs, backups",
+    "tradeoff": "Compliance vs backup complexity (weakest point)"
+   },
+   {
+    "decision": "Provider terms and DPA",
+    "tradeoff": "Capability vs data residency/retention"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Lifecycle controls."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Concrete configuration, tests and thresholds."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none verified",
+   "same_intent": false
+  },
+  "code_findings": "No code in this record.",
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "Text Embeddings Reveal (Almost) As Much As Text (Morris et al.)",
+    "url": "https://arxiv.org/abs/2310.06816",
+    "supports": "Embeddings can leak information about the source text.",
+    "quote": "is able to recover 92% of 32-token inputs exactly (iterative correct-and-re-embed approach); also recovers full names from clinical notes",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [
+   "Regulatory points (erasure, retention) deliberately deferred to counsel; no legal source opened."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-12-5",
+  "verdict": "correct",
+  "reasons": [
+   "'probably below 1.5%' misreads a frequentist bound.",
+   "Practical says 'exact binomial' while giving Wilson intervals."
+  ],
+  "parts_answered": {
+   "plan": true,
+   "define/measure ASR": true,
+   "conclusion from 200 failures": true,
+   "adaptive attackers": true,
+   "what it cannot prove": true
+  },
+  "evidence": [
+   {
+    "claim": "0/200: one-sided 95% upper bound 1.49%, two-sided exact 1.83%, Wilson upper 1.88%",
+    "method": "executed",
+    "evidence": "1-0.05^(1/200)=0.01487; 1-0.025^(1/200)=0.01828; Wilson 0.0000-0.01885."
+   },
+   {
+    "claim": "2/200 Wilson 0.27%-3.57%; 3/200 0.51%-4.32%",
+    "method": "executed",
+    "evidence": "Computed."
+   },
+   {
+    "claim": "~600 attempts for 0.5% bound",
+    "method": "executed",
+    "evidence": "ln0.05/ln0.995 = 597.6; 3/0.005=600."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "So the honest statement is that, for this attack distribution, the rate is probably below about 1.5%.",
+    "problem": "A confidence bound is not a probability statement about the true rate.",
+    "replacement": "So the honest statement is that, for this attack distribution, a 95% upper confidence bound on the success rate is about 1.5%."
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "Worked numbers (computed with an exact binomial calculation).",
+    "problem": "Wilson intervals are not exact binomial.",
+    "replacement": "Worked numbers (the upper bound is exact binomial; the intervals are Wilson)."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Threat modelling, statistics on zero events, adaptive adversary.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Plan and reasoning."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Extra counts, sample-size planning and gate; repeats rule-of-three figures but adds new ones."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Good.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none verified",
+   "same_intent": false
+  },
+  "code_findings": "No code in this record.",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Red-team plan structure is practice-based (no source)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-12-6",
+  "verdict": "correct",
+  "reasons": [
+   "Overlap with 'direct prompt injection' not addressed.",
+   "One universal claim about models."
+  ],
+  "parts_answered": {
+   "precise distinction": true,
+   "attacker/victim": true,
+   "why mitigations partly overlap": true
+  },
+  "evidence": [
+   {
+    "claim": "Instructions and data share one channel (Greshake)",
+    "method": "paper",
+    "evidence": "Opened: 'blur the line between data and instructions'."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "The two overlap:",
+    "problem": "Direct prompt injection (user overriding system prompt) is the area where the terms blur and should be named.",
+    "replacement": "The two overlap (a user typing an override of the system prompt is often called direct prompt injection, which is where the terms blur):"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "a safe-behaving model still obeys an injected instruction",
+    "problem": "Universal; model-dependent.",
+    "replacement": "a safe-behaving model can still obey an injected instruction"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Precise concept distinction with applied mitigations.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single field."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Good.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none verified (GEN-12-1 in this batch is related but about a filter)",
+   "same_intent": false
+  },
+  "code_findings": "No code in this record.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2302.12173",
+    "status": "partially",
+    "evidence": "Supports the data/instruction blur and indirect injection; the jailbreak definition is not in this paper."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Jailbreak definition and its mitigations (no authoritative page opened)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-15-1",
+  "verdict": "correct",
+  "reasons": [
+   "Rollback rule infeasible at the stated volume (12,000/month, 45% in scope).",
+   "Shadow review sample large relative to eligible traffic."
+  ],
+  "parts_answered": {
+   "scope": true,
+   "escalation": true,
+   "rollout": true,
+   "metrics beyond containment": true,
+   "wrong answers/legal": true,
+   "go/no-go gate": true
+  },
+  "evidence": [
+   {
+    "claim": "Wilson 1380/1500 = 90.5%-93.3%; 1350/1500 lower bound 88.4%",
+    "method": "executed",
+    "evidence": "0.9052-0.9327; 0.8838-0.9142."
+   },
+   {
+    "claim": "In-scope volume 12,000 x 45% = 5,400/month; 20% = 36/day, 5% = 9/day",
+    "method": "derivation",
+    "evidence": "Computed; makes 'n of at least 100 reviewed' per day impossible."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "practical_answer",
+    "claim": "Automatic rollback if the daily sampled correct rate (n of at least 100 reviewed) drops below 88% or any severity-1 error occurs.",
+    "problem": "At about 5,400 in-scope conversations a month, 20% traffic is about 36 a day and 5% about 9 a day, so 100 reviewed per day cannot exist.",
+    "replacement": "Automatic rollback if the rolling sampled correct rate over the latest 100 or more reviewed conversations (about 3 days at 20% traffic) drops below 88%, or any severity-1 error occurs."
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "Shadow stage: score 1,500 bot drafts",
+    "problem": "1,500 drafts is more than half of the roughly 2,700 in-scope conversations in a two-week shadow window.",
+    "replacement": "Shadow stage (live shadowing plus replay of recorded conversations): score 1,500 bot drafts"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Product launch design with metrics, statistics and risk.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Scope to top-10 low-risk intents",
+    "tradeoff": "Safer vs lower ceiling (45% volume max)"
+   },
+   {
+    "decision": "Resolution metric with 7-day re-contact",
+    "tradeoff": "Honest vs lagged"
+   },
+   {
+    "decision": "Shadow then 5% then 20%",
+    "tradeoff": "Safety vs slower launch against the 8-week target"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "About 60 words."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Full plan."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Numeric gate."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "Good.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none verified",
+   "same_intent": false
+  },
+  "code_findings": "No code in this record.",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Legal point about jurisdictional rules is hedged, no source."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-15-2",
+  "verdict": "correct",
+  "reasons": [
+   "Gate wording: 285 of 300 vs 'lower bound above 90%' are two different rules."
+  ],
+  "parts_answered": {
+   "what to promise": true,
+   "presentation/citations": true,
+   "access control": true,
+   "pre-launch evaluation": true
+  },
+  "evidence": [
+   {
+    "claim": "Wilson 285/300 91.9%-96.9%; 270/300 86.1%-92.9%",
+    "method": "executed",
+    "evidence": "0.9192-0.9695; 0.8608-0.9291."
+   },
+   {
+    "claim": "Lowest count with Wilson lower bound >= 90% is 281",
+    "method": "executed",
+    "evidence": "281: 0.9032."
+   },
+   {
+    "claim": "54/60 = 90%",
+    "method": "derivation",
+    "evidence": "Correct."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "need 285 or more of 300 (95%); at 285 the Wilson 95% interval is 91.9% to 96.9%, with lower bound above 90% required for launch.",
+    "problem": "Mixes a count threshold with a lower-bound rule; the lower-bound rule alone is met from 281.",
+    "replacement": "observed accuracy of at least 95% (285 of 300 gives a Wilson 95% interval of 91.9% to 96.9%), with the lower bound required to be above 90% (281 of 300 is the minimum that clears it)."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Design of product promise, trust boundary and evaluation gates.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Reasoning."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Numeric gate and pilot."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Good.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none verified",
+   "same_intent": false
+  },
+  "code_findings": "No code in this record.",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Legal-tech positioning (not legal advice) is common practice; no source."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-15-3",
+  "verdict": "correct",
+  "reasons": [
+   "Never states a clear ship/no-ship; net-resolution difference not tested."
+  ],
+  "parts_answered": {
+   "headline vs net": true,
+   "significance": true,
+   "satisfaction": true,
+   "decision": true
+  },
+  "evidence": [
+   {
+    "claim": "Contained 1,550 vs 1,950; re-contact 186 vs 410",
+    "method": "executed",
+    "evidence": "Correct."
+   },
+   {
+    "claim": "Net resolution 27.3% vs 30.8%, gain 3.5 points",
+    "method": "executed",
+    "evidence": "0.2728, 0.3081."
+   },
+   {
+    "claim": "z about 7 for re-contact, about 8 for containment",
+    "method": "executed",
+    "evidence": "-7.04 and 8.39."
+   },
+   {
+    "claim": "Wilson intervals 10.5%-13.7% and 19.3%-22.9%",
+    "method": "executed",
+    "evidence": "Correct."
+   },
+   {
+    "claim": "Net-resolution difference z about 3.9",
+    "method": "executed",
+    "evidence": "1540 vs 1364 of 5,000 each: z=3.88."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "Decision. Break results down by intent.",
+    "problem": "Question asks 'Should you ship?' and answer implies but does not say no, nor tests the net gain.",
+    "replacement": "Decision. Do not ship to all traffic yet: net resolution is up about 3.5 points (conversation-level z of about 3.9) but the re-contact guardrail is clearly breached. Break results down by intent."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Metric decomposition, significance and decision under mixed signals.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single field."
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Good.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none verified",
+   "same_intent": false
+  },
+  "code_findings": "No code in this record.",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Survey non-response bias (general statistics, no source)."
+  ],
+  "code_patch": null
+ }
+]

@@ -1,0 +1,1625 @@
+[
+ {
+  "id": "smi-i0001",
+  "plan_id": "P3-ML-01",
+  "domain": "Machine Learning",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 0,
+  "corrections_applied": 0,
+  "difficulty_author": "Easy",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "No code field; nothing to run. Docs-only record.",
+  "reasons": [
+   "Self-contained, specific (two named teammate claims), definitions, examples, inflation mechanism and fixes all present and accurate.",
+   "Closing note that authors use 'leakage' for both is honest hedging."
+  ],
+  "issues": [],
+  "parts_answered": {
+   "define target leakage": true,
+   "define train-test contamination": true,
+   "example of each": true,
+   "how each inflates offline metrics": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0003",
+   "same_intent": false
+  },
+  "sources_findings": [
+   {
+    "url": "https://scikit-learn.org/stable/common_pitfalls.html",
+    "status": "supported",
+    "evidence": "'Data leakage occurs when information that would not be available at prediction time is used when building the model'; 'The general rule is to never call fit on the test data'; SelectKBest on all data gave 0.76 accuracy on random targets; Pipeline recommended for CV."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0002",
+  "plan_id": "P3-ML-02",
+  "domain": "Machine Learning",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 0,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "No code field; nothing to run.",
+  "reasons": [
+   "Five distinct, setup-specific leakage mechanisms (random split of customer-month rows is the key one) each with a runnable check; ends with out-of-time validation.",
+   "Minor: the shuffled-label check only exposes label-using pipeline leakage (target encoding, selection), not time-of-availability leakage; acceptable as stated ('pipeline itself leaks'). The 'near 0.8' figure is clearly tied to the prior model, so illustrative."
+  ],
+  "issues": [],
+  "parts_answered": {
+   "list likely leakage sources": true,
+   "concrete check for each": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0003",
+   "same_intent": false
+  },
+  "sources_findings": [
+   {
+    "url": "https://scikit-learn.org/stable/common_pitfalls.html",
+    "status": "supported",
+    "evidence": "Preprocessing/feature selection fitted before split inflates scores (0.76 vs 0.5 on random data); Pipeline prevents it."
+   },
+   {
+    "url": "https://scikit-learn.org/stable/modules/cross_validation.html",
+    "status": "supported",
+    "evidence": "'GroupKFold ... ensures that the same group is not represented in both testing and training sets'; 'The i.i.d. assumption is broken if the underlying generative process yields groups of dependent samples.'"
+   }
+  ]
+ },
+ {
+  "id": "smi-i0003",
+  "plan_id": "P3-ML-03",
+  "domain": "Machine Learning",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 1,
+  "minor": 1,
+  "corrections_applied": 2,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "No code field. I ran my own numpy/sklearn simulation (sklearn 1.9.1) to check the numbers.",
+  "reasons": [
+   "The simulation figures are stated as fact but are not reproducible: I re-ran a 200,000-row perfectly calibrated score (true logit ~ N(-1.5,1.5), seeds 0-3, 10 equal-width bins): AUC 0.817-0.819 (unchanged by tripling the logit), ECE 0.0018-0.0025 before and 0.1245-0.127 after, versus the record's 0.8314 / 0.001 / 0.07. Direction and AUC invariance are right; the numbers depend on the unstated score distribution and binning."
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "Illustration (seeded simulation, 200,000 rows): taking a perfectly calibrated score and tripling its logit leaves AUC at 0.8314 but raises ECE from about 0.001 to about 0.07, because the ordering is identical while the probabilities are badly stretched.",
+    "problem": "Numbers not reproducible; seed and score distribution not given; my reproduction gives AUC about 0.82 and ECE about 0.002 -> 0.13.",
+    "replacement": "Illustration (my own simulation, 200,000 rows, true logit drawn from Normal(-1.5, 1.5), 10 equal-width bins; exact values depend on the score distribution and binning): taking a perfectly calibrated score and tripling its logit leaves AUC at about 0.82 but raises ECE from about 0.002 to about 0.13, because the ordering is identical while the probabilities are badly stretched."
+   },
+   {
+    "severity": "minor",
+    "claim": "means the model is overconfident in that region",
+    "problem": "Predicting 0.30 where 12% default is overestimation of risk; 'overconfident' usually means too extreme/sharp and is ambiguous here.",
+    "replacement": "means the model overestimates default risk in that region"
+   }
+  ],
+  "parts_answered": {
+   "what calibrated means": true,
+   "reliability diagram": true,
+   "ECE": true,
+   "why high AUC does not imply right probabilities": true,
+   "when calibration matters": true
+  },
+  "nearest_existing": {
+   "id": "smi-0178",
+   "same_intent": false
+  },
+  "sources_findings": [
+   {
+    "url": "https://scikit-learn.org/stable/modules/calibration.html",
+    "status": "supported",
+    "evidence": "'calibration_curve ... per bin average predicted probabilities and fraction of positives'; 'It is generally expected that calibration does not affect ranking metrics such as ROC-AUC.'"
+   }
+  ]
+ },
+ {
+  "id": "smi-i0004",
+  "plan_id": "P3-ML-04",
+  "domain": "Machine Learning",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 3,
+  "corrections_applied": 3,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "No code field; nothing to run.",
+  "reasons": [
+   "Technically sound and matches the docs; minor hedging/wording fixes only.",
+   "Option A (about 60 positives) leaves no room for a third evaluation set; answer says 'yet another set' without a small-data alternative.",
+   "'what really matters is the number of positives' is the author's heuristic, not documented."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "That figure is a rule of thumb; what really matters is the number of positives, since each step needs enough of them.",
+    "problem": "Presented as fact; docs only give '~1000 samples'. Positive-count reasoning is a reasonable but undocumented heuristic.",
+    "replacement": "That figure is a rule of thumb for total samples; with imbalanced data I would look at the number of positives rather than total rows, since each isotonic step needs enough of them (this is my own heuristic, not a documented threshold)."
+   },
+   {
+    "severity": "minor",
+    "claim": "Then evaluate calibration on yet another set, because the calibration set cannot grade itself.",
+    "problem": "Infeasible as a third split for option A.",
+    "replacement": "Then evaluate calibration on yet another set, because the calibration set cannot grade itself; with only about 60 positives in option A, use repeated or nested cross-validation instead of carving out a third set."
+   },
+   {
+    "severity": "minor",
+    "claim": "Isotonic produces ties, so AUC can change slightly, usually by a small amount.",
+    "problem": "Redundant and 'usually' unsupported; docs only say metrics 'might differ'.",
+    "replacement": "Isotonic produces ties, so ROC-AUC can differ slightly from the uncalibrated value; sigmoid is strictly monotonic and keeps the ranking."
+   }
+  ],
+  "parts_answered": {
+   "Platt vs isotonic for option A": true,
+   "Platt vs isotonic for option B": true,
+   "why not fit on training data": true,
+   "effect on ROC-AUC": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0009",
+   "same_intent": false
+  },
+  "sources_findings": [
+   {
+    "url": "https://scikit-learn.org/stable/modules/calibration.html",
+    "status": "supported",
+    "evidence": "'isotonic will perform as well as or better than sigmoid when there is enough data (greater than ~ 1000 samples)'; 'more prone to overfitting, especially on small datasets'; 'biased calibrator that maps to probabilities closer to 0 and 1 than it should'; isotonic 'introduces ties'; sigmoid 'strictly monotonic'. Imbalance sentence: 'can be a problem for highly imbalanced classification problems, where outputs do not have equal variance' (answer paraphrase 'errors are not symmetric' is close enough). Note: recommending Platt for the 3%-positive option A sits slightly against that caveat; the answer's 'report the uncertainty' partly covers it."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0005",
+  "plan_id": "P3-ML-05",
+  "domain": "Machine Learning",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 2,
+  "corrections_applied": 2,
+  "difficulty_author": "Easy",
+  "difficulty_blind": "Easy",
+  "difficulty_final": "Easy",
+  "code_findings": "No code field; nothing to run. No sources; definitions are standard (background knowledge, not verified against a cited page).",
+  "reasons": [
+   "Definitions correct. Two accuracy issues: the recession example is arguably concept drift (same profiles default more) so 'defaulters still look like past defaulters' is a stretch; and 'directly detect covariate drift' glosses that a P(X) change is also produced by label shift, so label-free monitoring detects input drift, not the type.",
+   "'label delay' is listed as a key concept but not discussed."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Example: a recession lifts the default rate from 3% to 6%, while defaulters still look like past defaulters.",
+    "problem": "Recessions usually also change P(y|X); example is only pure label drift under a strong assumption.",
+    "replacement": "Example: a recession lifts the default rate from 3% to 6%; this is pure label drift only if defaulters still look like past defaulters, which rarely holds exactly, so real cases are often a mix of label and concept drift."
+   },
+   {
+    "severity": "minor",
+    "claim": "you can directly detect covariate drift, by comparing feature distributions between a reference and a recent window (PSI, KS).",
+    "problem": "A P(X) shift cannot by itself show P(y|X) is unchanged, nor distinguish covariate from label shift (P(X) moves when P(y) moves).",
+    "replacement": "you can directly detect a change in the input distribution P(X), by comparing feature distributions between a reference and a recent window (PSI, KS); this flags input drift but cannot on its own show whether P(y|X) is unchanged or whether the cause is covariate or label shift."
+   }
+  ],
+  "parts_answered": {
+   "define covariate drift": true,
+   "define label drift": true,
+   "define concept drift": true,
+   "credit-risk example for each": true,
+   "which detectable without labels": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0009",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0006",
+  "plan_id": "P3-ML-06",
+  "domain": "Machine Learning",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 1,
+  "minor": 2,
+  "corrections_applied": 3,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Hard",
+  "difficulty_final": "Hard",
+  "code_findings": "No code field; nothing to run.",
+  "reasons": [
+   "Strong tiered design, but 'alert thresholds' is only thinly answered (PSI conventions, 'floor') with no way of setting them, and the proxy-bias statement and flag-rate heuristic miss points (review outcomes are a precision proxy and are biased mostly for recall; precision also falls when fraud prevalence falls).",
+   "PSI 0.1/0.25 correctly hedged as convention. No sources; remaining claims are standard practice."
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "Trade-offs: tight thresholds catch problems early but cause alert fatigue;",
+    "problem": "Question requires alert thresholds with trade-offs; no method for setting them is given.",
+    "replacement": "Trade-offs: set alert thresholds from each metric's historical week-to-week variation (for example a 'watch' level and a 'page' level, firing only if breached in two consecutive windows) rather than from one fixed number; tight thresholds catch problems early but cause alert fatigue;"
+   },
+   {
+    "severity": "minor",
+    "claim": "These are faster but biased, because only flagged items are reviewed; keep a small random sample of unflagged or low-score traffic for unbiased review.",
+    "problem": "Reviewed-and-confirmed rate among flagged items is a direct (if noisy) precision proxy; selection mainly hurts recall/missed-fraud estimates.",
+    "replacement": "These are faster but incomplete and noisy: analyst confirmation can disagree with eventual chargebacks, and because only flagged items are reviewed they say little about recall or missed fraud; keep a small random sample of unflagged or low-score traffic for unbiased review."
+   },
+   {
+    "severity": "minor",
+    "claim": "A stable flag rate with falling precision suggests concept change; a rising one suggests input drift or fraudster adaptation.",
+    "problem": "Omits the prevalence explanation: precision falls when the fraud rate falls even with an unchanged model.",
+    "replacement": "A stable flag rate with falling precision suggests concept change or a falling fraud rate (precision depends on prevalence, so also track the confirmed-fraud rate); a rising flag rate suggests input drift or fraudster adaptation."
+   }
+  ],
+  "parts_answered": {
+   "input checks": true,
+   "score checks": true,
+   "proxy metrics": true,
+   "delayed-label evaluation": true,
+   "alert thresholds": "partial",
+   "retraining triggers": true,
+   "trade-offs": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0009",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0007",
+  "plan_id": "P3-ML-07",
+  "domain": "Machine Learning",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 0,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "No code. Arithmetic recomputed in Python.",
+  "reasons": [
+   "Arithmetic verified: 0.8*1000=800 TP, 0.05*99000=4950 FP, precision 800/5750=13.9%, 5/105=0.0476. TPR 0.80/FPR 0.05 is consistent with AUC about 0.96 under a binormal model (d'=2.5), so the example is realistic.",
+   "Threshold derivation correct with stated calibration and zero-cost-for-correct-decisions assumptions; capacity override noted.",
+   "Question wording leaves the daily volume unstated (are 100,000 transactions per day?); answer handles it with '(or per day's volume)'. Not worth a change."
+  ],
+  "issues": [],
+  "parts_answered": {
+   "why PR-AUC more informative": true,
+   "why precision@k more informative": true,
+   "cost-based threshold": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0009",
+   "same_intent": false
+  },
+  "sources_findings": [
+   {
+    "url": "https://scikit-learn.org/stable/modules/model_evaluation.html",
+    "status": "supported",
+    "evidence": "'With random predictions, the AP is the fraction of positive samples.'"
+   }
+  ]
+ },
+ {
+  "id": "smi-i0008",
+  "plan_id": "P3-ML-08",
+  "domain": "Machine Learning",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 0,
+  "corrections_applied": 0,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Hard",
+  "difficulty_final": "Hard",
+  "code_findings": "No code field; nothing to run.",
+  "reasons": [
+   "Each scheme's leakage correctly identified; deployment-matching choice and label-horizon gap are right; reporting advice (untouched final test, customer-level bootstrap) is sound. 'usually' hedges the optimism claim.",
+   "Minor unstated assumption about the unit of prediction (event vs customer snapshot) does not change the answer."
+  ],
+  "issues": [],
+  "parts_answered": {
+   "what leaks in random k-fold": true,
+   "what leaks in GroupKFold": true,
+   "what leaks in time split": true,
+   "which fits": true,
+   "how to report": true
+  },
+  "nearest_existing": {
+   "id": "smi-0202",
+   "same_intent": false
+  },
+  "sources_findings": [
+   {
+    "url": "https://scikit-learn.org/stable/modules/cross_validation.html",
+    "status": "supported",
+    "evidence": "'classical cross-validation techniques such as KFold and ShuffleSplit assume the samples are independent and identically distributed, and would result in unreasonable correlation between training and testing instances (yielding poor estimates of generalization error) on time series data'; GroupKFold keeps groups out of both sets; TimeSeriesSplit successive training sets are supersets."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0009",
+  "plan_id": "P3-ML-09",
+  "domain": "Machine Learning",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 2,
+  "minor": 0,
+  "corrections_applied": 2,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Hard",
+  "difficulty_final": "Hard",
+  "code_findings": "No code field; nothing to run. No sources; content is standard MLOps practice (background knowledge).",
+  "reasons": [
+   "Question wording is garbled: 'beats the old one by the same margin ... (same AUC ...)' contradicts itself.",
+   "Answer assumes training-serving skew is the cause; it omits the most important alternative for a retention-uplift outcome (churn AUC does not measure response to the intervention) and A/B validity, so 'whichever step first reveals a gap names the cause' can falsely imply a gap must exist."
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "beats the old one by the same margin in offline evaluation (same AUC on a held-out month)",
+    "problem": "Self-contradictory/ambiguous (beats vs same AUC).",
+    "replacement": "beats the old one in offline evaluation (higher AUC on a held-out month)"
+   },
+   {
+    "severity": "major",
+    "claim": "Whichever step first reveals a gap names the cause.",
+    "problem": "If steps (a)-(d) show no feature/score gap the procedure ends without a cause; objective mismatch and experiment validity are not covered.",
+    "replacement": "Whichever step first reveals a gap names the cause. If (a)-(d) show no feature or score gap, suspect the objective rather than skew: churn AUC measures who will leave, not who will respond to the retention offer, so a model that ranks churn risk equally well can still give lower uplift; also check A/B validity (sample-ratio mismatch, sample size, novelty effects)."
+   }
+  ],
+  "parts_answered": {
+   "causes of training-serving skew": true,
+   "how to isolate": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0003",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0010",
+  "plan_id": "P3-ML-10",
+  "domain": "Machine Learning",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 0,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "No code field; numbers recomputed in Python (matches).",
+  "reasons": [
+   "Recomputed in numpy: precisions 0.972/0.588/0.333, recalls 0.956/0.625/0.500, F1 0.9636/0.6061/0.4000, macro 0.6565 (0.657), weighted 0.9237 (0.924), micro = accuracy 0.92. Row sums 900/80/20 and total 1000 match the question.",
+   "Metric choices for (a) and (b) are justified and caveated (small-support volatility)."
+  ],
+  "issues": [],
+  "parts_answered": {
+   "per-class F1": true,
+   "macro-F1": true,
+   "weighted-F1": true,
+   "micro-F1": true,
+   "why they differ": true,
+   "choice for (a)": true,
+   "choice for (b)": true
+  },
+  "nearest_existing": {
+   "id": "smi-0205",
+   "same_intent": false
+  },
+  "sources_findings": [
+   {
+    "url": "https://scikit-learn.org/stable/modules/model_evaluation.html",
+    "status": "supported",
+    "evidence": "'If all labels are included, \"micro\"-averaging in a multiclass setting will produce precision, recall and F that are all identical to accuracy.'; macro 'giving equal weight to each class'; weighted 'weighted by its presence in the true data sample'."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0011",
+  "plan_id": "P3-SQL-01",
+  "domain": "SQL",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 1,
+  "difficulty_author": "Easy",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Run from scratch on real SQLite 3.37.2 (LD_LIBRARY_PATH lib, sqlite3.sqlite_version printed 3.37.2) and on sandbox 3.45.1: result equals `expected`; the single fenced sql block in the answer is byte-identical to code.solution. Extra cases I ran on 3.37.2: mismatched column counts -> error 'SELECTs to the left and right of UNION do not have the same number of result columns'; ORDER BY before UNION -> error 'ORDER BY clause should come after UNION not before'; ORDER BY lower(email) on a compound -> error '1st ORDER BY term does not match any column in the result set' (confirms 'resolved against output columns'); output column name comes from first SELECT (alias a vs b); A UNION B UNION ALL C grouped left to right. Subqueries in FROM have no alias: fine in SQLite, rejected by some engines (not claimed).",
+  "reasons": [
+   "All facts verified (UNION dedup, NULL=NULL in dedup, same column count, ORDER BY only at end, left-to-right grouping, names from first SELECT) by running 3.37.2 and against lang_select.html.",
+   "One unhedged performance claim ('cannot stream rows out immediately') is background knowledge, not verified; minor hedge only."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "so it does extra work and cannot stream rows out immediately",
+    "problem": "Engine-internal behaviour stated as a certainty; not derivable from the data or the SQLite page (I did not verify it per engine).",
+    "replacement": "so it does extra work and usually has to consume its input before the final rows are known"
+   }
+  ],
+  "parts_answered": {
+   "UNION vs UNION ALL difference": true,
+   "cost of each": true,
+   "column-list rules": true,
+   "ORDER BY rules": true,
+   "count query with columns op,n_rows ordered by n_rows": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0037",
+   "same_intent": false,
+   "note": "g0037 also contrasts UNION/UNION ALL row counts but as part of a segment query; this one adds NULL-in-dedup, ORDER BY/column-list rules and a count query. Partial overlap only."
+  },
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/lang_select.html",
+    "status": "supported",
+    "evidence": "'duplicate rows are removed' for UNION; 'NULL values are considered equal to other NULL values'; 'all the constituent SELECTs must return the same number of result columns'; 'only the last or right-most simple SELECT may have an ORDER BY clause. That ORDER BY clause will apply across all elements of the compound'; 'group from left to right'."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0012",
+  "plan_id": "P3-SQL-02",
+  "domain": "SQL",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 0,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Run from scratch on real SQLite 3.37.2 (LD_LIBRARY_PATH lib, sqlite3.sqlite_version printed 3.37.2) and on sandbox 3.45.1: result equals `expected`; the single fenced sql block in the answer is byte-identical to code.solution. Extras: adding customer 9 (Aviator only) -> EXCEPT returns 1,4,9 as expected; NOT EXISTS without DISTINCT returns (1,1,4) exactly as claimed; common-mistake 3 (product='Aviator' AND product<>'Wayfarer') excludes nobody - true by logic.",
+  "reasons": [
+   "Query correct on 3.37.2 and 3.45.1; NOT EXISTS version really returns [1,1,4], with DISTINCT [1,4], NOT IN with DISTINCT [1,4] (all run).",
+   "Every part answered; claims about NULL/NOT IN are standard and consistent with the existing bank (g0031)."
+  ],
+  "issues": [],
+  "parts_answered": {
+   "EXCEPT query": true,
+   "what each form returns for customer 1": true,
+   "when to prefer which": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0037",
+   "same_intent": false,
+   "note": "g0037 uses EXCEPT for 'jan_not_feb' but asks about set operators vs UNION; this one is about EXCEPT vs NOT EXISTS duplicate semantics. Related, intent differs."
+  },
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/lang_select.html",
+    "status": "supported",
+    "evidence": "'The EXCEPT operator returns the subset of rows returned by the left SELECT that are not also returned by the right-hand SELECT. Duplicate rows are removed from the results of INTERSECT and EXCEPT operators'."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0013",
+  "plan_id": "P3-SQL-03",
+  "domain": "SQL",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 3,
+  "corrections_applied": 3,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Run from scratch on real SQLite 3.37.2 (LD_LIBRARY_PATH lib, sqlite3.sqlite_version printed 3.37.2) and on sandbox 3.45.1: result equals `expected`; the single fenced sql block in the answer is byte-identical to code.solution. Extras on 3.37.2: duplicate row (6,'f@x.com','1') twice in crm and absent in billing -> reported once as crm_only; after adding one copy to billing -> not reported (confirms 'EXCEPT ignores multiplicity'). 'NULL IS NOT DISTINCT FROM NULL' is a syntax error on 3.37.2 (added in SQLite 3.39) - the answer only recommends IS for SQLite, which works on 3.37.2.",
+  "reasons": [
+   "Query and result verified on 3.37.2/3.45.1; the NOT EXISTS/LEFT JOIN with = on phone does return ids 2,3,4 (run), and with IS it returns 3,4.",
+   "Minor wording problems: first-person 'I ran this' in a reference answer, a misleading UNION vs UNION ALL rationale (UNION returns identical rows here, verified), and a muddled common_mistake."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "(I ran this: it returns ids 2, 3 and 4)",
+    "problem": "First-person claim in a reference answer; the exact anti-join is not shown. Verified true for an anti-join on id, email and phone with =.",
+    "replacement": "(on this data it returns ids 2, 3 and 4)"
+   },
+   {
+    "severity": "minor",
+    "claim": "Pick UNION ALL, not UNION, for stacking, so nothing is dropped.",
+    "problem": "Misleading: the side tag makes the two halves distinct, and replacing UNION ALL by UNION gives identical rows on this data (verified). UNION ALL is preferable only to skip needless dedup.",
+    "replacement": "Use UNION ALL for the stacking: the side tag already keeps the two halves distinct, so UNION would return the same rows here and only add a pointless duplicate-removal step."
+   },
+   {
+    "severity": "minor",
+    "claim": "Using UNION instead of UNION ALL and relying on EXCEPT for multiplicity, forgetting both are set-based and ignore duplicate counts.",
+    "problem": "Confused common_mistake (UNION vs UNION ALL is not what hides multiplicity differences).",
+    "replacement": "Assuming EXCEPT reports a row that appears a different number of times in each table; it is set-based and ignores duplicate counts."
+   }
+  ],
+  "parts_answered": {
+   "query with side,id,email,phone ordered by id then side": true,
+   "row 2 not reported": true,
+   "why join on phone gets row 2 wrong": true,
+   "why EXCEPT does not": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0031",
+   "same_intent": false,
+   "note": "g0031 is about NOT IN with NULLs; this one is NULL equality in set operators vs = for reconciliation. Related theme, intent differs."
+  },
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/lang_select.html",
+    "status": "supported",
+    "evidence": "'NULL values are considered equal to other NULL values and distinct from all non-NULL values'; EXCEPT definition quoted from the page."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0014",
+  "plan_id": "P3-SQL-04",
+  "domain": "SQL",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 0,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Run from scratch on real SQLite 3.37.2 (LD_LIBRARY_PATH lib, sqlite3.sqlite_version printed 3.37.2) and on sandbox 3.45.1: result equals `expected`; the single fenced sql block in the answer is byte-identical to code.solution. Extras: user 6 with '2024-10-31 23:59:59' and user 7 with '2024-09-30 23:59:59' + '2024-10-01 00:00:00' -> INTERSECT returns 1,4,5,7 (half-open ranges work on timestamps); BETWEEN '2024-10-01' AND '2024-10-31' misses 23:59:59 on the 31st (empty result for user 6) - confirms common mistake 3; empty table -> empty result.",
+  "reasons": [
+   "Query verified; plain self-join returns exactly 9 rows (1 x6, 4 x1, 5 x2); IN without DISTINCT returns 1,1,4,5,5; with DISTINCT 1,4,5 (all run).",
+   "Core retrieval (users active in two months via INTERSECT) overlaps the 'both' segment of existing smi-g0037; the join-fan-out comparison is the new part. Owner should accept that overlap knowingly."
+  ],
+  "issues": [],
+  "parts_answered": {
+   "INTERSECT query": true,
+   "compare with self-join and IN versions": true,
+   "what plain join returns and why": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0037",
+   "same_intent": false,
+   "note": "Overlap: smi-g0037's 'both' segment is the same INTERSECT of two monthly user lists. This record differs by asking for join/IN equivalents and join fan-out; flagged as high overlap."
+  },
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/lang_select.html",
+    "status": "supported",
+    "evidence": "'The INTERSECT operator returns the intersection of the results of the left and right SELECTs... Duplicate rows are removed from the results of INTERSECT and EXCEPT'."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0015",
+  "plan_id": "P3-SQL-05",
+  "domain": "SQL",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 1,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Run from scratch on real SQLite 3.37.2 (LD_LIBRARY_PATH lib, sqlite3.sqlite_version printed 3.37.2) and on sandbox 3.45.1: result equals `expected`; the single fenced sql block in the answer is byte-identical to code.solution. Extras on 3.37.2: single-row dept (77) -> 77.0; two rows (10,20) -> 15.0; six rows 1..6 -> 3.5; negative salaries (-5,-7) -> -6.0; all-NULL dept disappears (as claimed); empty table -> no rows. AVG returns float (140.0) as claimed. No-filter variant gives Ops 55.0.",
+  "reasons": [
+   "Median query verified for odd/even counts, ties, NULL exclusion; without the filter Ops gives 55.0 as stated (run).",
+   "Question premise 'SQLite has no MEDIAN function' is true for standard builds but the sqlite3 shell since 3.47.0 and opt-in builds (3.51+) ship median(); hedge it."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "SQLite has no MEDIAN function.",
+    "problem": "Over-absolute: per sqlite.org/changes.html, 3.47.0 added median()/percentile() to the CLI and 3.51.0 built the percentile extension into the amalgamation (opt-in at compile time). Not in default library builds, incl. 3.37.2.",
+    "replacement": "Standard SQLite builds (including the 3.37.2 library) have no built-in MEDIAN aggregate."
+   }
+  ],
+  "parts_answered": {
+   "one query dept, median_salary ordered by dept": true,
+   "handling of odd and even counts": true,
+   "what goes wrong if NULL not excluded": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0027",
+   "same_intent": false,
+   "note": "Same employees table, but g0027 is top-N salary levels with RANK/DENSE_RANK; this is median. Nearest by table only; smi-g0035 (second highest) also differs."
+  },
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/windowfunctions.html",
+    "status": "supported",
+    "evidence": "'Window function support was first added to SQLite with release version 3.25.0'; 'row_number(): The number of the row within the current partition. Rows are numbered starting from 1 in the order defined by the ORDER BY clause'."
+   },
+   {
+    "url": "https://www.sqlite.org/lang_aggfunc.html",
+    "status": "supported",
+    "evidence": "'The result of avg() is always a floating point value whenever there is at least one non-NULL input' (used for the 140.0 remark; not the listed source but checked)."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0016",
+  "plan_id": "P3-SQL-06",
+  "domain": "SQL",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 0,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Hard",
+  "difficulty_final": "Hard",
+  "code_findings": "Run from scratch on real SQLite 3.37.2 (LD_LIBRARY_PATH lib, sqlite3.sqlite_version printed 3.37.2) and on sandbox 3.45.1: result equals `expected`; the single fenced sql block in the answer is byte-identical to code.solution. Extras: category T with three products at 10 -> rn 1,2 both cutoff_tie=1; category Z (9,9,1) -> both fit, flag 0; single-product category -> flag 0; empty table -> no rows.",
+  "reasons": [
+   "Result, rn/rnk values and cutoff_tie flag verified; RANK<=2 returns 4 Lenses and 3 Sunglasses rows, DENSE_RANK<=2 adds Retro in Frames (RANK 1,1,3 does not) - all run.",
+   "cutoff_tie condition rnk + n_same - 1 > 2 is correct (extra 3-way tie, 2-way tie at rank 1, single product tested).",
+   "Overlaps the conceptual core of smi-g0027 but adds aggregate-before-rank and tie-at-cutoff detection."
+  ],
+  "issues": [],
+  "parts_answered": {
+   "aggregated product revenue": true,
+   "rn, rnk, cutoff_tie columns and order": true,
+   "explain each ranking function with ties": true,
+   "business consequence": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0027",
+   "same_intent": false,
+   "note": "Both ask how ROW_NUMBER/RANK/DENSE_RANK treat ties and which to choose; this one adds aggregation, exactly-two-slots rule and the cutoff_tie flag. High conceptual overlap, different task."
+  },
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/windowfunctions.html",
+    "status": "supported",
+    "evidence": "'rank(): The row_number() of the first peer in each group - the rank of the current row with gaps'; 'dense_rank(): ... rank of the current row without gaps'."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0017",
+  "plan_id": "P3-SQL-07",
+  "domain": "SQL",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 2,
+  "corrections_applied": 2,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Hard",
+  "difficulty_final": "Hard",
+  "code_findings": "Run from scratch on real SQLite 3.37.2 (LD_LIBRARY_PATH lib, sqlite3.sqlite_version printed 3.37.2) and on sandbox 3.45.1: result equals `expected`; the single fenced sql block in the answer is byte-identical to code.solution. Extras on 3.37.2 and 3.45.1: user 4 (09:00, then three events at 10:00) -> sessions (1 event),(3 events) under both ROWS and default RANGE frames; user 5 with 09:30:00 then 09:30:01 after 09:00 -> one session of 3 (gap 1800 then 1 s; 09:00->09:30 = exactly 1800 stays); user 6 23:59:59 -> 00:29:59 (exactly 1800) stays, +00:30:01 splits; empty table -> no rows. strftime('%s') works on 3.37.2.",
+  "reasons": [
+   "Sessionisation query verified (exact 1800 s stays; 31 min splits; midnight crossing; duplicate timestamps) and the julianday claim is true: for 960 of 1440 exact-30-minute gaps julianday*86400 > 1800 (e.g. 1800.0000134).",
+   "One overstated claim about duplicate-timestamp ordering and a questionable 'be explicit' recommendation; in SQLite both windows sort identically so results are right, but this is not guaranteed."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "duplicate timestamps give a zero gap, so their LAG order does not change the sessions.",
+    "problem": "Overstated. The tied rows' order inside LAG and inside the ROWS-frame SUM is not defined by ORDER BY event_ts; if the two windows ordered ties differently, the flagged tied row could land in the previous session. SQLite sorts identical windows the same way (my duplicate tests at session start were correct), but it is not guaranteed.",
+    "replacement": "duplicate timestamps give a zero gap, so they never start a session of their own; the order of tied rows is not defined by ORDER BY event_ts alone, so for a guaranteed-deterministic result add a unique tie-breaker such as rowid to both ORDER BY clauses."
+   },
+   {
+    "severity": "minor",
+    "claim": "the default RANGE frame would also work here but treats equal timestamps as peers, so be explicit.",
+    "problem": "The default RANGE frame is actually the order-insensitive choice for tied timestamps (all peers get the same running sum), so 'be explicit' with ROWS is only safe with a tie-breaker.",
+    "replacement": "the default RANGE frame would also work here and treats equal timestamps as peers (tied rows all get the same running sum); an explicit ROWS frame is the usual idiom but then needs a unique tie-breaker in the ORDER BY."
+   }
+  ],
+  "parts_answered": {
+   "user_id, session_id, session_start, session_end, n_events ordered": true,
+   "uses LAG and running SUM": true,
+   "why running SUM works": true,
+   "edge cases": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0034",
+   "same_intent": false,
+   "note": "Same events table shape but g0034 is day-1 retention; sessionisation here. smi-g0030 (streaks via date-minus-row_number) is the same gaps-and-islands family but different rule."
+  },
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/windowfunctions.html",
+    "status": "supported",
+    "evidence": "'lag()... returns the result of evaluating expression expr against the previous row in the partition. Or, if there is no previous row... NULL'; default frame 'RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW ... current row and its peers'. strftime/julianday claims checked by running code, not by the page."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0018",
+  "plan_id": "P3-SQL-08",
+  "domain": "SQL",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 2,
+  "corrections_applied": 1,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Run from scratch on real SQLite 3.37.2 (LD_LIBRARY_PATH lib, sqlite3.sqlite_version printed 3.37.2) and on sandbox 3.45.1: result equals `expected`; the single fenced sql block in the answer is byte-identical to code.solution. Extras on 3.37.2: empty events -> one row (0,0,0,NULL,NULL,NULL); only views -> (7,0,0,0.0,NULL,0.0); simultaneous timestamps for view/cart/purchase count as ordered (>=); a user with purchase but no cart is dropped at purchase (NULL propagates); user with cart before first view dropped from cart and later steps.",
+  "reasons": [
+   "Funnel numbers verified (7/4/3, 57.1, 75.0, 42.9; 10 view events; 4 purchase events incl. user 6).",
+   "Answer does not flag that using only the FIRST cart event vs first view can drop users who viewed then carted after an earlier pre-view cart; and one key concept ('COUNT DISTINCT users vs events') is not what the solution does."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "and decide up front whether ties on timestamps count as ordered (here >= does).",
+    "problem": "Missing limitation: comparing the first cart with the first view is stricter than 'carted after viewing'. A user with cart 10:00, view 10:05, cart 10:10 is dropped from the cart step although a later cart follows a view (by the question's literal rule this is intended, but the answer should say so).",
+    "replacement": "and decide up front whether ties on timestamps count as ordered (here >= does). Also note the literal rule compares only each user's first cart with their first view, so a user with cart 10:00, view 10:05, cart 10:10 is not counted as carted; if that should count, use the earliest cart at or after the first view instead."
+   },
+   {
+    "severity": "minor",
+    "claim": "COUNT DISTINCT users vs events",
+    "problem": "Listed key concept, but the solution never uses COUNT DISTINCT; it counts users via GROUP BY user_id and COUNT(column).",
+    "replacement": "users vs events"
+   }
+  ],
+  "parts_answered": {
+   "one row with viewed, carted, purchased, three pct columns (1 decimal)": true,
+   "counts users not events": true,
+   "order rules applied": true,
+   "design choices explained": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0034",
+   "same_intent": false,
+   "note": "Different analysis (day-1 retention vs step funnel); both user-level conditional aggregation over an events table."
+  },
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/lang_aggfunc.html",
+    "status": "supported",
+    "evidence": "'The count(X) function returns a count of the number of times that X is not NULL in a group. The count(*) function... returns the total number of rows in the group.'"
+   }
+  ]
+ },
+ {
+  "id": "smi-i0019",
+  "plan_id": "P3-SQL-09",
+  "domain": "SQL",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 0,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Run from scratch on real SQLite 3.37.2 (LD_LIBRARY_PATH lib, sqlite3.sqlite_version printed 3.37.2) and on sandbox 3.45.1: result equals `expected`; the single fenced sql block in the answer is byte-identical to code.solution. Extras on 3.37.2: West 0,0,-50 -> yoy NULL (prev 0); N2 2022->2024 gap -> prev/yoy NULL; total of a year = 0 -> share NULL; duplicate region-year rows are summed first; empty table -> no rows. Negative base revenue would give a misleading sign of yoy_pct (not claimed).",
+  "reasons": [
+   "Result verified against expected on both versions; gap-year, zero-previous and first-year NULL rules all work; SQLite division by zero -> NULL claim true.",
+   "Extra cases (zero totals, negative revenue, all-zero year, duplicate region-year rows aggregated first) behave sensibly; no claim in the answer is wrong."
+  ],
+  "issues": [],
+  "parts_answered": {
+   "share_pct per year": true,
+   "prev_revenue with NULL on first year and gap year": true,
+   "yoy_pct NULL when prev 0": true,
+   "ordered by year, region": true,
+   "explain traps": true
+  },
+  "nearest_existing": {
+   "id": "smi-g0039",
+   "same_intent": false,
+   "note": "g0039 does MoM % with a generated month list and a zero guard; this one adds share-of-total and detects gaps with LAG(year). Overlap on the zero/gap theme only."
+  },
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/windowfunctions.html",
+    "status": "supported",
+    "evidence": "lag(): 'if there is no previous row (because the current row is the first), NULL'. Window functions in SELECT list used throughout page examples."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0020",
+  "plan_id": "P3-SQL-10",
+  "domain": "SQL",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 3,
+  "corrections_applied": 3,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Run from scratch on real SQLite 3.37.2 (LD_LIBRARY_PATH lib, sqlite3.sqlite_version printed 3.37.2) and on sandbox 3.45.1: result equals `expected`; the single fenced sql block in the answer is byte-identical to code.solution. Extras on 3.37.2: user 5 with two NULL timestamps -> ROW_NUMBER returns id 11 (highest id), correlated returns nothing for user 5, GROUP BY returns id 11 arbitrary; user 6 tied (12,13) -> ROW_NUMBER 13, correlated both; empty table -> no rows. Subquery in FROM without an alias is accepted by SQLite but rejected by e.g. MySQL and PostgreSQL before 16 (not claimed).",
+  "reasons": [
+   "ROW_NUMBER result verified; correlated form returns ids 5 and 6 for user 2; GROUP BY ... MAX returned id 5 on 3.37.2 and 3.45.1 (also with an index and reversed insert order), consistent with the documented arbitrary choice.",
+   "Minor: 'covering index' is imprecise, and the NULL behaviour of the GROUP BY form (asked in the question) is only implicit."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "it needs a covering index on (user_id, updated_at) to avoid a scan per row",
+    "problem": "'Covering' is wrong here: the select list has other columns, so the index is a supporting, not covering, index.",
+    "replacement": "it benefits from an index on (user_id, updated_at) so each outer row does not scan all of that user's rows"
+   },
+   {
+    "severity": "minor",
+    "claim": "Do not use it where the tie matters or the code must be portable.",
+    "problem": "The question asks what each form does with the NULL; the GROUP BY form is not addressed. Verified: MAX ignores NULL (user 4 -> id 9); a user whose timestamps are all NULL returns an arbitrary row from GROUP BY, no row from the correlated form, and the highest id from ROW_NUMBER.",
+    "replacement": "Do not use it where the tie matters or the code must be portable. NULLs: MAX ignores them, so user 4 still gets id 9; a user whose timestamps are all NULL would get an arbitrary one of their rows from this form, no row at all from the correlated form (updated_at = NULL is never true), and the highest id from ROW_NUMBER."
+   },
+   {
+    "severity": "minor",
+    "claim": "users 2's rows 5 and 6",
+    "problem": "Typo in question.",
+    "replacement": "user 2's rows 5 and 6"
+   }
+  ],
+  "parts_answered": {
+   "ROW_NUMBER version": true,
+   "correlated subquery ties": true,
+   "correlated subquery NULL": true,
+   "GROUP BY MAX ties": true,
+   "GROUP BY MAX NULL": false
+  },
+  "nearest_existing": {
+   "id": "smi-g0028",
+   "same_intent": false,
+   "note": "g0028 keeps the earliest row per normalised email with DELETE; this keeps the latest per user with ROW_NUMBER and compares alternatives. Same 'one row per group' family, different intent."
+  },
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/lang_select.html",
+    "status": "supported",
+    "evidence": "'If there is exactly one min() or max() aggregate in the query, then all bare columns... take values from an input row which also contains the minimum or maximum.' 'If the same minimum or maximum value occurs on two or more rows... The choice is arbitrary.' 'SQLite considers NULL values to be smaller than any other values for sorting purposes. Hence, NULLs naturally appear... at the end of a DESC order-by.'"
+   },
+   {
+    "url": "https://www.sqlite.org/lang_aggfunc.html",
+    "status": "supported",
+    "evidence": "'Aggregate max() returns NULL if and only if there are no non-NULL values in the group.'"
+   }
+  ]
+ },
+ {
+  "id": "smi-i0021",
+  "plan_id": "P3-PY-01",
+  "domain": "Python",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Ran solution+test on sandbox 3.13.16, /home/claude/work/v310 (3.10.20) and v311 (3.11.17) via xrun.py: all ok. Fenced block in answer is byte-identical to the tested solution. Own edge cases (3.13 and 3.10): empty file ->0; ' ERROR ' only, no newline ->1; two lines ' ERROR \\n ERROR ' ->2; UTF-8 BOM prefix ->1; 'a\\x00 ERROR \\x80' ->1; two matches on one line counted once ->1 (line count, as asked); missing file -> FileNotFoundError. No break found.",
+  "reasons": [
+   "Self-contained, specific scenario; answer covers read() memory, iteration, with, encoding, errors policy, newline translation, test; all claims verified."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "count the lines containing ' ERROR '",
+    "problem": "Literal ' ERROR ' needs a trailing space, so a line ending 'x ERROR\\n' is not counted (verified: b'x ERROR\\n' -> 0). Question wording makes this the spec, so it is only an ambiguity; also a bytes-mode count (b' ERROR ' in line on 'rb') would avoid decoding altogether and is not mentioned.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "what is wrong with read().splitlines()": true,
+   "how to write it": true,
+   "function": true,
+   "test": true,
+   "handles invalid bytes and CRLF": true
+  },
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0022",
+  "plan_id": "P3-PY-02",
+  "domain": "Python",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 1,
+  "minor": 1,
+  "corrections_applied": 2,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "No code field. Claims run on 3.13 and 3.10: PurePosixPath('a')/'/b' -> /b; PurePosixPath('a\\\\b').parts -> single part; b.tar.gz suffix .gz stem b.tar; .bashrc suffix ''; PureWindowsPath case-insensitive equal. All true.",
+  "reasons": [
+   "Answer argues for pathlib correctly, but does not address the failure direction in the question (Linux-style paths failing on Windows) and ends with an overstated 'no functional gap' claim."
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "That is the usual reason Windows-style strings break on Linux.",
+    "problem": "The question describes the opposite direction (paths copied from Linux fail on a Windows machine). Windows accepts '/' as separator, so the typical causes are Linux absolute paths such as /home/u/data.csv (no drive letter; verified PureWindowsPath('/home/u/data.csv').is_absolute() is False), hard-coded separators in strings, and case/separator assumptions. pathlib does not fix hard-coded absolute Linux paths.",
+    "replacement": "That is the usual reason Windows-style strings break on Linux. In the opposite direction (Linux paths on Windows), '/' separators mostly work, so the failures come from absolute paths like /home/u/data.csv (no drive, so not absolute on Windows), hard-coded locations and case assumptions; pathlib does not fix those, so keep base directories in configuration and build everything below them with / ."
+   },
+   {
+    "severity": "minor",
+    "claim": "there is no functional gap that forces you to keep it",
+    "problem": "Overstated: os.path.expandvars, os.path.relpath (Path.relative_to refuses '..' walks before 3.12; verified error on 3.10) and os.path.commonpath have no exact Path equivalents.",
+    "replacement": "os.path remains fine for quick string work, and a few helpers (expandvars, relpath with '..', commonpath) have no exact Path equivalent, but nothing forces you to keep it for new code."
+   }
+  ],
+  "parts_answered": {
+   "argue for or against pathlib": true,
+   "concrete things Path gives you": true,
+   "cases needing care": true,
+   "explains the Windows failure described": false
+  },
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0023",
+  "plan_id": "P3-PY-03",
+  "domain": "Python",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 1,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Hard",
+  "difficulty_final": "Hard",
+  "code_findings": "Ran solution+test on sandbox 3.13.16, /home/claude/work/v310 (3.10.20) and v311 (3.11.17) via xrun.py: all ok. Fenced block in answer is byte-identical to the tested solution. Own edge cases (3.13 and 3.10): relative path ok; destination is a directory -> IsADirectoryError and temp file cleaned; missing parent dir -> FileNotFoundError; empty text -> 0-byte file; non-str text -> TypeError, old content kept, no temp left; symlink replaced rather than followed (caveat above). Permission copy verified by test on POSIX only (skipped on Windows).",
+  "reasons": [
+   "Correct write-then-replace pattern with honest durability caveats; test and answer code verified."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Ownership, ACLs and hard links are not preserved either.",
+    "problem": "Symlinks are also not followed: atomic_write_text('link.json') replaces the symlink with a regular file and leaves the target untouched (verified). Worth one clause.",
+    "replacement": "Ownership, ACLs, hard links and symlinks are not preserved either (a symlink at the destination is replaced by a regular file; resolve it first with os.path.realpath if that matters)."
+   }
+  ],
+  "parts_answered": {
+   "why the file is empty": true,
+   "safer function": true,
+   "test that old file survives a failed write": true
+  },
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0024",
+  "plan_id": "P3-PY-04",
+  "domain": "Python",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Ran solution+test on sandbox 3.13.16, /home/claude/work/v310 (3.10.20) and v311 (3.11.17) via xrun.py: all ok. Fenced block in answer is byte-identical to the tested solution. Own edge cases (3.13 and 3.10): empty file ->[]; header only ->[]; short row -> None filler, long row -> extra under None key; BOM file -> first key '\\ufeffa' (confirms the utf-8-sig advice); doubled quotes + embedded newline parsed right; blank line skipped; duplicate header names -> later column wins silently.",
+  "reasons": [
+   "Correct diagnosis of both failure modes, newline='' explanation matches csv docs, test genuinely exercises them."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "return list(csv.DictReader(f))",
+    "problem": "Materialises all rows; fine for the stated export but not for huge files. Ragged rows give None values / a None key (verified: '1' -> {'a':'1','b':None}).",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "explain what is going wrong": true,
+   "correct reading code": true,
+   "why newline=''": true,
+   "test": true
+  },
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0025",
+  "plan_id": "P3-PY-05",
+  "domain": "Python",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 1,
+  "minor": 1,
+  "corrections_applied": 1,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "No code field. Reproduced the cycle in files: error on 3.10/3.11 as quoted; import customers entry names customers/get_customer as the answer says; one-sided fix behaviour as described in the issue.",
+  "reasons": [
+   "Explanation of sys.modules / partial initialisation is right; fix 2 as stated is incomplete (applying it on one side only may not work)."
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "2. Import the module, not the name: import customers, then call customers.get_customer(...) inside functions.",
+    "problem": "Changing only one side is not enough. Verified: with both modules using from-imports, switching only orders to 'import customers' still fails for 'import orders'. It works only if the module that executes second (the one whose from-import hits a partially initialised module) switches, and since either may be the entry point, both should.",
+    "replacement": "2. Import the module, not the name, on both sides (or at least in the module that is executed second): import customers in orders.py and import orders in customers.py, then call customers.get_customer(...) inside functions. If only one side is changed, it works only for the entry order where the changed module is the second one loaded."
+   },
+   {
+    "severity": "minor",
+    "claim": "ImportError: cannot import name 'latest_order' from partially initialized module 'orders'",
+    "problem": "Exact wording is version-dependent. Verified identical on 3.10.20 and 3.11.17; the sandbox 3.13.16 printed \"cannot import name 'latest_order' from 'orders' (consider renaming ...)\" for the same files. Worth stating 'wording varies by version'.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "why the error occurs": true,
+   "three fixes": true,
+   "in order of preference": true
+  },
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0026",
+  "plan_id": "P3-PY-06",
+  "domain": "Python",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 1,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "No code field. Ran files: python shop/cli.py -> 'attempted relative import with no known parent package'; script prints __name__ '__main__', __package__ None, sys.path[0]=shop dir; python -m shop.cli from the parent prints '__main__' 'shop' and sys.path[0]=cwd; running -m from inside shop/ fails (ModuleNotFoundError), confirming the cwd caveat; namespace package without __init__.py imports fine.",
+  "reasons": [
+   "Substantively right (verified by running), one imprecise statement about __package__."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "it has no package (__package__ is empty)",
+    "problem": "Verified: for a script run, __package__ is None (not an empty string); under -m it is 'shop'.",
+    "replacement": "it has no package (__package__ is None)"
+   }
+  ],
+  "parts_answered": {
+   "why python shop/cli.py fails": true,
+   "why python -m works": true,
+   "what __init__.py is for": true,
+   "what __name__=='__main__' tests": true
+  },
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0027",
+  "plan_id": "P3-PY-07",
+  "domain": "Python",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 1,
+  "minor": 2,
+  "corrections_applied": 2,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "No code field.",
+  "reasons": [
+   "Library vs service pinning advice is sound, but the answer contains a process-leak sentence, a misleading 'pip freeze ... with hashes', and a thin account of what goes in pyproject.toml."
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "The format is defined by PyPA specifications, but I did not open them in this task, so check the packaging guide for the exact field list.",
+    "problem": "First-person process note does not belong in a reference answer and leaves the pyproject part of the question under-answered. WebFetch of packaging.python.org was refused here, so I checked by parsing a sample with tomllib only (structure valid), not against the spec text.",
+    "replacement": "The format is defined by the PyPA pyproject.toml specification (see the 'Writing your pyproject.toml' guide). For the library, [project] holds name, version, requires-python, dependencies (abstract ranges), optional-dependencies (e.g. a 'dev' or 'test' extra) and [project.scripts] for entry points; for the service, keep the same table with loose requirements and a lock file beside it."
+   },
+   {
+    "severity": "minor",
+    "claim": "(pip-compile, uv, poetry or pip freeze from a clean venv; ideally with hashes)",
+    "problem": "pip freeze cannot emit hashes (no hash option, verified in pip 24.0 help); hashes come from pip-compile --generate-hashes, uv or poetry.",
+    "replacement": "(pip-compile, uv or poetry; or pip freeze from a clean venv, which records versions but no hashes; ideally with hashes where the tool supports them)"
+   },
+   {
+    "severity": "minor",
+    "claim": "Many Linux distributions now mark the system Python as externally managed",
+    "problem": "True (PEP 668; /usr/lib/python3.12/EXTERNALLY-MANAGED exists in the sandbox) but supported only by background knowledge and a local file check, not official docs.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "virtual environments": true,
+   "what goes in pyproject.toml": true,
+   "pin differently for service vs library": true
+  },
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "sources_findings": [
+   {
+    "url": "(none in record)",
+    "status": "unreachable",
+    "evidence": "No sources listed; WebFetch refused (permission), so PyPA claims rest on local checks and background knowledge."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0028",
+  "plan_id": "P3-PY-08",
+  "domain": "Python",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 0,
+  "minor": 2,
+  "corrections_applied": 2,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Ran solution+test on sandbox 3.13.16, /home/claude/work/v310 (3.10.20) and v311 (3.11.17) via xrun.py: all ok. Fenced block in answer is byte-identical to the tested solution. Also ran the question's exact f/swallow code on 3.13: outputs match the answer (ok: try/else/finally 'from else'; raise: try/except/finally; return: try/finally 'from try'; swallow 'done'). Fenced block in answer is the logging variant, equal to tested solution.",
+  "reasons": [
+   "Traces and semantics all correct (re-run), but the answer says swallow() returns 'done' while its fenced code and test use 'finally wins'; the question's own code was not what got tested."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "return \"finally wins\"   # discards the in-flight RuntimeError",
+    "problem": "Answer text and question say swallow() returns 'done'; the fenced code returns 'finally wins'. Tested code therefore differs from the question's. (test must change in step: assert swallow() == \"finally wins\")",
+    "replacement": "return \"done\"   # discards the in-flight RuntimeError"
+   },
+   {
+    "severity": "minor",
+    "claim": "Avoid it; linters flag it.",
+    "problem": "Hedge/currency: since Python 3.14 (PEP 765) return/break/continue in finally emits a SyntaxWarning. Background knowledge, not run (no 3.14 available).",
+    "replacement": "Avoid it; linters flag it, and Python 3.14 emits a SyntaxWarning for it."
+   }
+  ],
+  "parts_answered": {
+   "what f('ok') prints/returns": true,
+   "f('raise')": true,
+   "f('return')": true,
+   "swallow() return": true,
+   "order of try/except/else/finally": true,
+   "why return in finally is dangerous": true,
+   "why bare except is harmful": true
+  },
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0029",
+  "plan_id": "P3-PY-09",
+  "domain": "Python",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 1,
+  "minor": 1,
+  "corrections_applied": 1,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Ran solution+test on sandbox 3.13.16, /home/claude/work/v310 (3.10.20) and v311 (3.11.17) via xrun.py: all ok. Fenced block in answer is byte-identical to the tested solution. Own edge cases: '', '0x10', '8e3', '80.0' -> ConfigValueError with ValueError cause; '0', '65536', '-1' -> out-of-range with no cause/context; None -> TypeError escapes; True -> 1.",
+  "reasons": [
+   "Chaining semantics all verified; but the hierarchy shown in code has no file-related error even though the question requires distinguishing a bad value from a missing file."
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "class ConfigValueError(ConfigError):\n    pass",
+    "problem": "Code defines only one subclass; the file-problem class is mentioned in prose only, so the 'missing file vs bad value' requirement is not demonstrated.",
+    "replacement": "class ConfigValueError(ConfigError):\n    pass\n\n\nclass ConfigFileError(ConfigError):\n    \"\"\"The config file is missing or unreadable.\"\"\"\n    pass"
+   },
+   {
+    "severity": "minor",
+    "claim": "def parse_port(text):",
+    "problem": "Exceptions outside the hierarchy leak: parse_port(None) raises TypeError (not a ConfigError), and parse_port('８０'), ' 80 ', '1_000', 80.5 are accepted (int() semantics). Verified on 3.13 and 3.10. Fine for the question, but undermines 'catch anything this library raised' unless inputs are validated.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "hierarchy with single catch-all base": true,
+   "bad value vs missing file handled differently": false,
+   "re-raise int() failure keeping original": true,
+   "__cause__ vs __context__": true,
+   "when from None is appropriate": true
+  },
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0030",
+  "plan_id": "P3-PY-10",
+  "domain": "Python",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "Ran solution+test on sandbox 3.13.16, /home/claude/work/v310 (3.10.20) and v311 (3.11.17) via xrun.py: all ok. Fenced block in answer is byte-identical to the tested solution. Own edge cases (3.13 and 3.10): [] ->[]; size 1; size == len; size > len; str/tuple/range inputs sliced correctly; size 0/-1 -> ValueError; size 2.0 -> TypeError; None -> TypeError. No break found.",
+  "reasons": [
+   "Disciplined, accurate debugging method; the off-by-one claim is correct and tested; code equals answer."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Buggy code: range(0, len(items) - size, size)",
+    "problem": "Correct and in fact always drops exactly the final batch (derived: the last start index is the largest multiple of size below n, which is never < n-size). The buggy function appears only in prose and the test, not in a code block.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "step-by-step find and prove": true,
+   "minimal reproduction": true,
+   "fix": true,
+   "test": true,
+   "traceback": true,
+   "logging vs print": true,
+   "breakpoint()": true,
+   "assertions": true,
+   "shrinking input": true
+  },
+  "nearest_existing": {
+   "id": "smi-0444",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0031",
+  "plan_id": "P3-DA-01",
+  "domain": "Data Analysis",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 0,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "No code (code is null).",
+  "reasons": [
+   "Self-contained, ordered, and gives a documentation list. No numeric or library-specific claims to verify."
+  ],
+  "issues": [],
+  "parts_answered": {
+   "what you check": true,
+   "in what order": true,
+   "what you write down": true
+  },
+  "nearest_existing": {
+   "id": "smi-0318",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0032",
+  "plan_id": "P3-DA-02",
+  "domain": "Data Analysis",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 0,
+  "corrections_applied": 0,
+  "difficulty_author": "Easy",
+  "difficulty_blind": "Easy",
+  "difficulty_final": "Easy",
+  "code_findings": "No code (code is null).",
+  "reasons": [
+   "Mean/median reasoning is correct (mean x n = total revenue; median robust; mode rarely useful for continuous data). Numbers 84/41 are from the question only."
+  ],
+  "issues": [],
+  "parts_answered": {
+   "which number": true,
+   "why gap/skew": true,
+   "what to put on dashboard": true
+  },
+  "nearest_existing": {
+   "id": "smi-0169",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0033",
+  "plan_id": "P3-DA-03",
+  "domain": "Data Analysis",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 1,
+  "minor": 0,
+  "corrections_applied": 1,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "No code (code is null).",
+  "reasons": [
+   "Definitions and consequences of complete-case vs imputation are right; MAR vs MNAR untestable is right.",
+   "One overstated claim about testing."
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "Differences rule out MCAR.",
+    "problem": "Overstated: a statistically significant difference is evidence against MCAR, not proof, and absence of a significant difference does not establish MCAR (low power, unobserved drivers).",
+    "replacement": "Clear differences are evidence against MCAR; finding none does not prove it, because the test can lack power and missingness may depend on unobserved variables."
+   }
+  ],
+  "parts_answered": {
+   "decide MCAR/MAR/MNAR with business examples": true,
+   "drop vs impute": true,
+   "what can be tested": true
+  },
+  "nearest_existing": {
+   "id": "smi-0318",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0034",
+  "plan_id": "P3-DA-04",
+  "domain": "Data Analysis",
+  "verdict": "correct",
+  "status": "corrected",
+  "major": 1,
+  "minor": 2,
+  "corrections_applied": 3,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Hard",
+  "difficulty_final": "Hard",
+  "code_findings": "No code (code is null).",
+  "reasons": [
+   "Design structure is sound (SRM, user-level randomisation, weekly cycles, peeking). Verified sample sizes with the standard two-proportion normal-approximation formula (scipy): 4.0->4.2 percent = 154,304 per arm; 4.0->4.4 percent = 39,475 per arm.",
+   "The 10 percent relative figure is misstated and the 5 percent figure is rounded down."
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "A 10 percent relative lift needs about 38,000 to 39,000 per arm.",
+    "problem": "Computed value is about 39,500 per arm (39,475), outside the stated range.",
+    "replacement": "A 10 percent relative lift (4.0 to 4.4 percent) needs about 39,500 per arm."
+   },
+   {
+    "severity": "minor",
+    "claim": "gives roughly 150,000 users per arm (illustrative, computed)",
+    "problem": "Computed value is about 154,000; also assumes pooled-variance normal approximation, equal arms.",
+    "replacement": "gives roughly 154,000 users per arm (normal approximation, equal allocation; computed)"
+   },
+   {
+    "severity": "minor",
+    "claim": "150,000 per arm takes roughly 8 days",
+    "problem": "Follows from 154,000/20,000 = 7.7 days, but assumes all 40,000 daily visitors are unique new users, which the answer then partly caveats.",
+    "replacement": "about 154,000 per arm takes roughly 8 days if every daily visitor were a new unique user; in practice longer"
+   }
+  ],
+  "parts_answered": {
+   "primary and guardrail metrics": true,
+   "randomisation unit": true,
+   "sample size": true,
+   "duration": true,
+   "novelty effects": true,
+   "stopping rule": true
+  },
+  "nearest_existing": {
+   "id": "smi-0172",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0035",
+  "plan_id": "P3-DA-05",
+  "domain": "Data Analysis",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 0,
+  "corrections_applied": 0,
+  "difficulty_author": "Easy",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "No code (code is null).",
+  "reasons": [
+   "Interpretation of CI is correct; width drivers correct (SE = s/sqrt(n), four times data to halve width); conditions stated; credible interval contrast correct."
+  ],
+  "issues": [],
+  "parts_answered": {
+   "is statement right": true,
+   "what interval means": true,
+   "what widens/narrows": true
+  },
+  "nearest_existing": {
+   "id": "smi-0169",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0036",
+  "plan_id": "P3-DA-06",
+  "domain": "Data Analysis",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 0,
+  "corrections_applied": 0,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "No code (code is null).",
+  "reasons": [
+   "Checked arithmetic: 5 percent x 2.0 percent = +0.10 pp; 5 x -0.5 percent = -0.025 pp; 5 x 4.5 percent = +0.225 pp. Upper end 4.5 < 5 percent relative threshold, as stated. Interpretation of CI containing zero is correct. Dollar and threshold figures are labelled illustrative."
+  ],
+  "issues": [],
+  "parts_answered": {
+   "conclusion": true,
+   "recommendation": true,
+   "what extra info would change decision": true
+  },
+  "nearest_existing": {
+   "id": "smi-0172",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0037",
+  "plan_id": "P3-DA-07",
+  "domain": "Data Analysis",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 0,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Hard",
+  "difficulty_final": "Hard",
+  "code_findings": "No code (code is null).",
+  "reasons": [
+   "Interference/SUTVA explanation correct; bias direction explicitly not asserted; switchback and cluster trade-offs correct and conditioned. Mechanism claims are standard background knowledge (not run)."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Two-sided or hybrid designs, and modelling the interference, which depend on assumptions.",
+    "problem": "Vague; adds little for a grader.",
+    "replacement": null
+   }
+  ],
+  "parts_answered": {
+   "why biased": true,
+   "alternatives": true
+  },
+  "nearest_existing": {
+   "id": "smi-0172",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0038",
+  "plan_id": "P3-DA-08",
+  "domain": "Data Analysis",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 1,
+  "corrections_applied": 1,
+  "difficulty_author": "Medium",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "No code (code is null).",
+  "reasons": [
+   "Survivorship bias, direction (satisfaction overstated; tenure hedged), and KM/censoring fixes are correct. Direction on tenure is appropriately left conditional."
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Fixing it by weighting survivors instead of recovering churned data",
+    "problem": "Listed as a mistake, but inverse-probability weighting can be valid when churner covariates are available; overstated as always wrong.",
+    "replacement": "Relying only on weighting survivors without checking that the weights can capture why people left, instead of recovering churned data"
+   }
+  ],
+  "parts_answered": {
+   "what is wrong": true,
+   "which way is the bias": true,
+   "how to detect": true,
+   "how to fix/reframe": true
+  },
+  "nearest_existing": {
+   "id": "smi-0318",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0039",
+  "plan_id": "P3-DA-09",
+  "domain": "Data Analysis",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 0,
+  "corrections_applied": 0,
+  "difficulty_author": "Hard",
+  "difficulty_blind": "Medium",
+  "difficulty_final": "Medium",
+  "code_findings": "No code (code is null).",
+  "reasons": [
+   "Structured diagnostic is sound and conditions are stated. Minor ambiguity: a 12 percent drop in a monthly metric within one week is itself a hint of rolling-window/definition effects, which the answer does not use, but the answer is not wrong."
+  ],
+  "issues": [],
+  "parts_answered": {
+   "real vs artefact": true,
+   "reconcile": true,
+   "explain to stakeholders": true
+  },
+  "nearest_existing": {
+   "id": "smi-0408",
+   "same_intent": false
+  },
+  "sources_findings": []
+ },
+ {
+  "id": "smi-i0040",
+  "plan_id": "P3-DA-10",
+  "domain": "Data Analysis",
+  "verdict": "pass",
+  "status": "pass",
+  "major": 0,
+  "minor": 0,
+  "corrections_applied": 0,
+  "difficulty_author": "Easy",
+  "difficulty_blind": "Easy",
+  "difficulty_final": "Easy",
+  "code_findings": "No code (code is null).",
+  "reasons": [
+   "Arithmetic verified: 0.5/2.0 = 25 percent; 0.5/20 = 2.5 percent; 25 percent of 20 = 5 pp (10x of 0.5); 0.5 pp x 100,000 = 500; 50->25 is -25 pp/-50 percent, recovery +100 percent; 'up 0.5 percent' of 2.0 = 2.01."
+  ],
+  "issues": [],
+  "parts_answered": {
+   "which is right": true,
+   "how to write it": true,
+   "why base rate matters": true,
+   "same absolute change on 20 percent baseline": true
+  },
+  "nearest_existing": {
+   "id": "smi-0169",
+   "same_intent": false
+  },
+  "sources_findings": []
+ }
+]

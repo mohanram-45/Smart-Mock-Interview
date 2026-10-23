@@ -1,0 +1,3 @@
+# Stage 1D - Batch 3 (MLOps & Model Deployment part A, 45 records) - STAGED
+Ids `smi-l0001..smi-l0045`. Not merged into any curated version; v1-v5 and Batches 1-2 untouched. Same layout as batch 2. Verification: AI-generated, blind AI review, AI recheck of every corrected record, final recheck of the 21 records changed afterwards, code executed on Python 3.10/3.11/3.13, source pages opened by AI agents and (9 records) by the lead. No human review. yaml/Dockerfile snippets in 5 practical answers are configuration examples, not executed.
+Validate: `python -B audit/expansion/validate_batch.py data/expansion/batch_03`

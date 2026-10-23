@@ -1,0 +1,838 @@
+[
+ {
+  "entry_id": "B1-GEN-01-1#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Fetched; all five passages present. The 'HNSW is the best option' sentence is conditional on 'a lot of RAM or the dataset is small', and the k_factor re-ranking is tied to the IVF,PQ+RFlat option. The record's nlist range, 32-bit link arithmetic (M*2*4 = 256 B at M=32), 'RAM-hungry' hedge and 'deletes awkward/implementation-dependent' wording are consistent with this.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-01-1#3",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "partial",
+  "note": "Abstract says 'Interestingly, very different approaches to k-NN search yield comparable quality-performance trade-offs.' This is a finding on the benchmarked datasets; it supports 'measure on your data rather than choose by reputation' but is not a proof that no family wins everywhere. The record only says 'decide on measured curves', so no wording change needed.",
+  "narrowed_supports": "On the benchmarked datasets, very different ANN approaches gave comparable quality-performance trade-offs, which motivates measuring recall-latency curves on your own data.",
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-01-4#0",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "Fetch tool paraphrased the abstract rather than quoting the 'Compatible means...' sentence, but it confirmed compatible-with-old-features training (BCT), bypassing recomputation, and the term 'backfilling'. Supports the record's 'unless the two models were deliberately trained to be compatible' and the backfill rollout.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-01-5#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Abstract calls hubness 'a new aspect of the dimensionality curse' and 'an inherent property of data distributions in high-dimensional vector space'. Record only says hubness is reported in high dimensions, with hedging.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-01-6#2",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "Abstract: MRL 'allows a single embedding to adapt to the computational constraints of downstream tasks' and learns coarse-to-fine representations at least as accurate as independently trained low-dim models. Record says only that some models are trained so a prefix works and to use that when documented, which matches. Quote in the entry is a light paraphrase.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-03-1#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Abstract: 'BM25 is a robust baseline' and dense and sparse retrieval models 'often underperform other approaches' (zero-shot setting). Supports not claiming universal dense superiority, as the record words it.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-03-2#1",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "Fetched; 'combines ranks without regard to the arbitrary scores', 'RRF consistently equaled or bettered other methods we tried' (the tool rendered the Condorcet Fuse/CombMNZ part as 'established metaranking standards'), and the formula sum 1/(k+r(d)) confirmed. Record's 'rank-only, safe default' is supported; its caveat about tuned convex combos is hedged and comes from the other cited source.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-03-4#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Lucene 9.9 javadoc: k1=1.2, b=0.75, idf log(1+(docCount-docFreq+0.5)/(docFreq+0.5)), k1 saturation, b length normalisation all confirmed verbatim.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-03-6#0",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "partial",
+  "note": "Abstract says the hypothetical document is 'unreal and may contain false details' but that the encoder's dense bottleneck filters out incorrect details. The record's claim that hallucinated specifics 'pull retrieval toward the wrong place' as a risk goes beyond the paper, which argues the opposite mitigation; the 'weak for exact identifiers' claim is also not from this source.",
+  "narrowed_supports": "HyDE embeds an LLM-written hypothetical document that may contain false details; the paper argues the encoder's dense bottleneck filters most of them out.",
+  "fixes": [
+   {
+    "field": "answer",
+    "claim": "Risks: the draft may contain hallucinated specifics that pull retrieval toward the wrong place,",
+    "replacement": "Risks: the draft may contain hallucinated specifics (the HyDE paper argues the encoder largely filters these out, but that is not guaranteed on every corpus or for rare facts) that can pull retrieval toward the wrong place,"
+   }
+  ]
+ },
+ {
+  "entry_id": "B1-GEN-03-7#0",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "pgvector README Filtering section confirmed: filtering after the approximate-index scan, the 10% / ef_search 40 -> 4 rows example, exact indexes for low-percentage matches, iterative scans, partial indexing for few values, partitioning for many. The record's 'retry doubling candidate depth' is its own design, analogous to iterative scans, and is not presented as pgvector's.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-04-1#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Both passages confirmed verbatim; record's '50 to 200 candidates' is a range around the doc's 'e.g. 100'.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-04-3#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Abstract confirms best at start/end, degraded in the middle. Record hedges it as empirical and model-dependent, which is appropriate; mechanism sentences in the record are hedged ('attention can favour...') and not attributed to the paper.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-04-4#2",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "partial",
+  "note": "RECOMP abstract confirms extractive and abstractive compressors and selective augmentation (empty string). It does not say compression drops qualifiers or alters numbers; the record states those as risks ('can introduce errors or drop qualifiers'), hedged, so no wording change is needed provided the paper is cited only for the existence of the two approaches.",
+  "narrowed_supports": "Extractive (sentence selection) and abstractive (model-generated summary) compression of retrieved documents are established approaches; the paper does not itself state the risks of dropped qualifiers or altered numbers.",
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-04-6#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "partial",
+  "note": "Page confirms shared window (system, messages, tools, output incl. thinking) and a 400 'prompt is too long' error for over-long input; it states no silent truncation for the API (only chat products may roll context). Record says overflow either fails or 'the provider/framework truncates silently', which is not supported for this provider and is only a generic hedge. Also, on newer models over-long output ends with stop_reason model_context_window_exceeded rather than an error.",
+  "narrowed_supports": "System prompt, history and generated output share one window, and on the Claude API an over-long input is rejected with a 400 'prompt is too long' error; silent truncation is not documented there.",
+  "fixes": [
+   {
+    "field": "detailed_answer",
+    "claim": "either the request fails or the provider/framework truncates silently (depending on the stack, by cutting the start or the end of the prompt)",
+    "replacement": "either the request fails (the Claude API returns a 400 'prompt is too long' error) or, on some other stacks, a framework or provider truncates silently (by cutting the start or the end of the prompt)"
+   }
+  ]
+ },
+ {
+  "entry_id": "B1-GEN-07-2#0",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "Paper (Maynez et al. 2020) states majority of hallucinations are extrinsic and 'could be valid abstractions', 'Hallucinations are not necessarily erroneous', and factual hallucinations can be intrinsic or extrinsic. Supports faithfulness vs correctness being distinct. Caveat: the same paper reports over 90% of extrinsic hallucinations were erroneous in its setup; the record does not claim most unsupported claims are true, so no change.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-07-4#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "partial",
+  "note": "Page says some models 'require using specific text prompts to achieve optimal performance' with the E5 query:/passage: example. It does not say degradation is silent. The record only says the new model 'may need a different query/document prefix or normalisation', which is supported; the 'silently degrade' part of the entry's supports text is an inference.",
+  "narrowed_supports": "Some embedding models require specific query/document prompts (e.g. E5 'query: ' / 'passage: ') for best performance, so a model swap may need different prefixes.",
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-07-5#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "partial",
+  "note": "Abstract confirms dense retrievers drastically underperform sparse on EntityQuestions and generalise only to common entities. It does not show subword-fragment mechanism or near-miss ID conflation (SLA-7 vs SLA-8); the record states the mechanism fairly firmly in its first 'Why' sentence.",
+  "narrowed_supports": "Dense retrievers underperform sparse (BM25-style) retrieval on rare-entity questions; the paper does not show subword-fragmentation or near-miss ID conflation.",
+  "fixes": [
+   {
+    "field": "detailed_answer",
+    "claim": "so their embeddings are weakly informative and similar to many other IDs;",
+    "replacement": "so their embeddings tend to be weakly informative and can sit close to those of other IDs (dense retrievers are reported to underperform sparse ones on rare-entity questions);"
+   }
+  ]
+ },
+ {
+  "entry_id": "B1-GEN-05-1#0",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "partial",
+  "note": "Koehn describes paired bootstrap resampling (1000 resampled test sets, score both systems on each) but derives significance from win frequency (e.g. 95%). The record's percentile CI on the mean per-query difference is the standard analogue, not Koehn's procedure. Record text does not attribute the CI to Koehn explicitly, and the sign-test/SE figures are its own arithmetic.",
+  "narrowed_supports": "Paired bootstrap resampling (resample test items with replacement, score both systems on each resample) is an established method (Koehn 2004); the percentile CI on the mean difference is a standard analogous use.",
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-05-2#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "sklearn page confirms the agreement description, kappa=(p_o-p_e)/(1-p_e), per-annotator empirical prior for p_e, and 0.0 = chance-level agreement. Record's p_e=0.90x0.95+0.10x0.05=0.86 matches. Page says nothing on prevalence; the record's 'depends on prevalence' remark is uncited general knowledge, not contradicted.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-05-3#2",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Ragas FactualCorrectness 'compares and evaluates the factual accuracy of the generated response with the reference'; every example passes a reference. Supports 'correctness needs a reference answer'.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-05-4#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Abstract confirms ranking can be hacked by altering order and Balanced Position Calibration aggregates across orders. Record's 'count a win only when the same system wins in both orders' is a related but different aggregation rule; the record does not claim it is BPC.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-05-5#1",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "partial",
+  "note": "Paper confirms synthetic queries had much fewer relevant documents, synthetic collections tended to be easier, and GPT-4 queries were much longer (10.7 vs 5.8 words real); T5 queries were about the same length as real ones (5.7). It does not show lexical leakage or BM25 favouritism, and 'real queries are shorter' holds only against GPT-4 queries.",
+  "narrowed_supports": "LLM-generated queries differ from real ones: GPT-4-generated queries were longer, had much fewer relevant documents, and synthetic collections tended to be easier; no lexical-leakage or BM25-bias finding.",
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-05-7#0",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "BEIR Section 6 confirms 'All other unseen documents are assumed to be irrelevant', that missing annotations (holes) were manually added for all systems, and Conclusions call for 'Better datasets, that use diverse pooling strategies'. Entry's quote is a semicolon-joined paraphrase of those separate passages.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-06-1#0",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "Weaviate page (re-fetched) confirms post-filtering 'chance that the original vector search does not contain any match at all' and a flat-search cutoff configured as ~15% of dataset size (percentage, not an object count as tool reports; flatSearchCutoff term not seen). Record only says engines may switch to brute force for selective filters, which is supported.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-06-2#0",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "Paper: 'Simulations also suggest that 2*M is a good choice for Mmax0'; mL=1/ln(M) corresponds to skip-list p=1/M; layer drawn as floor(-ln(unif)*mL). Record's n/(M-1) upper-layer entries follows from geometric 1/M per layer (arithmetic, correct). Entry's quote joins two separate sentences.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-06-3#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Both sentences confirmed verbatim. Record frames soft deletes as common and engine-dependent, which is appropriately hedged.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-06-4#0",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "Elastic NRT page confirms a refresh makes operations since the last refresh searchable, new Lucene segments are written/opened without full commit, default ~1s refresh and controls. Record's 'invisible until next refresh or commit' is supported for Elasticsearch/Lucene-style engines.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-06-5#2",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "Qdrant indexing docs: planner switches to full scan instead of HNSW traversal when the estimated points matching the condition fall below full_scan_threshold (page names it both full_scan_threshold and full_scan_threshold_kb). One engine example; record phrases it as 'unless the engine pre-filters or scans exactly', which is hedged adequately. Entry quote omits the condition clause.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-06-6#2",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "Cormack et al.: k=60 fixed in a pilot and not altered; k=60 near-optimal but choice not critical. Record says only 'c = 60 is a widely used default' and uses the formula 1/(c+rank), both supported. Worked example arithmetic (0.03227 vs 0.03226) checks.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-01-1#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "FAISS wiki says HNSW does not support removing vectors ('would destroy the graph structure'). Supports 'awkward with deletes' for FAISS; tombstone/implementation-dependent wording in our answer is hedged and not claimed by this source.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-01-3#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "All four passages present (squared L2, not cosine unless normalised, normalise -> MIPS, |x-y|^2=2-2<x,y>). Matches answer's FAISS squared-L2 and unit-vector equivalence claims. The 'IP not a true metric' sentence is not covered by this source.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-01-4#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "partial",
+  "note": "Abstract states a linear mapping between vector spaces of languages (word translation across separately trained monolingual spaces). It is precedent only; it does not show a linear map bridges two versions of the same model family or is usable 'for a temporary period'. Answer already hedges ('lossy', 'validate empirically').",
+  "narrowed_supports": "Precedent that a linear map can be learned between separately trained embedding spaces (cross-lingual word embeddings); does not establish its adequacy for bridging embedding-model versions.",
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-01-6#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "FAISS guidelines give HNSW memory (d*4 + M*2*4) bytes/vector; answer's M=16 -> 2M=32 links x 4 B = 128 B/vector matches, with upper layers hedged.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-01-7#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "partial",
+  "note": "Quote exists, but on the page the 4*sqrt(N)-16*sqrt(N) rule sits under the 'below 1M vectors' section. For 30M it is an extrapolation; the page's own 10M-100M row recommends IVF262144_HNSW32, which also supports a larger nlist than 4,096.",
+  "narrowed_supports": "FAISS gives K=4-16*sqrt(N) as a heuristic for datasets under 1M and recommends a much larger IVF (262144 cells) for 10M-100M, both consistent with raising nlist above 4,096 for 30M vectors.",
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-03-1#2",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Cormack et al. say RRF combines ranks without regard to arbitrary scores; supports using RRF as score-free fusion. Answer only recommends RRF or calibrated weighted fusion, no overreach.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-03-3#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Formula, k=60 fixed in a pilot and not altered, and 'near-optimal, but choice not critical' all confirmed. Supports 'a widely used default, not a theorem'.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-03-4#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Elastic blog text matches both passages (tf curve saturating around k1; b=0 means length has no bearing). Supports saturation and b=0 claims; the k1+1 asymptote is algebra from the formula, not from the blog.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-03-6#1",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "partial",
+  "note": "Abstract describes multi-query generation with reciprocal-rank fusion and reports some answers drifting off topic when generated queries are insufficiently relevant. It does not report a recall gain or increased retrieval load (the load point is simple arithmetic, not sourced). 'Raises recall' is stated as fact.",
+  "narrowed_supports": "Multi-query generation with reciprocal-rank fusion is a described method (RAG-Fusion) and generated queries that stray from the original can add off-topic results.",
+  "fixes": [
+   {
+    "field": "answer",
+    "claim": "It raises recall for ambiguous queries but multiplies",
+    "replacement": "It can raise recall for ambiguous queries (not shown by the RAG-Fusion abstract; measure it) but multiplies"
+   }
+  ]
+ },
+ {
+  "entry_id": "B1-GEN-03-7#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Qdrant article: clear threshold where search fails due to graph decomposition into small connected components; connections between categories can be lost. Supports answer's hedged 'recall may drop... disconnected valid subgraph... engines add filter-aware traversal'. Article is the 2019 design, consistent with the entry's caveat.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-04-1#1",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "partial",
+  "note": "Abstract supports independent encoding and offline precomputation of document representations (no per-pair full network pass). It says nothing about per-token storage cost or quality relative to single-vector bi-encoders; the answer states both as fact.",
+  "narrowed_supports": "Late-interaction (ColBERT) encodes query and document independently and precomputes document representations offline, so no per-pair transformer pass at query time.",
+  "fixes": [
+   {
+    "field": "detailed_answer",
+    "claim": "trade extra storage for better quality than single-vector bi-encoders while still avoiding",
+    "replacement": "trade extra storage (one vector per token) for the aim of better quality than single-vector bi-encoders while still avoiding"
+   }
+  ]
+ },
+ {
+  "entry_id": "B1-GEN-04-4#0",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "partial",
+  "note": "Paper: linear combination of relevance and novelty; lambda=1 gives standard ranking, lambda=0 maximal diversity; 0.7 and 0.3 are illustrative values in a two-stage strategy (0.3 survey, 0.7 refine/focus), not a general recommended default. Answer's 'around 0.7' is a heuristic and should say so.",
+  "narrowed_supports": "MMR linearly trades relevance against redundancy via lambda; the paper uses about 0.7 as an illustrative relevance-leaning setting for focusing on reinforcing documents and about 0.3 for broad exploration, and advocates a user-tunable value.",
+  "fixes": [
+   {
+    "field": "practical_answer",
+    "claim": "Optionally apply MMR with lambda around 0.7 to the remaining list.",
+    "replacement": "Optionally apply MMR with a relevance-leaning lambda (around 0.7 is a common starting point, tune it) to the remaining list."
+   }
+  ]
+ },
+ {
+  "entry_id": "B1-GEN-04-5#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Abstract gives 51.5% fully supported and defines citation precision/recall as separate properties; supports 'a valid citation does not mean the passage supports the claim'.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-07-1#0",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "Abstract confirms best performance at beginning/end, degradation in the middle, and models do not robustly use long contexts. Supports 'position or distraction effects with many chunks'; extra-irrelevant-context harm is shown in the paper body (more documents lowers accuracy), not explicitly in the abstract.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-07-2#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Ragas defines faithfulness over response vs retrieved context, no reference answer; matches the answer's 'faithfulness (claims supported by context)'.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-07-4#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "partial",
+  "note": "Alias page confirms aliases and atomic switching with no impact on concurrent requests. It does not cover rollback or retaining the old collection; 'rollback = one alias flip' is a sound inference (repoint the alias) but not stated.",
+  "narrowed_supports": "Qdrant aliases can be repointed atomically at a newly built collection with no impact on concurrent requests (cutover); rollback by repointing is an inference.",
+  "fixes": [
+   {
+    "field": "detailed_answer",
+    "claim": "Rolling back then takes one alias flip.",
+    "replacement": "Rolling back then takes one alias flip back to the old collection (alias changes are atomic), provided the old collection was kept."
+   }
+  ]
+ },
+ {
+  "entry_id": "B1-GEN-07-5#1",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "partial",
+  "note": "Abstract says BM25 is a robust baseline and that dense and sparse retrieval models 'often underperform other approaches' (the 'other approaches' are re-ranking/late-interaction, not BM25 specifically). The BM25-vs-dense average result is in the paper body, not the abstract. Does not test fusion.",
+  "narrowed_supports": "BEIR reports BM25 as a robust zero-shot baseline and that dense/sparse retrievers often underperform other approaches in generalisation; this motivates but does not itself demonstrate benefit from adding lexical retrieval.",
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-05-1#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "partial",
+  "note": "Passages confirmed (size of test set has a large effect; 100 Brown sentences need 3.00 F1). But these are F1/BLEU thresholds on sentence-level NLP test sets, so it supports the general principle that small test sets need large gains, not a specific threshold for 40 queries with hit@5. The answer's conclusion is derived from its own bootstrap computation, which is fine.",
+  "narrowed_supports": "Small test sets need large observed gains to reach significance (shown for MT/parsing F1/BLEU); general principle only, not a threshold for 40 hit@5 queries.",
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-05-3#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Ragas faithfulness uses response and retrieved context, no reference answer; supports 'Faithfulness needs answer plus context'. Ragas also passes the user question into its pipeline; the claim is acceptable. 'Correctness needs a reference answer' is not covered by this source.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-05-3#3",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Maynez et al. confirm unsupported (extrinsic) content can be factual and 'Hallucinations are not necessarily erroneous'. Supports faithfulness vs correctness being distinct. Note the paper found most extrinsic content in its data was erroneous (>90%), so 'can' wording in our answer is right.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-05-4#2",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Abstract confirms AlpacaEval is known to favour longer outputs and that a length-controlled version answers a counterfactual equal-length question. Supports length bias plus length-adjusted win rate; evidence is for AlpacaEval's judge specifically.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-05-5#2",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "partial",
+  "note": "Zobel confirms unjudged documents are assumed non-relevant and that a system not contributing to the pool may be underestimated. That is about pooled judgements; applying it to single-gold-chunk golden sets (duplicates scored as misses) is an extension by analogy. Zobel also found the average effect small on TREC.",
+  "narrowed_supports": "Pooled relevance judgements treat unjudged documents as non-relevant, so systems that did not contribute to the pool may be underestimated; extension to single-gold-chunk sets is by analogy.",
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-05-7#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Both passages confirmed and match 'unjudged documents count as non-relevant' and bias against systems outside the pool. Zobel reports the average effect was small on TREC collections, so magnitude should not be overstated; the answer states the direction/mechanism, not size.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-06-1#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Qdrant article states search begins to fail past a threshold due to decomposition of the graph into small connected components. Supports the answer's hedged 'effective graph of matching nodes can become disconnected and recall or latency degrades'.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-06-2#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Formulas confirmed: SQ8 = d bytes, IndexPQ = ceil(M*nbits/8), IndexHNSWFlat = 4*d + x*M*2*4 (x undefined on the page). Supports the 1 B/dim, 96 B PQ and 2M*4 B layer-0 link claims. The upper-layer link term (n/(m-1)*m*4) in the practical code is our own estimate, not from the page.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-06-3#2",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "partial",
+  "note": "Qdrant indexing docs say many soft-deleted points can leave disconnected graph components (the ACORN section). That supports soft deletes degrading graph search in Qdrant. It does not state that searches traverse deleted nodes consuming ef budget, nor that inserting around deleted nodes reduces graph quality.",
+  "narrowed_supports": "In Qdrant's HNSW, a large number of soft-deleted points can leave the graph with disconnected components and degrade filtered search.",
+  "fixes": [
+   {
+    "field": "detailed_answer",
+    "claim": "searches still traverse deleted nodes, which consume part of the ef budget;",
+    "replacement": "searches can still traverse deleted nodes, which may consume part of the ef budget (implementation-dependent; Qdrant documents graph disconnection with many soft-deleted points);"
+   }
+  ]
+ },
+ {
+  "entry_id": "B1-GEN-06-5#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Qdrant page recommends one collection with tenant payload partitioning, warns per-tenant collections carry overhead, and reserves multiple collections for few tenants needing strict isolation. Matches the tiered design.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-06-6#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Lucene javadoc idf = log(1 + (docCount - docFreq + 0.5)/(docFreq + 0.5)) confirmed; recomputed worked example gives 10.72 and 8.73, matching the answer.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-01-1#2",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "partial",
+  "note": "Abstract states both quoted phrases. It supports incremental multi-layer construction and strong results versus earlier open-source vector-only methods; it does not state HNSW 'usually gives the best latency at high recall' as worded in the answer.",
+  "narrowed_supports": "HNSW is built incrementally as a multi-layer proximity graph and was reported to strongly outperform earlier open-source vector-only methods.",
+  "fixes": [
+   {
+    "field": "concise_answer",
+    "claim": "HNSW usually gives the best latency at high recall",
+    "replacement": "HNSW is often reported to give very good latency at high recall"
+   },
+   {
+    "field": "detailed_answer",
+    "claim": "At high recall it usually offers the best latency per query",
+    "replacement": "At high recall it is often reported to offer very good latency per query"
+   }
+  ]
+ },
+ {
+  "entry_id": "B1-GEN-01-3#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Model card lists dot-product as suitable score function and 'Produces normalized embeddings: No'. Matches the answer's caveat that some models are trained for dot product with unnormalised output.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-01-5#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "All three passages present (abstract x2, section 6). Supports distance concentration (under the paper's assumptions) and its limits; the answer's claims about intrinsic dimension of real embeddings are not from this paper but are not attributed to it.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-01-6#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "partial",
+  "note": "FAISS wiki confirms SQfp16 = 2*d+8 bytes (half of float32) and 'may cause some loss of precision'. The answer says float16 is 'usually near-lossless', which the page does not state.",
+  "narrowed_supports": "float16 halves per-vector storage (2*d+8 bytes) and may cause some loss of precision.",
+  "fixes": [
+   {
+    "field": "answer",
+    "claim": "float16 is usually near-lossless",
+    "replacement": "float16 usually loses little but can cost some precision"
+   }
+  ]
+ },
+ {
+  "entry_id": "B1-GEN-03-1#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "partial",
+  "note": "Abstract says dense retrievers drastically underperform sparse on simple entity-centric questions and generalise only to common entities unless the pattern was seen in training. That is about entity questions (Wikipedia-style), not error codes, SKUs or paraphrase; the answer's per-query predictions for (a)-(c) are mechanistic reasoning, hedged, and not tested by the paper.",
+  "narrowed_supports": "On simple entity-centric questions, dense retrievers drastically underperform sparse methods and generalise mainly to common entities, which is consistent with weakness on rare identifiers (error codes and SKUs were not tested).",
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-03-2#0",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "Abstract: CC outperforms RRF in- and out-of-domain; RRF found sensitive to its parameters ('Contrary to existing studies' wording is in the abstract); CC sample efficient. Matches the answer's hedged 'some studies find...'.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-03-3#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Elastic RRF page gives rank_constant default 60 and the score += 1.0/(k + rank(...)) pseudocode. (Fetch covered first 100k chars of a 121k-char page; both items found.)",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-03-5#0",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "Formula (OCR garbled, reconstructed; paper uses X for lambda) and the lambda=1 relevance-ranking and lambda=0 maximal-diversity statements are present. The answer's note that lam=0 picks lowest index first is specific to our implementation, not claimed from the paper.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-03-6#2",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Abstract sentence present. Systems fused are rankers/runs (Wumpus configurations, TREC runs, LETOR baselines), not query variants, so it supports RRF as multi-ranker fusion but not multi-query expansion benefits; the given supports text already says this.",
+  "narrowed_supports": "RRF is a rank-fusion method for combining rankings from multiple IR systems and generally beats the individual systems it fuses (not evidence about fusing query variants).",
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-02-2#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Page text confirms 'may not appear in any particular reading order', 'responsibility of the PDF creator', sort option top-left to bottom-right, and (in another section) get_text('blocks') with position info for establishing reading order. Note plain sort does not itself handle multi-column layouts; the answer does not claim it does.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-04-2#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Both sentences present on the Retrieve & Re-Rank page.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-04-4#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "partial",
+  "note": "Shingle definition, resemblance as intersection over union of shingle sets, and 0-1 range all present. The paper supports shingle/Jaccard resemblance as a near-duplicate measure; the practical answer's 0.8 threshold and 5-grams are our choices and are not labelled illustrative.",
+  "narrowed_supports": "Shingle (contiguous token subsequence) overlap, as Jaccard-style resemblance in [0,1], is an established near-duplicate measure; the 0.8 threshold and n=5 are our own choices.",
+  "fixes": [
+   {
+    "field": "practical_answer",
+    "claim": "Drop any chunk with Jaccard overlap above 0.8 on word 5-grams",
+    "replacement": "Drop any chunk with Jaccard overlap above 0.8 (an illustrative threshold to tune) on word 5-grams"
+   }
+  ]
+ },
+ {
+  "entry_id": "B1-GEN-04-5#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "All four quoted passages present (TRUE entailment check s3.3, citation recall averaging s3.3, correlation with humans s6, abstract 50% figure). Supports NLI-style citation checking and that citations often fail to fully support; the answer's quote-substring check is our own design.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-07-1#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "partial",
+  "note": "Abstract: LLMs can be highly receptive to coherent, convincing external evidence even when it conflicts with memory, but show strong confirmation bias toward evidence consistent with their memory. So it supports 'parametric influence is possible and condition-dependent', not that models generally override supplied context.",
+  "narrowed_supports": "LLMs can be receptive to conflicting external evidence yet show confirmation bias when evidence matches their parametric memory, so parametric override is a plausible cause to test, not a given.",
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-07-3#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Ragas definition and 'faithful if all claims can be supported by the retrieved context' present; examples use response and retrieved_contexts with no reference.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-07-4#2",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Aliases page lists atomic multi-action alias updates, reindex without downtime, and changing targets in real time; supports the 'one alias flip' rollback/blue-green claim.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-07-5#2",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Page defines RRF as combining multiple result sets with different relevance indicators and gives the rank-only formula. 'Standard' is a mild extrapolation but the answer does not rely on it. (Fetch covered first 100k chars of 121k.)",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-05-1#2",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "statsmodels says exact=True uses the binomial distribution and the statistic is min(n1,n2), the counts discordant between samples. The p=0.5 null is implicit, not stated on the page. The answer's 2 x 37/256 = 0.289 arithmetic is correct. Page does not use the word 'discordant' in the quoted lines.",
+  "narrowed_supports": "McNemar's test can be computed exactly with the binomial distribution on the two off-diagonal (discordant) counts, with statistic min(n1, n2); consistent with our sign-test framing.",
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-05-3#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Ragas Answer Relevancy definition, inputs (user_input, response) and 'without evaluating factual accuracy' present.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-05-4#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "All quoted phrases found in the MT-Bench paper, including that self-enhancement could not be determined. The answer lists self-preference only as something to test, which is consistent with the inconclusive evidence.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-05-5#0",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "BEIR s6/s7 state lexical annotation bias disfavours dense retrieval, the TREC-COVID pool is still biased toward lexical approaches, and diverse pooling is needed. Supports the pooling-bias and diverse-pooling remedy; it is not evidence for the separate claim that LLM-generated questions leak lexical terms.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-05-6#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Abstract wording matches. Supports 'often' less reliable in the middle, as the answer words it.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-05-7#2",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Abstract defines condensed lists and says results do not hold when judgments are biased toward particular systems or pool tops. Consistent with using them only as a sensitivity check.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-06-1#2",
+  "fetched": true,
+  "quote_found": "close_paraphrase",
+  "verdict": "supported",
+  "note": "Qdrant docs: payload index estimates filter cardinality and the planner uses full scan instead of HNSW traversal when estimated matches fall below full_scan_threshold. Supports the answer's 'implementations may switch to brute force when selective'.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-06-3#0",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "hnswlib README: mark_deleted omits element from search results; deleted slots can later be replaced by new elements. Supports tombstone-style delete.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-06-3#3",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "partial",
+  "note": "Javadoc confirms deletesPctAllowed (max tolerated deleted percentage, default 20, range 5-50) and that merges favour reclaiming deletes. It is a Lucene segment-merge policy, an analogy for tombstone compaction, not evidence about HNSW graph deletion; the answer does not cite it for HNSW specifically.",
+  "narrowed_supports": "Lucene's TieredMergePolicy tolerates a configurable maximum percentage of deleted documents and favours merges that reclaim deletes (an analogous compaction trigger, not HNSW-specific).",
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-06-5#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Weaviate docs state each tenant's data is isolated on a dedicated shard and deleting a tenant deletes all its objects.",
+  "narrowed_supports": null,
+  "fixes": []
+ },
+ {
+  "entry_id": "B1-GEN-06-6#1",
+  "fetched": true,
+  "quote_found": "exact",
+  "verdict": "supported",
+  "note": "Blog confirms per-shard scoring by default, dfs_query_then_fetch gathers global term statistics giving the same score as one shard, and adds an extra round trip. Latency cost is not quantified, and the answer does not quantify it.",
+  "narrowed_supports": null,
+  "fixes": []
+ }
+]

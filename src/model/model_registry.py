@@ -56,6 +56,48 @@ _lock = threading.Lock()
 _cache: Dict[str, "_BaseAdapter"] = {}
 
 
+def readiness(model_key: str) -> Dict[str, object]:
+    """Can this scorer be loaded WITHOUT training or downloading anything? Cheap (no torch / transformers import) and side-effect free.
+
+    {"ready": bool, "reason": str|None, "hint": str|None}. `get_scorer` behaves exactly as before (the legacy /api routes still train the Bi-LSTM on first use if no
+    checkpoint exists); this probe lets a caller decide not to.
+    """
+    import importlib.util
+    import os
+    from pathlib import Path
+    if model_key not in MODEL_CHOICES:
+        return {"ready": False, "reason": f"Unknown model '{model_key}'.", "hint": None}
+    root = Path(__file__).resolve().parents[2]
+    if model_key == "bilstm":
+        if importlib.util.find_spec("torch") is None:
+            return {"ready": False, "reason": "PyTorch is not installed.", "hint": "pip install torch"}
+        ckpt = root / "results" / "siamese_bilstm.pt"
+        if not ckpt.exists():
+            return {"ready": False, "reason": "No trained Bi-LSTM checkpoint was found (results/siamese_bilstm.pt). Using it would start a multi-minute training run.",
+                    "hint": "Train it once on purpose: python src\\model\\SiameseBiLSTM.py"}
+        return {"ready": True, "reason": None, "hint": None}
+    if model_key == "bert":
+        if importlib.util.find_spec("sentence_transformers") is None:
+            return {"ready": False, "reason": "sentence-transformers is not installed.", "hint": "pip install sentence-transformers"}
+        hub = Path(os.environ.get("HF_HOME") or (Path.home() / ".cache" / "huggingface")) / "hub"
+        if os.environ.get("HF_HUB_CACHE"):
+            hub = Path(os.environ["HF_HUB_CACHE"])
+        cached = (hub / "models--sentence-transformers--all-MiniLM-L6-v2" / "snapshots")
+        if not (cached.exists() and any(cached.iterdir())):
+            return {"ready": False, "reason": "The Sentence-BERT model (all-MiniLM-L6-v2, about 90 MB) is not in the local cache, so first use would download it.",
+                    "hint": "Run once with internet access: python src\\model\\Pretrained_NEURALN.py"}
+        return {"ready": True, "reason": None, "hint": None}
+    if importlib.util.find_spec("sklearn") is None:
+        return {"ready": False, "reason": "scikit-learn is not installed.", "hint": "pip install scikit-learn"}
+    if importlib.util.find_spec("language_tool_python") is None:            # TraditionalMLScorer imports it at module level
+        return {"ready": False, "reason": "language-tool-python is not installed (the TF-IDF scorer's grammar checker).", "hint": "pip install language-tool-python"}
+    ltp = Path(os.environ.get("LTP_PATH") or (Path.home() / ".cache" / "language_tool_python"))
+    if not (ltp.exists() and any(ltp.iterdir())):                              # its first use downloads LanguageTool (a few hundred MB) and needs Java
+        return {"ready": False, "reason": "The grammar checker (LanguageTool) has not been downloaded yet, so first use of the TF-IDF scorer would download it (a few hundred MB, needs Java).",
+                "hint": "Run once with internet access and Java installed: python -c \"import language_tool_python as l; l.LanguageTool('en-US')\""}
+    return {"ready": True, "reason": None, "hint": None}
+
+
 def is_valid_model(model_key: Optional[str]) -> bool:
     return model_key in MODEL_CHOICES
 
@@ -81,6 +123,11 @@ class _BiLSTMAdapter(_BaseAdapter):
 
     def ensure_ready(self) -> None:
         if not self._model.is_trained:
+            import os
+            if os.environ.get("SMART_FORBID_MODEL_TRAINING", "").strip().lower() in ("1", "true", "yes", "on"):
+                # Container/CI guard (set in Dockerfile and docker-compose.yml): a request must never start a multi-minute training run. Unset = legacy behaviour.
+                raise RuntimeError("No trained Bi-LSTM checkpoint (results/siamese_bilstm.pt) and SMART_FORBID_MODEL_TRAINING is set, so training was refused. "
+                                   "Train once on a development machine (python -m ...), or choose another scorer.")
             logger.info("Training Siamese Bi-LSTM from questions_cleaned.json (first use)")
             self._model.train_from_dataset(epochs=10)
 

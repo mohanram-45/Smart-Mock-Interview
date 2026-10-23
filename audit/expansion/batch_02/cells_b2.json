@@ -1,0 +1,58 @@
+[
+ {
+  "cell_id": "GEN-08",
+  "topic": "Prompting and structured output (few-shot, CoT caveats, schemas, determinism)",
+  "count": 6,
+  "type_hint": "concept;scenario;coding",
+  "guidance": "Angles: why a JSON-mode/schema-constrained output can still be semantically wrong (valid syntax != correct values); few-shot example selection and ordering effects (model-dependent); why chain-of-thought text may not be a faithful explanation and when it adds latency without accuracy; why temperature 0 is not guaranteed bit-for-bit deterministic and what to do for reproducibility tests; a tested example: a robust parser/validator that extracts JSON from model output with retries/repair and rejects schema violations (stdlib only, no network, simulate model outputs as strings); prompt-template versioning and regression testing. Avoid model names and API parameter lists."
+ },
+ {
+  "cell_id": "GEN-09",
+  "topic": "Tool use and agents (function calling, loops, failure modes, action guardrails)",
+  "count": 7,
+  "type_hint": "concept;scenario;design",
+  "guidance": "Angles: designing a tool schema/description so the model picks the right tool; agent loop failure modes (infinite loops, repeated identical calls, error amplification, context growth) and loop/budget guards; idempotency and confirmation for irreversible actions (refund, delete, send email); tool-result injection (untrusted tool output as an attack path - the mechanism only, defence belongs in GEN-12 too but keep this about agent control flow); when NOT to use an agent (deterministic workflow vs agent); evaluating an agent by trajectory vs final outcome; permission scoping / least privilege for tools. Keep it framework-agnostic."
+ },
+ {
+  "cell_id": "GEN-10",
+  "topic": "LLM evaluation (benchmarks, contamination, LLM-as-judge bias, regression suites)",
+  "count": 7,
+  "type_hint": "evaluation;concept",
+  "guidance": "Angles (v5 already has smi-h0012 n-gram contamination implementation, smi-h0010 retrieval metrics, and batch 1 has judge-bias in RAG eval GEN-05 - do NOT repeat those): why a public benchmark gain may not transfer to your task; building a regression suite for prompt/model changes (sample size, paired comparison, flaky cases, variance from sampling); pairwise vs absolute scoring for judges and tie handling; calibrating an LLM judge against human labels (agreement, disagreement analysis, rubric design) - AI label vs human label must be stated honestly; metric gaming/Goodhart; evaluating safety/refusal rate alongside helpfulness; confidence intervals for pass rates at small n (coding allowed only if it is a tested stdlib function)."
+ },
+ {
+  "cell_id": "GEN-11",
+  "topic": "Fine-tuning vs RAG vs prompting (LoRA/QLoRA, SFT, forgetting, data needs)",
+  "count": 6,
+  "type_hint": "concept;scenario;business_case",
+  "guidance": "Decision-oriented (v5 smi-h0004 does LoRA parameter arithmetic, smi-g0011 does a RAG architecture - do not repeat): which approach for new knowledge vs new style/format vs new skill; knowledge freshness and update cost; data quantity/quality needs for SFT and the risk of training on model-generated data; catastrophic forgetting and regression checks after fine-tuning; evaluating whether fine-tuning beat a better prompt (a fair baseline); cost/latency/ops comparison framed conceptually (NO prices, NO model names); QLoRA's trade-off conceptually (quantised base, memory vs quality/speed); a business case where the right answer is 'prompting first'."
+ },
+ {
+  "cell_id": "GEN-12",
+  "topic": "Safety, security and privacy (prompt injection, PII, jailbreaks, red teaming)",
+  "count": 6,
+  "type_hint": "scenario;concept;debugging",
+  "guidance": "Angles: direct vs indirect prompt injection in a RAG/email/browsing assistant and why 'ignore previous instructions' filters fail; layered defence (least privilege, output validation, human confirmation, separating instructions from data) with honest limits - no defence is complete; PII in prompts, logs and retrieved documents (redaction, retention, access control, tenant isolation in a shared vector index); data exfiltration through rendered markdown/links; designing a red-team plan and measuring attack success rate; jailbreak vs prompt injection distinction. Keep it defensive: explain mechanisms and mitigations, do NOT give working attack payload recipes."
+ },
+ {
+  "cell_id": "GEN-13",
+  "topic": "Serving, latency and cost (KV cache, batching, quantisation, caching, token budgets)",
+  "count": 7,
+  "type_hint": "concept;coding;scenario",
+  "guidance": "Angles (v5 smi-h0017 implements cached causal self-attention and smi-g0026 covers generic compression - do not repeat): KV-cache memory arithmetic (layers x heads x head_dim x seq x batch x bytes) for a hypothetical model; why decode is memory-bandwidth-bound and prefill compute-bound; continuous batching vs static batching and the throughput/latency trade-off; time-to-first-token vs inter-token latency vs total latency and what users feel; quantisation trade-offs (weight-only vs activation, quality checks) conceptually; response/semantic caching risks (stale or wrong-tenant answers); a tested stdlib+numpy function (e.g. KV-cache size calculator with validation, or a token-budget planner / simple batching simulator with deterministic seeds). Hypothetical numbers only; no vendor limits, prices or model names."
+ },
+ {
+  "cell_id": "GEN-14",
+  "topic": "Hallucination, grounding and long context",
+  "count": 6,
+  "type_hint": "concept;scenario",
+  "guidance": "Angles (batch 1 already has lost-in-the-middle context assembly, citation checking and faithfulness metrics under RAG - do NOT repeat): why LLMs hallucinate (training objective, no abstention signal, knowledge gaps) vs retrieval-induced errors; when grounding does not remove hallucination (irrelevant retrieved context, conflicting sources, over-trust); abstention/'I don't know' design and its precision-recall trade-off; long-context models vs RAG (cost, latency, attention dilution, update freshness) as a decision; uncertainty signals (token probabilities, self-consistency) and their limits; hallucination detection by cross-checking claims against sources (NLI-style) and its error modes; user-facing mitigations (citations, confidence wording)."
+ },
+ {
+  "cell_id": "GEN-15",
+  "topic": "GenAI product scenarios (support bot, document QA)",
+  "count": 3,
+  "type_hint": "business_case;scenario",
+  "guidance": "Product-level questions: launching a customer-support bot (scope, escalation to humans, success metrics such as containment vs satisfaction, rollout with shadow mode/A-B, handling wrong answers and legal risk); a document-QA product for contracts or manuals (what to promise users, citations, access control, evaluation before launch). Business-case style with concrete hypothetical numbers; no prices; state trade-offs and a measurable launch gate."
+ }
+]

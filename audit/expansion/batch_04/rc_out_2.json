@@ -1,0 +1,644 @@
+[
+ {
+  "plan_id": "B4-MLO-08-3",
+  "verdict": "pass",
+  "reasons": [
+   "Numbers and applied corrections check out; optional added SRE source for the symptom-based paging principle.",
+   "Both applied changes are accurate: the Sculley sentence matches Sec. 7 (broad enough not to trigger spuriously; alerts fire and trigger manual intervention); the replay caveat is sound."
+  ],
+  "parts_answered": {
+   "why noisy (1.2/day, ~70%)": true,
+   "redesign principles": true,
+   "fixes missed null-rate incident": true,
+   "tier table (practical)": true
+  },
+  "evidence": [
+   {
+    "claim": "120*0.01=1.2 expected false hits/day",
+    "method": "executed",
+    "evidence": "1.2"
+   },
+   {
+    "claim": "1-0.99^120 ~ 70%",
+    "method": "executed",
+    "evidence": "0.7006"
+   },
+   {
+    "claim": "ML Test Score: alert thresholds need careful tuning for FP/FN balance; schema divergence alert",
+    "method": "paper",
+    "evidence": "Opened PDF: \"careful tuning of alerting thresholds is needed to achieve a useful balance between false positive and false negative rates.\""
+   },
+   {
+    "claim": "Sculley action limits broad enough not to trigger spuriously; alert then manual investigation",
+    "method": "paper",
+    "evidence": "Opened: \"These limits should be broad enough not to trigger spuriously.\" and \"automated alerts should fire and trigger manual intervention or investigation.\" (Sec. 7)"
+   },
+   {
+    "claim": "Alert on symptoms, pages must be actionable",
+    "method": "doc",
+    "evidence": "SRE book Monitoring chapter opened: \"Every page should be actionable.\"; symptom=what is broken, cause=why"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Multi-part alert-design answer, but each step is standard (multiplicity arithmetic, history-based thresholds, persistence, tiers); rubric-style trade-offs rather than deep derivation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "rigorous reasoning + principles"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "concrete page/ticket/dashboard tiers with percentile rules; not a paraphrase"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "7 concepts all discussed (alert fatigue, multiple testing, effect size, historical thresholds, persistence, tiers, symptom-based).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0026",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/46555.pdf",
+    "status": "supported",
+    "evidence": "\"careful tuning of alerting thresholds is needed...\"; schema-divergence alert quoted from Monitor 2; slice-bias quote present (not used in answer)."
+   },
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "partially",
+    "evidence": "Action-limit sentence supported verbatim and used. The listed \"direct feedback loops\" support is true of the paper but not used in this answer (harmless)."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Monitoring Distributed Systems (Google SRE Book)",
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "supports": "Page on symptoms, every page should be actionable, non-urgent signals belong on dashboards (principles 1, 4 and the tier table).",
+    "quote": "Every page should be actionable.",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Percentile-of-history thresholds, k-of-n persistence and 90-day windows are practitioner heuristics (answer labels values illustrative)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-09-3",
+  "verdict": "pass",
+  "reasons": [
+   "Applied correction clearly separates the Sculley action-limit idea (real-world actions) from the proposed champion/challenger bound; wording now honest.",
+   "Rubric/answer/key concepts consistent; all question parts (which guardrails + where in pipeline) covered."
+  ],
+  "parts_answered": {
+   "which guardrails": true,
+   "where each sits (ordered stages 1-6)": true,
+   "why corrupted holdout passed gate": true
+  },
+  "evidence": [
+   {
+    "claim": "Google MLOps guide: data validation required before training to decide whether to retrain; model validation after training",
+    "method": "doc",
+    "evidence": "Opened: \"This step is required before model training to decide whether you should retrain the model\"; \"This step occurs after you successfully train the model given the new data.\""
+   },
+   {
+    "claim": "Sculley action limits sanity check broad enough not to trigger spuriously",
+    "method": "paper",
+    "evidence": "Opened Sec. 7 quote; answer now says \"a similar bound on champion/challenger change\", i.e. flagged as an extension"
+   },
+   {
+    "claim": "Pipeline logic: PSI trigger on corrupted income -> retrain on window incl. rows -> holdout same rows -> AUC gate passes",
+    "method": "derivation",
+    "evidence": "Consistent with scenario; guardrails map to each failure link"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-stage pipeline design reasoning about correlated failure of trigger, training data and evaluation data, with trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single-field answer; ordered by pipeline stage"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "7 concepts all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0010",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://docs.cloud.google.com/architecture/mlops-continuous-delivery-and-automation-pipelines-in-machine-learning",
+    "status": "supported",
+    "evidence": "Quotes above; triggers list (schedule, new data, degradation, distribution changes) also confirmed."
+   },
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "supported",
+    "evidence": "Action-limit sentence verified. Its \"direct feedback loops\" supports clause is not used in the answer (harmless)."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Cooldown/persistence limits, curated fixed reference set and human-approval thresholds are engineering practice, not sourced (framed as recommendations)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-11-1",
+  "verdict": "correct",
+  "reasons": [
+   "Code re-run on 3.13, 3.10, 3.11 and sandbox python: pass; fenced code equals tested solution.",
+   "Applied additions (protects / does not protect) are accurate; one overstated phrase (typosquatting) remains."
+  ],
+  "parts_answered": {
+   "identities and permissions": true,
+   "artifact integrity": true,
+   "dependency and image hygiene": true,
+   "approval flow": true,
+   "protects/does-not-protect per control": true
+  },
+  "evidence": [
+   {
+    "claim": "pickle can execute arbitrary code; never unpickle untrusted/tamperable data; sign with hmac",
+    "method": "doc",
+    "evidence": "Opened docs.python.org pickle: \"Never unpickle data that could have come from an untrusted source, or that could have been tampered with.\" and \"Consider signing data with hmac...\""
+   },
+   {
+    "claim": "pip hash-checking requires hashes for all dependencies",
+    "method": "doc",
+    "evidence": "Opened: \"Hashes are required for all dependencies.\"; unhashed dependency errors"
+   },
+   {
+    "claim": "verify_artifact accepts upper-case/space-padded digest, rejects appended byte",
+    "method": "executed",
+    "evidence": "ok on 3.13, 3.10, 3.11 and /home/claude/work/dep python"
+   },
+   {
+    "claim": "Edge cases: empty file, 3MB random file (chunk loop), wrong/empty/short digest, missing file",
+    "method": "executed",
+    "evidence": "all ValueError/FileNotFoundError as expected; non-ASCII expected digest raises TypeError (still fails closed)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Protects against: tampered or typosquatted packages and silent upstream base-image changes.",
+    "problem": "Hash-pinned lock files catch contents changing after locking, but a typosquatted name chosen at lock time is pinned happily; only a mirror/allowlist of reviewed packages (or review) stops it.",
+    "replacement": "Protects against: packages whose contents change after you locked them, typosquatted names when the internal mirror serves only reviewed packages, and silent upstream base-image changes."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open-ended security design across five control layers with limits of each; expects supply-chain threat modelling.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "controls + protects/does-not-protect"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "tested digest-verify code and procedure, not in detailed"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "8 concepts all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0017",
+   "same_intent": false
+  },
+  "code_findings": "Run on all 3 interpreters + sandbox: \"ok\"/\"edge ok\". Fenced block identical to code.solution. stdlib only, no 3.11+ features. Note: verify-then-load has a theoretical TOCTOU window; procedure downloads to a private path, which mitigates it.",
+  "sources_findings": [
+   {
+    "url": "https://docs.python.org/3/library/pickle.html",
+    "status": "supported",
+    "evidence": "Warning box quoted; hmac signing sentence present."
+   },
+   {
+    "url": "https://pip.pypa.io/en/stable/topics/secure-installs/",
+    "status": "supported",
+    "evidence": "\"Hashes are required for all dependencies.\""
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Role separation, signed digests, egress-less loader, immutable audit log are standard practice (no single source); \"ideally signs\" is hedged."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-11-5",
+  "verdict": "correct",
+  "reasons": [
+   "Applied correction introduced an overstatement: \"hundreds or thousands of perturbed queries\" is wrong for data-augmentation label-only attacks (a handful of queries per record).",
+   "Rate-limit bullet should note limits are sidestepped with many keys (paper says query limiting likely unsuitable).",
+   "Applied TPR@low-FPR addition is correct and supported by Carlini et al."
+  ],
+  "parts_answered": {
+   "risk in plain terms": true,
+   "conditions making it worse": true,
+   "ranking of cheap mitigations with do/do-not": true,
+   "measurement": true
+  },
+  "evidence": [
+   {
+    "claim": "Label-only attacks need few queries for augmentation (N=3 rotations, N=4d+1 translations) and ~2,500 for boundary distance; \"Query limiting would likely not be a suitable defense\"",
+    "method": "paper",
+    "evidence": "Opened arxiv 2007.14321 full text (via fetch): quoted; also \"even in low query regimes (<100) our attacks outperform the trivial gap\""
+   },
+   {
+    "claim": "Confidence masking not viable",
+    "method": "paper",
+    "evidence": "Abstract: \"confidence-masking is not a viable defense strategy against membership inference.\""
+   },
+   {
+    "claim": "Evaluate attacks by TPR at low FPR (<0.1%)",
+    "method": "paper",
+    "evidence": "Opened arxiv 2112.03570 abstract: \"...true-positive rate at low (e.g., <0.1%) false-positive rates.\""
+   },
+   {
+    "claim": "OWASP lists regularisation, noise/DP as prevention",
+    "method": "doc",
+    "evidence": "Opened: \"Regularisation techniques such as L1 or L2 regularization\"; \"adding random noise or using differential privacy techniques\""
+   },
+   {
+    "claim": "concise_answer length",
+    "method": "executed",
+    "evidence": "63 words"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "detailed_answer",
+    "claim": "(for example label-only attacks that probe each record with hundreds or thousands of perturbed queries)",
+    "problem": "Overstated: Choquette-Choo et al.'s augmentation attacks use only a few queries per record (3 rotations; 4d+1 translations); only the boundary-distance attack needs ~2,500. Presenting rate limits as strong against label-only attacks is not supported.",
+    "replacement": "(for example label-only attacks, which probe each record with a few augmented queries up to thousands for boundary-distance attacks)"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "but do nothing against a single-query threshold test by an authorised caller.",
+    "problem": "Missing condition: per-key limits can be sidestepped with many keys (Sybil); the label-only paper judges query limiting unlikely to be a sufficient defence.",
+    "replacement": "but do nothing against a single-query threshold test by an authorised caller, and per-key limits can be sidestepped with many keys."
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "(for example 0.1%), since a near-0.5 AUC can hide a handful of confidently identified records.",
+    "problem": "A 0.1% FPR is only estimable with several thousand non-members; otherwise the number is noise.",
+    "replacement": "(for example 0.1%, which needs several thousand non-members to estimate), since a near-0.5 AUC can hide a handful of confidently identified records."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism plus ranking of mitigations with caveats; no multi-step derivation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "63-word interview answer"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "mechanism, conditions, ranked mitigations"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "measurement procedure not in detailed"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "Applied key_concepts change leaves \"label-only attacks\" and \"label-only output\" as near-duplicates; \"model inversion\" was dropped though still mentioned.",
+  "suggested_key_concepts": [
+   "membership inference",
+   "overfitting gap",
+   "label-only attacks",
+   "output rounding",
+   "rate limiting",
+   "differential privacy",
+   "attack AUC measurement"
+  ],
+  "nearest_existing": {
+   "id": "smi-k0010",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://owasp.github.io/www-project-machine-learning-security-top-10/docs/ML04_2023-Membership_Inference_Attack",
+    "status": "supported",
+    "evidence": "Prevention list quoted; its attack description is loose (not relied upon)."
+   },
+   {
+    "url": "https://arxiv.org/abs/2007.14321",
+    "status": "supported",
+    "evidence": "\"confidence-masking is not a viable defense strategy against membership inference.\""
+   },
+   {
+    "url": "https://arxiv.org/abs/2112.03570",
+    "status": "supported",
+    "evidence": "TPR at low FPR quote verified."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "\"AUC >= 0.6 means act\" is flagged as judgement in the text."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-7",
+  "verdict": "correct",
+  "reasons": [
+   "Applied wording fixes are correct.",
+   "Impact method has a flaw: comparing the 19-day window to \"the same period a week earlier\" overlaps the incident window and would understate loss."
+  ],
+  "parts_answered": {
+   "quantify impact": true,
+   "why detection slow": true,
+   "action items": true,
+   "runbook": true,
+   "what to avoid": true
+  },
+  "evidence": [
+   {
+    "claim": "SRE book: blameless = good intentions, fix systems; monitoring failure is a postmortem trigger",
+    "method": "doc",
+    "evidence": "Opened: \"A blamelessly written postmortem assumes that everyone involved in an incident had good intentions\"; \"A monitoring failure (which usually implies manual incident discovery)\""
+   },
+   {
+    "claim": "Rules of ML #10 silent failures: stale joined table, gradual decay",
+    "method": "doc",
+    "evidence": "Opened: \"Suppose that a particular table that is being joined is no longer being updated.\" ... \"decaying gradually.\""
+   },
+   {
+    "claim": "Baseline overlap: window shifted by 7 days overlaps 12 of 19 bad days",
+    "method": "derivation",
+    "evidence": "days -7..11 relative to rename include 12 post-rename days"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "detailed_answer",
+    "claim": "compare CTR in the 19-day window to the same period a week or a month earlier, adjusting for seasonality,",
+    "problem": "A baseline one week earlier overlaps the faulty period (12 of 19 days), understating the loss.",
+    "replacement": "compare CTR in the 19-day window to the pre-rename baseline (the preceding weeks, matched by weekday and adjusted for seasonality; a window shifted by only a week would overlap the incident),"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Process-oriented scenario; quantification and runbook are application of known practice.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "postmortem outline"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "runbook and timeline template, not duplicated"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "7 concepts, all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0031",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/postmortem-culture/",
+    "status": "supported",
+    "evidence": "both quotes verified"
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule #10 quotes verified; \"without errors\" in the answer is an interpretation of gradual silent decay (acceptable)."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Likely-cause list for slow detection is explicitly hedged (\"Likely ones\")."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-13-2",
+  "verdict": "correct",
+  "reasons": [
+   "Applied corrections accurate (fail-open hedge; release-added latency check).",
+   "Two small precision fixes: step-change attribution ignores coincident external events; sampling should target newly blocked items to attribute the 2.7 extra points."
+  ],
+  "parts_answered": {
+   "decide real traffic vs prompt/model change vs miscalibration": true,
+   "what to log": true,
+   "latency link": true
+  },
+  "evidence": [
+   {
+    "claim": "MLflow prompt versions immutable; alias mutable",
+    "method": "doc",
+    "evidence": "Opened: \"Prompt versions in MLflow are immutable...\"; \"An mutable named reference to the prompt.\""
+   },
+   {
+    "claim": "3.9-1.2=2.7 points",
+    "method": "derivation",
+    "evidence": "2.7"
+   },
+   {
+    "claim": "concise_answer length",
+    "method": "executed",
+    "evidence": "73 words"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "a step change exactly at the deploy implicates your change (prompt, model, classifier version or threshold);",
+    "problem": "Overconfident attribution: a campaign or new customer can land on the same day.",
+    "replacement": "a step change exactly at the deploy implicates your change (prompt, model, classifier version or threshold) unless an external event, such as a campaign or a new customer, landed the same day;"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "This yields the share of the 2.7 extra points",
+    "problem": "A random sample of all blocked items estimates the overall false-positive share, not the share of the extra 2.7 points; the label effort should target newly blocked items.",
+    "replacement": "Labelling especially the newly blocked items (those the previous versions would have passed) yields the share of the 2.7 extra points"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Diagnostic reasoning with segmentation and logging requirements; no heavy math.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "73 words, consistent"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "reasoning detail"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "7 concepts discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0039",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/genai/prompt-registry/",
+    "status": "supported",
+    "evidence": "Immutable versions and mutable alias quotes verified."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Generic diagnostic heuristics (sample size 50-100, alert on falling rate) unsourced; presented as practice."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-4",
+  "verdict": "correct",
+  "reasons": [
+   "Applied IPW sentence is an improvement but \"works only if the logging policy was stochastic\" is too strict for position-bias propensities (estimable by randomisation experiments).",
+   "Applied plan sentence contradicts the question's requested order: item 4 is called cheapest/run first yet the plan lists it third and omits the item-3 metric change."
+  ],
+  "parts_answered": {
+   "explanations specific to logged data": true,
+   "order of checks": "inconsistent (fixed)",
+   "how to change offline evaluation": true
+  },
+  "evidence": [
+   {
+    "claim": "Rules of ML #37: same example should give same result in training/serving; discrepancy suggests engineering error",
+    "method": "doc",
+    "evidence": "Opened quote: \"...it should give you exactly the same result\"; \"a discrepancy here probably indicates an engineering error.\""
+   },
+   {
+    "claim": "Sculley Sec.4: model may directly influence its future training data",
+    "method": "paper",
+    "evidence": "Opened: \"A model may directly influence the selection of its own future training data.\""
+   },
+   {
+    "claim": "Rules of ML position bias",
+    "method": "doc",
+    "evidence": "Rule 36: \"The position of content dramatically affects how likely the user is to interact with it.\""
+   },
+   {
+    "claim": "Pooled AUC mixes between-query and within-query comparisons",
+    "method": "derivation",
+    "evidence": "AUC pools all (positive, negative) pairs across queries; within-query ranking quality not isolated"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "counterfactual evaluation (inverse-propensity weighting) works only if the logging policy was stochastic and its propensities were recorded, since items the old ranker never showed cannot be reweighted into the data",
+    "problem": "Too strict: IPW needs known or estimated propensities; for item exposure the logging policy must have non-zero recorded exposure probability, while position-bias propensities can be estimated from randomisation experiments or click models.",
+    "replacement": "counterfactual evaluation (inverse-propensity weighting) needs known or estimated propensities: for item exposure the logging policy must have been stochastic with recorded propensities, since items the old ranker never showed cannot be reweighted into the data (position-bias propensities can instead be estimated from a small randomisation experiment)"
+   },
+   {
+    "severity": "major",
+    "field": "answer",
+    "claim": "Plan (the skew check in item 4 is cheapest and can run first): reproduce the offline metric per position, replay with propensity weighting where propensities were logged,",
+    "problem": "Question asks for the order of checks; this sentence contradicts the 1-4 order and the plan then lists skew third and drops the top-of-list metric.",
+    "replacement": "Plan, in the order of items 1 to 4 (the skew check is cheap, so start it in parallel): reproduce the offline metric per position, replay with propensity weighting where propensities were logged, re-score with nDCG@5 or a conversion-weighted metric,"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Requires several non-obvious causal mechanisms for offline/online gap and a prioritised diagnosis plan.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single comprehensive answer"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "7 concepts, all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0033",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "supported",
+    "evidence": "Direct feedback loop sentence verified (Sec. 4)."
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule #37 quotes verified."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Rules of Machine Learning, Rule #36 (position bias)",
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "supports": "Position of content strongly affects interaction likelihood (item 1).",
+    "quote": "The position of content dramatically affects how likely the user is to interact with it.",
+    "type": "official_doc"
+   },
+   {
+    "title": "Unbiased Learning-to-Rank with Biased Feedback (Joachims et al.)",
+    "url": "https://arxiv.org/abs/1608.04468",
+    "supports": "Counterfactual propensity-weighted learning from position-biased clicks, with propensities estimated rather than requiring a stochastic logging policy.",
+    "quote": "Propensity-Weighted Ranking SVM",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [
+   "nDCG@5 and \"conversion-weighted\" offline metric are suggestions; saturation point is speculative."
+  ],
+  "code_patch": null
+ }
+]

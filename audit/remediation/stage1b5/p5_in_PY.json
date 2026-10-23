@@ -1,0 +1,252 @@
+[
+ {
+  "id": "smi-i0022",
+  "plan_id": "P3-PY-02",
+  "domain": "Python",
+  "difficulty": "Medium",
+  "priority": true,
+  "question": "Your team's scripts build paths like `base + '/' + name + '.csv'` and `os.path.join(...)`, and a Windows colleague's run fails on paths copied from Linux. Argue for or against moving to pathlib, naming concrete things Path objects give you and the cases where you would still need care.",
+  "answer": "For new code pathlib is generally preferable, because a path becomes an object with operations instead of a string you manipulate by hand.\n\nWhat you get:\n- Joining with the / operator: Path('data') / 'raw' / 'a.csv' uses the right separator for the platform. Like os.path.join, joining with an absolute component discards what came before: PurePosixPath('a') / '/b' is /b.\n- Parsing as attributes: .name, .stem, .suffix, .suffixes, .parent, .parts. Note .suffix is only the last extension: 'b.tar.gz' gives '.gz' and stem 'b.tar'. A dotfile like .bashrc has no suffix.\n- Safe edits: p.with_suffix('.json'), p.with_name(...).\n- Filesystem calls on the object: exists(), is_file(), mkdir(parents=True, exist_ok=True), glob('*.csv'), rglob('*.csv'), read_text(encoding=...), write_text(...), iterdir().\n- Platform semantics: WindowsPath accepts both / and \\ as separators and compares case-insensitively; PosixPath treats a backslash as an ordinary filename character, so PurePosixPath('a\\\\b').parts is a single part. That is the usual reason Windows-style strings break on Linux. In the opposite direction (Linux paths on Windows), '/' separators mostly work, so the failures come from absolute paths like /home/u/data.csv (no drive, so not absolute on Windows), hard-coded locations and case assumptions; pathlib does not fix those, so keep base directories in configuration and build everything below them with / .\n\nCare points: Path objects are not strings, so older APIs may need str(p) or os.fspath(p) (most standard-library functions accept them). Use PureWindowsPath/PurePosixPath when you need to manipulate foreign-platform paths without touching the disk. read_text/write_text still need an explicit encoding, and they load the whole file, so they are no replacement for streaming. os.path remains fine for quick string work, but os.path remains fine for quick string work, and a few helpers (expandvars, relpath with '..', commonpath) have no exact Path equivalent, but nothing forces you to keep it for new code..",
+  "key_concepts": [
+   "pathlib.Path",
+   "/ operator joining",
+   "suffix vs suffixes",
+   "with_suffix",
+   "glob and rglob",
+   "PurePosixPath vs PureWindowsPath",
+   "os.fspath"
+  ],
+  "common_mistakes": [
+   "Saying pathlib is just a prettier os.path",
+   "Believing .suffix returns all extensions",
+   "Expecting a backslash to be a separator when parsing with PosixPath"
+  ],
+  "sources": [],
+  "code": null,
+  "originally_flagged": [
+   {
+    "severity": "major",
+    "claim": "That is the usual reason Windows-style strings break on Linux.",
+    "problem": "The question describes the opposite direction (paths copied from Linux fail on a Windows machine). Windows accepts '/' as separator, so the typical causes are Linux absolute paths such as /home/u/data.csv (no drive letter; verified PureWindowsPath('/home/u/data.csv').is_absolute() is False), hard-coded separators in strings, and case/separator assumptions. pathlib does not fix hard-coded absolute Linux paths.",
+    "replacement": "That is the usual reason Windows-style strings break on Linux. In the opposite direction (Linux paths on Windows), '/' separators mostly work, so the failures come from absolute paths like /home/u/data.csv (no drive, so not absolute on Windows), hard-coded locations and case assumptions; pathlib does not fix those, so keep base directories in configuration and build everything below them with / ."
+   },
+   {
+    "severity": "minor",
+    "claim": "there is no functional gap that forces you to keep it",
+    "problem": "Overstated: os.path.expandvars, os.path.relpath (Path.relative_to refuses '..' walks before 3.12; verified error on 3.10) and os.path.commonpath have no exact Path equivalents.",
+    "replacement": "os.path remains fine for quick string work, and a few helpers (expandvars, relpath with '..', commonpath) have no exact Path equivalent, but nothing forces you to keep it for new code."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0025",
+  "plan_id": "P3-PY-05",
+  "domain": "Python",
+  "difficulty": "Medium",
+  "priority": true,
+  "question": "Two modules, `orders.py` and `customers.py`, each start with an import of the other: orders has `from customers import get_customer` and customers has `from orders import latest_order`. Running `import orders` fails with `ImportError: cannot import name 'latest_order' from partially initialized module 'orders' (most likely due to a circular import)`. Walk through exactly why, and give three fixes in order of preference.",
+  "answer": "What happens: import orders creates the module object for orders, puts it in sys.modules immediately, and starts executing its body. Line 1 imports customers, which creates and registers customers and starts executing its body. Its first line, from orders import latest_order, finds orders already in sys.modules, but orders has not yet reached the def of latest_order because it is still stuck on its own first import. So the module exists but is only partially initialised, and the name lookup fails. Notice that it is the from-import form that fails: it needs the attribute right now. Plain import orders would succeed, because it only binds the module object, and the attribute is looked up later at call time. (If you start with import customers instead, the error names customers and get_customer.)\n\nFixes, best first:\n1. Remove the cycle by restructuring. Move the shared pieces into a third module that both import, or move the function to the module where it logically belongs. A cycle usually indicates two modules that are too entangled.\n2. Import the module, not the name, on both sides (or at least in the module that is executed second): import customers in orders.py and import orders in customers.py, then call customers.get_customer(...) inside functions. If only one side is changed, it works only for the entry order where the changed module is the second one loaded. The attribute lookup is deferred until the module is fully loaded, provided nothing uses it at import time.\n3. Import inside the function that needs it. This is a legitimate local workaround with a small per-call lookup cost (the module is cached in sys.modules), but it hides the dependency and is a smell if used widely.\n\nAvoid reordering imports to the bottom of the file or catching ImportError: both are brittle, since they depend on which module happens to be imported first. For type-only references, put the import under if TYPE_CHECKING: with annotations as strings. Debugging aid: inspect sys.modules to see which modules are mid-import.",
+  "key_concepts": [
+   "circular import",
+   "partially initialised module",
+   "sys.modules",
+   "from-import vs import",
+   "deferred import",
+   "TYPE_CHECKING",
+   "dependency restructuring"
+  ],
+  "common_mistakes": [
+   "Blaming Python for 'not finding' the file",
+   "Fixing it by shuffling import order or wrapping in try/except ImportError",
+   "Moving imports into functions everywhere without addressing the design"
+  ],
+  "sources": [],
+  "code": null,
+  "originally_flagged": [
+   {
+    "severity": "major",
+    "claim": "2. Import the module, not the name: import customers, then call customers.get_customer(...) inside functions.",
+    "problem": "Changing only one side is not enough. Verified: with both modules using from-imports, switching only orders to 'import customers' still fails for 'import orders'. It works only if the module that executes second (the one whose from-import hits a partially initialised module) switches, and since either may be the entry point, both should.",
+    "replacement": "2. Import the module, not the name, on both sides (or at least in the module that is executed second): import customers in orders.py and import orders in customers.py, then call customers.get_customer(...) inside functions. If only one side is changed, it works only for the entry order where the changed module is the second one loaded."
+   },
+   {
+    "severity": "minor",
+    "claim": "ImportError: cannot import name 'latest_order' from partially initialized module 'orders'",
+    "problem": "Exact wording is version-dependent. Verified identical on 3.10.20 and 3.11.17; the sandbox 3.13.16 printed \"cannot import name 'latest_order' from 'orders' (consider renaming ...)\" for the same files. Worth stating 'wording varies by version'.",
+    "replacement": null
+   }
+  ]
+ },
+ {
+  "id": "smi-i0026",
+  "plan_id": "P3-PY-06",
+  "domain": "Python",
+  "difficulty": "Medium",
+  "priority": false,
+  "question": "You have a project folder `shop/` with `shop/__init__.py`, `shop/cli.py` and `shop/db.py`, and cli.py contains `from . import db`. `python shop/cli.py` fails with `ImportError: attempted relative import with no known parent package`, but `python -m shop.cli` works. Explain why, what `__init__.py` is for, and what `if __name__ == '__main__':` actually tests.",
+  "answer": "Running python shop/cli.py executes the file as a top-level script: its __name__ is '__main__' and it has no package (__package__ is None), and sys.path[0] becomes the shop/ directory itself. A relative import such as from . import db is resolved against the module's package, so with no parent package Python raises the error you saw. Running python -m shop.cli instead imports shop as a package, then runs cli inside it; __name__ is still '__main__' but __package__ is 'shop', so the relative import resolves. sys.path[0] is then the current working directory, so you must run it from the folder that contains shop/ (or have the project installed).\n\n__init__.py marks a directory as a regular package and its code runs when the package is first imported; it is the place to expose a public API or set __all__, and can be empty. Since Python 3.3, a directory without __init__.py can still be imported as a namespace package; this works but behaves differently (no single location, no init code), so add the file when you mean a normal package.\n\nAbsolute imports (from shop import db) name the full path from a sys.path entry and work from anywhere the package is importable; relative imports (from . import db, from ..x import y) only work inside a package and survive renaming of the top package. Many teams prefer absolute imports for readability and use relative ones within tightly coupled subpackages. Either is valid.\n\nif __name__ == '__main__': is true only when the file is the entry point (script or -m). Code under it does not run when another module imports the file, which is why it hosts the CLI or demo while the functions above stay importable and testable. In a package you can also provide shop/__main__.py to make python -m shop work.",
+  "key_concepts": [
+   "__init__.py",
+   "relative import",
+   "absolute import",
+   "python -m",
+   "__name__ == '__main__'",
+   "namespace package",
+   "sys.path[0]"
+  ],
+  "common_mistakes": [
+   "Adding __init__.py and expecting the script run to work",
+   "Fixing it by editing sys.path in the script",
+   "Thinking __name__ is the module name when run with -m",
+   "Saying __init__.py is required for any import in Python 3"
+  ],
+  "sources": [],
+  "code": null,
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "claim": "it has no package (__package__ is empty)",
+    "problem": "Verified: for a script run, __package__ is None (not an empty string); under -m it is 'shop'.",
+    "replacement": "it has no package (__package__ is None)"
+   }
+  ]
+ },
+ {
+  "id": "smi-i0027",
+  "plan_id": "P3-PY-07",
+  "domain": "Python",
+  "difficulty": "Medium",
+  "priority": true,
+  "question": "You inherit a small internal Flask service and a reusable parsing library, both of which 'work on my laptop' because everything was pip-installed into the system Python. Describe how you would set both up properly: virtual environments, what goes in pyproject.toml, and how you would pin dependencies differently for the service and for the library.",
+  "answer": "Virtual environments: create one per project (python -m venv .venv, then activate it or call .venv/bin/python -m pip ...). It gives the project its own site-packages, so projects with conflicting versions do not clash, and the machine's Python, which the OS or other tools may rely on, is not modified. Many Linux distributions now mark the system Python as externally managed, and pip refuses to install into it; that is a further reason not to.\n\npyproject.toml is the standard project metadata file. Its [build-system] table names the build requirements and backend (for example setuptools, hatchling or flit-core), so tools like pip can build the project. The [project] table holds name, version, requires-python, dependencies and optional-dependencies; tool settings live under [tool.*]. The format is defined by the PyPA pyproject.toml specification (see the 'Writing your pyproject.toml' guide). For the library, [project] holds name, version, requires-python, dependencies (abstract ranges), optional-dependencies (e.g. a 'dev' or 'test' extra) and [project.scripts] for entry points; for the service, keep the same table with loose requirements and a lock file beside it.\n\nPinning, which differs by role:\n- Library: declare abstract, permissive ranges in dependencies (for example requests>=2.28,<3 or a lower bound only), because your users must be able to resolve your requirements together with their own. Tight pins make installs conflict. Test against the lowest and highest versions you claim.\n- Application/service: you control the deployment, so you want reproducible installs. Keep the loose requirements in pyproject.toml and generate a fully pinned lock (pip-compile, uv or poetry; or pip freeze from a clean venv, which records versions but no hashes; ideally with hashes where the tool supports them) that CI and production install from. Update it deliberately.\n\nPitfall: a bare pip freeze from a polluted environment captures unrelated packages. Start from a fresh venv and install from the declared dependencies.",
+  "key_concepts": [
+   "virtual environment",
+   "pyproject.toml",
+   "build backend",
+   "abstract vs pinned dependencies",
+   "lock file",
+   "requires-python",
+   "externally managed environment"
+  ],
+  "common_mistakes": [
+   "Pinning exact versions in a library",
+   "Using unpinned requirements for a production service",
+   "Running pip install with sudo into the system Python",
+   "Confusing requirements.txt with project metadata"
+  ],
+  "sources": [],
+  "code": null,
+  "originally_flagged": [
+   {
+    "severity": "major",
+    "claim": "The format is defined by PyPA specifications, but I did not open them in this task, so check the packaging guide for the exact field list.",
+    "problem": "First-person process note does not belong in a reference answer and leaves the pyproject part of the question under-answered. WebFetch of packaging.python.org was refused here, so I checked by parsing a sample with tomllib only (structure valid), not against the spec text.",
+    "replacement": "The format is defined by the PyPA pyproject.toml specification (see the 'Writing your pyproject.toml' guide). For the library, [project] holds name, version, requires-python, dependencies (abstract ranges), optional-dependencies (e.g. a 'dev' or 'test' extra) and [project.scripts] for entry points; for the service, keep the same table with loose requirements and a lock file beside it."
+   },
+   {
+    "severity": "minor",
+    "claim": "(pip-compile, uv, poetry or pip freeze from a clean venv; ideally with hashes)",
+    "problem": "pip freeze cannot emit hashes (no hash option, verified in pip 24.0 help); hashes come from pip-compile --generate-hashes, uv or poetry.",
+    "replacement": "(pip-compile, uv or poetry; or pip freeze from a clean venv, which records versions but no hashes; ideally with hashes where the tool supports them)"
+   },
+   {
+    "severity": "minor",
+    "claim": "Many Linux distributions now mark the system Python as externally managed",
+    "problem": "True (PEP 668; /usr/lib/python3.12/EXTERNALLY-MANAGED exists in the sandbox) but supported only by background knowledge and a local file check, not official docs.",
+    "replacement": null
+   }
+  ]
+ },
+ {
+  "id": "smi-i0028",
+  "plan_id": "P3-PY-08",
+  "domain": "Python",
+  "difficulty": "Medium",
+  "priority": false,
+  "question": "What does this print, and what does `swallow()` return? Explain the order in which try, except, else and finally run, why `return` inside finally is dangerous, and why a bare `except:` is considered harmful.\n\n```python\ndef f(kind):\n    try:\n        print('try')\n        if kind == 'raise':\n            raise ValueError\n        if kind == 'return':\n            return 'from try'\n    except ValueError:\n        print('except')\n        return 'from except'\n    else:\n        print('else')\n        return 'from else'\n    finally:\n        print('finally')\n\ndef swallow():\n    try:\n        raise RuntimeError('boom')\n    finally:\n        return 'done'\n```\nfor f('ok'), f('raise'), f('return').",
+  "answer": "Results: f('ok') prints try, else, finally and returns 'from else'. f('raise') prints try, except, finally and returns 'from except'. f('return') prints try, finally and returns 'from try'. swallow() returns 'done' and no exception escapes.\n\nSemantics: the try body runs first. If it raises, the first matching except clause runs. The else clause runs only if the try body finished without an exception and without executing return, break or continue; that is why f('return') skips it. finally runs in every case, including when a return, break or exception is leaving the block, and it runs after the chosen return value has been computed but before the function actually returns. An exception raised in else is not handled by the except clauses of the same try.\n\nPurpose of else: keep the try body to the one statement that can raise the exception you expect, and put the follow-up code in else. That way an unrelated error in the follow-up code is not accidentally caught by your except.\n\nA return (or break/continue) in finally overrides whatever was pending, so it discards an in-flight exception, as swallow() shows, and also replaces a return value. Avoid it; linters flag it, and Python 3.14 emits a SyntaxWarning for it.\n\nBare except: catches everything, including KeyboardInterrupt and SystemExit (they derive from BaseException), so Ctrl-C and sys.exit stop working, and it hides programming errors like NameError. Catch the specific exceptions you can actually handle; use except Exception only at a top-level boundary where you log and re-raise or fail clearly, and never use pass to silence an error.\n\n```python\ndef run(kind):\n    log = []\n\n    def f():\n        try:\n            log.append(\"try\")\n            if kind == \"raise\":\n                raise ValueError(\"bad\")\n            if kind == \"return\":\n                return \"from try\"\n        except ValueError:\n            log.append(\"except\")\n            return \"from except\"\n        else:\n            log.append(\"else\")\n            return \"from else\"\n        finally:\n            log.append(\"finally\")\n\n    return f(), log\n\n\ndef swallow():\n    try:\n        raise RuntimeError(\"boom\")\n    finally:\n        return \"done\"   # discards the in-flight RuntimeError\n```\n\nThe tests assert the order logs above and that an exception raised in else escapes the same try.",
+  "key_concepts": [
+   "try/except/else/finally order",
+   "return in finally",
+   "else clause purpose",
+   "specific exception handling",
+   "bare except",
+   "BaseException vs Exception",
+   "KeyboardInterrupt"
+  ],
+  "common_mistakes": [
+   "Saying else runs after finally",
+   "Believing else runs when the try body returns",
+   "Thinking finally cannot override an exception",
+   "Using except: pass to make errors go away"
+  ],
+  "sources": [],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "def run(kind):\n    log = []\n\n    def f():\n        try:\n            log.append(\"try\")\n            if kind == \"raise\":\n                raise ValueError(\"bad\")\n            if kind == \"return\":\n                return \"from try\"\n        except ValueError:\n            log.append(\"except\")\n            return \"from except\"\n        else:\n            log.append(\"else\")\n            return \"from else\"\n        finally:\n            log.append(\"finally\")\n\n    return f(), log\n\n\ndef swallow():\n    try:\n        raise RuntimeError(\"boom\")\n    finally:\n        return \"done\"   # discards the in-flight RuntimeError\n",
+   "test": "assert run(\"ok\") == (\"from else\", [\"try\", \"else\", \"finally\"])\nassert run(\"raise\") == (\"from except\", [\"try\", \"except\", \"finally\"])\nassert run(\"return\") == (\"from try\", [\"try\", \"finally\"])   # else is skipped when try returns\nassert swallow() == \"done\"\n\n# an exception raised in else is NOT handled by the same try's except clauses\ndef else_raises():\n    try:\n        pass\n    except ValueError:\n        return \"handled\"\n    else:\n        raise ValueError(\"from else\")\n\ntry:\n    else_raises()\n    raise AssertionError(\"should have raised\")\nexcept ValueError as e:\n    assert str(e) == \"from else\"\n",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "claim": "return \"finally wins\"   # discards the in-flight RuntimeError",
+    "problem": "Answer text and question say swallow() returns 'done'; the fenced code returns 'finally wins'. Tested code therefore differs from the question's. (test must change in step: assert swallow() == \"finally wins\")",
+    "replacement": "return \"done\"   # discards the in-flight RuntimeError"
+   },
+   {
+    "severity": "minor",
+    "claim": "Avoid it; linters flag it.",
+    "problem": "Hedge/currency: since Python 3.14 (PEP 765) return/break/continue in finally emits a SyntaxWarning. Background knowledge, not run (no 3.14 available).",
+    "replacement": "Avoid it; linters flag it, and Python 3.14 emits a SyntaxWarning for it."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0029",
+  "plan_id": "P3-PY-09",
+  "domain": "Python",
+  "difficulty": "Medium",
+  "priority": true,
+  "question": "You are writing a small library, `acmeconf`, that reads configuration files. Design its exception hierarchy. A caller should be able to catch 'anything this library raised' with one clause, but also handle a bad value differently from a missing file. Inside the library you call int() on a port string; show how to re-raise as your own type while keeping the original error visible, and explain `__cause__` versus `__context__` and when `from None` is appropriate.",
+  "answer": "Design: define one base class, class ConfigError(Exception), and derive specific errors from it (for example ConfigValueError, plus one for file problems). Callers can catch the base to handle everything from the library, or a subclass for specific handling. Derive from Exception, not BaseException, so ordinary except Exception handlers work. Do not make subclasses of ValueError and friends unless callers really benefit from catching them as such; a multiple-inheritance mix (class ConfigValueError(ConfigError, ValueError)) is possible when you need both. Keep the number of types small: add one only if a caller would handle it differently. Document them as part of the public API, and put useful context in the message (the offending value, the key).\n\nChaining: raise NewError(...) from exc sets __cause__ to exc and marks it explicit; the traceback shows 'The above exception was the direct cause of the following exception'. If you raise a new exception inside an except block without from, Python still records the active exception in __context__ automatically, and the traceback says 'During handling of the above exception, another exception occurred'. That wording tells readers it may be an accident or a bug in the handler. raise ... from None sets __cause__ to None and sets __suppress_context__, which hides the context from the printed traceback (the __context__ attribute is still set). Use it sparingly, when the original is an irrelevant implementation detail, such as an internal KeyError you translated into a clean public error. Default to from exc so debugging information is not thrown away.\n\n```python\nclass ConfigError(Exception):\n    \"\"\"Base class: callers can catch this to handle any error from the library.\"\"\"\n\n\nclass ConfigValueError(ConfigError):\n    pass\n\n\nclass ConfigFileError(ConfigError):\n    \"\"\"The config file is missing or unreadable.\"\"\"\n    pass\n\n\ndef parse_port(text):\n    try:\n        value = int(text)\n    except ValueError as exc:\n        raise ConfigValueError(f\"port must be an integer, got {text!r}\") from exc\n    if not 0 < value < 65536:\n        raise ConfigValueError(f\"port out of range: {value}\")\n    return value\n\n\ndef read_port(path):\n    try:\n        with open(path, encoding=\"utf-8\") as fh:\n            text = fh.read().strip()\n    except OSError as exc:\n        raise ConfigFileError(f\"cannot read {path!r}\") from exc\n    return parse_port(text)\n\n\ndef implicit_chain():\n    try:\n        int(\"x\")\n    except ValueError:\n        raise ConfigValueError(\"raised without 'from'\")\n\n\ndef suppressed_chain():\n    try:\n        int(\"x\")\n    except ValueError:\n        raise ConfigValueError(\"raised 'from None'\") from None\n```\n\nAvoid swallowing tracebacks: don't catch Exception just to raise a new one without chaining, and don't log-and-return None. The test checks the base-class catch, __cause__, __context__ and __suppress_context__ in all three raising styles.\n\nIn the library, a missing or unreadable file raises ConfigFileError (chained from the OSError) and a malformed value raises ConfigValueError, so a caller can handle the two differently, while a single `except ConfigError` still catches everything the library raises on purpose. Exceptions from outside the hierarchy (for example a TypeError from passing None) are not wrapped unless you validate inputs.",
+  "key_concepts": [
+   "exception hierarchy",
+   "base exception class",
+   "raise from",
+   "__cause__",
+   "__context__",
+   "__suppress_context__",
+   "from None"
+  ],
+  "common_mistakes": [
+   "Raising bare Exception('...') from library code",
+   "Re-raising a new exception without chaining and losing the root cause",
+   "Overusing from None",
+   "Creating a deep hierarchy with a class per error message"
+  ],
+  "sources": [],
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "class ConfigError(Exception):\n    \"\"\"Base class: callers can catch this to handle any error from the library.\"\"\"\n\n\nclass ConfigValueError(ConfigError):\n    pass\n\n\nclass ConfigFileError(ConfigError):\n    \"\"\"The config file is missing or unreadable.\"\"\"\n    pass\n\n\ndef parse_port(text):\n    try:\n        value = int(text)\n    except ValueError as exc:\n        raise ConfigValueError(f\"port must be an integer, got {text!r}\") from exc\n    if not 0 < value < 65536:\n        raise ConfigValueError(f\"port out of range: {value}\")\n    return value\n\n\ndef read_port(path):\n    try:\n        with open(path, encoding=\"utf-8\") as fh:\n            text = fh.read().strip()\n    except OSError as exc:\n        raise ConfigFileError(f\"cannot read {path!r}\") from exc\n    return parse_port(text)\n\n\ndef implicit_chain():\n    try:\n        int(\"x\")\n    except ValueError:\n        raise ConfigValueError(\"raised without 'from'\")\n\n\ndef suppressed_chain():\n    try:\n        int(\"x\")\n    except ValueError:\n        raise ConfigValueError(\"raised 'from None'\") from None\n",
+   "test": "assert parse_port(\"8080\") == 8080\n\ntry:\n    parse_port(\"abc\")\nexcept ConfigError as e:                       # caught via the base class\n    assert isinstance(e, ConfigValueError)\n    assert isinstance(e.__cause__, ValueError)  # explicit: raise ... from exc\n    assert e.__suppress_context__ is True\n\ntry:\n    implicit_chain()\nexcept ConfigError as e:\n    assert e.__cause__ is None\n    assert isinstance(e.__context__, ValueError)  # implicit chaining\n    assert e.__suppress_context__ is False\n\ntry:\n    suppressed_chain()\nexcept ConfigError as e:\n    assert e.__cause__ is None\n    assert isinstance(e.__context__, ValueError)  # still recorded...\n    assert e.__suppress_context__ is True         # ...but hidden from the traceback display\n\nimport os, tempfile\nwith tempfile.TemporaryDirectory() as _d:\n    _missing = os.path.join(_d, \"nope.conf\")\n    try:\n        read_port(_missing)\n    except ConfigError as e:                    # one clause catches the whole library\n        assert isinstance(e, ConfigFileError) and not isinstance(e, ConfigValueError)\n        assert isinstance(e.__cause__, FileNotFoundError)\n    else:\n        raise AssertionError(\"missing file must raise\")\n    _ok = os.path.join(_d, \"ok.conf\")\n    with open(_ok, \"w\", encoding=\"utf-8\") as _fh:\n        _fh.write(\"8080\\n\")\n    assert read_port(_ok) == 8080\n    _bad = os.path.join(_d, \"bad.conf\")\n    with open(_bad, \"w\", encoding=\"utf-8\") as _fh:\n        _fh.write(\"eighty\\n\")\n    try:\n        read_port(_bad)\n    except ConfigValueError as e:                # a bad value is a different type from a missing file\n        assert not isinstance(e, ConfigFileError)\n    else:\n        raise AssertionError(\"bad value must raise\")\n\ntry:\n    parse_port(\"70000\")\nexcept ConfigValueError as e:\n    assert e.__cause__ is None and e.__context__ is None\n",
+   "expected": []
+  },
+  "originally_flagged": [
+   {
+    "severity": "major",
+    "claim": "class ConfigValueError(ConfigError):\n    pass",
+    "problem": "Code defines only one subclass; the file-problem class is mentioned in prose only, so the 'missing file vs bad value' requirement is not demonstrated.",
+    "replacement": "class ConfigValueError(ConfigError):\n    pass\n\n\nclass ConfigFileError(ConfigError):\n    \"\"\"The config file is missing or unreadable.\"\"\"\n    pass"
+   },
+   {
+    "severity": "minor",
+    "claim": "def parse_port(text):",
+    "problem": "Exceptions outside the hierarchy leak: parse_port(None) raises TypeError (not a ConfigError), and parse_port('\uff18\uff10'), ' 80 ', '1_000', 80.5 are accepted (int() semantics). Verified on 3.13 and 3.10. Fine for the question, but undermines 'catch anything this library raised' unless inputs are validated.",
+    "replacement": null
+   }
+  ]
+ }
+]

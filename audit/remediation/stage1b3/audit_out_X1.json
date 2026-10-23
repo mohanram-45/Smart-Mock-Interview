@@ -1,0 +1,478 @@
+[
+ {
+  "id": "smi-g0002",
+  "verdict": "correct",
+  "reasons": [
+   "Question is specific and self-contained; reference formula, tokenisation and l2 norm are right. Only defect: the 'verify against sklearn' part is answered by describing a hidden test ('The test builds...') instead of telling the reader what to do."
+  ],
+  "parts_answered": {
+   "implement tfidf(docs) -> (vocab, rows) without sklearn": true,
+   "lowercasing/default token pattern/smooth idf/l2 reproduced": true,
+   "why a word in every document is not weight zero": true,
+   "how to verify against sklearn on a tiny corpus": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "The test builds a three-document corpus, asserts the vocabulary equals TfidfVectorizer's, that the matrix matches with np.allclose, and that every row has unit l2 norm.",
+    "problem": "Refers to a test the reader never sees; the verification procedure the question asks for should be stated as instructions.",
+    "replacement": "To verify, build a three-document corpus, fit TfidfVectorizer on it, and assert vocab == list(sk.get_feature_names_out()), np.allclose(rows, sk.fit_transform(docs).toarray()) and that every row has unit l2 norm; also check that a term present in every document has sk.idf_ equal to 1.0."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short from-scratch implementation plus one conceptual explanation; the subtle points (smoothing formula, token pattern, alphabetical vocab) are recall rather than multi-step reasoning.",
+  "key_concepts_findings": "All six are discussed (smooth idf, l2, tf as raw count, df via Counter, token pattern, TfidfVectorizer). Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0341",
+   "same_intent": false
+  },
+  "code_findings": "Fenced code is byte-identical to the stored solution (stripped). Reran on sandbox 3.13 + sklearn 1.9.1: test ok. Under owner's 3.10.20 and 3.11.17 venvs the recorded test SKIPs (no sklearn installed there; xrun reports SKIP:sklearn) so the sklearn equivalence was NOT confirmed on the owner's stack; the pure-Python function itself runs on 3.10/3.11 and gave unit-norm rows. My extra checks: 200 random corpora (mixed case, digits, underscores, accents, 'İ', apostrophes, hyphens, single-char tokens) matched TfidfVectorizer on vocab and matrix with 0 mismatches; doc with no tokens gives an all-zero row, as sklearn does; tfidf([]) returns ([], []) and a corpus whose only tokens are 1-char returns ([], [[]]) whereas sklearn raises ValueError('empty vocabulary') (behavioural difference, not claimed in the answer). Not tested: sklearn behaviour with non-default parameters, which the answer does not claim.",
+  "sources_findings": [
+   {
+    "url": "https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.TfidfTransformer.html",
+    "status": "supported",
+    "evidence": "'idf(t) = log [ (1 + n) / (1 + df(t)) ] + 1' (smooth_idf=True default); 'tf-idf(t, d) = tf(t, d) * idf(t)'; 'norm ... default=l2'."
+   },
+   {
+    "url": "https://scikit-learn.org/stable/modules/feature_extraction.html",
+    "status": "partially",
+    "evidence": "Page says 'The default configuration tokenizes the string by extracting words of at least 2 letters' and does not state the regex; the answer's more exact '2+ word characters' (\\b\\w\\w+\\b, so digits/underscore count) is correct and I confirmed it empirically against sklearn, not from the page. The 'known issues' stop-word half of the supports sentence is not used by this answer."
+   }
+  ]
+ },
+ {
+  "id": "smi-g0004",
+  "verdict": "pass",
+  "reasons": [
+   "Objective, cost argument, 3/4-power noise distribution and k ranges all match the Mikolov et al. paper; single-vector explanation is correct and appropriately hedged. Minor wording: the question says 'loss' and the answer writes the maximised objective (loss is its negative); acceptable."
+  ],
+  "parts_answered": {
+   "loss for one (centre, context) pair": true,
+   "why used instead of full softmax": true,
+   "what the noise distribution controls": true,
+   "what k controls": true,
+   "why 'bank' has a single vector": true
+  },
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism explanation with a formula and a comparison to softmax cost; no multi-step derivation.",
+  "key_concepts_findings": "All seven concepts appear in the answer (subsampling and distributional hypothesis briefly).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0020",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/pdf/1310.4546",
+    "status": "supported",
+    "evidence": "Eq. 4: 'log σ(v′_wO^T v_wI) + Σ_{i=1..k} E_{wi∼Pn(w)}[log σ(−v′_wi^T v_wI)]'; 'values of k in the range 5–20 are useful for small training datasets', 2–5 for large; unigram^(3/4) 'outperformed significantly the unigram and the uniform distributions'."
+   }
+  ]
+ },
+ {
+  "id": "smi-g0007",
+  "verdict": "correct",
+  "reasons": [
+   "Good per-task reasoning, but the 50 ms CPU constraint (the central constraint in part a) is asserted met without condition, and 'no hallucination' for token classification is slightly overstated."
+  ],
+  "parts_answered": {
+   "(a) email routing choice and why": true,
+   "(b) span extraction choice and why": true,
+   "(c) reply drafting choice and why": true,
+   "change with zero labelled data": true
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "It is cheap, fast on CPU, and works well with a few thousand labels;",
+    "problem": "Unconditioned: whether an encoder meets 50 ms on CPU depends on model size, input length (emails can be long) and runtime; 'works well' with ~170 examples per class is also not guaranteed. Cannot be verified from the question.",
+    "replacement": "It is cheap and usually fast enough on CPU if the model is small (distilled or quantised) and long emails are truncated, but benchmark it on real email lengths against the 50 ms budget; it typically works well with a few thousand labels;"
+   },
+   {
+    "severity": "minor",
+    "claim": "which gives spans with character offsets and no hallucination;",
+    "problem": "Token classification cannot invent text but can still select the wrong span or miss one (OCR noise, total vs subtotal).",
+    "replacement": "which returns spans copied from the source with character offsets, so it cannot invent values (it can still pick the wrong span, so validate totals);"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Choosing model families per task under constraints is comparison/application; no multi-step derivation, though the constraint trade-offs push it to the top of Medium.",
+  "key_concepts_findings": "Seven concepts, all present in the answer (few-shot prompting appears as 'prompt or few-shot examples').",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0003",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0009",
+  "verdict": "pass",
+  "reasons": [
+   "Arithmetic checked: 200 toxic of 10,000; TPR 0.9 -> 180 TP, FPR 0.05 of 9,800 -> 490 FP, precision 180/670 = 26.9%. All four asked parts (evaluate, threshold, class weights/resampling, monitoring) covered; claims about class weights are hedged ('mostly')."
+  ],
+  "parts_answered": {
+   "how to evaluate": true,
+   "how to set the threshold": true,
+   "class weights or resampling": true,
+   "what to monitor after launch": true
+  },
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Applied scenario combining metrics, threshold choice and leakage-safe resampling; each step is standard practice.",
+  "key_concepts_findings": "All eight concepts appear in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0317",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0011",
+  "verdict": "pass",
+  "reasons": [
+   "Recommendation is well justified and the hedges are appropriate. Covers all asked parts: three-way comparison, failure modes, tests, hybrid."
+  ],
+  "parts_answered": {
+   "compare prompting / RAG / fine-tuning": true,
+   "failure modes of the choice": true,
+   "how to test for them": true,
+   "where a hybrid makes sense": true
+  },
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open-ended system design with trade-offs across three approaches, security (per-team access), failure modes and evaluation design.",
+  "key_concepts_findings": "All eight concepts appear in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0013",
+  "verdict": "pass",
+  "reasons": [
+   "Generative story, inputs/outputs, stop-word explanation, local-optima explanation, K selection and prior note are correct. sklearn default prior (1/n_components) and perplexity wording verified on the docs page. Note 'said' is not in sklearn's English stop list ('would' is), but the answer also recommends corpus-specific lists and df pruning, so it is not wrong."
+  ],
+  "parts_answered": {
+   "generative model": true,
+   "inputs and outputs": true,
+   "why function-like words dominate": true,
+   "why seeds differ": true,
+   "how to choose number of topics": true,
+   "how to make results more reliable": true
+  },
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Explain a generative model and diagnose two practical symptoms; no derivation.",
+  "key_concepts_findings": "All seven concepts present.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0158",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.LatentDirichletAllocation.html",
+    "status": "supported",
+    "evidence": "'doc_topic_prior ... If the value is None, defaults to 1 / n_components'; same for topic_word_prior; 'Perplexity is defined as exp(-1. * log-likelihood per word)'."
+   }
+  ]
+ },
+ {
+  "id": "smi-g0014",
+  "verdict": "correct",
+  "reasons": [
+   "Technical claims are right (negators are in ENGLISH_STOP_WORDS, so 'good' and 'not good' collide), but the question says 'Demonstrate the root cause in code' and the only fenced code defines builders; the demonstration lives in an unseen test. Also the toy fixed model still predicts 'bad' as positive, which the answer should not hide."
+  ],
+  "parts_answered": {
+   "demonstrate root cause in code": false,
+   "fix it": true,
+   "what to do instead of aggressive text cleaning": true
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "The test shows the two vectors are identical under broken_vec, differ under fixed_vec, and that the broken pipeline gives the same prediction for 'good' and 'not good' (and for 'bad' and 'not bad') while the fixed one separates 'not good' (0) from 'not bad' (1) on this toy data. The toy corpus is only a demonstration, not a quality claim.",
+    "problem": "The demonstration the question asks for is not in the answer's code. Verified replacement code below on sklearn 1.9.1: broken rows identical; predictions [0 0 0 0] broken vs [1 0 1 1] fixed.",
+    "replacement": "Demonstration (toy data, only to show the collision):\n```python\ntx = [\"the food was good\", \"the service was good\", \"really good value\", \"not good at all\",\n      \"the room was not good\", \"good but not clean\", \"bad and rude\", \"the food was bad\",\n      \"not bad at all, quite nice\", \"not bad, enjoyed it\", \"never disappointing, great\",\n      \"great and not boring\"]\ny = [1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1]\nfor w in [\"not\", \"no\", \"never\", \"nor\", \"cannot\"]:\n    assert w in ENGLISH_STOP_WORDS\nv = broken_vec().fit(tx)\nprint(v.transform([\"good\", \"not good\"]).toarray())   # two identical rows\nq = [\"good\", \"not good\", \"bad\", \"not bad\"]\nprint(fit_predict(broken_vec(), tx, y, q))            # [0 0 0 0]: 'not X' always equals 'X'\nprint(fit_predict(fixed_vec(), tx, y, q))             # [1 0 1 1]: 'not good' -> 0, 'not bad' -> 1\n```\nThe fixed pipeline separates 'not good' from 'good' and 'not bad' from 'bad', but on this tiny corpus it still labels bare 'bad' positive; the toy data only demonstrates the collision, it is not a quality claim."
+   },
+   {
+    "severity": "minor",
+    "claim": "(asserted in the test)",
+    "problem": "Refers to a test the reader cannot see.",
+    "replacement": "(check with `\"not\" in ENGLISH_STOP_WORDS`)"
+   },
+   {
+    "severity": "minor",
+    "claim": "transformer models should not get stop-word removal at all.",
+    "problem": "Absolute; it is common practice rather than a rule.",
+    "replacement": "transformer models normally do not need stop-word removal."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Debugging via a short reproduction and a vectorizer-level fix, plus judgement about preprocessing; single mechanism.",
+  "key_concepts_findings": "Seven concepts; 'token pattern' and 'ablation' appear only briefly but are discussed. Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0137",
+   "same_intent": false
+  },
+  "code_findings": "Fenced code equals the stored solution. Test passes on sandbox 3.13 + sklearn 1.9.1; SKIP on owner's 3.10/3.11 (no sklearn in those venvs), so the owner's sklearn version is unverified, though ENGLISH_STOP_WORDS has contained these negators for many releases (not verified for each). Extra checks: ngram_range=(1,2) combined with stop_words='english' yields only ['bad','good'] (no bigram), confirming the listed common mistake; a custom list of ENGLISH_STOP_WORDS minus negators keeps 'not'; with stop_words='english' the contraction \"isn't\" becomes 'isn' (the 't' is dropped by the token pattern), so contractions need separate handling; the stop list also contains none, nobody, nothing, neither, nowhere, noone. Fixed model on the toy data predicts [1 0 1 1] for [good, not good, bad, not bad]: 'bad' alone is wrong, as noted above.",
+  "sources_findings": [
+   {
+    "url": "https://scikit-learn.org/stable/modules/feature_extraction.html",
+    "status": "partially",
+    "evidence": "Page: 'There are several known issues in our provided ‘english’ stop word list' and 'Popular stop word lists may include words that are highly informative to some tasks'. It does not state that negators are in the list; that was verified by running ENGLISH_STOP_WORDS. 'words of at least 2 letters' supports the single-character claim loosely."
+   }
+  ]
+ },
+ {
+  "id": "smi-g0015",
+  "verdict": "correct",
+  "reasons": [
+   "Derivation, code and practical advice are right (rel error 2.65e-10 for a correct implementation at eps=1e-6, 0.797 when a(1-a) is omitted). Defect: the answer cites 'the run below' but shows no run, and one common_mistakes entry is vague."
+  ],
+  "parts_answered": {
+   "derive dL/dw": true,
+   "derive dL/db": true,
+   "numpy implementation": true,
+   "gradient check that catches forgotten sigmoid derivative": true,
+   "expected step size and relative error": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "(2.7e-10 in the run below)",
+    "problem": "No run is shown; numbers are reproducible (I got 2.65e-10) but should be tied to a stated setup.",
+    "replacement": "(about 3e-10 for a random 20x4 example with eps=1e-6)"
+   },
+   {
+    "severity": "minor",
+    "claim": "a missing a(1 - a) factor gave about 0.8, so the check catches it clearly.",
+    "problem": "Same example is implied, not stated.",
+    "replacement": "omitting the a(1 - a) factor gave about 0.8 on that example (X.T @ ((a - y) / N) versus the numeric gradient), so the check catches it clearly."
+   },
+   {
+    "severity": "minor",
+    "claim": "Using a forward difference or float32 and then seeing relative errors around 1e-3 and wrongly declaring a bug (or none)",
+    "problem": "Vague; in my runs float32 with eps=1e-6 gave 0.197 and float64 central differences stayed ~1e-10 for eps in 1e-4..1e-7.",
+    "replacement": "Using a forward difference or float32 and getting relative errors several orders of magnitude larger (1e-4 up to 1e-1), then wrongly declaring a bug or missing a real one"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Derivation by chain rule, short numpy implementation and a standard gradient-check recipe; single-concept chain with practical numerics.",
+  "key_concepts_findings": "All six present, including saturation/vanishing gradient in the closing paragraph.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0020",
+   "same_intent": false
+  },
+  "code_findings": "Fenced code equals stored solution; test passes on 3.13 (xrun ok on 3.10.20 and 3.11.17 too, numpy 2.2.6). My extras: eps sweep 1e-3..1e-10 rel_error 5.8e-8, 5.8e-10, 3.0e-11, 2.7e-10, 2.5e-9, 4.6e-8, 3.0e-6, so 'around 1e-6' and 'around 1e-7 or smaller' hold; omitting 1/N gives 0.90 so it is caught; at a saturated point (w*100) correct gradient is ~1e-16 and rel_error 1.5e-4 (noise), and the buggy version gives 1.0 though both gradients are near zero, consistent with the advice to test at a non-saturated point; N=1 works (rel err 1e-10); sigmoid overflows with a RuntimeWarning for z=-1000 but returns correct 0 (not claimed otherwise).",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0017",
+  "verdict": "correct",
+  "reasons": [
+   "Formulas, 3.16x figure, AdamW remark and hedging about SGD all correct. Two small defects: 'whatever the gradient scale' needs the condition |g| >> eps, and the hand-computed test is only described, not shown."
+  ],
+  "parts_answered": {
+   "write Adam's update rule": true,
+   "what m and v track": true,
+   "why bias correction": true,
+   "one Adam step in numpy": true,
+   "test against hand-computed first step": true,
+   "when SGD with momentum may be better": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "essentially lr*sign(g) whatever the gradient scale.",
+    "problem": "Fails when |g| is comparable to or below eps: for g=1e-12 I measured a first step of 1e-7 instead of 1e-3.",
+    "replacement": "essentially lr*sign(g) as long as |g| is much larger than eps."
+   },
+   {
+    "severity": "minor",
+    "claim": "The test checks m, v and the update for gradient [0.5, -2, 0]: each nonzero coordinate moves by almost exactly lr and the zero-gradient coordinate does not move.",
+    "problem": "Test not shown, so the 'test against a hand-computed first step' is not actually in the answer.",
+    "replacement": "Check:\n```python\ntheta = np.array([1.0, -1.0, 0.5]); g = np.array([0.5, -2.0, 0.0])\ntheta1, m1, v1 = adam_step(theta, g, np.zeros(3), np.zeros(3), t=1)\nassert np.allclose(m1, 0.1 * g) and np.allclose(v1, 0.001 * g ** 2)   # hand-computed m, v\nassert np.allclose(theta - theta1, [1e-3, -1e-3, 0.0], atol=1e-9)    # each nonzero coordinate moves by ~lr\n```"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short implementation and mechanism explanation (bias correction) with a numeric sanity check; the generalisation discussion is hedged recall.",
+  "key_concepts_findings": "All seven present; the SGD-vs-Adam part is thin (could mention Adam stores two states per parameter versus one for momentum SGD) but adequate.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0061",
+   "same_intent": false
+  },
+  "code_findings": "Fenced code equals stored solution; test ok on 3.13, 3.10.20, 3.11.17. Extras: t=0 gives nan (0/0) with warnings, consistent with the stated 1-based t; zero gradient gives zero step; scalar float inputs work; constant gradient 2.0 for 100 steps moves theta by exactly -0.1 (lr per step); small gradients (1e-12) give step ~1e-7 (eps dominates), the basis for the minor issue above.",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0018",
+  "verdict": "correct",
+  "reasons": [
+   "Axes, train/inference behaviour and most failure modes are correct, but one listed failure mode contradicts the answer's own inference description."
+  ],
+  "parts_answered": {
+   "axes for batch norm": true,
+   "axes for layer norm": true,
+   "training vs inference behaviour": true,
+   "small-batch problems": true,
+   "variable-length sequence problems": true
+  },
+  "issues": [
+   {
+    "severity": "major",
+    "claim": "in autoregressive decoding with batch size 1 there is no meaningful batch statistic;",
+    "problem": "At inference batch norm uses running averages (as the answer says two paragraphs earlier), so a batch of 1 is fine; the real problems are in training with tiny batches and per-time-step statistics in sequence models.",
+    "replacement": "in recurrent or step-by-step models, per-time-step batch statistics are awkward to maintain and do not carry over to sequence lengths unseen in training;"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Comparison of two normalisation schemes with mechanism (axes, running stats); recall plus short reasoning.",
+  "key_concepts_findings": "All seven discussed (group norm only in last sentence).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0112",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0019",
+  "verdict": "correct",
+  "reasons": [
+   "Diagnoses and priorities are sound. The Run C statistical argument conflates sampling uncertainty of the accuracy estimate with epoch-to-epoch variation of one model on a fixed validation set."
+  ],
+  "parts_answered": {
+   "diagnose Run A": true,
+   "diagnose Run B": true,
+   "diagnose Run C": true,
+   "priority-ordered actions for each": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "With 300 images and accuracy near 70%, the binomial standard error is sqrt(0.7*0.3/300), about 2.6 points, so swings of a few points are expected.",
+    "problem": "Arithmetic is right (2.6 points) but the binomial SE describes sampling error of the estimate, not changes between epochs on the same 300 images; epoch-to-epoch swings come from the model flipping a handful of predictions (each image is 0.33 points).",
+    "replacement": "With 300 images and accuracy near 70%, the binomial standard error is sqrt(0.7*0.3/300), about 2.6 points, and each image is worth 0.33 points, so a gap of a few points between epochs is within noise; on a fixed set the swings come from SGD noise flipping a few predictions (learning rate still high, no averaging)."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Three-way diagnosis with a small statistical estimate and ordered remedies; standard practice but multi-part.",
+  "key_concepts_findings": "All seven concepts appear.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0133",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0022",
+  "verdict": "correct",
+  "reasons": [
+   "Degradation problem, gradient argument and shape-mismatch handling are correct (Option A zero-pad / Option B 1x1 projection confirmed in He et al.). Missing conditions: the original ResNet applies ReLU after the addition, and the authors themselves argue degradation is unlikely to be due to vanishing gradients."
+  ],
+  "parts_answered": {
+   "how skip connections address degradation": true,
+   "the gradient argument": true,
+   "handling different input/output shapes": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "This helps gradients reach early layers and eases optimisation, though it does not remove every training difficulty (normalisation, initialisation and learning rate still matter).",
+    "problem": "The clean identity path holds exactly for pre-activation blocks (original ResNet: 'second nonlinearity after the addition'); the original paper says degradation 'is unlikely to be caused by vanishing gradients' since the plain nets use batch norm.",
+    "replacement": "This helps gradients reach early layers and eases optimisation. The identity path is exact in pre-activation blocks; the original ResNet applies a ReLU after the addition. He et al. also argue the degradation is unlikely to be caused by vanishing gradients (the plain nets use batch norm), so read the identity path as easing optimisation, not only as a vanishing-gradient fix. It does not remove every training difficulty (normalisation, initialisation and learning rate still matter)."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism explanation plus a one-line Jacobian argument and a design detail; no long derivation.",
+  "key_concepts_findings": "All six present.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0097",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0024",
+  "verdict": "correct",
+  "reasons": [
+   "Formulas and all numbers are correct (re-derived and brute-forced). Overclaim in the text: 'each verified by brute-force' covers only the output sizes, and the question leaves padding/channels of the 7x7 stem unspecified, which the answer assumes silently."
+  ],
+  "parts_answered": {
+   "output size helper": true,
+   "parameter-count helper": true,
+   "worked examples incl. 7x7 stride-2 stem on 224": true,
+   "depthwise-separable pair": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "Worked results asserted by the test (each verified by brute-force counting of window positions):",
+    "problem": "Only the output sizes were brute-forced; parameter counts are arithmetic. Stem padding (3) and channels (3->64) are assumed, not given.",
+    "replacement": "Worked results (the output sizes were cross-checked by brute-force counting of window positions; the parameter counts are hand arithmetic; the stem assumes the usual ResNet setting of 3 input channels, 64 output channels and padding 3):"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short code from a formula plus worked application with groups/dilation; no multi-step reasoning.",
+  "key_concepts_findings": "All six present.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0110",
+   "same_intent": false
+  },
+  "code_findings": "Fenced code equals stored solution; test passes on 3.13, 3.10.20, 3.11.17 (the test includes a brute-force sweep of 288 shape combinations). Extras: conv_out_size(224,11,2,4)=55 (AlexNet) correct; (5,5)->1; (5,6) raises ValueError as designed; stride=0 raises ZeroDivisionError and groups=0 raises ZeroDivisionError (not a ValueError; no input validation, not claimed); conv_params(0,0,3)=0; conv_params(3,64,7,bias=False)=9408; (4,8,3,groups=2)=152 correct. No SQLite/library dependence. I could not run PyTorch (not installed) to cross-check against nn.Conv2d, so the numbers rely on my arithmetic and the brute-force count.",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0025",
+  "verdict": "correct",
+  "reasons": [
+   "Maths, cost argument and sparsity discussion are correct and the optimiser remark is hedged. The 'show that lookup equals one-hot' step is only described ('The test confirms...'), and the helpers silently assume 1-D indices."
+  ],
+  "parts_answered": {
+   "show lookup equals one-hot matmul": true,
+   "gradient for both": true,
+   "why lookup form is used": true,
+   "how gradients reach only used rows": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "The test confirms the forward and backward results match, that repeated index 2 accumulates dout[0] + dout[2], that unused rows are exactly zero, and that naive assignment would overwrite instead of accumulate.",
+    "problem": "The equivalence the question asks to show is not in the answer's code; helpers also assume 1-D idx.",
+    "replacement": "Check (idx is 1-D here; for (batch, seq) ids flatten idx and dout first):\n```python\nrng = np.random.default_rng(3)\nE = rng.normal(size=(10, 4)); idx = np.array([2, 7, 2, 5]); dout = rng.normal(size=(4, 4))\nassert np.allclose(embed_lookup(E, idx), embed_onehot(E, idx))\ng = embed_grad_lookup(10, idx, dout)\nassert np.allclose(g, embed_grad_onehot(10, idx, dout))\nassert np.allclose(g[2], dout[0] + dout[2])      # repeated index accumulates\nassert np.all(g[[0, 1, 3, 4, 6, 8, 9]] == 0)     # unused rows get exactly zero\n```"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short numpy equivalence demonstration and backward with scatter-add; moderate subtlety (repeated indices).",
+  "key_concepts_findings": "All six present.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0063",
+   "same_intent": false
+  },
+  "code_findings": "Fenced code equals stored solution; test ok on 3.13, 3.10.20, 3.11.17. Replacement check above run on 3.13. Extras: empty idx works for all four helpers (shapes (0,d), (V,d)); negative indices agree between lookup and one-hot forms and gradients; out-of-range idx raises IndexError in the lookup; with 2-D idx embed_lookup returns (2,2,3) but embed_onehot silently returns a wrong-shaped (2,3) result and embed_grad_lookup raises ValueError, so batched ids need flattening (the answer does not claim 2-D support).",
+  "sources_findings": []
+ }
+]

@@ -1,0 +1,627 @@
+[
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Design choices. Quantile edges taken from the reference give roughly equal reference mass per bin, which copes with skewed features; the edges are frozen so every later window is compared on the same bins. np.unique collapses duplicate edges, so a feature with a large spike (say many zeros) simply ends up with fewer bins. Searching only the interior edges sends values below the reference minimum to the first bin and values above its maximum to the last, so out-of-range data is counted rather than dropped. Proportions are floored at eps because (q - p) * log(q / p) is undefined when either proportion is 0.\n\nThe floor makes the output an artefact once a bin is empty. With a 20,000-row N(0,1) reference and 1,000 current values all equal to 5.0, the PSI was about 12.4 with eps=1e-6 and about 3.9 with eps=1e-2. Read such a value as 'enormous', not as a magnitude to compare across runs.\n\nWhy 200 rows and 40 bins is a bad signal: PSI is a sum over bins of sampling noise even without drift. A rough chi-square-style argument gives an expected null value near (B - 1) * (1/n + 1/m): for B=10 and n=m=200 that is 0.09, and a 300-repetition simulation with two samples from the same normal distribution gave a mean of 0.089 (sd 0.046). With 40 bins (about 5 expected rows per bin) the approximation breaks down and the simulated mean was 0.50 (sd 0.15). Commonly quoted rule-of-thumb cutoffs such as 0.1 and 0.25 are not statistical thresholds, and here they would be exceeded with no change at all. Remedies: fewer bins, more rows, a longer window, or calibrating the alert threshold against the noise floor measured on same-distribution splits.",
+  "practical_answer": "Reference implementation (this exact code was run on Python 3.10, 3.11 and 3.13 with numpy, together with the test below):\n\n```python\nimport numpy as np\n\n\ndef psi(reference, current, n_bins=10, eps=1e-4):\n    \"\"\"Population Stability Index with quantile bins fixed from `reference`.\n\n    Out-of-range current values fall into the first/last bin. Bin\n    proportions are floored at `eps` so an empty bin gives a large but\n    finite term instead of log(0).\n    \"\"\"\n    ref = np.asarray(reference, dtype=float)\n    cur = np.asarray(current, dtype=float)\n    edges = np.unique(np.quantile(ref, np.linspace(0.0, 1.0, n_bins + 1)))\n    inner = edges[1:-1]\n    if inner.size == 0:\n        return 0.0\n    ref_idx = np.searchsorted(inner, ref, side=\"right\")\n    cur_idx = np.searchsorted(inner, cur, side=\"right\")\n    k = inner.size + 1\n    p = np.bincount(ref_idx, minlength=k) / ref.size\n    q = np.bincount(cur_idx, minlength=k) / cur.size\n    p = np.maximum(p, eps)\n    q = np.maximum(q, eps)\n    return float(np.sum((q - p) * np.log(q / p)))\n```\n\nSuggested checks, all asserted in the recorded test: PSI of a sample against itself is exactly 0; two independent 20,000-row normal samples give less than 0.01; a 0.5 sd mean shift gives about 0.23; the all-5.0 case grows as eps shrinks; and the null PSI with 40 bins is more than three times the null PSI with 10 bins at n=200.\n\nOperational recipe: before choosing an alert level for a feature, split a known-stable period into two random halves 100 times, compute PSI on each pair at your production window size and bin count, and set the alert above a high percentile of that null distribution, not at a textbook constant.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\n\ndef psi(reference, current, n_bins=10, eps=1e-4):\n    \"\"\"Population Stability Index with quantile bins fixed from `reference`.\n\n    Out-of-range current values fall into the first/last bin. Bin\n    proportions are floored at `eps` so an empty bin gives a large but\n    finite term instead of log(0).\n    \"\"\"\n    ref = np.asarray(reference, dtype=float)\n    cur = np.asarray(current, dtype=float)\n    edges = np.unique(np.quantile(ref, np.linspace(0.0, 1.0, n_bins + 1)))\n    inner = edges[1:-1]\n    if inner.size == 0:\n        return 0.0\n    ref_idx = np.searchsorted(inner, ref, side=\"right\")\n    cur_idx = np.searchsorted(inner, cur, side=\"right\")\n    k = inner.size + 1\n    p = np.bincount(ref_idx, minlength=k) / ref.size\n    q = np.bincount(cur_idx, minlength=k) / cur.size\n    p = np.maximum(p, eps)\n    q = np.maximum(q, eps)\n    return float(np.sum((q - p) * np.log(q / p)))",
+   "test": "rng = np.random.default_rng(0)\nref_big = rng.normal(0, 1, 20000)\nsame = rng.normal(0, 1, 20000)\nassert psi(ref_big, same) < 0.01\nassert psi(ref_big, ref_big) == 0.0\nshifted = rng.normal(0.5, 1, 20000)\nassert 0.15 < psi(ref_big, shifted) < 0.35\n# empty bin: all current values above the reference's 90th percentile region\ncur = np.full(1000, 5.0)\nv_small = psi(ref_big, cur, eps=1e-6)\nv_big = psi(ref_big, cur, eps=1e-2)\nassert v_small > v_big > 0\n# small-sample instability: same distribution, 200 vs 200\ndef null_stats(bins, n=200, reps=300):\n    r = np.random.default_rng(1)\n    vals = [psi(r.normal(size=n), r.normal(size=n), n_bins=bins) for _ in range(reps)]\n    return float(np.mean(vals)), float(np.std(vals))\nm10, s10 = null_stats(10)\nm40, s40 = null_stats(40)\nassert m40 > 3 * m10\nassert 0.05 < m10 < 0.15 and m40 > 0.25\nprint(round(psi(ref_big, shifted),3), v_small, v_big, m10, s10, m40, s40, 9*0.01, 39*0.01)",
+   "expected": null
+  },
+  "sources": [],
+  "related_domains": [],
+  "time_sensitive": false,
+  "configs": [],
+  "plan_id": "B4-MLO-08-1",
+  "cell_id": "MLO-08",
+  "topic": "Production monitoring and drift operations (input/prediction drift, PSI/KS, delayed labels, alert design)",
+  "question_type": "coding",
+  "difficulty": "Medium",
+  "question": "Implement psi(reference, current, n_bins=10, eps=1e-4) with numpy only. Bin edges must come from quantiles of the reference sample, current values outside the reference range must still be counted, and empty bins must not produce log(0) or a division by zero. Then explain why a PSI computed from 200 reference rows, 200 current rows and 40 bins is a poor drift signal even when nothing has changed.",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "PSI",
+   "quantile bins",
+   "reference sample",
+   "empty-bin floor (eps)",
+   "out-of-range values",
+   "sampling noise floor",
+   "number of bins"
+  ],
+  "common_mistakes": [
+   "Recomputing bin edges from the current window, which makes every window look similar to itself",
+   "Using log(q/p) with zero proportions or dropping empty bins silently",
+   "Treating the 0.1/0.25 rule of thumb as a universal threshold regardless of sample size and bin count"
+  ],
+  "interview_style_note": "Implements it cleanly, handles ties and out-of-range values, and recognises that PSI has a non-zero noise floor that grows with bin count and shrinks with sample size.",
+  "tags": [
+   "psi",
+   "drift",
+   "numpy",
+   "binning"
+  ],
+  "change_notes": "Tested-example slot of the cell. Nearest existing is smi-i0005 (defines drift types) and smi-l0045 (categorical skew code); this one is numeric PSI binning, empty bins and the small-sample noise floor.",
+  "confidence": "high"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": "Do not retrain yet; treat both as data-quality incidents until proven otherwise.\n\ntxn_amount: a PSI of 8.3 means essentially all current values fall in bins that held little reference mass. A pure unit change does exactly that. In a simulation (50,000 lognormal amounts each side), multiplying every value by 100, as dollars-to-cents would, gave PSI about 8.3 while two plain samples gave about 0.0003. Real behavioural drift rarely multiplies every quantile by the same constant. Check: compare quantiles (p10, p50, p99) of current vs reference; a near-constant ratio such as 100 points to a unit or schema change. Then confirm in raw logs, the upstream release notes and the data contract, and look for a step at a deploy timestamp across all slices. The collapsed scores are a consequence: the model is being fed out-of-support inputs. Fix at the source (or add an explicit conversion in the feature pipeline), backfill or mark the affected window, and exclude it from training data. Retraining on a mix of units would bake the bug into the model.\n\ndiscount_pct: a null-to-zero spike moves 9% of the mass into the one bin that already contained the reference zeros. In a similar simulation PSI was only about 0.055 with 10 bins (about 0.09 with 20), under the threshold, although the feature is broken. Binned distribution distances are weak at detecting a modest mass moving inside a single bin. Add explicit data-quality monitors measured before imputation: null rate, zero rate, min/max and unit-sanity bounds, schema and type checks, each with absolute bands from history. The ML Test Score paper lists matching data against a schema and alerting when it diverges as a monitoring test.\n\nRouting: data-quality alerts go to the data owner and block automated retraining; distribution drift goes to the model owner.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "code": null,
+  "sources": [
+   {
+    "title": "The ML Test Score: A Rubric for ML Production Readiness and Technical Debt Reduction",
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/46555.pdf",
+    "supports": "Monitoring tests: measure whether data matches the schema and alert when it diverges significantly; alert thresholds need careful tuning to balance false positives and false negatives; models should have zero bias in aggregate and on slices."
+   }
+  ],
+  "related_domains": [],
+  "time_sensitive": false,
+  "configs": [],
+  "plan_id": "B4-MLO-08-2",
+  "cell_id": "MLO-08",
+  "topic": "Production monitoring and drift operations (input/prediction drift, PSI/KS, delayed labels, alert design)",
+  "question_type": "debugging",
+  "difficulty": "Medium",
+  "question": "On Monday 06:10 the drift job pages you: txn_amount has PSI 8.3 against the training reference, and the model's score distribution has collapsed to near-constant high scores. The same report shows discount_pct at PSI 0.05, below the team's 0.1 'investigate' line, yet a colleague points out its null rate went from 0.2% to 9% on Friday after an upstream ETL release; downstream code imputes nulls with 0. Product's first instinct is to retrain. How do you triage, what do the two numbers tell you, and what changes in monitoring?",
+  "answer_set": "single",
+  "key_concepts": [
+   "unit change",
+   "null-rate monitoring",
+   "PSI insensitivity",
+   "quantile ratio check",
+   "data-quality incident",
+   "schema/data contract",
+   "imputation before monitoring"
+  ],
+  "common_mistakes": [
+   "Retraining on the corrupted window, which teaches the model the bug",
+   "Trusting PSI alone and missing a null-rate jump hidden by imputation",
+   "Concluding the world changed without checking whether the shift is a constant factor across quantiles"
+  ],
+  "interview_style_note": "Separates a data-quality incident from real drift using concrete checks, and notices that one number was loud for the right reason while the other was silent for the wrong reason.",
+  "tags": [
+   "data-quality",
+   "psi",
+   "null-rate",
+   "debugging",
+   "schema"
+  ],
+  "change_notes": "Debugging angle of false drift alarms. Nearest: smi-i0005 (definitions) and smi-l0040 (training-serving skew); this one is a concrete upstream unit/null incident and the PSI blind spot.",
+  "confidence": "high"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Start from why it is noisy. With 120 features tested at p < 0.01, even if nothing changes you expect 120 x 0.01 = 1.2 false hits per day, and if the tests were independent the chance of at least one hit is 1 - 0.99^120, about 70%. Correlated features change that arithmetic but not the conclusion. In addition, with large daily volumes a p-value flags differences far too small to matter, so alerts are dominated by statistical significance rather than importance.\n\nPrinciples for the redesign:\n1. Alert on symptoms first. The model's output distribution (score histogram, positive rate), data-quality invariants (schema, null rate, range) and, when available, quality proxies are what someone should be paged for. Per-feature distribution changes are diagnostic detail.\n2. Use an effect size, not a p-value, and set thresholds from the metric's own history (for example a high percentile of the last 60-90 daily values, compared on the same weekday where there is weekly seasonality). The ML Test Score paper notes that alert thresholds need careful tuning to balance false positives against false negatives.\n3. Require persistence: fire only if the condition holds for k of the last n windows, except for hard failures such as schema violations.\n4. Tier the severity by feature importance and failure type, and route each tier to an owner.\n5. Review the alerts: track which were actionable and retire or retune rules that never lead to action. Sculley et al. suggest limits broad enough not to trigger spuriously.\n\nThis design also fixes the missed incident: a null-rate regression becomes a data-quality rule with its own absolute band instead of one of 120 anonymous drift hits.",
+  "practical_answer": "Worked tier table for this model (illustrative values, tune on your history):\n- Page (owner on call): schema or type violation; null rate of any of the top 10 features above its 90-day maximum by more than a set margin for 2 consecutive windows; score-distribution PSI above its own 99th-percentile historical value for 2 consecutive windows.\n- Ticket (next business day): any single feature's drift metric above its own 99th-percentile history on 3 of the last 5 days; or the number of drifted features above its usual band.\n- Dashboard only: everything else, with no notification.\n\nExpected result with these rules: a quiet channel on normal days, one page for the null-rate class of incident, and a weekly review of ticket outcomes. Each alert carries the metric value, its historical band, a link to the slice breakdown and the runbook step, so the receiver can decide quickly.",
+  "code": null,
+  "sources": [
+   {
+    "title": "The ML Test Score: A Rubric for ML Production Readiness and Technical Debt Reduction",
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/46555.pdf",
+    "supports": "Monitoring tests: measure whether data matches the schema and alert when it diverges significantly; alert thresholds need careful tuning to balance false positives and false negatives; models should have zero bias in aggregate and on slices."
+   },
+   {
+    "title": "Hidden Technical Debt in Machine Learning Systems",
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "supports": "A model may directly influence the selection of its own future training data (direct feedback loops); action limits should be set as a sanity check and be broad enough not to trigger spuriously."
+   }
+  ],
+  "related_domains": [],
+  "time_sensitive": false,
+  "configs": [],
+  "plan_id": "B4-MLO-08-3",
+  "cell_id": "MLO-08",
+  "topic": "Production monitoring and drift operations (input/prediction drift, PSI/KS, delayed labels, alert design)",
+  "question_type": "design",
+  "difficulty": "Medium",
+  "question": "A churn model has 120 input features. A daily job runs a two-sample test per feature at p < 0.01 and posts every hit to a Slack channel. Typically one to three features alert each day, nobody reads the channel any more, and last month a real null-rate regression went unnoticed. Redesign the alerting so that someone acts on what fires.",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "alert fatigue",
+   "multiple testing",
+   "effect size vs p-value",
+   "historical thresholds",
+   "persistence window",
+   "severity tiers",
+   "symptom-based alerting"
+  ],
+  "common_mistakes": [
+   "Tightening the p-value only, which keeps the significance-versus-importance problem",
+   "Paging on every feature instead of on model outputs and data-quality invariants",
+   "Using one fixed threshold for all features regardless of their normal variability"
+  ],
+  "interview_style_note": "Quantifies the false-alarm rate, proposes thresholds derived from history, and separates paging, ticketing and dashboard-only signals.",
+  "tags": [
+   "alerting",
+   "alert-fatigue",
+   "thresholds",
+   "monitoring"
+  ],
+  "change_notes": "Alert-design angle. Distinct from smi-l0026/l0027 (serving SLI and SLO burn-rate alerts): this is about drift/data-quality alert noise and multiplicity.",
+  "confidence": "high"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": "The storm is a sample-size effect, not a bug. A KS p-value answers 'is there any difference between the two distributions?', and with a million rows per side almost any real difference, however small, is significant. In a simulation with two N(0,1) samples of 1,000,000 rows where one was shifted by 0.01 standard deviations, the KS statistic was about 0.005 and the p-value about 1e-11, while PSI with 10 bins was about 0.0001. At the other extreme, 1,000 rows per side with a 0.3 sd shift gave KS statistic 0.14 (p about 8e-9) and PSI about 0.10. So p-values track evidence, not size.\n\nWhat each measures. SciPy documents the KS statistic as the maximum absolute difference between the two empirical CDFs, with a null hypothesis of identical distributions, and assumes continuous inputs. The statistic itself is a bounded effect size and is the thing to threshold (ideally against its historical variation). PSI is not a test: it bins the data, and sums (q - p) * log(q / p) over bins, so it depends on the bin count and any empty-bin floor, is sensitive to where mass moves between bins, and has a noise floor of roughly (B - 1) * (1/n + 1/m).\n\nCaveats. KS on features with many ties (spikes at 0, integer counts, sentinel values) violates the continuity assumption, so use PSI or a chi-square-type comparison on bins or categories instead. KS is often more sensitive to changes in the bulk of the distribution than to far tails, so pair it with min/max or tail-quantile checks when tails matter.\n\nNeither tells you whether the model cares: that needs feature importance, prediction drift, and eventually labels. Neither sees changes in joint structure (correlations) when marginals stay the same, and neither reports why the shift happened, such as a data-quality bug.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "code": null,
+  "sources": [
+   {
+    "title": "scipy.stats.ks_2samp",
+    "url": "https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.ks_2samp.html",
+    "supports": "The statistic is the maximum absolute difference between the empirical distribution functions of the two samples; the null hypothesis is that the distributions are identical; inputs are assumed to be drawn from a continuous distribution."
+   }
+  ],
+  "related_domains": [],
+  "time_sensitive": false,
+  "configs": [],
+  "plan_id": "B4-MLO-08-4",
+  "cell_id": "MLO-08",
+  "topic": "Production monitoring and drift operations (input/prediction drift, PSI/KS, delayed labels, alert design)",
+  "question_type": "evaluation",
+  "difficulty": "Medium",
+  "question": "A daily job runs a two-sample Kolmogorov-Smirnov test on each numeric feature, yesterday's 1,000,000 logged rows against a 1,000,000-row reference, and alerts at p < 0.05. It alerts on almost every feature every day. Another team uses PSI with 10 quantile bins and alerts above 0.1. Compare what the two signals measure, explain the alert storm, and say what neither tells you.",
+  "answer_set": "single",
+  "key_concepts": [
+   "KS statistic",
+   "p-value vs effect size",
+   "sample size sensitivity",
+   "PSI binning",
+   "ties and discrete features",
+   "noise floor",
+   "prediction impact"
+  ],
+  "common_mistakes": [
+   "Alerting on the p-value of a test with millions of rows",
+   "Applying KS directly to discrete or heavily tied features and trusting the p-value",
+   "Assuming a drift metric measures impact on model performance"
+  ],
+  "interview_style_note": "Explains the alert storm from sample size, moves the threshold to an effect size, and states the limits of both metrics.",
+  "tags": [
+   "ks-test",
+   "psi",
+   "effect-size",
+   "sample-size"
+  ],
+  "change_notes": "Metric-choice angle. smi-i0005 only defines drift types; smi-l0045 is categorical skew code. This compares KS vs PSI semantics and the large-n alert storm.",
+  "confidence": "high"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": "Treat the dashboard as a lead, not a verdict. Feature drift is harmless when the model's behaviour on the new inputs is still what it learned; it is harmful when the inputs leave the region where the model is reliable or when the input-to-label relationship has changed. Without labels you can test the first part cheaply.\n\nTriage steps:\n1. Weight by importance. Rank the 14 drifted features by the model's importance (permutation or attribution mass on a recent sample). Drift in low-importance or redundant features matters little.\n2. Counterfactual replacement. Re-score a recent sample after replacing each drifted feature (or the group) with values resampled from the reference. If the scores barely move, the drift is not driving predictions; if they move a lot, find out in which direction.\n3. Support check. What fraction of current rows lie outside the training range or in sparsely populated regions? Inputs inside the training support are interpolation; far outside they are extrapolation, where tree models flatten and neural nets can behave unpredictably.\n4. Slice the output. Check score distributions and queue rates for campaign-acquired cohorts vs the rest, since an unchanged aggregate can hide a changed slice.\n5. Get cheap labels. Have analysts review a small random sample of campaign traffic, or use early proxies such as confirmed customer disputes.\n\nWhat changes the answer: scores shifting, rows outside support, or analyst labels disagreeing with the model indicate real harm. Unchanged scores do not rule out concept drift, because the model can still output the same scores for inputs whose fraud rate changed; only labels settle that.\n\nRetraining tonight on a few days of campaign-skewed data risks fitting a transient and removes your ability to attribute any change. Prefer monitoring, targeted checks and a scheduled retrain once labels mature.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "code": null,
+  "sources": [],
+  "related_domains": [],
+  "time_sensitive": false,
+  "configs": [],
+  "plan_id": "B4-MLO-08-5",
+  "cell_id": "MLO-08",
+  "topic": "Production monitoring and drift operations (input/prediction drift, PSI/KS, delayed labels, alert design)",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "After a marketing campaign, the drift dashboard shows PSI above 0.25 on 14 of a fraud model's 120 features, while the score distribution and the review-queue rate look unchanged. Product wants to retrain tonight. With labels arriving weeks later, how do you decide whether this drift is harmful, and what would change your answer?",
+  "answer_set": "single",
+  "key_concepts": [
+   "harmless vs harmful drift",
+   "feature importance weighting",
+   "counterfactual feature replacement",
+   "training support",
+   "slice analysis",
+   "concept drift without labels",
+   "proxy labels"
+  ],
+  "common_mistakes": [
+   "Retraining immediately because PSI exceeded a threshold",
+   "Assuming stable score distribution proves the relationship to labels is stable",
+   "Looking only at aggregates and ignoring the campaign cohort"
+  ],
+  "interview_style_note": "Gives a label-free triage procedure with specific checks, and states clearly what only labels can reveal.",
+  "tags": [
+   "drift-triage",
+   "feature-importance",
+   "support",
+   "unlabelled"
+  ],
+  "change_notes": "Harmless-vs-harmful triage. Nearest smi-i0005 (which drift types are detectable without labels) and smi-i0006 (fraud monitoring with delayed labels, centred on proxy design); this one is deciding whether a specific multi-feature drift needs action.",
+  "confidence": "medium"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": "Dilution. In a simulation of 100,000 rows with 10% from the new market, basket_value shifted from N(50, 10) to N(80, 10) in that market only. The overall mean moved just from about 50 to 53, and aggregate PSI (10 quantile bins) was about 0.06, below a typical 0.1 line, while PSI on the new-market slice alone was above 5 (the exact figure depends on the empty-bin floor) and about 0.0001 on the rest. A shift that is huge for 10% of users is small in the pooled distribution, and PSI grows with both the size of the shift and the share of traffic affected.\n\nFix: compute the drift and quality metrics per slice as well as overall. Choose slices by what the business and risk owners care about: market/country, new vs returning users, acquisition channel, device, and any segment with a distinct policy. The ML Test Score paper makes the parallel point for prediction quality: models should have zero bias in aggregate and on slices.\n\nCosts and limits:\n- Multiplicity: F features x S slices x metrics multiplies the false-alarm opportunities, so use effect-size thresholds, persistence and a ranking by slice size times severity rather than paging on each pair.\n- Sample size: a small slice has a high noise floor of roughly (B - 1) * (1/n + 1/m) for PSI, so enforce a minimum row count and use longer windows for small slices, or sample them at a higher rate.\n- Interpretation: when the aggregate drifts but each slice is stable, the cause is a mix shift (traffic composition changed). That can be harmless if the model performs well in each slice; compare aggregate and per-slice results to tell the two cases apart.\n- New slices that did not exist at training time cannot appear in a reference, so also alert on previously unseen category values and sharp changes in slice share.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "code": null,
+  "sources": [
+   {
+    "title": "The ML Test Score: A Rubric for ML Production Readiness and Technical Debt Reduction",
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/46555.pdf",
+    "supports": "Monitoring tests: measure whether data matches the schema and alert when it diverges significantly; alert thresholds need careful tuning to balance false positives and false negatives; models should have zero bias in aggregate and on slices."
+   }
+  ],
+  "related_domains": [],
+  "time_sensitive": false,
+  "configs": [],
+  "plan_id": "B4-MLO-08-6",
+  "cell_id": "MLO-08",
+  "topic": "Production monitoring and drift operations (input/prediction drift, PSI/KS, delayed labels, alert design)",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "Your monitor computes one PSI per feature over all traffic and has stayed green for weeks. Customer support then reports that a newly launched market, about 10% of traffic, gets poor recommendations. The offending feature, basket_value, was roughly N(50, 10) in training for everyone and is now about N(80, 10) in that market only. Why did the aggregate monitor stay quiet, how would you change the monitoring, and what does it cost?",
+  "answer_set": "single",
+  "key_concepts": [
+   "metric dilution",
+   "slice-level monitoring",
+   "mix shift",
+   "PSI noise floor",
+   "minimum slice size",
+   "multiplicity",
+   "unseen category share"
+  ],
+  "common_mistakes": [
+   "Relying on global averages that hide a minority segment's shift",
+   "Creating hundreds of slice alerts without minimum sizes or ranking",
+   "Treating every aggregate drift as a model problem when it is only a traffic-mix change"
+  ],
+  "interview_style_note": "Shows with arithmetic why the aggregate stays green and balances slice coverage against noise and alert volume.",
+  "tags": [
+   "slices",
+   "aggregate-vs-slice",
+   "mix-shift",
+   "psi"
+  ],
+  "change_notes": "Slice-vs-aggregate monitoring with computed numbers. Distinct from smi-l0013 (post-promotion business metric guardrail) and smi-i0005.",
+  "confidence": "high"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Separate three needs, because they have different cost profiles.\n\n1. Always-on aggregates, computed in the stream with no raw rows retained: request counts, null and zero rates, min/max, quantile sketches or histograms on the frozen reference bin edges, score histograms, category counts, per slice and per model version. These are exact over all traffic and tiny, and they serve the data-quality and drift dashboards.\n\n2. A sampled set of raw feature rows for investigation, drift tests that need raw values, and the label join. Sample deterministically from a hash of the request ID, for example keep the row if hash(id) mod 10,000 is below 100 for a 1% rate. The decision is reproducible, uncorrelated with feature values and needs no coordination, and the same ID can later be joined to labels. Always store the sampling rate or weight on each row so estimates can be re-weighted.\n\n3. Higher or full capture where rarity matters: errors, low-confidence scores and small but important slices.\n\nSizing. At 1%, 2,000,000 x 0.01 = 20,000 rows a day, about 80 MB at 4 KB instead of 8 GB. The PSI noise floor is roughly (B - 1) * (1/n + 1/m); with B=10, a 100,000-row reference and 20,000 daily rows, that is 9 x (0.00001 + 0.00005), about 0.0005, negligible. But the 0.5% slice gets only 2,000,000 x 0.005 x 0.01 = 100 rows a day, about 4 per hour, which is useless; even 50 rows gives 9 x (0.00001 + 0.02), about 0.18, above a typical 0.1 line with no drift at all. So the slice should be captured at 100%, which is 10,000 rows a day, about 417 an hour, and the hourly floor becomes about 9 x (0.00001 + 1/417), about 0.02.\n\nPrivacy: log the model's input features rather than raw free text or identifiers where possible, pseudonymise IDs, and set retention limits; what is permitted depends on jurisdiction and legal advice.",
+  "practical_answer": "Concrete policy for this service (illustrative):\n- Stream job: per-hour counters and histograms for all 2M requests/day, retained for the long term.\n- Raw sample: 1% by request-ID hash, retained for a limited period, with the sampling rate stored per row.\n- Slice rule: 100% of the 0.5% slice, plus 100% of errors and of scores in the top uncertain band; each row tagged with its sampling weight (1 for 100%, 100 for the 1% sample).\n- Label join: key on request ID; labels arriving weeks later attach to whichever rows were kept, so performance estimates for the general population use the weighted 1% sample.\n\nValidation before trusting it: for two or three days, log everything once (under a short retention), then compare the sampled histograms and null rates with the full ones. For each feature, PSI between the 1% sample and the full data should sit near the noise floor computed above (a few 0.0001s); if a feature stands out, the sampling key is correlated with something. Repeat the check after any change to the ID format.",
+  "code": null,
+  "sources": [],
+  "related_domains": [],
+  "time_sensitive": false,
+  "configs": [],
+  "plan_id": "B4-MLO-08-7",
+  "cell_id": "MLO-08",
+  "topic": "Production monitoring and drift operations (input/prediction drift, PSI/KS, delayed labels, alert design)",
+  "question_type": "design",
+  "difficulty": "Hard",
+  "question": "A scoring service handles 2 million predictions a day. A full feature payload is about 4 KB, so logging everything is 8 GB a day, and the security team also wants less raw data retained. You must support daily PSI checks per feature, hourly checks for a slice that is 0.5% of traffic, and a join with labels arriving weeks later. Design what you log and how you sample, and show that the sample is big enough.",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "deterministic hash sampling",
+   "streaming aggregates",
+   "sampling weights",
+   "PSI noise floor",
+   "oversampling small slices",
+   "label join key",
+   "privacy minimisation"
+  ],
+  "common_mistakes": [
+   "Sampling uniformly and ending up with a handful of rows for the slice that matters",
+   "Sampling with non-reproducible randomness so labels cannot be joined later",
+   "Computing everything from the sample when exact counters could be streamed over all traffic"
+  ],
+  "interview_style_note": "Splits cheap exact aggregates from sampled raw rows, sizes the sample with the noise-floor arithmetic, and oversamples where rarity demands it.",
+  "tags": [
+   "logging",
+   "sampling",
+   "cost",
+   "slices",
+   "privacy"
+  ],
+  "change_notes": "Cost/sampling angle for logged payloads. smi-l0026 lists what to log for an endpoint; this focuses on sampling design and statistical sufficiency for drift and slice checks.",
+  "confidence": "high"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": "Each reference answers a different question, so use two.\n\n(A) Training set: answers 'how far is today from what the model learned?', which is the question that matters for model validity. Weekly seasonality causes recurring weekend alarms unless the training window covered full cycles and you compare like with like, but it does catch the creep: after 60 days the mean has moved 60 x 0.05 = 3 sd. Downsides: once the shift is real it stays red permanently and says nothing about when it started.\n\n(B) Yesterday: compares Monday to Sunday, so the weekly cycle produces false alarms every week. It is also nearly blind to the creep: a day-over-day change of 0.05 sd is far below the noise of most daily samples.\n\n(C) Pooled previous 7 days: averages out the weekly cycle, so false alarms from seasonality are mostly gone. But its lag is large: the average age of the pooled days is (1 + ... + 7) / 7 = 4 days, so under steady creep today sits about 4 x 0.05 = 0.2 sd above the reference. That is a constant small offset, easy to miss, and it does not accumulate.\n\n(D) Same weekday, previous 4 weeks: removes seasonality exactly; the average age is (7 + 14 + 21 + 28) / 4 = 17.5 days, so the creep offset is about 17.5 x 0.05 = 0.875 sd, much more visible, though each weekday sample is only 4 pooled days, so its noise floor is higher and holidays contaminate it.\n\nRecommendation: keep a seasonal-aware rolling reference (D, or C with weekday adjustment) to catch recent changes with few false alarms, plus a fixed training reference tracked as a slowly moving 'distance from training' trend with a staleness limit that triggers a retrain review. Reset the fixed reference only when you retrain. Compare both against historical variability, not a constant threshold.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "code": null,
+  "sources": [],
+  "related_domains": [],
+  "time_sensitive": false,
+  "configs": [],
+  "plan_id": "B4-MLO-08-8",
+  "cell_id": "MLO-08",
+  "topic": "Production monitoring and drift operations (input/prediction drift, PSI/KS, delayed labels, alert design)",
+  "question_type": "evaluation",
+  "difficulty": "Medium",
+  "question": "daily_orders_per_user has a strong weekly cycle (weekends about 25% higher). You are choosing the reference for a daily drift check: (A) the training set, (B) yesterday, (C) the pooled previous 7 days, or (D) the same weekday over the previous 4 weeks. Separately, the true feature mean has been creeping up by 0.05 standard deviations per day. Compare the four options on false alarms and on detecting the slow creep, and recommend a setup.",
+  "answer_set": "single",
+  "key_concepts": [
+   "reference window",
+   "weekly seasonality",
+   "slow drift",
+   "lagging baseline",
+   "same-weekday comparison",
+   "training reference",
+   "retrain staleness"
+  ],
+  "common_mistakes": [
+   "Comparing today with yesterday and alarming on the weekly cycle",
+   "Using a rolling baseline alone, which hides slow drift because the baseline moves with the data",
+   "Never resetting the fixed training reference after retraining, or resetting it silently on every run"
+  ],
+  "interview_style_note": "Reasons quantitatively about baseline lag and seasonality and proposes a pair of references with distinct purposes.",
+  "tags": [
+   "reference-window",
+   "seasonality",
+   "slow-drift",
+   "baseline"
+  ],
+  "change_notes": "Reference-window selection and slow drift; no existing question addresses baseline choice (nearest smi-i0005).",
+  "confidence": "high"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": "Continuous training (CT) is the automated retraining, validation and serving of models in response to triggers such as a schedule, new data, performance decay or data-distribution change. CI/CD ships changes to code. CT adds an ML-specific loop where the data, not the code, changes and the model must be rebuilt, which needs data validation before training and model validation before release.",
+  "detailed_answer": "In application software, behaviour changes only when someone changes the code, so CI/CD (build, test, deploy) is enough to keep production current. In an ML system the model is a product of code plus data, so the same code can yield a different, and eventually staler, model as the world and the data change. Continuous training automates that second loop: a pipeline that can be triggered repeatedly, retrains the model, checks it and, if it passes, hands it to deployment. Google's MLOps architecture guidance describes CT as a property unique to ML systems concerned with automatically retraining and serving models, and lists triggers such as a schedule, availability of new training data, performance degradation and significant changes in data distributions.\n\nDifferences from code CI/CD:\n- What is tested: besides code and components, CI/CD for ML also covers data (schema, distribution checks) and models (quality against a baseline).\n- Two extra gates: data validation before training decides whether it is worth, or safe, to retrain; model validation after training decides whether the new model may replace the current one.\n- Artifacts: the pipeline must record the data version, features, parameters and metrics, since the result is not reproducible from code alone.\n- Triggers: not only commits but also time, data arrival and monitoring signals.\n\nCommon pitfalls: 'continuous' does not mean retraining all the time. Retraining has cost and risk, so the trigger policy and the validation gates matter more than the frequency. Automating retraining without data validation and model validation simply automates the production of bad models. CT also does not replace CI/CD: pipeline code still needs ordinary testing and deployment.",
+  "practical_answer": null,
+  "code": null,
+  "sources": [
+   {
+    "title": "MLOps: Continuous delivery and automation pipelines in machine learning (Google Cloud Architecture Center)",
+    "url": "https://docs.cloud.google.com/architecture/mlops-continuous-delivery-and-automation-pipelines-in-machine-learning",
+    "supports": "CT is a property of ML systems concerned with automatically retraining and serving models; pipeline triggers include schedule, new training data, performance degradation and changes in data distributions; data validation is required before training to decide whether to retrain and model validation occurs after training."
+   }
+  ],
+  "related_domains": [],
+  "time_sensitive": false,
+  "configs": [],
+  "plan_id": "B4-MLO-09-1",
+  "cell_id": "MLO-09",
+  "topic": "Retraining and automation (triggers, continuous training, champion/challenger, rollback of a retrain)",
+  "question_type": "concept",
+  "difficulty": "Easy",
+  "question": "What does 'continuous training' mean in an ML system, and how does it differ from CI/CD for ordinary application code?",
+  "answer_set": "concise+detailed",
+  "key_concepts": [
+   "continuous training",
+   "retraining triggers",
+   "data validation",
+   "model validation",
+   "CI/CD for ML",
+   "lineage tracking"
+  ],
+  "common_mistakes": [
+   "Equating CT with retraining on every commit or continuously without triggers",
+   "Saying CT replaces CI/CD",
+   "Omitting data and model validation steps from the automated loop"
+  ],
+  "interview_style_note": "Gives a crisp definition, explains why data makes ML different, and names the validation gates.",
+  "tags": [
+   "continuous-training",
+   "mlops",
+   "ci-cd",
+   "retraining"
+  ],
+  "change_notes": "Introductory Easy definition requested in the cell guidance. smi-l0015 maps events to pipelines for a specific team; this is the plain concept.",
+  "confidence": "high"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "This is a selection-bias feedback loop. Outcomes (repayment or default) are observed only for approved applicants, so the training set is truncated to people the previous model already liked. The model never sees what happens to rejected applicants, cannot learn that some of them would have repaid, and is evaluated on a population it pre-filtered. Each retrain makes the model better at ranking within the approved region and leaves its behaviour outside that region untested. Sculley et al. describe the general case: a model may directly influence the selection of its own future training data.\n\nWhy the offline numbers mislead: they are computed on loans the model chose, where its scores are concentrated and the outcome range is narrow, so improvements say little about the rejected 60%, and the extra confidence never gets challenged.\n\nRedesign:\n- Exploration: approve a small random sample of applicants who would have been rejected, ideally concentrated near the threshold, record the approval probability (propensity) and the outcome. This gives unbiased labels for a part of the rejected region at a known business cost.\n- Weighting: use inverse-propensity weights in training and evaluation so that the explored cases represent the rejected population they were drawn from.\n- Evaluation: judge challengers on the exploration slice and on any data from policy-independent sources, not on the approved set alone.\n- Logging: store the model version, score, threshold and decision with every application so you can tell how the data was selected.\n- Alternatives such as reject inference (imputing outcomes for rejected applicants) rely on modelling assumptions and are best treated as supplementary, not as a replacement for real outcomes.\n\nExploration has a direct cost and may need risk and compliance approval; what is allowed depends on jurisdiction and legal advice.",
+  "practical_answer": "Worked sizing for the exploration slice (illustrative): of 50,000 monthly applications, 60% are rejected, which is 30,000. Randomly approve 2% of the rejected applicants whose score is within a band below the threshold. If the band covers all rejected applicants that is 600 loans a month, each carrying weight 1 / 0.02 = 50 in training and evaluation (it stands for 50 rejected applicants). If 15% of those loans default, that is about 90 observed defaults a month, so the slice supports coarse estimates but not fine-grained slicing; you would accumulate several months or concentrate the band closer to the threshold to get more labels where the decision is closest.\n\nPromotion rule to add to the pipeline: a challenger is promoted only if it is not worse than the champion on the weighted exploration slice (with an interval, not a point estimate) as well as on the approved set. Keep the exploration budget capped, tracked as an explicit cost, and reviewed by risk owners.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Hidden Technical Debt in Machine Learning Systems",
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "supports": "A model may directly influence the selection of its own future training data (direct feedback loops); action limits should be set as a sanity check and be broad enough not to trigger spuriously."
+   }
+  ],
+  "related_domains": [],
+  "time_sensitive": false,
+  "configs": [],
+  "plan_id": "B4-MLO-09-2",
+  "cell_id": "MLO-09",
+  "topic": "Retraining and automation (triggers, continuous training, champion/challenger, rollback of a retrain)",
+  "question_type": "scenario",
+  "difficulty": "Hard",
+  "question": "A lender's credit model approves applicants scoring above a threshold (about 40% of 50,000 monthly applications). Each month the team retrains on repayment outcomes of the approved loans and keeps the score threshold. After six months offline metrics on the newest approved loans look better than ever, yet approval volume is flat, losses are not improving, and risk managers suspect good applicants are being turned away. What is going on, and how would you redesign the retraining data?",
+  "answer_set": "detailed+practical",
+  "key_concepts": [
+   "selection bias",
+   "feedback loop",
+   "exploration",
+   "inverse propensity weighting",
+   "reject inference",
+   "propensity logging",
+   "policy-independent evaluation"
+  ],
+  "common_mistakes": [
+   "Trusting offline metrics computed only on approved loans",
+   "Retraining more often as the fix, which strengthens the loop",
+   "Treating reject inference as equivalent to observed outcomes"
+  ],
+  "interview_style_note": "Identifies the truncated-label feedback loop immediately and proposes exploration with propensity weights, including cost and sample-size awareness.",
+  "tags": [
+   "feedback-loop",
+   "selection-bias",
+   "exploration",
+   "retraining-data"
+  ],
+  "change_notes": "Feedback-loop angle from the cell guidance. smi-i0006 deals with delayed labels for monitoring; smi-l0010 with a promotion check. This one is about what data retraining sees.",
+  "confidence": "medium"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": "The root problem is a pipeline that treats every drift alarm as a reason to learn and uses the same possibly corrupted data to train and to judge. Guardrails, in pipeline order:\n\n1. Trigger: separate data-quality alerts (null/zero rate, range, schema) from distribution drift. A data-quality failure should block automated retraining and go to the data owner, not start it. Add persistence (the condition holds for several windows) and a cooldown or maximum retrains per period, so a flapping alarm cannot cause a chain of retrains.\n\n2. Data validation before training: Google's MLOps guidance states that data validation is required before training to decide whether to retrain. Run it on the whole training window: schema, null and zero rates, ranges, row counts and label rates compared with their usual bands. Quarantine bad partitions (here the six hours) instead of training on them, and fail the run if the failures are too large.\n\n3. Trusted evaluation data: the holdout must pass the same validation and should not be allowed to share the defect that the training data had. Prefer a time-based holdout of validated data, plus a fixed, curated reference set that rarely changes, so a corrupted recent window cannot grade itself.\n\n4. Model validation after training: besides AUC against the champion, compare the new model's predictions against the champion's on the trusted set and on the champion's slices, and bound the change. The Sculley et al. paper suggests action limits as sanity checks that are broad enough not to trigger spuriously; a sudden large shift in score distribution or in the importance of income should stop promotion.\n\n5. Approval and rollout: require human approval when the model affects money or when the behaviour change exceeds a limit, and release through a staged rollout with a rollback path.\n\n6. Record data versions and excluded partitions so the incident can be audited.\n\nA single guardrail is not enough: the failure needed corrupted training data, a corrupted holdout and a missing sanity check to align.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "code": null,
+  "sources": [
+   {
+    "title": "MLOps: Continuous delivery and automation pipelines in machine learning (Google Cloud Architecture Center)",
+    "url": "https://docs.cloud.google.com/architecture/mlops-continuous-delivery-and-automation-pipelines-in-machine-learning",
+    "supports": "CT is a property of ML systems concerned with automatically retraining and serving models; pipeline triggers include schedule, new training data, performance degradation and changes in data distributions; data validation is required before training to decide whether to retrain and model validation occurs after training."
+   },
+   {
+    "title": "Hidden Technical Debt in Machine Learning Systems",
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "supports": "A model may directly influence the selection of its own future training data (direct feedback loops); action limits should be set as a sanity check and be broad enough not to trigger spuriously."
+   }
+  ],
+  "related_domains": [],
+  "time_sensitive": false,
+  "configs": [],
+  "plan_id": "B4-MLO-09-3",
+  "cell_id": "MLO-09",
+  "topic": "Retraining and automation (triggers, continuous training, champion/challenger, rollback of a retrain)",
+  "question_type": "design",
+  "difficulty": "Hard",
+  "question": "Your pipeline retrains automatically whenever PSI on any of five key features exceeds 0.25, evaluates on the latest 7 days and promotes the result if AUC beats the champion. Last week an upstream bug wrote income = 0 for six hours. The monitor fired, the pipeline retrained on a window that included those rows, and the new model passed the gate because the 7-day holdout contained the same corrupted rows. Which guardrails would have stopped this, and where in the pipeline does each sit?",
+  "answer_set": "single",
+  "key_concepts": [
+   "data validation before training",
+   "quarantine bad partitions",
+   "trusted holdout",
+   "action limits",
+   "cooldown",
+   "human approval",
+   "data-quality vs drift trigger"
+  ],
+  "common_mistakes": [
+   "Adding only a minimum-improvement margin, which a corrupted holdout still passes",
+   "Allowing a data-quality alert to trigger retraining",
+   "Evaluating on a recent window that was produced by the same faulty pipeline"
+  ],
+  "interview_style_note": "Places each guardrail at a pipeline stage, and explains why evaluation data needs independent validation.",
+  "tags": [
+   "guardrails",
+   "retraining",
+   "data-validation",
+   "cooldown",
+   "automation"
+  ],
+  "change_notes": "Trigger and pre-training guardrails with a failure story. smi-l0010/l0011 cover promotion margins and slice gates; smi-l0014 covers idempotent retries; smi-l0008 places validation generally. This focuses on drift-triggered auto-retrain on corrupted data.",
+  "confidence": "high"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": "Warm start trades compute for risks that accumulate silently.\n\nBenefits: 40 minutes vs 14 hours a day, quicker adaptation to recent changes, and little idle freshness lag. Rules of Machine Learning (Rule 8) advises measuring how much performance degrades as a model ages, which tells you how much freshness is worth.\n\nRisks:\n- Recency bias and forgetting: training only on the last day can overwrite patterns that a 180-day window contains, such as weekly cycles, rare seasonal behaviour or small segments absent yesterday. A single day also over-represents one weekday.\n- Error persistence: a bad day (bug, outage, bot traffic) leaves a trace in the weights that later updates only gradually dilute, whereas in a sliding-window retrain the bad day leaves the window after 180 days, or can be dropped at once from the data.\n- Reproducibility and lineage: the model is a function of the whole chain of updates, so 'this code plus this data version' no longer recreates it, and a defective link cannot be undone without going back to an earlier checkpoint.\n- Optimiser and schedule effects: learning rate schedules and optimiser state must be handled deliberately, and some model families do not support clean continuation (for example, refitting trees is not the same as adding trees; the behaviour is implementation-specific).\n\nA common compromise: warm-start daily from the last full-retrain checkpoint, possibly mixing in a replay sample of older data, and do a full retrain weekly, which bounds drift between the two and resets accumulated error.\n\nDecide empirically with a rolling-origin backtest over the last 60 days: for each day, produce both variants using only data available then, score both on the same following window, and compare overall and by slice, along with day-to-day stability and the cost. Include a day with a deliberately injected bad batch to see how long each variant needs to recover. If warm-start is within noise of the full retrain on every slice and recovers, its cost advantage justifies it.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "code": null,
+  "sources": [
+   {
+    "title": "Rules of Machine Learning (Google)",
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "supports": "Rule 8: know the freshness requirements of your system, i.e. how much performance degrades if the model is a day, a week or a quarter old."
+   }
+  ],
+  "related_domains": [],
+  "time_sensitive": false,
+  "configs": [],
+  "plan_id": "B4-MLO-09-4",
+  "cell_id": "MLO-09",
+  "topic": "Retraining and automation (triggers, continuous training, champion/challenger, rollback of a retrain)",
+  "question_type": "evaluation",
+  "difficulty": "Medium",
+  "question": "A full retrain of your ranking model on the last 180 days takes about 14 hours on a shared cluster, and the business wants daily updates. A teammate proposes warm-starting from yesterday's model and training only on the last day's data, which takes about 40 minutes. Compare this with a full retrain on a sliding window, say what can go wrong with the warm start, and how you would decide with data.",
+  "answer_set": "single",
+  "key_concepts": [
+   "warm start",
+   "sliding-window retrain",
+   "catastrophic forgetting",
+   "error persistence",
+   "lineage",
+   "hybrid schedule",
+   "rolling-origin backtest"
+  ],
+  "common_mistakes": [
+   "Assuming warm start and full retrain give equivalent models if the loss looks similar",
+   "Ignoring that one day of data over-represents one weekday",
+   "Comparing the variants on different evaluation windows"
+  ],
+  "interview_style_note": "Frames it as a cost versus risk trade-off, names the concrete failure modes and proposes a backtest that can settle the question.",
+  "tags": [
+   "warm-start",
+   "full-retrain",
+   "freshness",
+   "backtest"
+  ],
+  "change_notes": "Warm-start vs full retrain from the cell guidance; no existing question compares retraining strategies (nearest smi-l0015, smi-l0014).",
+  "confidence": "medium"
+ },
+ {
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "answer": "Redeploying v11 restores one artifact, not the system. Check these:\n\n1. Everything that was released with v12. Decision thresholds, calibration layers, feature definitions, post-processing rules and config changed with v12 must go back too, or v11 runs with v12's cut-offs. Confirm that v11 still loads, that the features it expects are still produced in the online path, and that its dependencies remain deployed.\n2. The data produced in Tuesday to Thursday. For those two days the system's decisions came from v12, so any outcomes (clicks, purchases, labels) were shaped by it. If v12 behaved badly, logs from that period may be biased or may carry unusual behaviour. Tag all logs with model version, and exclude or down-weight the v12 window when building the next training set, particularly for feedback-loop-prone systems. Keep the logs, since they are the evidence for the post-mortem.\n3. The retrain trigger. Whatever fired the pipeline that produced v12 will probably fire again. Pause automatic promotion (or the trigger) until you know why v12 was worse; otherwise the pipeline will re-ship a similar model on its next run.\n4. Staleness. v11 is older than v12. Record it in the registry as the current production model, check its freshness against what the business accepts, and plan the next candidate rather than letting v11 age silently.\n5. The gate that failed. Determine why offline evaluation approved a model that hurt online conversion (a metric not aligned with conversions, a slice not evaluated, a holdout not representative, or a feature unavailable or different online) and add a check that would have caught it. Add the online guardrail metric that detected it to the automated rollback policy.\n6. Evidence trail. The registry should show v12's status, the rollback reason, who approved it and the metrics before and after, so the decision is auditable.\n\nTime to detection matters: partial exposure, like a canary, would have limited the damage to a small share of traffic.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "code": null,
+  "sources": [],
+  "related_domains": [],
+  "time_sensitive": false,
+  "configs": [],
+  "plan_id": "B4-MLO-09-5",
+  "cell_id": "MLO-09",
+  "topic": "Retraining and automation (triggers, continuous training, champion/challenger, rollback of a retrain)",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "A retrained model v12 was promoted on Tuesday and rolled back to v11 on Thursday after conversions fell. The team plans to 'just redeploy v11 and carry on'. What else has to be checked or changed so the rollback really restores the previous state, and so the same thing does not happen again on the next automated retrain?",
+  "answer_set": "single",
+  "key_concepts": [
+   "rollback scope",
+   "decision thresholds and calibration",
+   "log tagging by model version",
+   "excluding contaminated window",
+   "retrain trigger pause",
+   "registry status",
+   "offline-online gate gap"
+  ],
+  "common_mistakes": [
+   "Only redeploying the old artifact and leaving v12-era thresholds or configs in place",
+   "Feeding the v12-era outcomes straight into the next retrain",
+   "Leaving the automatic trigger running so the same failure repeats"
+  ],
+  "interview_style_note": "Treats rollback as restoring system state and closing the process gap, not just swapping a file.",
+  "tags": [
+   "rollback",
+   "retraining",
+   "post-mortem",
+   "model-registry"
+  ],
+  "change_notes": "Rollback-of-a-retrain angle. smi-l0032 covers rollback when a feature pipeline also changed; smi-l0013 covers detecting a bad promotion. This one covers the aftermath: contaminated data, trigger pause, gate fix.",
+  "confidence": "high"
+ }
+]

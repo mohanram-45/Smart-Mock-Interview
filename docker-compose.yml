@@ -1,0 +1,73 @@
+# SMART Mock Interview - local Docker Compose.
+#   docker compose up --build            # app only  ->  http://127.0.0.1:5000/demo/
+#   docker compose --profile ollama up   # app + optional local Ollama service (for the opt-in live Qwen evaluation)
+# Defaults are conservative: bound to 127.0.0.1 only (NOT reachable from your network), experimental features off, no candidate-code execution
+# (the container has no Docker client or socket and SMART_CODEEVAL_EXEC is deliberately not passed through), no model training, no credentials.
+# Copy .env.example to .env to change anything. Not a production deployment: see docs/MLOPS.md "Production and security limitations".
+
+name: smart-mock-interview
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        PYTHON_IMAGE: ${SMART_PYTHON_IMAGE:-python:3.13-slim-bookworm}   # pin by digest for fully reproducible builds: python:3.13-slim-bookworm@sha256:<digest>
+        INSTALL_ML: ${SMART_INSTALL_ML:-0}          # 1 = also install torch/sentence-transformers/faiss (large; legacy BERT/Bi-LSTM scorers, /api/retrieval)
+        SMART_GIT_COMMIT: ${SMART_GIT_COMMIT:-unknown}
+    image: smart-mock-interview:local
+    ports:
+      - "127.0.0.1:${SMART_PUBLISH_PORT:-5000}:5000"   # loopback only. Do not change to 0.0.0.0 without adding authentication and TLS first
+    environment:
+      SMART_TRUST_DOCKER_GATEWAY: "1"                  # trust ONLY the container default gateway (the host path of the published port); see src/security/local_guard.py
+      SMART_HOST: "0.0.0.0"                            # inside the container only; exposure is controlled by the port mapping above
+      SMART_FORBID_MODEL_TRAINING: "1"                 # a request can never start a training run
+      SMART_DEMO_DATA_DIR: /app/results/demo_sessions
+      SMART_DEMO_RETENTION_DAYS: ${SMART_DEMO_RETENTION_DAYS:-14}
+      SMART_DEMO_LEGACY_MODEL: ${SMART_DEMO_LEGACY_MODEL:-bilstm}
+      SMART_DEMO_ALLOW_SCORER_SETUP: "0"
+      # experimental features: all OFF unless you opt in in .env
+      SMART_DEMO_LIVE_MODULAR: ${SMART_DEMO_LIVE_MODULAR:-0}
+      SMART_DEMO_OLLAMA_HOST: ${SMART_DEMO_OLLAMA_HOST:-http://ollama:11434}
+      SMART_DEMO_QWEN_MODEL: ${SMART_DEMO_QWEN_MODEL:-qwen2.5:7b}
+      SMART_DEMO_CODE_EVAL: ${SMART_DEMO_CODE_EVAL:-0}  # static (read-only) code check only; it never executes code
+      SMART_QUESTION_SOURCE: ${SMART_QUESTION_SOURCE:-legacy}
+      SMART_RETRIEVAL_ENABLED: ${SMART_RETRIEVAL_ENABLED:-0}
+      SMART_LLM_ALLOW_PAID: "0"
+      HF_HUB_OFFLINE: ${SMART_HF_OFFLINE:-1}            # 1 = never download a model (default). See .env.example to populate the cache once, with your approval
+      TRANSFORMERS_OFFLINE: ${SMART_HF_OFFLINE:-1}
+      # observability (no answers, ids or bodies are ever logged)
+      SMART_JSON_LOGS: ${SMART_JSON_LOGS:-1}
+      SMART_METRICS_ENABLED: ${SMART_METRICS_ENABLED:-1}
+      SMART_OBS_PROBE_OLLAMA: ${SMART_OBS_PROBE_OLLAMA:-0}
+    volumes:
+      - smart-results:/app/results                    # session files, generated reports (named volume; `docker compose down -v` deletes it)
+      - smart-hf-cache:/hf-cache                      # embedding-model cache for INSTALL_ML=1 builds (empty and unused in the default image)
+    healthcheck:
+      test: ["CMD", "python", "scripts/healthcheck.py"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    restart: unless-stopped
+    read_only: true                                   # root filesystem is read-only; only /app/results and /tmp are writable
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: ${SMART_APP_MEM_LIMIT:-1g}
+
+  ollama:                                             # OPTIONAL. Only started with:  docker compose --profile ollama up
+    profiles: ["ollama"]
+    image: ${OLLAMA_IMAGE:-ollama/ollama:latest}      # set OLLAMA_IMAGE to a specific tag to pin it (the app was only evaluated with Ollama 0.32.13 on the host)
+    volumes:
+      - ollama-models:/root/.ollama                   # model weights live here, never in an image. Pull manually: docker compose exec ollama ollama pull qwen2.5:7b
+    # No `ports:` on purpose: only the app container reaches it, over the compose network. No GPU is reserved by default (see docs/MLOPS.md for NVIDIA).
+    restart: unless-stopped
+
+volumes:
+  smart-results:
+  smart-hf-cache:
+  ollama-models:

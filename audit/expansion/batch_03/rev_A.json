@@ -1,0 +1,1272 @@
+[
+ {
+  "plan_id": "B3-MLO-01-1",
+  "verdict": "pass",
+  "reasons": [
+   "Complete, accurate checklist of reproducibility inputs; forgotten items identified; MLflow sentence verified; no number claims."
+  ],
+  "parts_answered": {
+   "which info must be recorded": true,
+   "which are most often forgotten": true
+  },
+  "evidence": [
+   {
+    "claim": "MLflow Tracking is an API and UI for logging parameters, code versions, metrics and output files",
+    "method": "doc",
+    "evidence": "Opened https://mlflow.org/docs/latest/ml/tracking/, sentence quoted verbatim."
+   },
+   {
+    "claim": "A run records metadata plus artifacts such as model weights",
+    "method": "doc",
+    "evidence": "Same page, quoted."
+   },
+   {
+    "claim": "Bit-exact reruns can differ because of hardware nondeterminism",
+    "method": "doc",
+    "evidence": "PyTorch randomness notes (opened): results may not be reproducible across platforms/CPU vs GPU even with identical seeds."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Easy",
+  "difficulty_rationale": "Single-concept recall of what to log; no computation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single-answer record; 234 words, structured list plus forgotten-items paragraph. Fine for a concept question."
+   }
+  ],
+  "suggested_answer_set": "single (as is)",
+  "key_concepts_findings": "All 7 are specific and discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none (no MLOps/versioning item exists)",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/ml/tracking/",
+    "status": "supported",
+    "evidence": "Opened. Page: \"The MLflow Tracking is an API and UI for logging parameters, code versions, metrics, and output files\"; \"Each run records metadata (various information about your run such as metrics, parameters, start and end times)\" and artifacts \"(output files from the run such as model weights, images, etc)\". Note the page does not mention git commits, which the answers do not attribute to it."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'Uncommitted changes / saved diff' and 'content hash of dataset' are standard practice (background_only)."
+  ],
+  "code_patch": null,
+  "interview_note_findings": "Genuine: names input classes and the commonly forgotten ones. common_mistakes useful."
+ },
+ {
+  "plan_id": "B3-MLO-01-2",
+  "verdict": "correct",
+  "reasons": [
+   "Good conceptual answer; one overstated universal ('most ... fail silently') to hedge. No sources; all claims background_only but uncontroversial."
+  ],
+  "parts_answered": {
+   "why ML is worse than ordinary code": true
+  },
+  "evidence": [
+   {
+    "claim": "Unpinned dependency can change defaults/kernels/RNG behaviour",
+    "method": "background_only",
+    "evidence": "General engineering knowledge; PyTorch notes (opened) confirm results differ across releases/platforms."
+   },
+   {
+    "claim": "Remedies: lockfile, image digest, data identity, seeds, noise level",
+    "method": "background_only",
+    "evidence": "Standard practice."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "and most of the extra dependencies fail silently",
+    "problem": "Universal wording; plenty of ML dependencies fail loudly (shape errors, import errors). It is the numeric/data-dependent ones that fail silently.",
+    "replacement": "and many of the extra dependencies fail silently"
+   }
+  ],
+  "difficulty_blind": "Easy",
+  "difficulty_rationale": "Explain silent failure modes; no computation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer; distinct from 01-1 (why vs what-to-record) although content overlaps (data, versions, seeds)."
+   }
+  ],
+  "suggested_answer_set": "single (as is)",
+  "key_concepts_findings": "Good (6). 'container image' is thin in the body but mentioned in remedies.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none; internal overlap with B3-MLO-01-1 and 01-3 (different intent)",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'Pin by digest rather than moving tag' (background_only)",
+   "Hardware/driver can change floating-point results (supported by PyTorch notes opened for 01-4)."
+  ],
+  "code_patch": null,
+  "interview_note_findings": "Fine; clean failure-mode framing."
+ },
+ {
+  "plan_id": "B3-MLO-01-3",
+  "verdict": "correct",
+  "reasons": [
+   "Checklist and decision rule are sound; the noise arithmetic compares a gap to a single-run SD, which understates the noise of a difference of two runs. Fixable with exact replacements."
+  ],
+  "parts_answered": {
+   "ordered checklist": true,
+   "how to decide if real regression": true
+  },
+  "evidence": [
+   {
+    "claim": "0.013/0.005 = 2.6",
+    "method": "executed",
+    "evidence": "python: 2.6; but SD of difference of two single runs = 0.005*sqrt(2)=0.0071 -> 0.013/0.0071 = 1.84"
+   },
+   {
+    "claim": "Table: 0.841 -> 0.830 = -0.011; 0.842 -> 0.829 = -0.013",
+    "method": "executed",
+    "evidence": "python checked; rows consistent (A reproduces original within 0.001, B moves 0.001, C -0.010/-0.011, D -0.001)"
+   },
+   {
+    "claim": "0.011 vs 5-seed means: SE of diff = 0.005*sqrt(2/5)=0.0032 -> 3.5 SE",
+    "method": "derivation",
+    "evidence": "0.011/0.00316=3.48"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "a 0.013 gap is roughly 2.6 standard deviations for a single comparison, which is suggestive but not conclusive",
+    "problem": "If the 0.842 and the new 0.829 are each single runs, their difference has SD about 0.005*sqrt(2)=0.007, so the gap is ~1.8 SD, not 2.6. 2.6 holds only if the old number is treated as exact.",
+    "replacement": "a 0.013 gap is about 2.6 seed SDs if the old number is treated as exact, but only about 1.8 SDs (0.013 / (0.005 x 1.41)) when both numbers are single runs: suggestive but not conclusive"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "which is more than two standard deviations of the seed noise",
+    "problem": "Comparing a difference of two 5-seed means to the single-run SD is loose; the proper yardstick is the SE of the difference of means.",
+    "replacement": "which is about 3.5 standard errors of the difference between two 5-seed means (0.005 x sqrt(2/5) = 0.0032)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Multi-step but standard debugging order; arithmetic is simple.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Ordered checklist plus decision rule."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked bisection table with numbers; distinct. Numbers are consistent with the detailed answer (0.842/0.829/0.013 and SD 0.005)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "Good (7).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0002 (churn leakage; different intent)",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Bisection method / manifest advice (background_only)."
+  ],
+  "code_patch": null,
+  "interview_note_findings": "Genuine; the grader can check noise-floor-first logic."
+ },
+ {
+  "plan_id": "B3-MLO-01-4",
+  "verdict": "correct",
+  "reasons": [
+   "Code runs identically on all interpreters; PyTorch and NumPy statements verified against docs; one minor technical slip (dict order is not hash-randomised)."
+  ],
+  "parts_answered": {
+   "why seed necessary not sufficient": true,
+   "what to control": true,
+   "what to accept": true
+  },
+  "evidence": [
+   {
+    "claim": "float32: (1e8+1)-1e8 = 0.0 but (1e8-1e8)+1 = 1.0",
+    "method": "executed",
+    "evidence": "ran on 3.10, 3.11, 3.13 and sandbox python: (0.0, 1.0)"
+   },
+   {
+    "claim": "SeedSequence.spawn children are prefix-stable (workers 2 = first 2 of 4)",
+    "method": "executed",
+    "evidence": "assert in test passes on all interpreters"
+   },
+   {
+    "claim": "PyTorch: not guaranteed across releases/commits/platforms; CPU vs GPU may differ with identical seeds; cudnn benchmark may select different algorithms even on same machine; worker_init_fn+generator",
+    "method": "doc",
+    "evidence": "Opened https://docs.pytorch.org/docs/2.14/notes/randomness.html (redirect target of /stable/). Quotes: 'Completely reproducible results are not guaranteed across PyTorch releases, individual commits, or different platforms.'; 'results may not be reproducible between CPU and GPU executions, even when using identical seeds.'; 'the benchmark may select different algorithms on subsequent runs, even on the same machine.'; 'Use worker_init_fn() and generator to preserve reproducibility'"
+   },
+   {
+    "claim": "NumPy warns against worker_seed = root_seed + worker_id",
+    "method": "doc",
+    "evidence": "Opened numpy parallel page: 'UNSAFE! Do not do this!' ... 'it is quite likely that multiple invocations ... with different seeds will get overlapping sets of worker seeds ... causing a bias in the overall ensemble of results.'"
+   },
+   {
+    "claim": "Dict iteration order is insertion-ordered in Python 3.7+; only str-keyed sets are affected by PYTHONHASHSEED",
+    "method": "derivation",
+    "evidence": "language spec"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "hash-randomised set or dict iteration order",
+    "problem": "dict iteration order is deterministic (insertion order) in Python 3.7+; only set/frozenset of str/bytes (hash randomisation) varies between processes.",
+    "replacement": "hash-randomised iteration order of sets of strings (PYTHONHASHSEED)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism (FP non-associativity, algorithm selection, RNG streams) with short code.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "59 words, interview-ready, consistent."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Rigorous, sourced."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Runnable demos; fenced code identical to code.solution (verified). Stated outputs (0.0,1.0) correct."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical (as is)",
+  "key_concepts_findings": "Good (7).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0013 (LDA seed variation; different)",
+   "same_intent": false
+  },
+  "code_findings": "Ran solution+test from scratch on /home/claude/work/dep/v (3.13), v310, v311 and system python3: all pass, printed [[497, 916, 581], [74, 467, 182], [703, 71, 771], [899, 763, 921]]. Fenced block equals code.solution. Stdlib+numpy only; no 3.11+ features. Extra edge cases run: not separately needed beyond the test's own four properties (reproducible, distinct, new root seed differs, prefix stability); additionally worker_draws(42,1) == d1[:1] holds by the same spawn property. np.float32 scalar arithmetic order_demo is stable across numpy 2.2.6 and the sandbox numpy.",
+  "sources_findings": [
+   {
+    "url": "https://docs.pytorch.org/docs/stable/notes/randomness.html",
+    "status": "supported",
+    "evidence": "Opened (redirects to /docs/2.14/); all five listed behaviours quoted above. PyTorch's own seed_worker example uses numpy.random.seed(worker_seed), not SeedSequence - the answer's SeedSequence advice comes from the NumPy page, not PyTorch."
+   },
+   {
+    "url": "https://numpy.org/doc/stable/reference/random/parallel.html",
+    "status": "supported",
+    "evidence": "Opened. spawn() gives 'new (with very high probability) independent' generators; root_seed+worker_id is marked UNSAFE for the reason the answer states. Page also recommends [worker_id, root_seed] list seeding as an alternative."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'Accumulation order depends on scheduling in some GPU kernels' (background_only; standard CUDA atomics behaviour)."
+  ],
+  "code_patch": null,
+  "interview_note_findings": "Useful: separates PRNG state from numerical nondeterminism."
+ },
+ {
+  "plan_id": "B3-MLO-01-5",
+  "verdict": "correct",
+  "reasons": [
+   "Sound design answer with a clear lineage chain; two wording overstatements (bucket 'none of this'; immutability presented as inherent). Registry claims had no source; MLflow Model Registry page found and opened."
+  ],
+  "parts_answered": {
+   "what belongs in tracker": true,
+   "what belongs in registry": true,
+   "why one is not enough": true,
+   "how to answer which code/data/run serves traffic": true
+  },
+  "evidence": [
+   {
+    "claim": "Tracker logs params, code versions, metrics, output files",
+    "method": "doc",
+    "evidence": "Opened MLflow tracking page."
+   },
+   {
+    "claim": "Registry: versions, mutable aliases, lineage to experiment/run",
+    "method": "doc",
+    "evidence": "Opened https://mlflow.org/docs/latest/ml/model-registry/ : aliases are 'a mutable, named reference to a particular version of a registered model'; registry provides lineage ('which MLflow experiment and run produced the model'). Page does NOT claim versions are immutable and recommends aliases; stage transitions appear only in an OSS section."
+   },
+   {
+    "claim": "Concise answer length",
+    "method": "executed",
+    "evidence": "78 words (<=80)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "A plain file bucket has none of this: no immutability guarantee, no pointer semantics, no approval trail, no link to evidence.",
+    "problem": "Object stores commonly offer versioning/object-lock; 'none of this' is too absolute, and registry immutability is a design requirement you impose, not something MLflow's docs state.",
+    "replacement": "A plain file bucket typically has none of this by default: no enforced immutability (unless object lock or versioning is configured and used consistently), no pointer semantics, no approval trail, no link to evidence."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Comparison of two tools plus end-to-end lineage reasoning.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Tracker = high-volume exploratory log (all runs, params, metrics, artifacts, input identities)",
+    "tradeoff": "Cheap and complete, but unreviewed and mutable; not a release record."
+   },
+   {
+    "decision": "Registry = few governed, immutable versions with alias/stage pointer, signature, approval and link to run",
+    "tradeoff": "Adds process overhead but gives audit, rollback and a deployment-relevant event."
+   },
+   {
+    "decision": "Carry run id/commit/data hash into registry entry, and model version + artifact checksum into serving logs",
+    "tradeoff": "Small logging cost; without it lineage breaks at the first manual copy."
+   },
+   {
+    "decision": "Register the full deployable bundle (model plus fitted preprocessors, signature, env)",
+    "tradeoff": "Larger artifacts, but avoids un-servable or non-reproducible versions."
+   },
+   {
+    "decision": "Promote by moving a pointer, never by overwriting bytes at a fixed path",
+    "tradeoff": "Needs a registry/convention, but version number keeps identifying bytes and rollback is a pointer move."
+   },
+   {
+    "decision": "Retention/garbage-collection tied to registered versions",
+    "tradeoff": "Storage cost versus ability to reproduce or roll back."
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "78 words, standalone."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Adds contents of each, the 3-link chain and pitfalls."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed (as is)",
+  "key_concepts_findings": "Good (7).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0009 (training-serving skew; different)",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/ml/tracking/",
+    "status": "supported",
+    "evidence": "Opened. Page: \"The MLflow Tracking is an API and UI for logging parameters, code versions, metrics, and output files\"; \"Each run records metadata (various information about your run such as metrics, parameters, start and end times)\" and artifacts \"(output files from the run such as model weights, images, etc)\". Note the page does not mention git commits, which the answers do not attribute to it."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "MLflow Model Registry",
+    "url": "https://mlflow.org/docs/latest/ml/model-registry/",
+    "supports": "Registry holds versions of registered models, mutable aliases pointing to versions, and lineage to the experiment/run that produced the model.",
+    "quote": "a mutable, named reference to a particular version of a registered model (alias); lineage: which MLflow experiment and run produced the model",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Registry 'immutable versions' and 'approval trail' are generic design requirements (not in MLflow docs)."
+  ],
+  "code_patch": null,
+  "interview_note_findings": "Good; the serving-lineage chain is what a grader wants."
+ },
+ {
+  "plan_id": "B3-MLO-01-6",
+  "verdict": "correct",
+  "reasons": [
+   "Sound design and verified arithmetic; DVC claims verified except the directory-hash sentence (page does not state how the directory hash is computed); counting wording unclear."
+  ],
+  "parts_answered": {
+   "compare full copies vs content-hash": true,
+   "what each run records": true,
+   "what can go wrong": true
+  },
+  "evidence": [
+   {
+    "claim": "52 x 400 GB = 20.8 TB; 400+52x8 = 816 GB; ratio",
+    "method": "executed",
+    "evidence": "python: 20800 GB, 816 GB, ratio 25.5x (26.0x if the initial copy is also counted: 21.2 TB)"
+   },
+   {
+    "claim": "DVC .dvc file is small metadata in Git recording an md5 and acting as a placeholder; checkout of a commit then dvc checkout restores data",
+    "method": "doc",
+    "evidence": "Opened https://doc.dvc.org/start/data-management/data-versioning : 'a special .dvc file ... a placeholder for the original data'; md5: 22a1a29...; 'git checkout HEAD~1 data/data.xml.dvc' then 'dvc checkout'."
+   },
+   {
+    "claim": "Directory hash = hash of listing",
+    "method": "doc",
+    "evidence": "Opened https://doc.dvc.org/user-guide/project-structure/internal-files : directory gets a '.dir' entry containing 'the mapping of files inside (as a JSON array), identified by their hash values'; page does not state how the directory's own hash is computed."
+   },
+   {
+    "claim": "GC can delete objects old commits reference",
+    "method": "doc",
+    "evidence": "Opened https://doc.dvc.org/command-reference/gc : 'Remove unused files and directories from cache'; keeps only data referenced within the chosen scope (--all-commits etc.)."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "- Directory hashes: the hash of a directory is a hash of its listing, so adding one file changes the directory hash but leaves the other files' objects shared.",
+    "problem": "The cited DVC docs show a .dir entry that lists files and their hashes, but do not state the directory hash is 'a hash of its listing'; hedge to what is documented.",
+    "replacement": "- Directory entries: a directory is represented by a manifest (in DVC a .dir entry) that lists its files and their hashes, so adding one file changes the directory entry but leaves the other files' objects shared."
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "- Weekly full copies for a year: 52 x 400 GB = 20.8 TB, on top of the original 400 GB if the first copy is counted separately.",
+    "problem": "Unclear counting: 52 weekly copies = 20.8 TB; with the starting copy it is 53 copies = 21.2 TB.",
+    "replacement": "- Weekly full copies for a year: 52 x 400 GB = 20.8 TB (21.2 TB if the initial copy is counted as well)."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Trade-off comparison with simple arithmetic.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Content-addressed objects + small manifest/pointer file in Git",
+    "tradeoff": "~25x less storage and cheap diffs, vs tooling and remote-storage complexity."
+   },
+   {
+    "decision": "Immutable versions; never edit in place",
+    "tradeoff": "Needs discipline/enforcement, but makes silent drift detectable by hash."
+   },
+   {
+    "decision": "Run records manifest hash + split rule (+ commit)",
+    "tradeoff": "Tiny record gives exact reproducibility; labels must be inside the versioned set."
+   },
+   {
+    "decision": "Retention/GC rules tied to registered models",
+    "tradeoff": "Storage savings vs losing objects an old model needs."
+   },
+   {
+    "decision": "Hash bytes on ingestion, verify manifest/sizes at training time",
+    "tradeoff": "Speed vs full integrity check."
+   },
+   {
+    "decision": "Handle many small files via packing/manifest formats; plan for deletion requests",
+    "tradeoff": "Extra engineering vs slow hashing/checkout and compliance risk."
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanism, properties, failure modes."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Storage arithmetic (verified) and pointer-file sketch; the 'verify only sizes at training time' tip is extra."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "Good (7).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://doc.dvc.org/start/data-management/data-versioning",
+    "status": "supported",
+    "evidence": "Opened; .dvc placeholder, md5, Git versioning, cache, dvc checkout quoted above. Note: the page says DVC 'is technically not a version control system by itself' and relies on Git."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "DVC command reference: gc",
+    "url": "https://doc.dvc.org/command-reference/gc",
+    "supports": "Garbage collection removes cache objects not referenced within the chosen scope, so retention scope decides whether old datasets survive.",
+    "quote": "Remove unused files and directories from cache",
+    "type": "official_doc"
+   },
+   {
+    "title": "DVC internal files (cache structure)",
+    "url": "https://doc.dvc.org/user-guide/project-structure/internal-files",
+    "supports": "A directory is stored as a .dir entry mapping its files to their hashes.",
+    "quote": "It contains the mapping of files inside (as a JSON array), identified by their hash values.",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Hashing cost/small-files slowness and legal deletion handling (background_only)."
+  ],
+  "code_patch": null,
+  "interview_note_findings": "Good."
+ },
+ {
+  "plan_id": "B3-MLO-01-7",
+  "verdict": "correct",
+  "reasons": [
+   "All numbers recompute (means, SDs, SE, 10 SE, sign test p=0.0625). One overstated phrase ('well above') and no t-based interval."
+  ],
+  "parts_answered": {
+   "how to compare fairly": true,
+   "how strong is the evidence": true
+  },
+  "evidence": [
+   {
+    "claim": "A mean 0.9118 sd 0.00507; B mean 0.9156 sd 0.00518",
+    "method": "executed",
+    "evidence": "python"
+   },
+   {
+    "claim": "Independent SE of diff = 0.00324; z = 1.17 (reported ~1.2)",
+    "method": "executed",
+    "evidence": "python"
+   },
+   {
+    "claim": "Paired diffs 0.005,0.003,0.003,0.004,0.004: mean 0.0038, sd 0.00084, se 0.00037, t = 10.16 (df 4)",
+    "method": "executed",
+    "evidence": "python"
+   },
+   {
+    "claim": "Sign test 5/5 two-sided p = 2*(1/2)^5 = 0.0625",
+    "method": "executed",
+    "evidence": "python"
+   },
+   {
+    "claim": "Paired 95% t-interval lower end = 0.0038 - 2.776*0.000374 = 0.0028; Welch-style interval lower = -0.0037",
+    "method": "executed",
+    "evidence": "python; t crit values 2.776 (df4) and 2.306 (df8, approx for unpaired)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "here the paired lower end is well above it, but the independent analysis would not be.",
+    "problem": "'Well above' overstates: the paired 95% t-interval lower end is about 0.0028 versus the 0.002 bar (clears it, not by far).",
+    "replacement": "here the paired 95% t-interval lower end (about 0.0028) clears it, but the independent analysis (lower end about -0.004) would not."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Needs paired vs independent reasoning, small-n caveats, selection bias.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Statistics and caveats."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Reporting procedure and decision rule; numbers match."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "Good (6).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0028",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Statistical methods (paired SE, sign test) are derived/executed, no external source needed."
+  ],
+  "code_patch": null,
+  "interview_note_findings": "Genuine; tension between sign-test floor and paired t is instructive."
+ },
+ {
+  "plan_id": "B3-MLO-02-1",
+  "verdict": "pass",
+  "reasons": [
+   "Covers placement, block vs warn, training vs serving separately; ML Test Score and Rules of ML attributions verified."
+  ],
+  "parts_answered": {
+   "where to place validation": true,
+   "block vs warn": true,
+   "training vs serving separately": true
+  },
+  "evidence": [
+   {
+    "claim": "Rules of ML recommends saving serving-time features to a log",
+    "method": "doc",
+    "evidence": "Rule 29 quote: 'save the set of features used at serving time, and then pipe those features to a log to use them at training time'."
+   },
+   {
+    "claim": "ML Test Score lists schema expectations and data invariants for training and serving inputs",
+    "method": "paper",
+    "evidence": "Opened PDF: 'Feature expectations are captured in a schema' (Data 1); 'Data invariants hold for inputs' (Monitor 2, section heading 'in training and serving inputs')."
+   },
+   {
+    "claim": "Concise answer length",
+    "method": "executed",
+    "evidence": "71 words"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Placement/policy reasoning, no computation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "71 words."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Per-stage detail."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed (as is)",
+  "key_concepts_findings": "Good (7).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Opened via WebFetch. Table I: 'Feature expectations are captured in a schema'; Table II: 'Offline and online metrics correlate', 'The impact of model staleness is known', 'A simpler model is not better', 'Model quality is sufficient on important data slices'; Table III: 'Training is reproducible', 'The ML pipeline is integration tested', 'Model quality is validated before serving', 'Models are canaried before serving', 'Serving models can be rolled back'; Table IV: 'Data invariants hold for inputs' (section heading: 'in training and serving inputs'), 'Training and serving are not skewed'. Every name in the listed 'supports' sentence is present. (The curl route was blocked by the proxy; WebFetch worked.)"
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Opened. Rule 5 'Test the infrastructure independently from the machine learning': 'Check that feature columns that should be populated are populated' and 'Make sure that the model in your training environment gives the same score as the model in your serving environment'. Rule 8 'Know the freshness requirements of your system' ('How much does performance degrade if you have a model that is a day old?'). Rule 9 'Detect problems before exporting models': 'Do sanity checks right before you export the model.' Rule 29: 'save the set of features used at serving time, and then pipe those features to a log'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Threshold/fail-vs-warn policy is judgement (background_only)."
+  ],
+  "code_patch": null,
+  "interview_note_findings": "Good."
+ },
+ {
+  "plan_id": "B3-MLO-02-2",
+  "verdict": "correct",
+  "reasons": [
+   "Code meets the spec and passes on all interpreters, but has a real boundary bug: null rate computed as 1 - k/n makes a rate exactly at the limit fail (3 nulls in 10 with max_null_rate 0.3 reports '0.300 > 0.300'). Minor robustness: np.float32 NaN not treated as null."
+  ],
+  "parts_answered": {
+   "empty batch": true,
+   "column absent from every row": true,
+   "null rate": true,
+   "wrong type, bool not int, int ok as float": true,
+   "range": true,
+   "allowed": true,
+   "structured output, deterministic order": true,
+   "has_errors": true,
+   "pipeline wiring": true
+  },
+  "evidence": [
+   {
+    "claim": "Original test passes",
+    "method": "executed",
+    "evidence": "3.10, 3.11, 3.13 and system python: ok"
+   },
+   {
+    "claim": "Boundary bug",
+    "method": "executed",
+    "evidence": "validate_batch([{'x':None}]*3+[{'x':1.0}]*7, {'x':{'max_null_rate':0.3}}) returns a null_rate violation 'null rate 0.300 > 0.300' (1 - 7/10 = 0.30000000000000004)"
+   },
+   {
+    "claim": "Other edge cases",
+    "method": "executed",
+    "evidence": "all-null column -> null_rate only; NaN in int column -> null (not type); inf with no min/max passes (as documented); unknown type 'integer' raises ValueError; unhashable value with allowed raises TypeError; np.float32('nan') -> type error instead of null; severity 'warn' does not downgrade type errors (as documented)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "practical_answer",
+    "claim": "import math\n\n\ndef _is_null(v):\n    return v is None or (isinstance(v, float) and math.isnan(v))\n\n\ndef _type_ok(v, t):\n    if t == \"int\":\n        return isinstance(v, int) and not isinstance(v, bool)\n    if t == \"float\":\n        return isinstance(v, (int, float)) and not isinstance(v, bool)\n    if t == \"str\":\n        return isinstance(v, str)\n    raise ValueError(\"unknown type: \" + str(t))\n\n\ndef validate_batch(rows, schema):\n    \"\"\"Return a list of violation dicts; an empty list means the batch is clean.\n\n    schema maps column -> dict with optional keys: type ('int'|'float'|'str'),\n    min, max, allowed (collection), max_null_rate (default 0.0),\n    severity ('error' or 'warn', default 'error').\n    A missing key or None/NaN counts as null.\n    \"\"\"\n    if not rows:\n        return [{\"column\": None, \"check\": \"empty_batch\", \"severity\": \"error\",\n                 \"detail\": \"no rows\"}]\n    out = []\n    n = len(rows)\n    for col in sorted(schema):\n        spec = schema[col]\n        sev = spec.get(\"severity\", \"error\")\n        if not any(col in r for r in rows):\n            out.append({\"column\": col, \"check\": \"missing_column\",\n                        \"severity\": \"error\", \"detail\": \"absent from every row\"})\n            continue\n        values = [r.get(col) for r in rows]\n        non_null = [v for v in values if not _is_null(v)]\n        null_rate = 1 - len(non_null) / n\n        if null_rate > spec.get(\"max_null_rate\", 0.0):\n            out.append({\"column\": col, \"check\": \"null_rate\", \"severity\": sev,\n                        \"detail\": \"null rate %.3f > %.3f\"\n                        % (null_rate, spec.get(\"max_null_rate\", 0.0))})\n        if \"type\" in spec:\n            bad = [v for v in non_null if not _type_ok(v, spec[\"type\"])]\n            if bad:\n                out.append({\"column\": col, \"check\": \"type\", \"severity\": \"error\",\n                            \"detail\": \"%d value(s) not %s\" % (len(bad), spec[\"type\"])})\n                continue\n        if \"min\" in spec or \"max\" in spec:\n            lo = spec.get(\"min\", -math.inf)\n            hi = spec.get(\"max\", math.inf)\n            bad = [v for v in non_null\n                   if not (isinstance(v, (int, float)) and not isinstance(v, bool)\n                           and lo <= v <= hi)]\n            if bad:\n                out.append({\"column\": col, \"check\": \"range\", \"severity\": sev,\n                            \"detail\": \"%d value(s) outside [%s, %s]\" % (len(bad), lo, hi)})\n        if \"allowed\" in spec:\n            allowed = set(spec[\"allowed\"])\n            bad = [v for v in non_null if v not in allowed]\n            if bad:\n                out.append({\"column\": col, \"check\": \"allowed\", \"severity\": sev,\n                            \"detail\": \"unseen values: %s\" % sorted(set(map(str, bad)))})\n    return out\n\n\ndef has_errors(violations):\n    return any(v[\"severity\"] == \"error\" for v in violations)",
+    "problem": "Rate-at-limit bug: null_rate = 1 - len(non_null)/n suffers float error so a rate exactly equal to max_null_rate is reported as a violation; also NaN detection only recognises Python float.",
+    "replacement": "import math\n\n\ndef _is_null(v):\n    return v is None or v != v\n\n\ndef _type_ok(v, t):\n    if t == \"int\":\n        return isinstance(v, int) and not isinstance(v, bool)\n    if t == \"float\":\n        return isinstance(v, (int, float)) and not isinstance(v, bool)\n    if t == \"str\":\n        return isinstance(v, str)\n    raise ValueError(\"unknown type: \" + str(t))\n\n\ndef validate_batch(rows, schema):\n    \"\"\"Return a list of violation dicts; an empty list means the batch is clean.\n\n    schema maps column -> dict with optional keys: type ('int'|'float'|'str'),\n    min, max, allowed (collection), max_null_rate (default 0.0),\n    severity ('error' or 'warn', default 'error').\n    A missing key or None/NaN counts as null.\n    \"\"\"\n    if not rows:\n        return [{\"column\": None, \"check\": \"empty_batch\", \"severity\": \"error\",\n                 \"detail\": \"no rows\"}]\n    out = []\n    n = len(rows)\n    for col in sorted(schema):\n        spec = schema[col]\n        sev = spec.get(\"severity\", \"error\")\n        if not any(col in r for r in rows):\n            out.append({\"column\": col, \"check\": \"missing_column\",\n                        \"severity\": \"error\", \"detail\": \"absent from every row\"})\n            continue\n        values = [r.get(col) for r in rows]\n        non_null = [v for v in values if not _is_null(v)]\n        null_rate = (n - len(non_null)) / n\n        if null_rate > spec.get(\"max_null_rate\", 0.0):\n            out.append({\"column\": col, \"check\": \"null_rate\", \"severity\": sev,\n                        \"detail\": \"null rate %.3f > %.3f\"\n                        % (null_rate, spec.get(\"max_null_rate\", 0.0))})\n        if \"type\" in spec:\n            bad = [v for v in non_null if not _type_ok(v, spec[\"type\"])]\n            if bad:\n                out.append({\"column\": col, \"check\": \"type\", \"severity\": \"error\",\n                            \"detail\": \"%d value(s) not %s\" % (len(bad), spec[\"type\"])})\n                continue\n        if \"min\" in spec or \"max\" in spec:\n            lo = spec.get(\"min\", -math.inf)\n            hi = spec.get(\"max\", math.inf)\n            bad = [v for v in non_null\n                   if not (isinstance(v, (int, float)) and not isinstance(v, bool)\n                           and lo <= v <= hi)]\n            if bad:\n                out.append({\"column\": col, \"check\": \"range\", \"severity\": sev,\n                            \"detail\": \"%d value(s) outside [%s, %s]\" % (len(bad), lo, hi)})\n        if \"allowed\" in spec:\n            allowed = set(spec[\"allowed\"])\n            bad = [v for v in non_null if v not in allowed]\n            if bad:\n                out.append({\"column\": col, \"check\": \"allowed\", \"severity\": sev,\n                            \"detail\": \"unseen values: %s\" % sorted(set(map(str, bad)))})\n    return out\n\n\ndef has_errors(violations):\n    return any(v[\"severity\"] == \"error\" for v in violations)"
+   },
+   {
+    "severity": "major",
+    "field": "code.solution",
+    "claim": "import math\n\n\ndef _is_null(v):\n    return v is None or (isinstance(v, float) and math.isnan(v))\n\n\ndef _type_ok(v, t):\n    if t == \"int\":\n        return isinstance(v, int) and not isinstance(v, bool)\n    if t == \"float\":\n        return isinstance(v, (int, float)) and not isinstance(v, bool)\n    if t == \"str\":\n        return isinstance(v, str)\n    raise ValueError(\"unknown type: \" + str(t))\n\n\ndef validate_batch(rows, schema):\n    \"\"\"Return a list of violation dicts; an empty list means the batch is clean.\n\n    schema maps column -> dict with optional keys: type ('int'|'float'|'str'),\n    min, max, allowed (collection), max_null_rate (default 0.0),\n    severity ('error' or 'warn', default 'error').\n    A missing key or None/NaN counts as null.\n    \"\"\"\n    if not rows:\n        return [{\"column\": None, \"check\": \"empty_batch\", \"severity\": \"error\",\n                 \"detail\": \"no rows\"}]\n    out = []\n    n = len(rows)\n    for col in sorted(schema):\n        spec = schema[col]\n        sev = spec.get(\"severity\", \"error\")\n        if not any(col in r for r in rows):\n            out.append({\"column\": col, \"check\": \"missing_column\",\n                        \"severity\": \"error\", \"detail\": \"absent from every row\"})\n            continue\n        values = [r.get(col) for r in rows]\n        non_null = [v for v in values if not _is_null(v)]\n        null_rate = 1 - len(non_null) / n\n        if null_rate > spec.get(\"max_null_rate\", 0.0):\n            out.append({\"column\": col, \"check\": \"null_rate\", \"severity\": sev,\n                        \"detail\": \"null rate %.3f > %.3f\"\n                        % (null_rate, spec.get(\"max_null_rate\", 0.0))})\n        if \"type\" in spec:\n            bad = [v for v in non_null if not _type_ok(v, spec[\"type\"])]\n            if bad:\n                out.append({\"column\": col, \"check\": \"type\", \"severity\": \"error\",\n                            \"detail\": \"%d value(s) not %s\" % (len(bad), spec[\"type\"])})\n                continue\n        if \"min\" in spec or \"max\" in spec:\n            lo = spec.get(\"min\", -math.inf)\n            hi = spec.get(\"max\", math.inf)\n            bad = [v for v in non_null\n                   if not (isinstance(v, (int, float)) and not isinstance(v, bool)\n                           and lo <= v <= hi)]\n            if bad:\n                out.append({\"column\": col, \"check\": \"range\", \"severity\": sev,\n                            \"detail\": \"%d value(s) outside [%s, %s]\" % (len(bad), lo, hi)})\n        if \"allowed\" in spec:\n            allowed = set(spec[\"allowed\"])\n            bad = [v for v in non_null if v not in allowed]\n            if bad:\n                out.append({\"column\": col, \"check\": \"allowed\", \"severity\": sev,\n                            \"detail\": \"unseen values: %s\" % sorted(set(map(str, bad)))})\n    return out\n\n\ndef has_errors(violations):\n    return any(v[\"severity\"] == \"error\" for v in violations)",
+    "problem": "Same defect in code.solution (fenced code must stay identical).",
+    "replacement": "import math\n\n\ndef _is_null(v):\n    return v is None or v != v\n\n\ndef _type_ok(v, t):\n    if t == \"int\":\n        return isinstance(v, int) and not isinstance(v, bool)\n    if t == \"float\":\n        return isinstance(v, (int, float)) and not isinstance(v, bool)\n    if t == \"str\":\n        return isinstance(v, str)\n    raise ValueError(\"unknown type: \" + str(t))\n\n\ndef validate_batch(rows, schema):\n    \"\"\"Return a list of violation dicts; an empty list means the batch is clean.\n\n    schema maps column -> dict with optional keys: type ('int'|'float'|'str'),\n    min, max, allowed (collection), max_null_rate (default 0.0),\n    severity ('error' or 'warn', default 'error').\n    A missing key or None/NaN counts as null.\n    \"\"\"\n    if not rows:\n        return [{\"column\": None, \"check\": \"empty_batch\", \"severity\": \"error\",\n                 \"detail\": \"no rows\"}]\n    out = []\n    n = len(rows)\n    for col in sorted(schema):\n        spec = schema[col]\n        sev = spec.get(\"severity\", \"error\")\n        if not any(col in r for r in rows):\n            out.append({\"column\": col, \"check\": \"missing_column\",\n                        \"severity\": \"error\", \"detail\": \"absent from every row\"})\n            continue\n        values = [r.get(col) for r in rows]\n        non_null = [v for v in values if not _is_null(v)]\n        null_rate = (n - len(non_null)) / n\n        if null_rate > spec.get(\"max_null_rate\", 0.0):\n            out.append({\"column\": col, \"check\": \"null_rate\", \"severity\": sev,\n                        \"detail\": \"null rate %.3f > %.3f\"\n                        % (null_rate, spec.get(\"max_null_rate\", 0.0))})\n        if \"type\" in spec:\n            bad = [v for v in non_null if not _type_ok(v, spec[\"type\"])]\n            if bad:\n                out.append({\"column\": col, \"check\": \"type\", \"severity\": \"error\",\n                            \"detail\": \"%d value(s) not %s\" % (len(bad), spec[\"type\"])})\n                continue\n        if \"min\" in spec or \"max\" in spec:\n            lo = spec.get(\"min\", -math.inf)\n            hi = spec.get(\"max\", math.inf)\n            bad = [v for v in non_null\n                   if not (isinstance(v, (int, float)) and not isinstance(v, bool)\n                           and lo <= v <= hi)]\n            if bad:\n                out.append({\"column\": col, \"check\": \"range\", \"severity\": sev,\n                            \"detail\": \"%d value(s) outside [%s, %s]\" % (len(bad), lo, hi)})\n        if \"allowed\" in spec:\n            allowed = set(spec[\"allowed\"])\n            bad = [v for v in non_null if v not in allowed]\n            if bad:\n                out.append({\"column\": col, \"check\": \"allowed\", \"severity\": sev,\n                            \"detail\": \"unseen values: %s\" % sorted(set(map(str, bad)))})\n    return out\n\n\ndef has_errors(violations):\n    return any(v[\"severity\"] == \"error\" for v in violations)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short but edge-case-heavy implementation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Design decisions and limitations, not code."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Code + wiring + example output (example output matches the test)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "Good (7).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none",
+   "same_intent": false
+  },
+  "code_findings": "Original passes on all 4 interpreters. My additional edge cases (see evidence) found the float-boundary bug. Patched solution + extended test (adds exact-limit 3/10 = allowed, 4/10 = violation, NaN in typed column, all-null column, partially present column) pass on dep/v 3.13, v310, v311 and python3. Fenced block replacement given as an issue on practical_answer; stdlib only, no 3.11+ features. Unhashable value with 'allowed' still raises TypeError (minor, documented nowhere; acceptable).",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Opened via WebFetch. Table I: 'Feature expectations are captured in a schema'; Table II: 'Offline and online metrics correlate', 'The impact of model staleness is known', 'A simpler model is not better', 'Model quality is sufficient on important data slices'; Table III: 'Training is reproducible', 'The ML pipeline is integration tested', 'Model quality is validated before serving', 'Models are canaried before serving', 'Serving models can be rolled back'; Table IV: 'Data invariants hold for inputs' (section heading: 'in training and serving inputs'), 'Training and serving are not skewed'. Every name in the listed 'supports' sentence is present. (The curl route was blocked by the proxy; WebFetch worked.)"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Wiring advice is judgement."
+  ],
+  "code_patch": {
+   "solution": "import math\n\n\ndef _is_null(v):\n    return v is None or v != v\n\n\ndef _type_ok(v, t):\n    if t == \"int\":\n        return isinstance(v, int) and not isinstance(v, bool)\n    if t == \"float\":\n        return isinstance(v, (int, float)) and not isinstance(v, bool)\n    if t == \"str\":\n        return isinstance(v, str)\n    raise ValueError(\"unknown type: \" + str(t))\n\n\ndef validate_batch(rows, schema):\n    \"\"\"Return a list of violation dicts; an empty list means the batch is clean.\n\n    schema maps column -> dict with optional keys: type ('int'|'float'|'str'),\n    min, max, allowed (collection), max_null_rate (default 0.0),\n    severity ('error' or 'warn', default 'error').\n    A missing key or None/NaN counts as null.\n    \"\"\"\n    if not rows:\n        return [{\"column\": None, \"check\": \"empty_batch\", \"severity\": \"error\",\n                 \"detail\": \"no rows\"}]\n    out = []\n    n = len(rows)\n    for col in sorted(schema):\n        spec = schema[col]\n        sev = spec.get(\"severity\", \"error\")\n        if not any(col in r for r in rows):\n            out.append({\"column\": col, \"check\": \"missing_column\",\n                        \"severity\": \"error\", \"detail\": \"absent from every row\"})\n            continue\n        values = [r.get(col) for r in rows]\n        non_null = [v for v in values if not _is_null(v)]\n        null_rate = (n - len(non_null)) / n\n        if null_rate > spec.get(\"max_null_rate\", 0.0):\n            out.append({\"column\": col, \"check\": \"null_rate\", \"severity\": sev,\n                        \"detail\": \"null rate %.3f > %.3f\"\n                        % (null_rate, spec.get(\"max_null_rate\", 0.0))})\n        if \"type\" in spec:\n            bad = [v for v in non_null if not _type_ok(v, spec[\"type\"])]\n            if bad:\n                out.append({\"column\": col, \"check\": \"type\", \"severity\": \"error\",\n                            \"detail\": \"%d value(s) not %s\" % (len(bad), spec[\"type\"])})\n                continue\n        if \"min\" in spec or \"max\" in spec:\n            lo = spec.get(\"min\", -math.inf)\n            hi = spec.get(\"max\", math.inf)\n            bad = [v for v in non_null\n                   if not (isinstance(v, (int, float)) and not isinstance(v, bool)\n                           and lo <= v <= hi)]\n            if bad:\n                out.append({\"column\": col, \"check\": \"range\", \"severity\": sev,\n                            \"detail\": \"%d value(s) outside [%s, %s]\" % (len(bad), lo, hi)})\n        if \"allowed\" in spec:\n            allowed = set(spec[\"allowed\"])\n            bad = [v for v in non_null if v not in allowed]\n            if bad:\n                out.append({\"column\": col, \"check\": \"allowed\", \"severity\": sev,\n                            \"detail\": \"unseen values: %s\" % sorted(set(map(str, bad)))})\n    return out\n\n\ndef has_errors(violations):\n    return any(v[\"severity\"] == \"error\" for v in violations)",
+   "test": "SCHEMA = {\n    \"age\": {\"type\": \"int\", \"min\": 18, \"max\": 100},\n    \"basket\": {\"type\": \"float\", \"min\": 0.0, \"max_null_rate\": 0.02, \"severity\": \"warn\"},\n    \"country\": {\"type\": \"str\", \"allowed\": [\"GB\", \"FR\", \"DE\"]},\n}\ngood = [{\"age\": 30 + i % 20, \"basket\": 10.0 + i, \"country\": \"GB\"} for i in range(100)]\nassert validate_batch(good, SCHEMA) == []\nassert not has_errors([])\n\nbad = [dict(r) for r in good]\nbad[0][\"age\"] = -1\nbad[1][\"age\"] = 250\nbad[2][\"country\"] = \"XX\"\nfor i in range(3, 8):\n    bad[i][\"basket\"] = None\nbad[8][\"basket\"] = float(\"nan\")\nv = validate_batch(bad, SCHEMA)\nchecks = {(x[\"column\"], x[\"check\"]): x for x in v}\nassert set(checks) == {(\"age\", \"range\"), (\"country\", \"allowed\"), (\"basket\", \"null_rate\")}\nassert checks[(\"age\", \"range\")][\"detail\"].startswith(\"2 value(s)\")\nassert checks[(\"basket\", \"null_rate\")][\"severity\"] == \"warn\"\nassert \"0.060\" in checks[(\"basket\", \"null_rate\")][\"detail\"]\nassert has_errors(v)\nassert not has_errors([checks[(\"basket\", \"null_rate\")]])\n\n# a bool is not an int; a string in a numeric column is a type error\nt = [dict(r) for r in good]\nt[0][\"age\"] = True\nt[1][\"basket\"] = \"12\"\ntv = validate_batch(t, SCHEMA)\nassert {(x[\"column\"], x[\"check\"]) for x in tv} == {(\"age\", \"type\"), (\"basket\", \"type\")}\n\n# renamed column upstream: every row lacks it\nr = [{\"age\": 30, \"basket\": 1.0, \"nation\": \"GB\"} for _ in range(5)]\nrv = validate_batch(r, SCHEMA)\nassert [(x[\"column\"], x[\"check\"]) for x in rv] == [(\"country\", \"missing_column\")]\nassert validate_batch([], SCHEMA)[0][\"check\"] == \"empty_batch\"\n# no declared type: a string in a numeric-range column is flagged, not a crash\nnt = validate_batch([{\"x\": 1}, {\"x\": \"a\"}], {\"x\": {\"min\": 0, \"max\": 5}})\nassert [(v[\"column\"], v[\"check\"]) for v in nt] == [(\"x\", \"range\")]\n# exact-limit null rate is allowed (3/10 == 0.3), one more null is not\nat = [{\"x\": None}] * 3 + [{\"x\": 1.0}] * 7\nassert validate_batch(at, {\"x\": {\"max_null_rate\": 0.3}}) == []\nover = [{\"x\": None}] * 4 + [{\"x\": 1.0}] * 6\nassert [v[\"check\"] for v in validate_batch(over, {\"x\": {\"max_null_rate\": 0.3}})] == [\"null_rate\"]\n# NaN counts as null in a typed column (not a type error); all-null column\nassert [v[\"check\"] for v in validate_batch([{\"x\": float(\"nan\")}, {\"x\": 1}], {\"x\": {\"type\": \"int\"}})] == [\"null_rate\"]\nassert [v[\"check\"] for v in validate_batch([{\"x\": None}] * 3, {\"x\": {\"type\": \"int\"}})] == [\"null_rate\"]\n# a column present in only some rows is not 'missing'; unknown severity default is error\nassert validate_batch([{\"y\": 1}, {\"x\": 2}], {\"x\": {\"max_null_rate\": 0.5}}) == []\nprint(\"ok\")"
+  },
+  "interview_note_findings": "Good; bool/NaN/missing-key traps are what a grader would probe."
+ },
+ {
+  "plan_id": "B3-MLO-02-3",
+  "verdict": "correct",
+  "reasons": [
+   "Good ordered gate list and example; hypothetical table has an unresolved cell and an arithmetic tension between slice AUCs and the overall gain that should be explained."
+  ],
+  "parts_answered": {
+   "what to require besides AUC": true,
+   "order of checks": true,
+   "one concrete hidden example": true
+  },
+  "evidence": [
+   {
+    "claim": "Slice n: 4,800 = 6% -> holdout 80,000; consistent with detailed 80%/6% shares",
+    "method": "derivation",
+    "evidence": "4800/0.06=80000"
+   },
+   {
+    "claim": "ECE 0.020->0.045 is +0.025 > 0.01 so fail; latency 44<=50, size 230<=300 pass",
+    "method": "derivation",
+    "evidence": "arithmetic"
+   },
+   {
+    "claim": "Overall AUC is not a weighted mean of slice AUCs",
+    "method": "derivation",
+    "evidence": "AUC also depends on cross-slice ranking; with a -0.030 drop on 6% and others within 0.004, a +0.005 headline needs cross-slice gains, so a note is needed"
+   },
+   {
+    "claim": "Rules of ML Rule 9 sanity checks before export; ML Test Score slices",
+    "method": "doc",
+    "evidence": "opened, quoted"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "pass if the interval is [0.001, 0.009]; fail if it includes 0",
+    "problem": "Result cell is conditional rather than a result, unlike the other rows.",
+    "replacement": "pass (hypothetical 95% interval [0.001, 0.009] excludes 0); it would fail if the interval included 0"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "Outcome: rejected on the new-customer slice and on calibration, even though the headline metric improved.",
+    "problem": "Reader may notice that a 0.03 drop on 6% of data with other slices within 0.004 cannot raise a size-weighted slice average by 0.005.",
+    "replacement": "Outcome: rejected on the new-customer slice and on calibration, even though the headline metric improved (overall AUC is not a size-weighted average of slice AUCs, because it also depends on how scores rank across slices, so the pattern is possible)."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Application of a checklist with some metric reasoning.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Ordered checks."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Hypothetical gate report."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "Good (7).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0009 / smi-i0002 (different intent: skew / leakage)",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Opened via WebFetch. Table I: 'Feature expectations are captured in a schema'; Table II: 'Offline and online metrics correlate', 'The impact of model staleness is known', 'A simpler model is not better', 'Model quality is sufficient on important data slices'; Table III: 'Training is reproducible', 'The ML pipeline is integration tested', 'Model quality is validated before serving', 'Models are canaried before serving', 'Serving models can be rolled back'; Table IV: 'Data invariants hold for inputs' (section heading: 'in training and serving inputs'), 'Training and serving are not skewed'. Every name in the listed 'supports' sentence is present. (The curl route was blocked by the proxy; WebFetch worked.)"
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Opened. Rule 5 'Test the infrastructure independently from the machine learning': 'Check that feature columns that should be populated are populated' and 'Make sure that the model in your training environment gives the same score as the model in your serving environment'. Rule 8 'Know the freshness requirements of your system' ('How much does performance degrade if you have a model that is a day old?'). Rule 9 'Detect problems before exporting models': 'Do sanity checks right before you export the model.' Rule 29: 'save the set of features used at serving time, and then pipe those features to a log'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Calibration/behavioural-test recommendations are background_only (ECE, invariance tests)."
+  ],
+  "code_patch": null,
+  "interview_note_findings": "Good; orders checks by cost."
+ },
+ {
+  "plan_id": "B3-MLO-02-4",
+  "verdict": "correct",
+  "reasons": [
+   "Spec-compliant on the stated cases and discussion is good, but the gate that preaches fail-closed actually promotes on NaN metrics, and exact-threshold comparisons are broken by float rounding. Patched code given."
+  ],
+  "parts_answered": {
+   "overall gain >= min_improvement": true,
+   "lower bound > 0 with independent SEs": true,
+   "reject on large regressing slice": true,
+   "reject on missing slice": true,
+   "needs_review for small regressing slices": true,
+   "return dict": true,
+   "what rule does not protect": true
+  },
+  "evidence": [
+   {
+    "claim": "Numbers in answer: 0.910 vs 0.900 se .002 each -> lower bound 0.0045; 0.905 with se .02 -> -0.034",
+    "method": "executed",
+    "evidence": "python: 0.00446 and -0.03440"
+   },
+   {
+    "claim": "NaN fail-open",
+    "method": "executed",
+    "evidence": "promotion_gate(cand(nan), base) -> promote 'all checks passed'; NaN slice also -> promote"
+   },
+   {
+    "claim": "Float rounding at thresholds",
+    "method": "executed",
+    "evidence": "0.85-0.84 = 0.010000000000000009 so a drop of exactly the tolerance 0.01 is rejected although spec says 'more than'"
+   },
+   {
+    "claim": "min(b_n,c_n) vs spec 'baseline slice with at least min_slice_n'",
+    "method": "executed",
+    "evidence": "baseline n=1000, candidate n=150, regression 0.05 -> needs_review (spec literal: reject)"
+   },
+   {
+    "claim": "Test suite",
+    "method": "executed",
+    "evidence": "original passes on 4 interpreters; patched passes on 4 interpreters"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "practical_answer",
+    "claim": "import math\n\n\ndef promotion_gate(candidate, baseline, min_improvement=0.002, slice_tolerance=0.01,\n                   min_slice_n=200, z=1.96):\n    \"\"\"Compare candidate vs baseline on a higher-is-better metric.\n\n    Each side: {\"overall\": (value, std_err),\n                \"slices\": {name: (value, std_err, n)}}.\n    Independent standard errors are assumed (conservative when both models are\n    scored on the same examples). Returns {\"decision\", \"reasons\"} where\n    decision is 'promote', 'reject' or 'needs_review'.\n    \"\"\"\n    reasons = []\n    hard_fail = False\n    review = False\n\n    c_val, c_se = candidate[\"overall\"]\n    b_val, b_se = baseline[\"overall\"]\n    diff = c_val - b_val\n    se = math.sqrt(c_se ** 2 + b_se ** 2)\n    lower = diff - z * se\n    if diff < min_improvement:\n        hard_fail = True\n        reasons.append(\"overall gain %.4f below minimum %.4f\" % (diff, min_improvement))\n    elif lower <= 0:\n        hard_fail = True\n        reasons.append(\"overall gain %.4f not distinguishable from 0 (lower bound %.4f)\"\n                       % (diff, lower))\n\n    cand_slices = candidate.get(\"slices\", {})\n    for name in sorted(baseline.get(\"slices\", {})):\n        b_s_val, _b_s_se, b_n = baseline[\"slices\"][name]\n        if name not in cand_slices:\n            hard_fail = True\n            reasons.append(\"slice %s missing from candidate\" % name)\n            continue\n        c_s_val, _c_s_se, c_n = cand_slices[name]\n        s_diff = c_s_val - b_s_val\n        if s_diff < -slice_tolerance:\n            if min(b_n, c_n) >= min_slice_n:\n                hard_fail = True\n                reasons.append(\"slice %s regressed by %.4f (n=%d)\" % (name, -s_diff, min(b_n, c_n)))\n            else:\n                review = True\n                reasons.append(\"slice %s regressed by %.4f but n=%d < %d: inconclusive\"\n                               % (name, -s_diff, min(b_n, c_n), min_slice_n))\n\n    if hard_fail:\n        return {\"decision\": \"reject\", \"reasons\": reasons}\n    if review:\n        return {\"decision\": \"needs_review\", \"reasons\": reasons}\n    return {\"decision\": \"promote\", \"reasons\": [\"all checks passed\"]}",
+    "problem": "NaN/inf metrics bypass every comparison (all False) and result in 'promote'; boundary comparisons are subject to float rounding; slice-size rule uses min(baseline n, candidate n) instead of the baseline n in the spec.",
+    "replacement": "import math\n\n\ndef promotion_gate(candidate, baseline, min_improvement=0.002, slice_tolerance=0.01,\n                   min_slice_n=200, z=1.96):\n    \"\"\"Compare candidate vs baseline on a higher-is-better metric.\n\n    Each side: {\"overall\": (value, std_err),\n                \"slices\": {name: (value, std_err, n)}}.\n    Independent standard errors are assumed (conservative when both models are\n    scored on the same examples). Returns {\"decision\", \"reasons\"} where\n    decision is 'promote', 'reject' or 'needs_review'.\n    \"\"\"\n    reasons = []\n    hard_fail = False\n    review = False\n\n    eps = 1e-12  # absorbs float rounding at exact thresholds\n    c_val, c_se = candidate[\"overall\"]\n    b_val, b_se = baseline[\"overall\"]\n    diff = c_val - b_val\n    se = math.sqrt(c_se ** 2 + b_se ** 2)\n    lower = diff - z * se\n    if not all(math.isfinite(x) for x in (c_val, c_se, b_val, b_se)):\n        hard_fail = True  # NaN/inf would make every comparison False and slip through\n        reasons.append(\"overall value or standard error is not finite\")\n    elif diff < min_improvement - eps:\n        hard_fail = True\n        reasons.append(\"overall gain %.4f below minimum %.4f\" % (diff, min_improvement))\n    elif lower <= 0:\n        hard_fail = True\n        reasons.append(\"overall gain %.4f not distinguishable from 0 (lower bound %.4f)\"\n                       % (diff, lower))\n\n    cand_slices = candidate.get(\"slices\", {})\n    for name in sorted(baseline.get(\"slices\", {})):\n        b_s_val, _b_s_se, b_n = baseline[\"slices\"][name]\n        if name not in cand_slices:\n            hard_fail = True\n            reasons.append(\"slice %s missing from candidate\" % name)\n            continue\n        c_s_val, _c_s_se, c_n = cand_slices[name]\n        if not (math.isfinite(b_s_val) and math.isfinite(c_s_val)):\n            hard_fail = True\n            reasons.append(\"slice %s has a non-finite value\" % name)\n            continue\n        s_diff = c_s_val - b_s_val\n        if s_diff < -slice_tolerance - eps:\n            if b_n >= min_slice_n:\n                hard_fail = True\n                reasons.append(\"slice %s regressed by %.4f (n=%d)\" % (name, -s_diff, b_n))\n            else:\n                review = True\n                reasons.append(\"slice %s regressed by %.4f but n=%d < %d: inconclusive\"\n                               % (name, -s_diff, b_n, min_slice_n))\n\n    if hard_fail:\n        return {\"decision\": \"reject\", \"reasons\": reasons}\n    if review:\n        return {\"decision\": \"needs_review\", \"reasons\": reasons}\n    return {\"decision\": \"promote\", \"reasons\": [\"all checks passed\"]}"
+   },
+   {
+    "severity": "major",
+    "field": "code.solution",
+    "claim": "import math\n\n\ndef promotion_gate(candidate, baseline, min_improvement=0.002, slice_tolerance=0.01,\n                   min_slice_n=200, z=1.96):\n    \"\"\"Compare candidate vs baseline on a higher-is-better metric.\n\n    Each side: {\"overall\": (value, std_err),\n                \"slices\": {name: (value, std_err, n)}}.\n    Independent standard errors are assumed (conservative when both models are\n    scored on the same examples). Returns {\"decision\", \"reasons\"} where\n    decision is 'promote', 'reject' or 'needs_review'.\n    \"\"\"\n    reasons = []\n    hard_fail = False\n    review = False\n\n    c_val, c_se = candidate[\"overall\"]\n    b_val, b_se = baseline[\"overall\"]\n    diff = c_val - b_val\n    se = math.sqrt(c_se ** 2 + b_se ** 2)\n    lower = diff - z * se\n    if diff < min_improvement:\n        hard_fail = True\n        reasons.append(\"overall gain %.4f below minimum %.4f\" % (diff, min_improvement))\n    elif lower <= 0:\n        hard_fail = True\n        reasons.append(\"overall gain %.4f not distinguishable from 0 (lower bound %.4f)\"\n                       % (diff, lower))\n\n    cand_slices = candidate.get(\"slices\", {})\n    for name in sorted(baseline.get(\"slices\", {})):\n        b_s_val, _b_s_se, b_n = baseline[\"slices\"][name]\n        if name not in cand_slices:\n            hard_fail = True\n            reasons.append(\"slice %s missing from candidate\" % name)\n            continue\n        c_s_val, _c_s_se, c_n = cand_slices[name]\n        s_diff = c_s_val - b_s_val\n        if s_diff < -slice_tolerance:\n            if min(b_n, c_n) >= min_slice_n:\n                hard_fail = True\n                reasons.append(\"slice %s regressed by %.4f (n=%d)\" % (name, -s_diff, min(b_n, c_n)))\n            else:\n                review = True\n                reasons.append(\"slice %s regressed by %.4f but n=%d < %d: inconclusive\"\n                               % (name, -s_diff, min(b_n, c_n), min_slice_n))\n\n    if hard_fail:\n        return {\"decision\": \"reject\", \"reasons\": reasons}\n    if review:\n        return {\"decision\": \"needs_review\", \"reasons\": reasons}\n    return {\"decision\": \"promote\", \"reasons\": [\"all checks passed\"]}",
+    "problem": "Same as above (fenced code must stay identical).",
+    "replacement": "import math\n\n\ndef promotion_gate(candidate, baseline, min_improvement=0.002, slice_tolerance=0.01,\n                   min_slice_n=200, z=1.96):\n    \"\"\"Compare candidate vs baseline on a higher-is-better metric.\n\n    Each side: {\"overall\": (value, std_err),\n                \"slices\": {name: (value, std_err, n)}}.\n    Independent standard errors are assumed (conservative when both models are\n    scored on the same examples). Returns {\"decision\", \"reasons\"} where\n    decision is 'promote', 'reject' or 'needs_review'.\n    \"\"\"\n    reasons = []\n    hard_fail = False\n    review = False\n\n    eps = 1e-12  # absorbs float rounding at exact thresholds\n    c_val, c_se = candidate[\"overall\"]\n    b_val, b_se = baseline[\"overall\"]\n    diff = c_val - b_val\n    se = math.sqrt(c_se ** 2 + b_se ** 2)\n    lower = diff - z * se\n    if not all(math.isfinite(x) for x in (c_val, c_se, b_val, b_se)):\n        hard_fail = True  # NaN/inf would make every comparison False and slip through\n        reasons.append(\"overall value or standard error is not finite\")\n    elif diff < min_improvement - eps:\n        hard_fail = True\n        reasons.append(\"overall gain %.4f below minimum %.4f\" % (diff, min_improvement))\n    elif lower <= 0:\n        hard_fail = True\n        reasons.append(\"overall gain %.4f not distinguishable from 0 (lower bound %.4f)\"\n                       % (diff, lower))\n\n    cand_slices = candidate.get(\"slices\", {})\n    for name in sorted(baseline.get(\"slices\", {})):\n        b_s_val, _b_s_se, b_n = baseline[\"slices\"][name]\n        if name not in cand_slices:\n            hard_fail = True\n            reasons.append(\"slice %s missing from candidate\" % name)\n            continue\n        c_s_val, _c_s_se, c_n = cand_slices[name]\n        if not (math.isfinite(b_s_val) and math.isfinite(c_s_val)):\n            hard_fail = True\n            reasons.append(\"slice %s has a non-finite value\" % name)\n            continue\n        s_diff = c_s_val - b_s_val\n        if s_diff < -slice_tolerance - eps:\n            if b_n >= min_slice_n:\n                hard_fail = True\n                reasons.append(\"slice %s regressed by %.4f (n=%d)\" % (name, -s_diff, b_n))\n            else:\n                review = True\n                reasons.append(\"slice %s regressed by %.4f but n=%d < %d: inconclusive\"\n                               % (name, -s_diff, b_n, min_slice_n))\n\n    if hard_fail:\n        return {\"decision\": \"reject\", \"reasons\": reasons}\n    if review:\n        return {\"decision\": \"needs_review\", \"reasons\": reasons}\n    return {\"decision\": \"promote\", \"reasons\": [\"all checks passed\"]}"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "- A slice missing from the candidate's evaluation is a hard failure: fail closed, because a missing metric often means a broken evaluation job.",
+    "problem": "The fail-closed principle is stated only for a missing slice; add non-finite values.",
+    "replacement": "- A slice missing from the candidate's evaluation, and any NaN or infinite metric, is a hard failure: fail closed, because a missing metric often means a broken evaluation job and a NaN makes every comparison False, which would otherwise read as a pass."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Careful implementation of rules with statistics; discussion of limits.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Design rationale and limits."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Code and usage numbers (verified)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "Good (7).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0028 (paired bootstrap; different)",
+   "same_intent": false
+  },
+  "code_findings": "Original passes on dep/v 3.13, v310, v311, python3. Edge cases I wrote: NaN overall, NaN slice, exact tolerance drop, exact min_improvement with se=0, baseline n large/candidate n small, no slices, candidate with extra slice. Findings above. Patched solution adds math.isfinite guards, eps=1e-12 on thresholds and uses baseline n; extended test (NaN overall/slice rejects, exact tolerance promotes, 0.839 rejects, exact min gain with zero SE promotes) passes on all 4 interpreters. Stdlib only.",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Opened via WebFetch. Table I: 'Feature expectations are captured in a schema'; Table II: 'Offline and online metrics correlate', 'The impact of model staleness is known', 'A simpler model is not better', 'Model quality is sufficient on important data slices'; Table III: 'Training is reproducible', 'The ML pipeline is integration tested', 'Model quality is validated before serving', 'Models are canaried before serving', 'Serving models can be rolled back'; Table IV: 'Data invariants hold for inputs' (section heading: 'in training and serving inputs'), 'Training and serving are not skewed'. Every name in the listed 'supports' sentence is present. (The curl route was blocked by the proxy; WebFetch worked.)"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Independent-SE conservativeness for positively correlated errors is derivation."
+  ],
+  "code_patch": {
+   "solution": "import math\n\n\ndef promotion_gate(candidate, baseline, min_improvement=0.002, slice_tolerance=0.01,\n                   min_slice_n=200, z=1.96):\n    \"\"\"Compare candidate vs baseline on a higher-is-better metric.\n\n    Each side: {\"overall\": (value, std_err),\n                \"slices\": {name: (value, std_err, n)}}.\n    Independent standard errors are assumed (conservative when both models are\n    scored on the same examples). Returns {\"decision\", \"reasons\"} where\n    decision is 'promote', 'reject' or 'needs_review'.\n    \"\"\"\n    reasons = []\n    hard_fail = False\n    review = False\n\n    eps = 1e-12  # absorbs float rounding at exact thresholds\n    c_val, c_se = candidate[\"overall\"]\n    b_val, b_se = baseline[\"overall\"]\n    diff = c_val - b_val\n    se = math.sqrt(c_se ** 2 + b_se ** 2)\n    lower = diff - z * se\n    if not all(math.isfinite(x) for x in (c_val, c_se, b_val, b_se)):\n        hard_fail = True  # NaN/inf would make every comparison False and slip through\n        reasons.append(\"overall value or standard error is not finite\")\n    elif diff < min_improvement - eps:\n        hard_fail = True\n        reasons.append(\"overall gain %.4f below minimum %.4f\" % (diff, min_improvement))\n    elif lower <= 0:\n        hard_fail = True\n        reasons.append(\"overall gain %.4f not distinguishable from 0 (lower bound %.4f)\"\n                       % (diff, lower))\n\n    cand_slices = candidate.get(\"slices\", {})\n    for name in sorted(baseline.get(\"slices\", {})):\n        b_s_val, _b_s_se, b_n = baseline[\"slices\"][name]\n        if name not in cand_slices:\n            hard_fail = True\n            reasons.append(\"slice %s missing from candidate\" % name)\n            continue\n        c_s_val, _c_s_se, c_n = cand_slices[name]\n        if not (math.isfinite(b_s_val) and math.isfinite(c_s_val)):\n            hard_fail = True\n            reasons.append(\"slice %s has a non-finite value\" % name)\n            continue\n        s_diff = c_s_val - b_s_val\n        if s_diff < -slice_tolerance - eps:\n            if b_n >= min_slice_n:\n                hard_fail = True\n                reasons.append(\"slice %s regressed by %.4f (n=%d)\" % (name, -s_diff, b_n))\n            else:\n                review = True\n                reasons.append(\"slice %s regressed by %.4f but n=%d < %d: inconclusive\"\n                               % (name, -s_diff, b_n, min_slice_n))\n\n    if hard_fail:\n        return {\"decision\": \"reject\", \"reasons\": reasons}\n    if review:\n        return {\"decision\": \"needs_review\", \"reasons\": reasons}\n    return {\"decision\": \"promote\", \"reasons\": [\"all checks passed\"]}",
+   "test": "base = {\"overall\": (0.900, 0.002),\n        \"slices\": {\"new_users\": (0.850, 0.010, 1500), \"mobile\": (0.880, 0.008, 3000),\n                   \"rare_country\": (0.800, 0.040, 90)}}\n\ndef cand(overall, new_users=0.855, mobile=0.885, rare=0.805, se=0.002):\n    return {\"overall\": (overall, se),\n            \"slices\": {\"new_users\": (new_users, 0.010, 1500), \"mobile\": (mobile, 0.008, 3000),\n                       \"rare_country\": (rare, 0.040, 90)}}\n\nr = promotion_gate(cand(0.910), base)\nassert r[\"decision\"] == \"promote\", r\n\n# gain smaller than the minimum improvement\nr = promotion_gate(cand(0.9015), base)\nassert r[\"decision\"] == \"reject\" and \"below minimum\" in r[\"reasons\"][0]\n\n# gain above minimum but within noise (large standard errors)\nr = promotion_gate(cand(0.905, se=0.02), base)\nassert r[\"decision\"] == \"reject\" and \"not distinguishable\" in r[\"reasons\"][0]\n\n# good overall gain hides a regression on a large slice\nr = promotion_gate(cand(0.915, new_users=0.820), base)\nassert r[\"decision\"] == \"reject\" and \"new_users\" in r[\"reasons\"][0]\n\n# regression on a tiny slice is inconclusive, not an automatic reject\nr = promotion_gate(cand(0.915, rare=0.700), base)\nassert r[\"decision\"] == \"needs_review\" and \"inconclusive\" in r[\"reasons\"][0]\n\n# a regression inside the tolerance is allowed\nr = promotion_gate(cand(0.915, mobile=0.872), base)\nassert r[\"decision\"] == \"promote\"\n\n# a slice missing from the candidate's evaluation is a hard failure\nc = cand(0.915); del c[\"slices\"][\"mobile\"]\nr = promotion_gate(c, base)\nassert r[\"decision\"] == \"reject\" and \"missing\" in r[\"reasons\"][0]\n# NaN must fail closed, not slip through every comparison\nr = promotion_gate(cand(float(\"nan\")), base)\nassert r[\"decision\"] == \"reject\" and \"not finite\" in r[\"reasons\"][0]\nr = promotion_gate(cand(0.915, new_users=float(\"nan\")), base)\nassert r[\"decision\"] == \"reject\" and \"non-finite\" in r[\"reasons\"][0]\n\n# a drop of exactly the tolerance is allowed despite float rounding (0.85 - 0.84)\nr = promotion_gate(cand(0.915, new_users=0.84), base)\nassert r[\"decision\"] == \"promote\", r\nr = promotion_gate(cand(0.915, new_users=0.839), base)\nassert r[\"decision\"] == \"reject\"\n\n# exact minimum improvement passes when the interval is clear of zero\nb0 = {\"overall\": (0.900, 0.0), \"slices\": {}}\nassert promotion_gate({\"overall\": (0.902, 0.0), \"slices\": {}}, b0)[\"decision\"] == \"promote\"\nprint(\"ok\")"
+  },
+  "interview_note_findings": "Good."
+ },
+ {
+  "plan_id": "B3-MLO-02-5",
+  "verdict": "correct",
+  "reasons": [
+   "Diagnosis and redesign are sound. The practical answer claims a first-person measurement whose code is not recorded anywhere, so the numbers cannot be reproduced; relabel as illustrative. Internally the numbers are consistent."
+  ],
+  "parts_answered": {
+   "diagnose flakiness": true,
+   "redesign the check": true,
+   "what a PR test can/cannot establish": true
+  },
+  "evidence": [
+   {
+    "claim": "Spread claim consistent with normal approx: mean .762, sd .0135 -> P(acc<.75)~14%, <.74 ~2%, <.73 ~0.4%",
+    "method": "derivation",
+    "evidence": "discreteness at 0.01 considered; consistent with 1-in-7"
+   },
+   {
+    "claim": "My own toy simulation (logistic regression SGD, 200 train/100 val, 200 seeds)",
+    "method": "executed",
+    "evidence": "gave sd 0.0139 (similar), but mean 0.742 and 53% below 0.75: the quoted mean/tail shares depend entirely on the setup, so they cannot be treated as measured facts without the code"
+   },
+   {
+    "claim": "ML Test Score training reproducibility / pipeline integration; Rule 5",
+    "method": "paper/doc",
+    "evidence": "opened, quoted"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "practical_answer",
+    "claim": "I measured the spread in a toy setup (NumPy logistic regression trained by SGD for 3 epochs, 200 training rows and a fixed 100-row validation set, 200 different seeds for initial weights and sample order; numbers will differ for your model):",
+    "problem": "First-person measurement with no recorded code or seed list; unverifiable as stated.",
+    "replacement": "Illustrative numbers (a hypothetical toy setup: NumPy logistic regression trained by SGD for 3 epochs, 200 training rows, a fixed 100-row validation set, 200 seeds; they are not reproduced here and will differ for your model, so measure your own):"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Diagnosis plus test design; light statistics.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Diagnosis and redesign."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked threshold-selection numbers (once labelled illustrative)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "Good (7).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0005 (flaky LLM tests, temperature 0; different)",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Opened via WebFetch. Table I: 'Feature expectations are captured in a schema'; Table II: 'Offline and online metrics correlate', 'The impact of model staleness is known', 'A simpler model is not better', 'Model quality is sufficient on important data slices'; Table III: 'Training is reproducible', 'The ML pipeline is integration tested', 'Model quality is validated before serving', 'Models are canaried before serving', 'Serving models can be rolled back'; Table IV: 'Data invariants hold for inputs' (section heading: 'in training and serving inputs'), 'Training and serving are not skewed'. Every name in the listed 'supports' sentence is present. (The curl route was blocked by the proxy; WebFetch worked.)"
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Opened. Rule 5 'Test the infrastructure independently from the machine learning': 'Check that feature columns that should be populated are populated' and 'Make sure that the model in your training environment gives the same score as the model in your serving environment'. Rule 8 'Know the freshness requirements of your system' ('How much does performance degrade if you have a model that is a day old?'). Rule 9 'Detect problems before exporting models': 'Do sanity checks right before you export the model.' Rule 29: 'save the set of features used at serving time, and then pipe those features to a log'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Toy spread numbers (illustrative)."
+  ],
+  "code_patch": null,
+  "interview_note_findings": "Good."
+ },
+ {
+  "plan_id": "B3-MLO-02-6",
+  "verdict": "pass",
+  "reasons": [
+   "Sound criteria split (hard auto vs soft human), preconditions for rollback, and ML Test Score canary/rollback claims verified. Could be sharper with example thresholds but nothing is wrong."
+  ],
+  "parts_answered": {
+   "rollback criteria agreed in advance": true,
+   "what must be true for quick safe rollback": true,
+   "handling the 14:40 signal": true
+  },
+  "evidence": [
+   {
+    "claim": "ML Test Score lists 'Models are canaried before serving' and 'Serving models can be rolled back'",
+    "method": "paper",
+    "evidence": "opened PDF, Table III items 6 and 7."
+   },
+   {
+    "claim": "Concise answer length",
+    "method": "executed",
+    "evidence": "70 words"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Scenario judgement; no computation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "70 words."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Adds signals, preconditions, state concerns, decision."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed (as is)",
+  "key_concepts_findings": "Good (7).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Opened via WebFetch. Table I: 'Feature expectations are captured in a schema'; Table II: 'Offline and online metrics correlate', 'The impact of model staleness is known', 'A simpler model is not better', 'Model quality is sufficient on important data slices'; Table III: 'Training is reproducible', 'The ML pipeline is integration tested', 'Model quality is validated before serving', 'Models are canaried before serving', 'Serving models can be rolled back'; Table IV: 'Data invariants hold for inputs' (section heading: 'in training and serving inputs'), 'Training and serving are not skewed'. Every name in the listed 'supports' sentence is present. (The curl route was blocked by the proxy; WebFetch worked.)"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Expand-then-contract schema practice (background_only)."
+  ],
+  "code_patch": null,
+  "interview_note_findings": "Good."
+ },
+ {
+  "plan_id": "B3-MLO-02-7",
+  "verdict": "correct",
+  "reasons": [
+   "Mostly correct design analysis; item 5 is vague/mislabelled. All claims are standard practice (no source)."
+  ],
+  "parts_answered": {
+   "list design faults and fixes": true,
+   "cache key formation": true
+  },
+  "evidence": [
+   {
+    "claim": "Cache key = hash(step, code hash, params, input content hashes, canonical serialisation)",
+    "method": "derivation",
+    "evidence": "standard content-addressed memoisation; practical example consistent (seed change affects only train and later keys)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "5. Validation and training were coupled to state of the first attempt: failed attempts left partial artifacts. Fix: commit outputs only on success.",
+    "problem": "Item 5 does not name a fault the scenario shows; the label 'validation and training coupled' is unsupported.",
+    "replacement": "5. Failed attempts left partial artifacts behind (a half-written feature partition, a stored but unregistered model) that later attempts could pick up. Fix: write to a temporary location, commit or rename only on success, and let downstream steps read only committed outputs."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-fault diagnosis and cache-key design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Faults and fixes."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked key and backfill example plus idempotency test."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "Good (8).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0009 (agent refund idempotency; different)",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "All claims background_only (idempotency, as-of snapshots)."
+  ],
+  "code_patch": null,
+  "interview_note_findings": "Good."
+ },
+ {
+  "plan_id": "B3-MLO-02-8",
+  "verdict": "pass",
+  "reasons": [
+   "Good event-to-pipeline mapping; Rule 8 claim verified. Open-ended so rubric supplied."
+  ],
+  "parts_answered": {
+   "which events trigger which pipeline": true,
+   "what each runs vs skips": true
+  },
+  "evidence": [
+   {
+    "claim": "Rules of ML Rule 8: know freshness requirements",
+    "method": "doc",
+    "evidence": "Opened; 'How much does performance degrade if you have a model that is a day old?'"
+   },
+   {
+    "claim": "Concise answer length",
+    "method": "executed",
+    "evidence": "69 words"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Design with reasonable consensus; no computation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "PR: fast lint, unit and tiny-fixture smoke tests, schema/config checks only",
+    "tradeoff": "Minutes of feedback, no model-quality judgement."
+   },
+   {
+    "decision": "Merge to main: integration run on fixed versioned sample with baseline comparison",
+    "tradeoff": "More cost, answers whether a change altered metrics/latency; path filters limit runs."
+   },
+   {
+    "decision": "New data: validate then retrain, evaluate on shared holdout, promotion gate; stop on validation failure",
+    "tradeoff": "Freshness vs risk of training on bad data."
+   },
+   {
+    "decision": "Schedule set by measured staleness cost, as a floor",
+    "tradeoff": "Compute spend vs decay in model value."
+   },
+   {
+    "decision": "Quality alerts trigger investigation or protective action, not auto-retrain",
+    "tradeoff": "Slower recovery vs avoiding retraining on broken feeds; auto-retrain only when mature and gated."
+   },
+   {
+    "decision": "All production paths pass the same promotion gate; alias change redeploys without retrain",
+    "tradeoff": "Uniform safety vs pipeline latency."
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "69 words."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Per-trigger detail."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed (as is)",
+  "key_concepts_findings": "Good (7).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0006 (monitoring labels delay; different)",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Opened. Rule 5 'Test the infrastructure independently from the machine learning': 'Check that feature columns that should be populated are populated' and 'Make sure that the model in your training environment gives the same score as the model in your serving environment'. Rule 8 'Know the freshness requirements of your system' ('How much does performance degrade if you have a model that is a day old?'). Rule 9 'Detect problems before exporting models': 'Do sanity checks right before you export the model.' Rule 29: 'save the set of features used at serving time, and then pipe those features to a log'."
+   },
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Opened via WebFetch. Table I: 'Feature expectations are captured in a schema'; Table II: 'Offline and online metrics correlate', 'The impact of model staleness is known', 'A simpler model is not better', 'Model quality is sufficient on important data slices'; Table III: 'Training is reproducible', 'The ML pipeline is integration tested', 'Model quality is validated before serving', 'Models are canaried before serving', 'Serving models can be rolled back'; Table IV: 'Data invariants hold for inputs' (section heading: 'in training and serving inputs'), 'Training and serving are not skewed'. Every name in the listed 'supports' sentence is present. (The curl route was blocked by the proxy; WebFetch worked.)"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Path-filtered triggers (background_only)."
+  ],
+  "code_patch": null,
+  "interview_note_findings": "Good."
+ }
+]

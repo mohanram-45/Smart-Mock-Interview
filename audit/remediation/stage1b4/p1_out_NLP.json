@@ -1,0 +1,445 @@
+[
+ {
+  "id": "smi-h0003",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "Bucket counts sum to the sample",
+    "method": "derivation",
+    "evidence": "24+21+9+6=60"
+   },
+   {
+    "claim": "21/60 95% interval roughly 24% to 48%",
+    "method": "derivation",
+    "evidence": "Wilson interval computed: 24.2% to 47.6%"
+   },
+   {
+    "claim": "RAGAS context recall is reference-based",
+    "method": "doc",
+    "evidence": "ragas _context_recall.py: LLM classifies each sentence of the 'reference' answer as attributable to retrieved context or not; score = attributed fraction"
+   },
+   {
+    "claim": "RAGAS answer relevancy = generated questions vs original question embedding similarity",
+    "method": "doc",
+    "evidence": "ragas _answer_relevance.py: generates questions from the answer (strictness=3), mean cosine similarity with the user question, times 0 if answer noncommittal"
+   },
+   {
+    "claim": "Reranker over top-50 rescues at most the 15 in top-50",
+    "method": "derivation",
+    "evidence": "upper bound wording present ('at most')"
+   },
+   {
+    "claim": "Mid-context evidence use degrades (Lost in the Middle)",
+    "method": "background_only",
+    "evidence": "already hedged in text as empirical and model-dependent"
+   },
+   {
+    "claim": "Original flags (upper bound, operationalise answer relevance) fixed",
+    "method": "derivation",
+    "evidence": "text now says 'at most those 15' and gives judge-rubric and RAGAS method"
+   }
+  ],
+  "remaining_limitations": [
+   "Lost-in-the-middle and NLI/LLM-judge faithfulness claims rest on background knowledge, hedged in text."
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "n/a",
+   "py3.11": "n/a",
+   "py3.10": "n/a"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-h0004",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "65,536 params per adapter, 0.39%, 4,194,304 total vs 1,073,741,824",
+    "method": "executed",
+    "evidence": "r*(d_in+d_out)=65536; 64*65536=4194304; 64*16777216=1073741824; ratio 0.00390625 matches example"
+   },
+   {
+    "claim": "Merged = unmerged and rank(delta)<=r",
+    "method": "executed",
+    "evidence": "200 random seeds: rank(Wm-W)==4 each time at tol 1e-9; float32 max diff 3.8e-6; algebra x(W+sBA)^T = xW^T + s(xA^T)B^T derived"
+   },
+   {
+    "claim": "Zero B and zero A/B both give no gradient",
+    "method": "derivation",
+    "evidence": "dL/dB \u221d (..)(A x)^T =0 when A=0 ... with B=0 and A=0 both gradients vanish; with B=0, A!=0 only B gets gradient initially"
+   },
+   {
+    "claim": "alpha/r scaling reduces retuning when varying r",
+    "method": "background_only",
+    "evidence": "LoRA paper (arXiv 2106.09685) could not be opened here (egress blocked); text already hedges 'empirical'"
+   },
+   {
+    "claim": "Flagged issue (no demo code) fixed",
+    "method": "executed",
+    "evidence": "demonstration block present and included verbatim in test; both fenced blocks match tested code"
+   }
+  ],
+  "remaining_limitations": [
+   "alpha/r rationale and 'close to full fine-tuning' claims are background_only, but hedged in the text."
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-h0006",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "best_span correct incl. ties, mask, max length",
+    "method": "executed",
+    "evidence": "300 random brute-force comparisons (integer logits so many ties) identical; example (2,4,5.5) and (2,3) reproduced; max_answer_len=0 and empty mask return None"
+   },
+   {
+    "claim": "Span of length <= overlap+1 lies inside some window",
+    "method": "derivation",
+    "evidence": "largest start s<=a has a-s<=step-1, so window end s+wl-1 >= a+overlap >= b; exhaustively checked for n<40, wl 2..8, all overlaps"
+   },
+   {
+    "claim": "sliding_windows example and edge cases",
+    "method": "executed",
+    "evidence": "(10,4,2)->[(0,4),(2,6),(4,8),(6,10)]; n=0 -> [(0,0)]; n<=window -> single window"
+   },
+   {
+    "claim": "Null decision null_score - best > threshold; min null score across windows is an implementation choice",
+    "method": "background_only",
+    "evidence": "matches HF/SQuAD-v2 convention from memory; text hedges 'differs between implementations'"
+   },
+   {
+    "claim": "Flagged issues (merge_windows null handling, input format)",
+    "method": "derivation",
+    "evidence": "text now states merge_windows merges only real spans and null decision must be applied by caller; format documented in docstring"
+   }
+  ],
+  "remaining_limitations": [
+   "Cross-window logit calibration remark is background knowledge, hedged."
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-h0007",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "fastText defaults bucket=2000000, minn=3, maxn=6",
+    "method": "doc",
+    "evidence": "fastText src/args.cc: bucket=2000000; minn=3; maxn=6 in the constructor, BUT parseArgs for 'supervised' sets minn=0, maxn=0"
+   },
+   {
+    "claim": "Hash is an FNV-1a variant",
+    "method": "doc",
+    "evidence": "dictionary.cc: h=2166136261; h ^= uint32_t(int8_t(c)); h*=16777619 (sign-extended bytes, so non-ASCII ids differ from plain unsigned FNV-1a)"
+   },
+   {
+    "claim": "n-grams by code point, markers, whole marked word",
+    "method": "doc",
+    "evidence": "computeSubwords skips UTF-8 continuation bytes (code-point aware); in-vocab word uses its own row id, not a hash"
+   },
+   {
+    "claim": "fnv1a_32('a')=0xE40C292C, 'foobar'=0xBF9CF968, ''=2166136261",
+    "method": "executed",
+    "evidence": "asserted and re-printed"
+   },
+   {
+    "claim": "Jaccard refund/refundd = 0.5; refund/refnud ~ 0.09",
+    "method": "executed",
+    "evidence": "0.5 and 0.0857"
+   },
+   {
+    "claim": "Flagged: marker wording, defaults hedge, hashed '<word>' unit",
+    "method": "derivation",
+    "evidence": "marker wording fixed; defaults hedged; deviation of always adding hashed whole word only implicit"
+   }
+  ],
+  "remaining_limitations": [
+   "Code deliberately deviates from fastText (always adds hashed '<word>', unsigned-byte FNV); answer says ids will not match pretrained models."
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "fastText's default is, to my knowledge, around two million buckets and n-gram lengths 3 to 6, but check your version;",
+    "problem": "Defaults of 2,000,000 buckets and minn 3 / maxn 6 hold for the general (skipgram/cbow) settings, but fastText's supervised classifier mode, the relevant one for a ticket classifier, sets minn=maxn=0 (no subwords) unless enabled.",
+    "replacement": "fastText's general defaults are 2,000,000 buckets and n-gram lengths 3 to 6 (per its source, args.cc), but its supervised classifier mode sets minn and maxn to 0 (no subwords) unless you pass -minn/-maxn;"
+   },
+   {
+    "severity": "minor",
+    "claim": "so never mix them.",
+    "problem": "Implementation always adds a hashed whole-word unit '<word>' (as the task specifies); real fastText uses the word's own vocabulary row for in-vocabulary words instead. Not stated.",
+    "replacement": "so never mix them. This implementation also always adds the hashed whole marked word as one extra unit, as the task specifies; real fastText uses the word's own vocabulary row for in-vocabulary words instead."
+   }
+  ],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-h0008",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "Arithmetic: 6% of 500 = 30; 35% majority floor",
+    "method": "derivation",
+    "evidence": "30 one-star in a 10% (500) test split; majority class 35%"
+   },
+   {
+    "claim": "Protocol (dedupe/group, macro-F1, QWK/MAE, bootstrap CI, learning curve, paired seeds) is standard",
+    "method": "background_only",
+    "evidence": "standard evaluation practice; no numeric claim beyond arithmetic"
+   },
+   {
+    "claim": "TF-IDF+LR latency few ms; base encoder marginal on one core",
+    "method": "background_only",
+    "evidence": "hedged in text ('normally', 'confirm with the latency check', 'can be marginal')"
+   },
+   {
+    "claim": "Flagged issues (hedge latency, explicit decision rule)",
+    "method": "derivation",
+    "evidence": "text now ties latency to measurement and states paired comparison with lower CI bound above pre-agreed threshold"
+   }
+  ],
+  "remaining_limitations": [
+   "Latency and 'transformers often help on small sentiment sets' are unmeasured, hedged claims."
+  ],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "n/a",
+   "py3.11": "n/a",
+   "py3.10": "n/a"
+  },
+  "difficulty_ok": false,
+  "suggested_difficulty": "Hard",
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-h0009",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Example: dot order [1,0,2]; cosine [2,1,0]; Euclidean [2,0,1]",
+    "method": "executed",
+    "evidence": "dot=[10,19,0.905]; squared L2=[81.81,163.81,0.4525]; cosine verified by topk_cosine"
+   },
+   {
+    "claim": "Identity |a-b|^2=|a|^2+|b|^2-2a.b and equal-norm condition",
+    "method": "derivation",
+    "evidence": "algebra; equal doc norms make all three monotone for a fixed query"
+   },
+   {
+    "claim": "topk_cosine correctness",
+    "method": "executed",
+    "evidence": "200 random integer-matrix trials (heavy ties, zero rows, k>n) match lexsort reference; 1000 identical rows -> [0,1,2]; k=0 returns empty"
+   },
+   {
+    "claim": "Memory 1M x 768 float32 = ~3.07 GB",
+    "method": "derivation",
+    "evidence": "1e6*768*4 = 3.072e9"
+   },
+   {
+    "claim": "Anisotropy / hubness caveats",
+    "method": "background_only",
+    "evidence": "hedged in text as empirical"
+   },
+   {
+    "claim": "Flagged Euclidean claim and sufficiency claim fixed",
+    "method": "executed",
+    "evidence": "text now correctly says Euclidean demotes long vectors but penalises any norm mismatch; equal-norm condition added"
+   }
+  ],
+  "remaining_limitations": [
+   "Reference function copies matrix to float64 per call (~6 GB at 1M x 768, plus normalised copy) -- original minor flag only partly addressed."
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "At 1M x 768 float32 the matrix is about 3.07 GB, so normalise once",
+    "problem": "Code builds a float64 copy plus a normalised float64 copy of the whole matrix on every call (~6 GB each at 1M x 768), fails with IndexError on an empty matrix (n=0), and 'ties by lower index' holds only for bit-identical scores; none is stated, although the answer advises normalising once.",
+    "replacement": "The function above is a reference version: it converts the whole matrix to float64 and normalises it on every call (about 6 GB per copy at 1M x 768), assumes at least one row, and breaks ties by lower index only for bit-identical scores (parallel rows scaled differently can differ by an ulp). At 1M x 768 float32 the matrix is about 3.07 GB, so normalise once"
+   }
+  ],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-h0010",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "recall@3=1/3, recall@5=2/3, RR=0.5",
+    "method": "executed",
+    "evidence": "reproduced"
+   },
+   {
+    "claim": "nDCG@5 = 0.578 linear, 0.608 exponential",
+    "method": "executed",
+    "evidence": "0.57838, 0.60776"
+   },
+   {
+    "claim": "Duplicate policy (drop repeats, shift up)",
+    "method": "executed",
+    "evidence": "reciprocal_rank(['a','a','b'],{'b'})=0.5; recall@2=1.0, consistent with question wording"
+   },
+   {
+    "claim": "Edge cases",
+    "method": "executed",
+    "evidence": "k=0 -> 0.0; empty/zero gains -> 0.0; fractional gains with exponential OK; empty runs -> 0.0"
+   },
+   {
+    "claim": "nDCG=1 iff gain sequence equals ideal; recall cap when >k relevant; pooling penalises unjudged",
+    "method": "derivation",
+    "evidence": "follows from definitions"
+   },
+   {
+    "claim": "Flagged issues (duplicate wording, MRR wording, nDCG=1 wording)",
+    "method": "derivation",
+    "evidence": "all three rewritten correctly"
+   }
+  ],
+  "remaining_limitations": [],
+  "fixes": [],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-h0011",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Pad==EOS and loss masking by token id stops EOS learning",
+    "method": "background_only",
+    "evidence": "well-known pitfall (e.g. HF collators set labels=-100 where id==pad_id); stated as a conditional in the text"
+   },
+   {
+    "claim": "Last-token readout with right padding reads a pad position",
+    "method": "derivation",
+    "evidence": "causal attention: real tokens never see later pads, so only the read index is wrong"
+   },
+   {
+    "claim": "Left padding needs mask-derived position ids",
+    "method": "background_only",
+    "evidence": "hedged ('implementation-dependent')"
+   },
+   {
+    "claim": "Flagged issues (context length, tokenizer padding/truncation side) added",
+    "method": "derivation",
+    "evidence": "steps 4 and 6 now include them"
+   },
+   {
+    "claim": "'short examples receive most padding' vs length-sorted batches",
+    "method": "derivation",
+    "evidence": "sorting by length minimises in-batch padding, so this explanation only holds with fixed max_length padding or mixed-length batches; step 1 states it unconditionally"
+   }
+  ],
+  "remaining_limitations": [
+   "Tolerances (1e-4 in fp32) are rule-of-thumb figures, hedged as 'roughly'."
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "This matches the symptom that short examples, which receive the most padding, suffer most.",
+    "problem": "With batches of 32 sorted by length (change 2) in-batch padding is small, so short tickets only receive the most padding when padded to a fixed max_length (such as 1024, change 3) or when batch lengths are mixed; the unconditional statement conflicts with the question's own setup.",
+    "replacement": "This matches the symptom that short examples suffer most, provided they receive the most padding: that happens when batches are padded to a fixed max_length (see step 6) or mix very different lengths, whereas length-sorted batches normally keep padding small, so check which padding strategy is actually used."
+   }
+  ],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "n/a",
+   "py3.11": "n/a",
+   "py3.10": "n/a"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ },
+ {
+  "id": "smi-h0012",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "contamination_report spec incl. None for short items, case/punctuation normalisation",
+    "method": "executed",
+    "evidence": "tests pass; 8-token item with n=8 returns 0.0/1.0 only; 'a b ... h' short -> proper; Chinese text -> (None, False)"
+   },
+   {
+    "claim": "GPT-3 paper used 13-gram overlap",
+    "method": "background_only",
+    "evidence": "hedged in text ('often cited'); source not opened"
+   },
+   {
+    "claim": "Flagged: threshold trade-off and non-Latin tokeniser",
+    "method": "derivation",
+    "evidence": "both now present"
+   },
+   {
+    "claim": "'10% overlap on an 8-token question'",
+    "method": "derivation",
+    "evidence": "8-token item with default n=8 has exactly one 8-gram so overlap is 0 or 1; with n=3 it has 6 n-grams (steps of 16.7%); 10% is impossible"
+   }
+  ],
+  "remaining_limitations": [
+   "Accented Latin letters are also split by [a-z0-9]+ (e.g. 'caf\u00e9' -> 'caf'); only non-Latin scripts are mentioned."
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "A full match of a 40-token question is strong evidence of exposure; 10% overlap on an 8-token question is not.",
+    "problem": "An 8-token item has a single 8-gram at the default n=8, so its overlap is only 0 or 1; '10% on an 8-token question' cannot occur and the contrast is misleading.",
+    "replacement": "A full match of a 40-token question (all 33 of its 8-grams) is strong evidence of exposure; one matching 8-gram out of 33 (about 3%) may just be a quoted phrase, and an 8-token item has only a single 8-gram at n=8, so its overlap can only be 0 or 1."
+   }
+  ],
+  "code_patch": null,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null,
+  "suggested_key_concepts": null
+ }
+]

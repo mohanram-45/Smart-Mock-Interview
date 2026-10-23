@@ -1,0 +1,250 @@
+{
+ "Machine Learning": [
+  [
+   "P3-ML-01",
+   "Leakage definitions",
+   "concept (Easy)",
+   "Target leakage vs train-test contamination: define each with a concrete example and say how each inflates offline metrics."
+  ],
+  [
+   "P3-ML-02",
+   "Too-good validation score",
+   "scenario",
+   "Churn model with 0.99 validation AUC: enumerate leakage sources (feature computed after the label date, same customer in train and validation, preprocessing fit on all data, duplicated rows) and the check for each."
+  ],
+  [
+   "P3-ML-03",
+   "Calibration basics",
+   "concept",
+   "What calibration means, reliability diagram and expected calibration error, why high AUC does not imply calibrated probabilities, when calibration matters."
+  ],
+  [
+   "P3-ML-04",
+   "Choosing a calibration method",
+   "scenario",
+   "Platt scaling vs isotonic regression with 2,000 vs 200,000 validation samples; calibrate on held-out data not training data; effect on ranking metrics."
+  ],
+  [
+   "P3-ML-05",
+   "Types of drift",
+   "concept (Easy)",
+   "Covariate (data) drift vs label (prior) drift vs concept drift: definitions, one example each, which can be detected without labels."
+  ],
+  [
+   "P3-ML-06",
+   "Monitoring a degrading production model",
+   "scenario (design)",
+   "Fraud model precision seems to be falling but labels arrive weeks late: monitoring plan (input distribution tests such as PSI/KS, score distribution, proxy metrics, delayed-label evaluation), alert thresholds and retraining triggers with trade-offs."
+  ],
+  [
+   "P3-ML-07",
+   "ROC-AUC vs PR-AUC under imbalance",
+   "concept/scenario",
+   "1 percent positives: why PR-AUC and precision@k are more informative than ROC-AUC; how to pick an operating threshold from asymmetric costs."
+  ],
+  [
+   "P3-ML-08",
+   "Validation scheme choice",
+   "scenario",
+   "Customer-level event data with repeated customers over time: random k-fold vs GroupKFold vs time-based split; what leaks in each; how to report the final estimate."
+  ],
+  [
+   "P3-ML-09",
+   "Training-serving skew",
+   "scenario (debugging)",
+   "Offline metrics match the previous model but the online metric is worse: list skew causes (feature computed differently online, stale features, missing-value handling, label delay, population shift) and how to isolate them."
+  ],
+  [
+   "P3-ML-10",
+   "Averaging multi-class metrics",
+   "concept",
+   "Macro vs micro vs weighted F1 on an imbalanced 3-class problem with a small worked confusion matrix; which to report for which goal."
+  ]
+ ],
+ "SQL": [
+  [
+   "P3-SQL-01",
+   "UNION vs UNION ALL",
+   "concept (Easy)",
+   "Semantics of UNION vs UNION ALL, duplicate removal cost, column count/type rules, how ORDER BY applies to a compound select; short executable demonstration."
+  ],
+  [
+   "P3-SQL-02",
+   "Customers who bought A but not B",
+   "sql_exercise",
+   "Two purchase tables or one table with product: use EXCEPT and compare with NOT EXISTS; sample data and expected rows."
+  ],
+  [
+   "P3-SQL-03",
+   "Reconciling two tables",
+   "sql_exercise (scenario)",
+   "Find rows present in only one of two snapshot tables (both directions) using EXCEPT and UNION ALL, including NULL-handling: set operators treat NULLs as equal while = does not."
+  ],
+  [
+   "P3-SQL-04",
+   "INTERSECT scenario",
+   "sql_exercise",
+   "Users active in both of two months (INTERSECT) vs the equivalent join/IN; the dedupe behaviour of INTERSECT; sample data."
+  ],
+  [
+   "P3-SQL-05",
+   "Median per group",
+   "sql_exercise",
+   "Median salary per department in SQLite using window functions (no MEDIAN function), handling even counts; expected rows."
+  ],
+  [
+   "P3-SQL-06",
+   "Top-N per group with ties",
+   "sql_exercise",
+   "Top 2 products by revenue per category with RANK vs ROW_NUMBER vs DENSE_RANK and the business consequence of ties."
+  ],
+  [
+   "P3-SQL-07",
+   "Sessionisation",
+   "sql_exercise (hard)",
+   "Assign session ids to events when the gap between consecutive events per user exceeds 30 minutes, using LAG and a running SUM; expected rows."
+  ],
+  [
+   "P3-SQL-08",
+   "Funnel conversion",
+   "sql_exercise (scenario)",
+   "Step-by-step funnel (view, add to cart, purchase) per user with conditional aggregation and conversion rates between steps; counting users not events."
+  ],
+  [
+   "P3-SQL-09",
+   "Percent of total and YoY",
+   "sql_exercise",
+   "Revenue share per region and year-over-year change with window functions; handle first year NULL and division by zero."
+  ],
+  [
+   "P3-SQL-10",
+   "Deduplicate keeping the latest",
+   "sql_exercise/concept",
+   "Keep the most recent row per key: ROW_NUMBER filter vs correlated subquery vs GROUP BY with MAX; trade-offs and tie behaviour."
+  ]
+ ],
+ "Python": [
+  [
+   "P3-PY-01",
+   "Reading a large file safely",
+   "concept/scenario",
+   "Reading a multi-GB log: iterate lines lazily, context managers, explicit encoding and errors handling, newline translation; why read() is wrong; short tested example."
+  ],
+  [
+   "P3-PY-02",
+   "pathlib vs os.path",
+   "concept",
+   "Path objects: joining, suffix, stem, exists, glob, read_text/write_text; why pathlib is preferred; Windows vs POSIX separators."
+  ],
+  [
+   "P3-PY-03",
+   "Atomic file writes",
+   "scenario",
+   "Config file corrupted when the process is killed mid-write: write to a temp file in the same directory then os.replace; fsync caveat; tested example with tempfile."
+  ],
+  [
+   "P3-PY-04",
+   "csv module pitfalls",
+   "debugging",
+   "Quoted fields with commas/newlines and the newline='' requirement; why line.split(',') is wrong; DictReader; tested example."
+  ],
+  [
+   "P3-PY-05",
+   "Import system and circular imports",
+   "debugging/concept",
+   "ImportError from a circular import between two modules; why it happens (partially initialised module), fixes (restructure, import inside function, import module not name); sys.modules."
+  ],
+  [
+   "P3-PY-06",
+   "Packages and __main__",
+   "concept",
+   "What __init__.py does, absolute vs relative imports, running a file as a script vs python -m, if __name__ == '__main__'."
+  ],
+  [
+   "P3-PY-07",
+   "Packaging and environments",
+   "concept/scenario",
+   "pyproject.toml basics, virtual environments, pinning vs ranges for applications vs libraries, why not install into system Python (hedged, cite PyPA docs if opened)."
+  ],
+  [
+   "P3-PY-08",
+   "try/except/else/finally semantics",
+   "concept",
+   "Order of execution including return in finally, else clause purpose, catching specific exceptions, why bare except is harmful; tested snippet."
+  ],
+  [
+   "P3-PY-09",
+   "Custom exceptions and chaining",
+   "concept/design",
+   "Exception hierarchy for a library, raise ... from ..., __cause__ vs __context__, not swallowing tracebacks; tested snippet."
+  ],
+  [
+   "P3-PY-10",
+   "Debugging a failing script",
+   "scenario (debugging)",
+   "Process for debugging a wrong-result bug: reproduce, read traceback bottom-up, logging vs print, pdb/breakpoint(), assertions, bisecting inputs; a small tested buggy-vs-fixed example."
+  ]
+ ],
+ "Data Analysis": [
+  [
+   "P3-DA-01",
+   "First steps on a new dataset",
+   "scenario",
+   "Checklist for EDA on an unfamiliar customer table: shape, dtypes, key uniqueness, missingness patterns, duplicates, distributions, outliers, date ranges, joins to other tables; what you would document."
+  ],
+  [
+   "P3-DA-02",
+   "Choosing summary statistics",
+   "concept (Easy)",
+   "Mean vs median vs mode for skewed data such as order values; when each misleads; what to report to a business audience."
+  ],
+  [
+   "P3-DA-03",
+   "Missing data mechanisms",
+   "concept",
+   "MCAR vs MAR vs MNAR with business examples, consequences of dropping rows vs imputing, how to probe the mechanism."
+  ],
+  [
+   "P3-DA-04",
+   "Designing an A/B test",
+   "scenario (design)",
+   "Test a new checkout button: primary metric, guardrail metrics, randomisation unit, sample size/duration (full weekly cycles), novelty effect, pre-registered stopping rule."
+  ],
+  [
+   "P3-DA-05",
+   "Confidence interval meaning",
+   "concept (Easy)",
+   "Correct interpretation of a 95 percent CI, common misreadings, effect of sample size and variability on width."
+  ],
+  [
+   "P3-DA-06",
+   "Reading an A/B result",
+   "scenario",
+   "Variant lifts conversion +2.0 percent relative, 95 percent CI [-0.5, +4.5] percent: what to conclude, what to recommend, what extra data would change the decision; statistical vs practical significance."
+  ],
+  [
+   "P3-DA-07",
+   "Randomisation unit and interference",
+   "scenario",
+   "Marketplace or social feature where users interact: why user-level randomisation can be biased (spillover), alternatives (cluster/geo/time-switchback), trade-offs."
+  ],
+  [
+   "P3-DA-08",
+   "Survivorship and selection bias",
+   "scenario",
+   "Analysing average tenure or satisfaction only among current customers: bias direction, how to detect, how to correct or reframe the question."
+  ],
+  [
+   "P3-DA-09",
+   "Metric definition ambiguity",
+   "scenario",
+   "DAU or conversion rate changes after a definition or logging change: how to investigate, reconcile, and communicate to stakeholders."
+  ],
+  [
+   "P3-DA-10",
+   "Percentages vs percentage points and relative change",
+   "concept (Easy)",
+   "Percentage points vs percent change, base-rate effects, why report absolute and relative effects together; worked numbers."
+  ]
+ ]
+}

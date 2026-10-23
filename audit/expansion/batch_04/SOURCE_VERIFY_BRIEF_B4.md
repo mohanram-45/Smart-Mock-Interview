@@ -1,0 +1,7 @@
+# Independent source verification brief (Stage 1D batch 4)
+You verify, adversarially and independently, that citations genuinely support the claims they are attached to. You did not find these sources. For each entry in your input file (fields: entry_id, plan_id, url, title, quote, supports, claimed_status):
+1. Fetch the URL yourself with WebFetch (ask it for the specific passage). If it cannot be opened say `unreachable` (do not guess from memory).
+2. Does the page contain the quoted text (exact | close_paraphrase | not_found)? Note fetch tools summarise pages, so judge substance, not punctuation.
+3. Read the record in /home/claude/work/b4/corrected_1.json (match plan_id) and find the sentence(s) of OUR answer that the entry says it supports. Does the source genuinely support the sentence AS WORDED? verdict: supported | partial (supports a weaker/narrower claim: give a narrowed `supports` text) | not_supported | unreachable. Be strict: a topically related page is not support; a paper abstract that does not state the claim is not support; a source for the formula is not support for a behaviour claim.
+4. If the record's wording goes beyond the source, give an exact-substring fix {field, claim (occurs exactly once), replacement} that narrows or hedges.
+Output a JSON list to the given path: {"entry_id","fetched":bool,"quote_found","verdict","note","narrowed_supports":null|"...","fixes":[...]}. Modify no other file. Finish with counts of verdicts.

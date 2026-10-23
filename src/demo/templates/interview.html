@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "_macros.html" import answer_view %}
+{% block title %}Interview · {{ s.config.role or 'Custom' }} · SMART Mock Interview{% endblock %}
+{% block page %}interview{% endblock %}
+{% block body %}
+{% set prog = interview_progress(s) %}
+<div id="interview" data-sid="{{ s.id }}" data-n="{{ n }}" data-total="{{ total }}" data-elapsed="{{ elapsed }}" data-spent="{{ spent }}" data-code="{{ '1' if codeq else '0' }}" data-stage="{{ q.stage or 'core' }}" data-fu-mode="{{ s.config.followup_mode or 'deterministic' }}">
+  <h1 class="sr">Mock interview: {{ s.config.role or 'custom topics' }}</h1>
+  <div class="work-top">
+    <div class="where">{{ s.config.role or 'Custom interview' }}<small id="stage-label">{{ stage_label(q) }}</small></div>
+    <div id="tracker" class="trk">{% include "_tracker.html" %}</div>
+    <div class="timers" id="timers"><span>This question <b id="t-q" aria-hidden="true">0:00</b></span><span>Total <b id="t-all" aria-hidden="true">0:00</b></span><button type="button" id="t-toggle" aria-pressed="false">Hide timer</button></div>
+  </div>
+  <progress class="sr-progress" id="prog" max="{{ prog.total }}" value="{{ prog.done }}" aria-label="Interview progress">{{ prog.done }} of {{ prog.total }} planned steps done</progress>
+  <svg class="pbar" viewBox="0 0 100 4" preserveAspectRatio="none" aria-hidden="true"><rect class="pb-back" width="100" height="4" rx="2"/><rect class="pb-fill" id="pb-fill" width="{{ (100 * (prog.done + 1) / prog.total)|round(1) if prog.total else 0 }}" height="4" rx="2"/></svg>
+  {% if s.notes and n == 1 %}<div class="banner banner-adv"><strong>Note</strong><span>{{ s.notes|join(' ') }}</span></div>{% endif %}
+
+  <div class="convo-grid">
+    <section class="convo" aria-label="Interview conversation">
+      <div class="thread" id="thread" role="log" aria-live="polite" aria-relevant="additions">
+        {% for t in turns %}
+        {% with q=t.q, n=t.n, current=false %}{% include "_prompt.html" %}{% endwith %}
+        <article class="turn turn-you" data-n="{{ t.n }}"><div class="bubble">
+          <p class="who">You</p>
+          {% if t.a and t.a.skipped %}<p class="muted">Skipped</p>{% elif t.a %}{{ answer_view(t.a.answer) }}{% endif %}
+        </div></article>
+        {% endfor %}
+        {% with current=true %}{% include "_prompt.html" %}{% endwith %}
+        <article class="turn turn-ai thinking hidden" id="thinking" aria-hidden="true"><div class="av" aria-hidden="true"><svg viewBox="0 0 30 30" width="26" height="26"><path d="M8 10h14M8 15h9" stroke="#04150b" stroke-width="2.4" stroke-linecap="round"/><rect x="19" y="13" width="2.8" height="9" rx="1.4" fill="#04150b"/></svg></div><div class="bubble"><span class="dots"><i></i><i></i><i></i></span><span class="think-label muted small" id="think-label" aria-live="polite"></span></div></article>
+      </div>
+
+      <div class="composer{{ ' is-code' if codeq }}" id="composer">
+        <form id="answer-form" novalidate>
+          <label class="field" for="answer" id="answer-label">{{ 'Your code' if codeq else 'Your answer' }}</label>
+          <div class="ed-bar"><b id="ed-name">{{ 'answer.py' if codeq else 'answer.txt' }}</b><span id="ed-lang">{% if codeq %}<span class="lang">Python</span>{% else %}Plain text{% endif %}</span></div>
+          <div class="editor">
+            <pre class="gutter" id="gutter" aria-hidden="true"{% if not codeq %} hidden{% endif %}>1</pre>
+            <textarea id="answer" name="answer" rows="{{ 14 if codeq else 7 }}" maxlength="8000" spellcheck="{{ 'false' if codeq else 'true' }}" autocapitalize="{{ 'off' if codeq else 'sentences' }}" {{ 'wrap="off"'|safe if codeq }} class="{{ 'codearea' if codeq }}" data-code="{{ '1' if codeq else '0' }}" aria-describedby="answer-help" placeholder="{{ 'Write your Python here' if codeq else 'Reply in your own words. Short, specific answers are fine.' }}" required></textarea>
+          </div>
+          <div class="row between tight-top"><span class="muted small" id="counter">0 / 8000</span><span class="draft-note" id="draft-note" role="status"></span></div>
+          <div class="keys" id="answer-help"><span><kbd>Ctrl</kbd> + <kbd>Enter</kbd> send</span><span class="only-code"{% if not codeq %} hidden{% endif %}><kbd>Tab</kbd> indents, <kbd>Esc</kbd> then <kbd>Tab</kbd> leaves the box</span></div>
+          <label class="check small only-code"{% if not codeq %} hidden{% endif %}><input type="checkbox" id="tabmode" {{ 'checked' if codeq }}> Tab key indents (4 spaces)</label>
+          <div id="answer-error" class="banner banner-bad hidden" role="alert"></div>
+          <div class="actions">
+            <button class="btn primary" type="submit" id="submit-btn" {{ 'data-live="1"' if s.config.modular_mode == 'live' }}>Send answer</button>
+            <button class="btn" type="button" id="skip-btn">Skip this question</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <aside class="side" aria-label="About this interview">
+      <div class="side-card">
+        <div class="who-card"><div class="av lg" aria-hidden="true"><svg viewBox="0 0 30 30" width="30" height="30"><path d="M8 10h14M8 15h9" stroke="#04150b" stroke-width="2.4" stroke-linecap="round"/><rect x="19" y="13" width="2.8" height="9" rx="1.4" fill="#04150b"/></svg></div><div><strong>Your interviewer</strong><span class="muted small">Scripted from the curated question bank</span></div></div>
+        <ul class="tips" id="tips"><li>Name the key idea first, then add one short example.</li><li>Short, specific answers are fine. You are not graded on length.</li><li>Your reply and your place are saved. Refresh or come back later and carry on.</li></ul>
+        <div class="side-actions"><a class="btn ghost sm" href="{{ url_for('demo.dashboard_page') }}">Save and leave</a><button class="btn ghost sm" type="button" id="finish-btn">End interview</button></div>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}

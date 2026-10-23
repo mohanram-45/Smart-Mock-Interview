@@ -1,0 +1,517 @@
+[
+ {
+  "plan_id": "B4-MLO-08-6",
+  "verdict": "correct",
+  "reasons": [
+   "Numbers re-simulated; only the 'rest' PSI is rounded down"
+  ],
+  "parts_answered": {
+   "all_parts": true
+  },
+  "evidence": [
+   {
+    "claim": "mean 50->53, aggregate PSI ~0.06, new-slice PSI >5, rest ~0.0002",
+    "method": "executed",
+    "evidence": "3 seeds, n=100000, 10 reference-quantile bins: mean 52.96-53.05; aggregate PSI 0.061-0.063; new-slice PSI 6.0-6.2 (eps 1e-4), 5.2-5.3 (eps 1e-3), up to 7.4 (eps 1e-6); rest 0.00016-0.00018"
+   },
+   {
+    "claim": "noise floor ~ (B-1)(1/n+1/m)",
+    "method": "derivation",
+    "evidence": "9*(1/1e5+1/9e4)=1.9e-4, matches simulated 'rest' PSI"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "and about 0.0001 on the rest",
+    "problem": "Simulated value is 0.00016-0.00018, which rounds to 0.0002",
+    "replacement": "and about 0.0002 on the rest"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism plus arithmetic and trade-offs",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field, 314 words"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All 7 key_concepts are discussed (unseen category share in last bullet).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close (smi-i0005 covers drift types, different intent)",
+   "same_intent": false
+  },
+  "code_findings": "No code or configs in this record; nothing to run.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/pdf/2303.01227",
+    "status": "supported",
+    "evidence": "PSI cut-offs 0.1/0.25; critical values depend on sample size and number of groups"
+   },
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/46555.pdf",
+    "status": "supported",
+    "evidence": "'zero bias, in aggregate and on slices' (Monitor 7); the edited wording 'prediction bias' now matches"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-09-4",
+  "verdict": "correct",
+  "reasons": [
+   "New parenthetical in the backtest paragraph describes an invalid way to backtest the warm-start variant"
+  ],
+  "parts_answered": {
+   "all_parts": true
+  },
+  "evidence": [
+   {
+    "claim": "60 daily full retrains x 14 h = 840 h",
+    "method": "derivation",
+    "evidence": "840 h = 35 days of cluster time, so sampling the baseline is sensible"
+   },
+   {
+    "claim": "Rule 8 freshness",
+    "method": "doc",
+    "evidence": "Rules of ML Rule #8 asks how much performance degrades if the model is a day old"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "answer",
+    "claim": "so use a sample of 10 to 15 origin days or a subsampled dataset)",
+    "problem": "Warm start is path dependent: its risks (forgetting, error persistence) accumulate over consecutive updates. Sampling 10-15 isolated origin days tests only single-step warm starts from a fresh checkpoint, hides exactly the failure modes the answer lists, and makes the 'day-to-day stability' and 'injected bad batch recovery' checks impossible. The warm-start chain is cheap (about 40 min per day), only the full-retrain baseline needs sampling.",
+    "replacement": "so run the warm-start chain on consecutive days from one full-retrain checkpoint, since it is cheap at about 40 minutes a day and its errors accumulate along the chain, and compute the full-retrain baseline only on a sample of 10 to 15 of those days or on a subsampled dataset)"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "(for example, refitting trees is not the same as adding trees; the behaviour is implementation-specific)",
+    "problem": "Vague and unsourced; the meaning is unclear to a grader",
+    "replacement": "(for example, some tree libraries can continue boosting from an existing model while others only refit, so check the library's documented behaviour)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Trade-off comparison and experiment design, no heavy derivation",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field, 362 words"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All concepts discussed; 'catastrophic forgetting' appears as 'forgetting'.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close",
+   "same_intent": false
+  },
+  "code_findings": "No code or configs in this record; nothing to run.",
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule #8 is about freshness: how much performance degrades with a day/week/quarter old model"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Library-specific warm-start behaviour of trees"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-11-2",
+  "verdict": "correct",
+  "reasons": [
+   "GDPR/privacy statements are hedged and match sources I opened; two small precision fixes"
+  ],
+  "parts_answered": {
+   "all_parts": true
+  },
+  "evidence": [
+   {
+    "claim": "Pseudonymised data is personal data in the hands of whoever holds the additional information",
+    "method": "doc",
+    "evidence": "ICO: 'Pseudonymised data is personal data in the hands of someone who holds the additional information'; also 'it may be anonymous information in their hands' for recipients without it (the answer's 'for a given recipient' covers this)"
+   },
+   {
+    "claim": "87% unique on ZIP, gender, DOB",
+    "method": "paper",
+    "evidence": "Sweeney abstract: 87% (216 of 248 million) US population likely unique on {5-digit ZIP, gender, date of birth}; data are 1990 census"
+   },
+   {
+    "claim": "Rule 29: save serving features even for a small fraction",
+    "method": "doc",
+    "evidence": "Rules of ML Rule #29"
+   },
+   {
+    "claim": "concise word count",
+    "method": "executed",
+    "evidence": "74 words now, 79 after the suggested edit"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Sweeney estimated that about 87% of the US population was likely unique on 5-digit ZIP, gender and date of birth",
+    "problem": "Omits that the estimate comes from 1990 census data and US 5-digit ZIPs (a full UK postcode and no gender field differ)",
+    "replacement": "Sweeney estimated, from 1990 US census data, that about 87% of the US population was likely unique on 5-digit ZIP, gender and date of birth"
+   },
+   {
+    "severity": "minor",
+    "field": "concise_answer",
+    "claim": "keep a way to find a person's rows for deletion.",
+    "problem": "Concise lacks the hedge that the detailed answer has on erasure; implies deletion is always owed",
+    "replacement": "keep a way to find a person's rows for access and deletion requests where they apply."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Application of privacy concepts to a concrete design, no heavy reasoning",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "genuine short version; numbers and claims agree with detailed"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "417 words, within 450"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "All 8 key_concepts discussed. No legal conclusion is stated unhedged: 'generally still treated as personal data', 'depends on jurisdiction and legal advice', 'right to erasure is not absolute; what applies depends on jurisdiction and legal advice', and the anonymisation-by-key-destruction caveat.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close (smi-l0026 logs a pseudonymised id, different intent)",
+   "same_intent": false
+  },
+  "code_findings": "No code or configs in this record; nothing to run.",
+  "sources_findings": [
+   {
+    "url": "https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/data-sharing/anonymisation/pseudonymisation/",
+    "status": "supported",
+    "evidence": "'Pseudonymised data is personal data in the hands of someone who holds the additional information'; additional information must be kept separate. The sentence's added claim that this includes the team with the key and raw IDs is an inference, hedged by 'depends on jurisdiction and legal advice'."
+   },
+   {
+    "url": "https://dataprivacylab.org/projects/identifiability/paper1.pdf",
+    "status": "supported",
+    "evidence": "87% on {5-digit ZIP, gender, DOB}"
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule #29"
+   },
+   {
+    "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32016R0679",
+    "status": "supported",
+    "evidence": "Recital 26 text read: pseudonymised data 'should be considered to be information on an identifiable natural person'; not cited for any sentence beyond that. Operative erasure article (Art. 17) not opened, so the erasure sentence rests only on its explicit hedge."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Right to erasure scope (kept only as a hedged statement; Art. 17 not opened)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-3",
+  "verdict": "pass",
+  "reasons": [
+   "Arithmetic re-derived; edits are consistent with the practical answer and key concepts"
+  ],
+  "parts_answered": {
+   "all_parts": true
+  },
+  "evidence": [
+   {
+    "claim": "0.1 GiB/h = 102.4 MiB/h; 36,000 req/h; ~2.9 KiB per request",
+    "method": "executed",
+    "evidence": "0.1*1024^3/36000 = 2982 B = 2.91 KiB"
+   },
+   {
+    "claim": "200,000 requests ~ 5.5 h at 10 rps; alert at 1.7 GiB for 3 h to OOM",
+    "method": "executed",
+    "evidence": "5.56 h; 2 - 3*0.1 = 1.7 GiB; 200k*2.9KiB=0.55 GiB so peak ~1.5 GiB stays under the limit"
+   },
+   {
+    "claim": "tracemalloc snapshot comparison",
+    "method": "doc",
+    "evidence": "Snapshot.compare_to documented; page says 'Compute the differences between two snapshots to detect memory leaks'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Several-step diagnosis with arithmetic",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "426 words, within 450"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked ladder, numbers match detailed"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All 8 key_concepts discussed, including gradient history retention (now phrased as autograd history).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0035 (OOMKilled with 4 GiB limit; different cause analysis)",
+   "same_intent": false
+  },
+  "code_findings": "No code or configs in this record; nothing to run.",
+  "sources_findings": [
+   {
+    "url": "https://docs.python.org/3/library/tracemalloc.html",
+    "status": "supported",
+    "evidence": "compare_to(old_snapshot, key_type) documented"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Fragmentation tends to plateau (hedged with 'usually' and 'tends')"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-7",
+  "verdict": "correct",
+  "reasons": [
+   "Edits are sound; one grammar-broken sentence in the practical answer"
+  ],
+  "parts_answered": {
+   "all_parts": true
+  },
+  "evidence": [
+   {
+    "claim": "SRE: blameless assumes good intentions; monitoring failure is a trigger",
+    "method": "doc",
+    "evidence": "Quotes found: 'assumes that everyone involved in an incident had good intentions'; 'A monitoring failure (which usually implies manual incident discovery)'"
+   },
+   {
+    "claim": "Rule 10 joined table no longer updated",
+    "method": "doc",
+    "evidence": "Rules of ML Rule #10 quote found"
+   },
+   {
+    "claim": "19-day timeline consistent across fields",
+    "method": "derivation",
+    "evidence": "question, detailed and practical all use 19 days / 7% relative"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "disable the feature only if the model was trained or validated with it missing (otherwise this reproduces the fault), so it is intentionally imputed and flagged,",
+    "problem": "Dangling 'so it is' after the edit; reads as a non sequitur",
+    "replacement": "disable the feature only if the model was trained or validated with it missing (otherwise this reproduces the fault), in which case it is intentionally imputed and flagged,"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Process/analysis answer with a few judgement calls",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "424 words, within 450"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "runbook not in detailed; compatible with new canary and holdout caveats"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All 7 key_concepts discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close",
+   "same_intent": false
+  },
+  "code_findings": "No code or configs in this record; nothing to run.",
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/postmortem-culture/",
+    "status": "supported",
+    "evidence": "both quotes found"
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule #10 silent failures"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-13-2",
+  "verdict": "pass",
+  "reasons": [
+   "Added CI parenthetical verified"
+  ],
+  "parts_answered": {
+   "all_parts": true
+  },
+  "evidence": [
+   {
+    "claim": "+-10 to 14 points at 95% for share near 50% with 50-100 labels",
+    "method": "executed",
+    "evidence": "1.96*sqrt(.25/50)=13.9, n=100 -> 9.8"
+   },
+   {
+    "claim": "2.7 extra points",
+    "method": "derivation",
+    "evidence": "3.9-1.2=2.7"
+   },
+   {
+    "claim": "MLflow prompt versions immutable, alias mutable",
+    "method": "doc",
+    "evidence": "'Prompt versions in MLflow are immutable'; alias is 'a mutable named reference'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Triage across hypotheses with some statistics",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "73 words, consistent with detailed"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "407 words"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "All 7 key_concepts discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close",
+   "same_intent": false
+  },
+  "code_findings": "No code or configs in this record; nothing to run.",
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/genai/prompt-registry/",
+    "status": "supported",
+    "evidence": "immutable versions; mutable alias"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Retry/regenerate loop raising p95 is a plausible mechanism, framed as a hypothesis to test"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-3",
+  "verdict": "pass",
+  "reasons": [
+   "Numbers recomputed; A/A parenthetical is correct"
+  ],
+  "parts_answered": {
+   "all_parts": true
+  },
+  "evidence": [
+   {
+    "claim": "chi-square 40.0, p about 2.5e-10",
+    "method": "executed",
+    "evidence": "(1000^2/50000)*2=40; erfc(sqrt(20))=2.54e-10"
+   },
+   {
+    "claim": "single A/A run p<0.05 about 5% of time",
+    "method": "derivation",
+    "evidence": "definition of the test size under the null"
+   },
+   {
+    "claim": "SRM threshold typically 0.001; do not interpret until explained",
+    "method": "doc",
+    "evidence": "Spotify Confidence page quotes both"
+   },
+   {
+    "claim": "Direct feedback loops, Section 4",
+    "method": "paper",
+    "evidence": "Hidden Technical Debt Sec. 4: 'A model may directly influence the selection of its own future training data.'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Two interacting interference mechanisms plus SRM test and design fixes (borderline Medium-Hard)",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "314 words"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "ordered checklist, numbers agree"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All 7 key_concepts discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0037 (SRM chi-square code, no interference) / smi-l0033 (split method and interference)",
+   "same_intent": false
+  },
+  "code_findings": "No code or configs in this record; nothing to run.",
+  "sources_findings": [
+   {
+    "url": "https://confidence.spotify.com/glossary/sample-ratio-mismatch",
+    "status": "supported",
+    "evidence": "typically 0.001; do not interpret until resolved"
+   },
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "supported",
+    "evidence": "Sec. 4 direct feedback loops"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ }
+]

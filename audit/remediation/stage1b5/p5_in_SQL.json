@@ -1,0 +1,440 @@
+[
+ {
+  "id": "smi-i0011",
+  "plan_id": "P3-SQL-01",
+  "domain": "SQL",
+  "difficulty": "Medium",
+  "priority": false,
+  "question": "Two tables hold sign-up emails: web_signups(email) with rows 'a@x.com', 'b@x.com', 'b@x.com', NULL, and newsletter(email) with rows 'b@x.com', 'c@x.com', NULL. A teammate combines them with UNION and is surprised the result has 4 rows, not 7. Explain the difference between UNION and UNION ALL, say what each costs, and state the rules a compound SELECT imposes on its column lists and on ORDER BY. Then write one query that returns the row count of the UNION result and of the UNION ALL result as two rows (columns op, n_rows), ordered by n_rows.",
+  "answer": "UNION returns the rows of both queries and then removes duplicate rows from the combined result; UNION ALL simply concatenates them and keeps every row. Here UNION ALL gives 4 + 3 = 7 rows and UNION gives 4: 'a@x.com', 'b@x.com', 'c@x.com' and one NULL. For duplicate removal, NULLs count as equal to each other (unlike in a = comparison), so the two NULL rows collapse into one.\n\n```sql\nSELECT 'union' AS op, COUNT(*) AS n_rows\nFROM (SELECT email FROM web_signups UNION SELECT email FROM newsletter)\nUNION ALL\nSELECT 'union_all', COUNT(*)\nFROM (SELECT email FROM web_signups UNION ALL SELECT email FROM newsletter)\nORDER BY n_rows;\n```\n\nCost: UNION has to detect duplicates, which typically means a sort or a hash/temporary index over the whole result, so it does extra work and usually has to consume its input before the final rows are known; UNION ALL needs no such step. Use UNION ALL when duplicates are impossible or wanted (for example, the two inputs are disjoint partitions), and UNION only when you actually need distinct rows. Using UNION \"just to be safe\" can also hide data problems.\n\nRules: every SELECT in the compound must return the same number of columns (otherwise SQLite raises an error); columns are matched by position, not by name, and the output column names come from the first SELECT. Column types should be compatible; SQLite does not enforce this, but stricter databases do. ORDER BY (and LIMIT) may appear only once, at the very end, and it applies to the whole combined result, not to the last SELECT alone; its terms are resolved against the output columns. Three or more operands group left to right.",
+  "key_concepts": [
+   "UNION",
+   "UNION ALL",
+   "duplicate elimination",
+   "NULL equality in set operations",
+   "compound SELECT",
+   "ORDER BY on compound select",
+   "column count and position matching"
+  ],
+  "common_mistakes": [
+   "Believing UNION ALL also removes duplicates, or that UNION only dedupes against the second table rather than the whole combined result.",
+   "Putting ORDER BY inside the first SELECT of the compound, or assuming the order of the inputs is preserved after UNION.",
+   "Using UNION by habit when the inputs are known to be disjoint, paying for an unnecessary distinct step."
+  ],
+  "sources": [
+   {
+    "title": "SQLite: SELECT statement (compound select operators)",
+    "url": "https://www.sqlite.org/lang_select.html",
+    "supports": "UNION removes duplicate rows while UNION ALL does not; all SELECTs in a compound must have the same number of columns; ORDER BY may only be at the end and applies to the whole compound; NULLs are considered equal when determining duplicates in compound selects.",
+    "verification": "independent_reviewer_supported"
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE web_signups(email TEXT);\nCREATE TABLE newsletter(email TEXT);\nINSERT INTO web_signups VALUES ('a@x.com'), ('b@x.com'), ('b@x.com'), (NULL);\nINSERT INTO newsletter VALUES ('b@x.com'), ('c@x.com'), (NULL);",
+   "solution": "SELECT 'union' AS op, COUNT(*) AS n_rows\nFROM (SELECT email FROM web_signups UNION SELECT email FROM newsletter)\nUNION ALL\nSELECT 'union_all', COUNT(*)\nFROM (SELECT email FROM web_signups UNION ALL SELECT email FROM newsletter)\nORDER BY n_rows;",
+   "test": "",
+   "expected": [
+    [
+     "union",
+     4
+    ],
+    [
+     "union_all",
+     7
+    ]
+   ]
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "claim": "so it does extra work and cannot stream rows out immediately",
+    "problem": "Engine-internal behaviour stated as a certainty; not derivable from the data or the SQLite page (I did not verify it per engine).",
+    "replacement": "so it does extra work and usually has to consume its input before the final rows are known"
+   }
+  ]
+ },
+ {
+  "id": "smi-i0013",
+  "plan_id": "P3-SQL-03",
+  "domain": "SQL",
+  "difficulty": "Medium",
+  "priority": false,
+  "question": "Two nightly snapshots of the same contact list should match. crm_contacts(id, email, phone) has rows (1,'a@x.com','111'), (2,'b@x.com',NULL), (3,'c@x.com','333'), (4,'d@x.com',NULL); billing_contacts(id, email, phone) has rows (1,'a@x.com','111'), (2,'b@x.com',NULL), (3,'c@x.com','999'), (5,'e@x.com',NULL). List every row that is present in only one snapshot, with columns side ('crm_only' or 'billing_only'), id, email, phone, ordered by id then side. Row 2 is identical in both (phone is NULL in both) and must not be reported. Explain why a join on phone = phone gets row 2 wrong and why EXCEPT does not.",
+  "answer": "Take the difference in both directions with EXCEPT and stack the two results with UNION ALL, tagging each with its side. Wrapping each EXCEPT in a subquery lets the final ORDER BY apply to the whole stacked result.\n\n```sql\nSELECT 'crm_only' AS side, id, email, phone\nFROM (SELECT id, email, phone FROM crm_contacts\n      EXCEPT\n      SELECT id, email, phone FROM billing_contacts)\nUNION ALL\nSELECT 'billing_only', id, email, phone\nFROM (SELECT id, email, phone FROM billing_contacts\n      EXCEPT\n      SELECT id, email, phone FROM crm_contacts)\nORDER BY id, side;\n```\n\nResult: (billing_only, 3, c@x.com, 999), (crm_only, 3, c@x.com, 333), (crm_only, 4, d@x.com, NULL), (billing_only, 5, e@x.com, NULL). Id 3 shows up on both sides because the phone differs, which is how a changed value appears in a row-set comparison; ids 4 and 5 are genuinely one-sided; row 2 is correctly absent.\n\nWhy it works: set operators compare whole rows and treat NULL as equal to NULL when finding duplicates. An equality comparison does not: NULL = NULL is unknown, so a NOT EXISTS (or LEFT JOIN ... IS NULL) anti-join with b.phone = c.phone treats row 2 as unmatched and falsely reports it as crm_only (on this data it returns ids 2, 3 and 4). To get the same effect with joins, compare with the NULL-safe operator (IS in SQLite, IS NOT DISTINCT FROM in standard SQL/PostgreSQL).\n\nLimits: EXCEPT is set-based, so it cannot see a row that is duplicated a different number of times in each table; compare GROUP BY counts if multiplicity matters. It also cannot tell you which column changed. Use UNION ALL for the stacking: the side tag already keeps the two halves distinct, so UNION would return the same rows here and only add a pointless duplicate-removal step.",
+  "key_concepts": [
+   "EXCEPT",
+   "UNION ALL",
+   "NULL-safe comparison",
+   "three-valued logic",
+   "table reconciliation",
+   "symmetric difference"
+  ],
+  "common_mistakes": [
+   "Using = on nullable columns in a NOT EXISTS/LEFT JOIN comparison, which reports identical NULL-containing rows as differences.",
+   "Running EXCEPT in only one direction, so rows that exist only in the second table are missed.",
+   "Assuming EXCEPT reports a row that appears a different number of times in each table; it is set-based and ignores duplicate counts."
+  ],
+  "sources": [
+   {
+    "title": "SQLite: SELECT statement (compound select operators)",
+    "url": "https://www.sqlite.org/lang_select.html",
+    "supports": "For duplicate determination in compound SELECTs, NULL values are considered equal to other NULL values; EXCEPT returns left rows not in the right result.",
+    "verification": "independent_reviewer_supported"
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE crm_contacts(id INTEGER, email TEXT, phone TEXT);\nCREATE TABLE billing_contacts(id INTEGER, email TEXT, phone TEXT);\nINSERT INTO crm_contacts VALUES (1,'a@x.com','111'),(2,'b@x.com',NULL),(3,'c@x.com','333'),(4,'d@x.com',NULL);\nINSERT INTO billing_contacts VALUES (1,'a@x.com','111'),(2,'b@x.com',NULL),(3,'c@x.com','999'),(5,'e@x.com',NULL);",
+   "solution": "SELECT 'crm_only' AS side, id, email, phone\nFROM (SELECT id, email, phone FROM crm_contacts\n      EXCEPT\n      SELECT id, email, phone FROM billing_contacts)\nUNION ALL\nSELECT 'billing_only', id, email, phone\nFROM (SELECT id, email, phone FROM billing_contacts\n      EXCEPT\n      SELECT id, email, phone FROM crm_contacts)\nORDER BY id, side;",
+   "test": "",
+   "expected": [
+    [
+     "billing_only",
+     3,
+     "c@x.com",
+     "999"
+    ],
+    [
+     "crm_only",
+     3,
+     "c@x.com",
+     "333"
+    ],
+    [
+     "crm_only",
+     4,
+     "d@x.com",
+     null
+    ],
+    [
+     "billing_only",
+     5,
+     "e@x.com",
+     null
+    ]
+   ]
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "claim": "(I ran this: it returns ids 2, 3 and 4)",
+    "problem": "First-person claim in a reference answer; the exact anti-join is not shown. Verified true for an anti-join on id, email and phone with =.",
+    "replacement": "(on this data it returns ids 2, 3 and 4)"
+   },
+   {
+    "severity": "minor",
+    "claim": "Pick UNION ALL, not UNION, for stacking, so nothing is dropped.",
+    "problem": "Misleading: the side tag makes the two halves distinct, and replacing UNION ALL by UNION gives identical rows on this data (verified). UNION ALL is preferable only to skip needless dedup.",
+    "replacement": "Use UNION ALL for the stacking: the side tag already keeps the two halves distinct, so UNION would return the same rows here and only add a pointless duplicate-removal step."
+   },
+   {
+    "severity": "minor",
+    "claim": "Using UNION instead of UNION ALL and relying on EXCEPT for multiplicity, forgetting both are set-based and ignore duplicate counts.",
+    "problem": "Confused common_mistake (UNION vs UNION ALL is not what hides multiplicity differences).",
+    "replacement": "Assuming EXCEPT reports a row that appears a different number of times in each table; it is set-based and ignores duplicate counts."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0015",
+  "plan_id": "P3-SQL-05",
+  "domain": "SQL",
+  "difficulty": "Medium",
+  "priority": false,
+  "question": "employees(id INTEGER PRIMARY KEY, name TEXT, dept TEXT, salary INTEGER) has rows (name, dept, salary): Ana Eng 150, Ben Eng 140, Cy Eng 140, Dee Eng 130, Eli Eng 120; Fay Sales 100, Gus Sales 90, Hal Sales 90, Ivy Sales 60; Jo HR 80, Kim HR 70; Lou Ops 50, Max Ops 70, Ned Ops NULL (not yet set), Oda Ops 60. Standard SQLite builds (including the 3.37.2 library) have no built-in MEDIAN aggregate. Write one query returning dept and median_salary (the middle value, or the mean of the two middle values when the count is even), ignoring NULL salaries, ordered by dept. Explain how you handle odd and even counts and what goes wrong if the NULL row is not excluded.",
+  "answer": "Number the non-NULL salaries inside each department and keep the middle one or two rows, then average them.\n\n```sql\nWITH ranked AS (\n  SELECT dept, salary,\n         ROW_NUMBER() OVER (PARTITION BY dept ORDER BY salary) AS rn,\n         COUNT(*)     OVER (PARTITION BY dept)                 AS cnt\n  FROM employees\n  WHERE salary IS NOT NULL\n)\nSELECT dept, AVG(salary) AS median_salary\nFROM ranked\nWHERE rn IN ((cnt + 1) / 2, (cnt + 2) / 2)\nGROUP BY dept\nORDER BY dept;\n```\n\nResult (Eng 140, HR 75, Ops 60, Sales 90; AVG returns a real number, so SQLite shows 140.0 etc.). Mechanism: ROW_NUMBER orders each department's salaries, COUNT(*) OVER gives the group size cnt. With integer division, (cnt+1)/2 and (cnt+2)/2 are the same row for odd cnt (cnt=5 gives row 3 twice) and the two middle rows for even cnt (cnt=4 gives rows 2 and 3). IN matches either one, and AVG over the one or two matching rows gives the median. Ties are harmless: Sales has 100, 90, 90, 60, and the middle rows are both 90.\n\nThe NULL row: salaries must be filtered before numbering, otherwise ROW_NUMBER and COUNT include the NULL row. In SQLite NULL sorts first in ascending order, so Ops would have 4 rows and the middle rows would be 50 and 60, giving 55 instead of the correct 60 (the middle of the three known values). Filtering in the CTE gives the correct median 60. A department whose salaries are all NULL disappears from the result; use a LEFT JOIN from a department table if you need it shown as NULL.\n\nAlternatives: a self-join counting rows below and above each value, or LIMIT/OFFSET in a correlated subquery per department; the window version is the clearest. Window functions require SQLite 3.25 or newer.",
+  "key_concepts": [
+   "median",
+   "ROW_NUMBER",
+   "COUNT window function",
+   "PARTITION BY",
+   "integer division",
+   "NULL handling",
+   "even and odd row counts"
+  ],
+  "common_mistakes": [
+   "Using AVG(salary) and calling it the median.",
+   "Not excluding NULLs before ROW_NUMBER/COUNT, which shifts the middle position.",
+   "Using cnt/2 only, which returns the wrong row for odd counts, or averaging DISTINCT salaries so repeated values are collapsed."
+  ],
+  "sources": [
+   {
+    "title": "SQLite: Window Functions",
+    "url": "https://www.sqlite.org/windowfunctions.html",
+    "supports": "Window functions were added in SQLite 3.25.0, and row_number() numbers rows within the partition in the order given by the window ORDER BY.",
+    "verification": "independent_reviewer_supported"
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE employees(id INTEGER PRIMARY KEY, name TEXT, dept TEXT, salary INTEGER);\nINSERT INTO employees(name, dept, salary) VALUES\n ('Ana','Eng',150),('Ben','Eng',140),('Cy','Eng',140),('Dee','Eng',130),('Eli','Eng',120),\n ('Fay','Sales',100),('Gus','Sales',90),('Hal','Sales',90),('Ivy','Sales',60),\n ('Jo','HR',80),('Kim','HR',70),\n ('Lou','Ops',50),('Max','Ops',70),('Ned','Ops',NULL),('Oda','Ops',60);",
+   "solution": "WITH ranked AS (\n  SELECT dept, salary,\n         ROW_NUMBER() OVER (PARTITION BY dept ORDER BY salary) AS rn,\n         COUNT(*)     OVER (PARTITION BY dept)                 AS cnt\n  FROM employees\n  WHERE salary IS NOT NULL\n)\nSELECT dept, AVG(salary) AS median_salary\nFROM ranked\nWHERE rn IN ((cnt + 1) / 2, (cnt + 2) / 2)\nGROUP BY dept\nORDER BY dept;",
+   "test": "",
+   "expected": [
+    [
+     "Eng",
+     140.0
+    ],
+    [
+     "HR",
+     75.0
+    ],
+    [
+     "Ops",
+     60.0
+    ],
+    [
+     "Sales",
+     90.0
+    ]
+   ]
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "claim": "SQLite has no MEDIAN function.",
+    "problem": "Over-absolute: per sqlite.org/changes.html, 3.47.0 added median()/percentile() to the CLI and 3.51.0 built the percentile extension into the amalgamation (opt-in at compile time). Not in default library builds, incl. 3.37.2.",
+    "replacement": "Standard SQLite builds (including the 3.37.2 library) have no built-in MEDIAN aggregate."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0017",
+  "plan_id": "P3-SQL-07",
+  "domain": "SQL",
+  "difficulty": "Hard",
+  "priority": false,
+  "question": "events(user_id INTEGER NOT NULL, event_ts TEXT NOT NULL, event_name TEXT) stores 'YYYY-MM-DD HH:MM:SS' timestamps in one time zone. Rows (user_id, event_ts): user 1: 2024-06-01 09:00:00, 09:10:00, 09:40:00, 10:11:00, 10:12:00; user 2: 2024-06-01 23:50:00, 2024-06-02 00:10:00, 2024-06-02 00:10:00 (two events at the same second), 2024-06-02 12:00:00; user 3: 2024-06-01 08:00:00. A new session starts at a user's first event, and whenever the gap to that user's previous event is strictly more than 30 minutes (a gap of exactly 30:00 stays in the session). Return user_id, session_id (1, 2, ... per user), session_start, session_end and n_events, ordered by user_id, session_id, using LAG and a running SUM. Explain why the running SUM works and which edge cases matter.",
+  "answer": "Mark session starts with LAG, then turn the flags into session numbers with a running SUM per user.\n\n```sql\nWITH lagged AS (\n  SELECT user_id, event_ts,\n         LAG(event_ts) OVER (PARTITION BY user_id ORDER BY event_ts) AS prev_ts\n  FROM events\n),\nflagged AS (\n  SELECT user_id, event_ts,\n         CASE WHEN prev_ts IS NULL\n                OR CAST(strftime('%s', event_ts) AS INTEGER)\n                 - CAST(strftime('%s', prev_ts)  AS INTEGER) > 1800\n              THEN 1 ELSE 0 END AS is_new\n  FROM lagged\n),\nnumbered AS (\n  SELECT user_id, event_ts,\n         SUM(is_new) OVER (PARTITION BY user_id ORDER BY event_ts\n                           ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS session_id\n  FROM flagged\n)\nSELECT user_id, session_id,\n       MIN(event_ts) AS session_start,\n       MAX(event_ts) AS session_end,\n       COUNT(*)      AS n_events\nFROM numbered\nGROUP BY user_id, session_id\nORDER BY user_id, session_id;\n```\n\nResult: user 1 has session 1 (09:00 to 09:40, 3 events) and session 2 (10:11 to 10:12, 2 events); user 2 has session 1 (23:50 to 00:10, 3 events) and session 2 (12:00, 1 event); user 3 has one session.\n\nWhy it works: is_new is 1 on each first event and after each big gap, and 0 otherwise. The running sum of those flags in time order increases by one exactly at a session boundary, so every event of a session carries the same value, which then serves as a group key. The sum has to be an explicit running one (ROWS frame); the default RANGE frame would also work here and treats equal timestamps as peers (tied rows all get the same running sum); an explicit ROWS frame is the usual idiom but then needs a unique tie-breaker in the ORDER BY.\n\nEdge cases from the data: the gap from 09:10 to 09:40 is exactly 1800 seconds and stays in the session because the test is > 1800; 09:40 to 10:11 is 31 minutes and splits; user 2 crosses midnight but is one session because the comparison uses full timestamps, not dates; duplicate timestamps give a zero gap, so they never start a session of their own; the order of tied rows is not defined by ORDER BY event_ts alone, so for a guaranteed-deterministic result add a unique tie-breaker such as rowid to both ORDER BY clauses. I compare epoch seconds with strftime('%s'), which gives exact integers; fractional julianday differences can misjudge the exact-30-minute boundary. Session ids are per user; combine user_id and session_id for a global key. Sessionisation needs the events ordered, so with millions of rows add a (user_id, event_ts) index. Window functions need SQLite 3.25+.",
+  "key_concepts": [
+   "sessionization",
+   "LAG",
+   "running SUM",
+   "window frame",
+   "gap threshold",
+   "strftime epoch seconds",
+   "boundary conditions"
+  ],
+  "common_mistakes": [
+   "Grouping by date instead of using time gaps, which splits sessions at midnight.",
+   "Using > 30 minutes computed with floating-point julianday differences, or >= instead of >, so boundary cases flip.",
+   "Forgetting PARTITION BY user_id, so one user's last event is compared with another user's first."
+  ],
+  "sources": [
+   {
+    "title": "SQLite: Window Functions",
+    "url": "https://www.sqlite.org/windowfunctions.html",
+    "supports": "lag() returns the value from the previous row in the partition, or NULL when there is no previous row.",
+    "verification": "independent_reviewer_supported"
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE events(user_id INTEGER NOT NULL, event_ts TEXT NOT NULL, event_name TEXT);\nINSERT INTO events VALUES\n (1,'2024-06-01 09:00:00','view'),(1,'2024-06-01 09:10:00','click'),(1,'2024-06-01 09:40:00','click'),\n (1,'2024-06-01 10:11:00','view'),(1,'2024-06-01 10:12:00','click'),\n (2,'2024-06-01 23:50:00','view'),(2,'2024-06-02 00:10:00','click'),(2,'2024-06-02 00:10:00','click'),\n (2,'2024-06-02 12:00:00','view'),\n (3,'2024-06-01 08:00:00','view');",
+   "solution": "WITH lagged AS (\n  SELECT user_id, event_ts,\n         LAG(event_ts) OVER (PARTITION BY user_id ORDER BY event_ts) AS prev_ts\n  FROM events\n),\nflagged AS (\n  SELECT user_id, event_ts,\n         CASE WHEN prev_ts IS NULL\n                OR CAST(strftime('%s', event_ts) AS INTEGER)\n                 - CAST(strftime('%s', prev_ts)  AS INTEGER) > 1800\n              THEN 1 ELSE 0 END AS is_new\n  FROM lagged\n),\nnumbered AS (\n  SELECT user_id, event_ts,\n         SUM(is_new) OVER (PARTITION BY user_id ORDER BY event_ts\n                           ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS session_id\n  FROM flagged\n)\nSELECT user_id, session_id,\n       MIN(event_ts) AS session_start,\n       MAX(event_ts) AS session_end,\n       COUNT(*)      AS n_events\nFROM numbered\nGROUP BY user_id, session_id\nORDER BY user_id, session_id;",
+   "test": "",
+   "expected": [
+    [
+     1,
+     1,
+     "2024-06-01 09:00:00",
+     "2024-06-01 09:40:00",
+     3
+    ],
+    [
+     1,
+     2,
+     "2024-06-01 10:11:00",
+     "2024-06-01 10:12:00",
+     2
+    ],
+    [
+     2,
+     1,
+     "2024-06-01 23:50:00",
+     "2024-06-02 00:10:00",
+     3
+    ],
+    [
+     2,
+     2,
+     "2024-06-02 12:00:00",
+     "2024-06-02 12:00:00",
+     1
+    ],
+    [
+     3,
+     1,
+     "2024-06-01 08:00:00",
+     "2024-06-01 08:00:00",
+     1
+    ]
+   ]
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "claim": "duplicate timestamps give a zero gap, so their LAG order does not change the sessions.",
+    "problem": "Overstated. The tied rows' order inside LAG and inside the ROWS-frame SUM is not defined by ORDER BY event_ts; if the two windows ordered ties differently, the flagged tied row could land in the previous session. SQLite sorts identical windows the same way (my duplicate tests at session start were correct), but it is not guaranteed.",
+    "replacement": "duplicate timestamps give a zero gap, so they never start a session of their own; the order of tied rows is not defined by ORDER BY event_ts alone, so for a guaranteed-deterministic result add a unique tie-breaker such as rowid to both ORDER BY clauses."
+   },
+   {
+    "severity": "minor",
+    "claim": "the default RANGE frame would also work here but treats equal timestamps as peers, so be explicit.",
+    "problem": "The default RANGE frame is actually the order-insensitive choice for tied timestamps (all peers get the same running sum), so 'be explicit' with ROWS is only safe with a tie-breaker.",
+    "replacement": "the default RANGE frame would also work here and treats equal timestamps as peers (tied rows all get the same running sum); an explicit ROWS frame is the usual idiom but then needs a unique tie-breaker in the ORDER BY."
+   }
+  ]
+ },
+ {
+  "id": "smi-i0018",
+  "plan_id": "P3-SQL-08",
+  "domain": "SQL",
+  "difficulty": "Medium",
+  "priority": false,
+  "question": "events(user_id INTEGER NOT NULL, event_name TEXT NOT NULL, event_ts TEXT NOT NULL) logs a shop funnel with event_name in 'view', 'add_to_cart', 'purchase'. Rows (user_id: event@ts, all 2024-05): 1: view 05-01 10:00, view 10:05, add_to_cart 10:06, purchase 10:20; 2: view 05-01 11:00, add_to_cart 11:02; 3: view 05-02 09:00; 4: view 05-02 12:00, view 12:30, view 05-03 08:00; 5: view 05-03 14:00, add_to_cart 14:01, add_to_cart 14:02, purchase 14:10; 6: purchase 05-04 09:00 only; 7: add_to_cart 05-04 10:00, then view 10:05; 8: view 05-04 15:00, add_to_cart 15:03, purchase 15:30. Count USERS (not events) at each step, where a user reaches add_to_cart only if their first cart event is at or after their first view, and reaches purchase only if their first purchase is at or after their first cart event. Return one row: viewed, carted, purchased, view_to_cart_pct, cart_to_purchase_pct, overall_pct (1 decimal). Explain the design choices.",
+  "answer": "Reduce to one row per user with the first time of each step using conditional aggregation, enforce the order of the steps, then count how many users have a value at each step.\n\n```sql\nWITH u AS (\n  SELECT user_id,\n         MIN(CASE WHEN event_name = 'view'        THEN event_ts END) AS t_view,\n         MIN(CASE WHEN event_name = 'add_to_cart' THEN event_ts END) AS t_cart,\n         MIN(CASE WHEN event_name = 'purchase'    THEN event_ts END) AS t_buy\n  FROM events\n  GROUP BY user_id\n),\ns2 AS (\n  SELECT user_id, t_view,\n         CASE WHEN t_cart >= t_view THEN t_cart END AS t_cart, t_buy\n  FROM u\n  WHERE t_view IS NOT NULL\n),\ns3 AS (\n  SELECT user_id, t_view, t_cart,\n         CASE WHEN t_buy >= t_cart THEN t_buy END AS t_buy\n  FROM s2\n)\nSELECT COUNT(t_view) AS viewed,\n       COUNT(t_cart) AS carted,\n       COUNT(t_buy)  AS purchased,\n       ROUND(100.0 * COUNT(t_cart) / NULLIF(COUNT(t_view), 0), 1) AS view_to_cart_pct,\n       ROUND(100.0 * COUNT(t_buy)  / NULLIF(COUNT(t_cart), 0), 1) AS cart_to_purchase_pct,\n       ROUND(100.0 * COUNT(t_buy)  / NULLIF(COUNT(t_view), 0), 1) AS overall_pct\nFROM s3;\n```\n\nResult: viewed 7, carted 4, purchased 3, view_to_cart 57.1%, cart_to_purchase 75.0%, overall 42.9%. Counting events would give 10 view events for 7 viewers (users 1 and 4 viewed several times), and a naive count of purchase events would include user 6, who purchased without any prior view in the log, and ignore the rule that the steps must happen in order.\n\nDesign choices: MIN(CASE WHEN ...) gives each user's first event of each type, so repeated events cannot inflate counts. COUNT(column) counts only non-NULL values, which is why a user who fails a step is simply dropped from that and later steps (their value becomes NULL). User 7 added to cart before viewing, so counts as viewed only; user 6 is excluded from the funnel entirely (they are worth investigating as a tracking gap or a buy-now path). The rate denominators are the previous step, and NULLIF avoids division by zero (SQLite would return NULL, other databases error). Use 100.0 to avoid integer division.\n\nLimits: this is a first-touch funnel, with no time window or session boundary and no product dimension; add a window such as purchase within 24 hours of the first view if the business defines conversion that way, and decide up front whether ties on timestamps count as ordered (here >= does). Also note the literal rule compares only each user's first cart with their first view, so a user with cart 10:00, view 10:05, cart 10:10 is not counted as carted; if that should count, use the earliest cart at or after the first view instead.",
+  "key_concepts": [
+   "conditional aggregation",
+   "funnel analysis",
+   "users vs events",
+   "COUNT(column) ignores NULL",
+   "step ordering",
+   "NULLIF division guard",
+   "conversion rate"
+  ],
+  "common_mistakes": [
+   "Counting events (COUNT(*)) instead of users, so repeat viewers inflate each step.",
+   "Counting purchasers who never viewed or added to cart, so later steps exceed earlier ones and rates can exceed 100%.",
+   "Dividing integers (COUNT/COUNT) and getting 0 instead of a percentage, or dividing by a zero step count."
+  ],
+  "sources": [
+   {
+    "title": "SQLite: Built-in Aggregate Functions",
+    "url": "https://www.sqlite.org/lang_aggfunc.html",
+    "supports": "count(X) counts the number of times X is not NULL in a group, while count(*) counts all rows in the group.",
+    "verification": "independent_reviewer_supported"
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE events(user_id INTEGER NOT NULL, event_name TEXT NOT NULL, event_ts TEXT NOT NULL);\nINSERT INTO events VALUES\n (1,'view','2024-05-01 10:00:00'),(1,'view','2024-05-01 10:05:00'),(1,'add_to_cart','2024-05-01 10:06:00'),(1,'purchase','2024-05-01 10:20:00'),\n (2,'view','2024-05-01 11:00:00'),(2,'add_to_cart','2024-05-01 11:02:00'),\n (3,'view','2024-05-02 09:00:00'),\n (4,'view','2024-05-02 12:00:00'),(4,'view','2024-05-02 12:30:00'),(4,'view','2024-05-03 08:00:00'),\n (5,'view','2024-05-03 14:00:00'),(5,'add_to_cart','2024-05-03 14:01:00'),(5,'add_to_cart','2024-05-03 14:02:00'),(5,'purchase','2024-05-03 14:10:00'),\n (6,'purchase','2024-05-04 09:00:00'),\n (7,'add_to_cart','2024-05-04 10:00:00'),(7,'view','2024-05-04 10:05:00'),\n (8,'view','2024-05-04 15:00:00'),(8,'add_to_cart','2024-05-04 15:03:00'),(8,'purchase','2024-05-04 15:30:00');",
+   "solution": "WITH u AS (\n  SELECT user_id,\n         MIN(CASE WHEN event_name = 'view'        THEN event_ts END) AS t_view,\n         MIN(CASE WHEN event_name = 'add_to_cart' THEN event_ts END) AS t_cart,\n         MIN(CASE WHEN event_name = 'purchase'    THEN event_ts END) AS t_buy\n  FROM events\n  GROUP BY user_id\n),\ns2 AS (\n  SELECT user_id, t_view,\n         CASE WHEN t_cart >= t_view THEN t_cart END AS t_cart, t_buy\n  FROM u\n  WHERE t_view IS NOT NULL\n),\ns3 AS (\n  SELECT user_id, t_view, t_cart,\n         CASE WHEN t_buy >= t_cart THEN t_buy END AS t_buy\n  FROM s2\n)\nSELECT COUNT(t_view) AS viewed,\n       COUNT(t_cart) AS carted,\n       COUNT(t_buy)  AS purchased,\n       ROUND(100.0 * COUNT(t_cart) / NULLIF(COUNT(t_view), 0), 1) AS view_to_cart_pct,\n       ROUND(100.0 * COUNT(t_buy)  / NULLIF(COUNT(t_cart), 0), 1) AS cart_to_purchase_pct,\n       ROUND(100.0 * COUNT(t_buy)  / NULLIF(COUNT(t_view), 0), 1) AS overall_pct\nFROM s3;",
+   "test": "",
+   "expected": [
+    [
+     7,
+     4,
+     3,
+     57.1,
+     75.0,
+     42.9
+    ]
+   ]
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "claim": "and decide up front whether ties on timestamps count as ordered (here >= does).",
+    "problem": "Missing limitation: comparing the first cart with the first view is stricter than 'carted after viewing'. A user with cart 10:00, view 10:05, cart 10:10 is dropped from the cart step although a later cart follows a view (by the question's literal rule this is intended, but the answer should say so).",
+    "replacement": "and decide up front whether ties on timestamps count as ordered (here >= does). Also note the literal rule compares only each user's first cart with their first view, so a user with cart 10:00, view 10:05, cart 10:10 is not counted as carted; if that should count, use the earliest cart at or after the first view instead."
+   },
+   {
+    "severity": "minor",
+    "claim": "COUNT DISTINCT users vs events",
+    "problem": "Listed key concept, but the solution never uses COUNT DISTINCT; it counts users via GROUP BY user_id and COUNT(column).",
+    "replacement": "users vs events"
+   }
+  ]
+ },
+ {
+  "id": "smi-i0020",
+  "plan_id": "P3-SQL-10",
+  "domain": "SQL",
+  "difficulty": "Medium",
+  "priority": false,
+  "question": "user_plans(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, plan TEXT NOT NULL, updated_at TEXT) is an append-style history. Rows (id, user_id, plan, updated_at): (1,1,free,'2024-01-10 09:00:00'), (2,1,pro,'2024-03-02 12:00:00'), (3,1,team,'2024-02-01 08:30:00'), (4,2,free,'2024-02-14 10:00:00'), (5,2,pro,'2024-02-20 17:45:00'), (6,2,team,'2024-02-20 17:45:00'), (7,3,free,'2024-01-05 00:00:00'), (8,4,free,NULL), (9,4,pro,'2024-03-01 00:00:00'). Return exactly one current row per user (id, user_id, plan, updated_at), the one with the latest updated_at, ordered by user_id. For the tie of user 2's rows 5 and 6, the higher id wins. Show the ROW_NUMBER version, then compare it with the correlated-subquery and the GROUP BY ... MAX() versions: what does each do with ties and the NULL?",
+  "answer": "Number each user's rows from newest to oldest and keep number 1. The tie-break is part of the ORDER BY.\n\n```sql\nSELECT id, user_id, plan, updated_at\nFROM (\n  SELECT id, user_id, plan, updated_at,\n         ROW_NUMBER() OVER (PARTITION BY user_id\n                            ORDER BY updated_at DESC, id DESC) AS rn\n  FROM user_plans\n)\nWHERE rn = 1\nORDER BY user_id;\n```\n\nResult: ids 2, 6, 7 and 9. User 2's tie goes to id 6 because of the id DESC tie-break. User 4's NULL timestamp row (id 8) is not chosen because SQLite sorts NULL as the smallest value, so it comes last in a DESC ordering; in PostgreSQL, NULLs sort first in DESC order by default, so you would add NULLS LAST there or filter them out.\n\nAlternative 1, correlated subquery: WHERE updated_at = (SELECT MAX(updated_at) FROM user_plans x WHERE x.user_id = u.user_id). It is simple and works on old engines, but returns both ids 5 and 6 for user 2 (two rows per user on ties), and it benefits from an index on (user_id, updated_at) so each outer row does not scan all of that user's rows. MAX ignores NULLs, so user 4 gets id 9.\n\nAlternative 2, SELECT id, user_id, plan, MAX(updated_at) ... GROUP BY user_id: returns one row per user, and SQLite documents that with exactly one MAX() the bare columns come from a row holding the maximum. But on ties the row is arbitrary (here it returned id 5, not 6), and the behaviour is SQLite-specific: most other databases reject the query or do not guarantee it. Do not use it where the tie matters or the code must be portable. NULLs: MAX ignores them, so user 4 still gets id 9; a user whose timestamps are all NULL would get an arbitrary one of their rows from this form, no row at all from the correlated form (updated_at = NULL is never true), and the highest id from ROW_NUMBER.\n\nPick the ROW_NUMBER form when you need exactly one row with a deterministic rule; use the correlated or join-to-MAX form only if duplicates are acceptable or the pair (user_id, updated_at) is unique by constraint. Window functions need SQLite 3.25+.",
+  "key_concepts": [
+   "ROW_NUMBER",
+   "latest row per group",
+   "deterministic tie-break",
+   "correlated subquery",
+   "bare columns with MAX",
+   "NULL ordering",
+   "deduplication"
+  ],
+  "common_mistakes": [
+   "Using the correlated MAX subquery and silently returning two rows for a tied timestamp.",
+   "Relying on SQLite's bare-column MAX behaviour with ties or in code that must run elsewhere.",
+   "Ordering by updated_at DESC without a tie-break, so the surviving row changes between runs; or forgetting that NULL timestamps sort differently across databases."
+  ],
+  "sources": [
+   {
+    "title": "SQLite: SELECT statement (compound select operators)",
+    "url": "https://www.sqlite.org/lang_select.html",
+    "supports": "With exactly one min() or max() aggregate, bare columns take values from a row containing the min/max, but on ties the row is arbitrary; NULLs are smaller than any value in sorting, so they come last in DESC order.",
+    "verification": "independent_reviewer_supported"
+   },
+   {
+    "title": "SQLite: Built-in Aggregate Functions",
+    "url": "https://www.sqlite.org/lang_aggfunc.html",
+    "supports": "max() returns NULL only when the group has no non-NULL values (NULLs are ignored).",
+    "verification": "independent_reviewer_supported"
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE user_plans(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, plan TEXT NOT NULL, updated_at TEXT);\nINSERT INTO user_plans(id, user_id, plan, updated_at) VALUES\n (1,1,'free','2024-01-10 09:00:00'),\n (2,1,'pro','2024-03-02 12:00:00'),\n (3,1,'team','2024-02-01 08:30:00'),\n (4,2,'free','2024-02-14 10:00:00'),\n (5,2,'pro','2024-02-20 17:45:00'),\n (6,2,'team','2024-02-20 17:45:00'),\n (7,3,'free','2024-01-05 00:00:00'),\n (8,4,'free',NULL),\n (9,4,'pro','2024-03-01 00:00:00');",
+   "solution": "SELECT id, user_id, plan, updated_at\nFROM (\n  SELECT id, user_id, plan, updated_at,\n         ROW_NUMBER() OVER (PARTITION BY user_id\n                            ORDER BY updated_at DESC, id DESC) AS rn\n  FROM user_plans\n)\nWHERE rn = 1\nORDER BY user_id;",
+   "test": "",
+   "expected": [
+    [
+     2,
+     1,
+     "pro",
+     "2024-03-02 12:00:00"
+    ],
+    [
+     6,
+     2,
+     "team",
+     "2024-02-20 17:45:00"
+    ],
+    [
+     7,
+     3,
+     "free",
+     "2024-01-05 00:00:00"
+    ],
+    [
+     9,
+     4,
+     "pro",
+     "2024-03-01 00:00:00"
+    ]
+   ]
+  },
+  "originally_flagged": [
+   {
+    "severity": "minor",
+    "claim": "it needs a covering index on (user_id, updated_at) to avoid a scan per row",
+    "problem": "'Covering' is wrong here: the select list has other columns, so the index is a supporting, not covering, index.",
+    "replacement": "it benefits from an index on (user_id, updated_at) so each outer row does not scan all of that user's rows"
+   },
+   {
+    "severity": "minor",
+    "claim": "Do not use it where the tie matters or the code must be portable.",
+    "problem": "The question asks what each form does with the NULL; the GROUP BY form is not addressed. Verified: MAX ignores NULL (user 4 -> id 9); a user whose timestamps are all NULL returns an arbitrary row from GROUP BY, no row from the correlated form, and the highest id from ROW_NUMBER.",
+    "replacement": "Do not use it where the tie matters or the code must be portable. NULLs: MAX ignores them, so user 4 still gets id 9; a user whose timestamps are all NULL would get an arbitrary one of their rows from this form, no row at all from the correlated form (updated_at = NULL is never true), and the highest id from ROW_NUMBER."
+   },
+   {
+    "severity": "minor",
+    "claim": "users 2's rows 5 and 6",
+    "problem": "Typo in question.",
+    "replacement": "user 2's rows 5 and 6"
+   }
+  ]
+ }
+]

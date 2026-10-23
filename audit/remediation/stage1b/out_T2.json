@@ -1,0 +1,1122 @@
+[
+ {
+  "id": "smi-0386",
+  "status": "ok",
+  "question": "How would you construct a feed to show relevant content for a site that involves user interactions with items?",
+  "answer": "Build it as a multi-stage recommender: candidate generation, ranking, then re-ranking. Candidate generation cheaply narrows millions of items to a few hundred using several sources: items from followed accounts or topics, collaborative retrieval (matrix factorisation or two-tower user/item embeddings with approximate nearest-neighbour search), content similarity, and fresh or popular items. A ranking model (often gradient-boosted trees or a neural network) then scores each candidate using user history, item features, user-item affinity, context and recency, predicting probabilities of several actions (click, like, share, long dwell, hide) that are combined into one value score. Re-ranking applies diversity, de-duplication, freshness and business or safety rules. Handle cold start with popularity, content features and exploration (e.g. bandits). Train on logged interactions, remembering that logs are biased by what was previously shown (position and selection bias). Evaluate offline with recall@k, NDCG or AUC, then online with A/B tests on engagement plus retention and negative-feedback guardrails, since optimising clicks alone promotes clickbait.",
+  "key_concepts": [
+   "candidate generation",
+   "ranking model",
+   "collaborative filtering",
+   "cold start",
+   "re-ranking and diversity",
+   "position bias",
+   "A/B tests"
+  ],
+  "difficulty": "Hard",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was one thin sentence listing signals. Added the standard retrieval/ranking/re-ranking architecture, cold start, training-data bias and evaluation.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0387",
+  "status": "ok",
+  "question": "How would you design the people you may know feature on LinkedIn or Facebook?",
+  "answer": "Frame it as link prediction on the social graph, in two stages. Candidate generation: take friends-of-friends (2-hop neighbours) and add other sources such as shared employer or school, imported contacts and profile views; cap or sample high-degree nodes because the 2-hop set explodes. Ranking: train a supervised model (e.g. gradient-boosted trees) where a positive is a suggested person who was connected to (invite sent and accepted) within a time window and negatives are shown-but-ignored or dismissed suggestions. Features include mutual-connection count, Adamic-Adar or Jaccard graph similarity, shared attributes (company, school, location), interaction signals (profile views, messages), recency and graph embeddings from node2vec or a GNN. Evaluate offline with precision@k or AUC using a time-based split (hide recent edges and predict them), and online via invite-acceptance rate and connections formed, with guardrails on dismissals and complaints. Also consider privacy (do not expose people who do not want to be found), popularity bias towards well-connected users, and spam or harassment.",
+  "key_concepts": [
+   "link prediction",
+   "mutual connections",
+   "Adamic-Adar",
+   "candidate generation",
+   "graph embeddings",
+   "time-based evaluation",
+   "privacy"
+  ],
+  "difficulty": "Hard",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original listed signals only. Added two-stage design, label definition, features, evaluation and risks. Avoided claims about how any specific company implements it.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0389",
+  "status": "ok",
+  "question": "How would you suggest to a franchise where to open a new store?",
+  "answer": "Treat it as predicting expected profit for each candidate site and ranking sites. First define the target, e.g. first-year or steady-state revenue or profit of existing stores. Build features per location: demographics and income in the catchment area, foot and car traffic, nearby anchors, competitor count and distance, rent and build cost, visibility and accessibility, and distance to the franchise's own stores. Train a regression model (regularised linear model or gradient-boosted trees) on existing stores; with only tens to hundreds of stores the data is small, so keep the model simple, regularise, and report prediction intervals. Validate with spatial or region-grouped cross-validation, because neighbouring stores are correlated and random splits leak. Model cannibalisation: a new store takes sales from nearby own stores, so use net incremental sales, not gross. Convert to expected profit (sales times margin minus fixed and capital costs) and payback or ROI, then rank candidates and consider risk. Check recommendations with local knowledge or a pilot, since models trained on existing stores extrapolate poorly to unlike areas.",
+  "key_concepts": [
+   "expected profit",
+   "catchment features",
+   "cannibalisation",
+   "spatial cross-validation",
+   "small-sample regression",
+   "prediction intervals",
+   "ROI"
+  ],
+  "difficulty": "Hard",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was a feature list. Added target definition, small-data modelling, spatial validation, cannibalisation and decision step.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0390",
+  "status": "ok",
+  "question": "In a search engine, given partial data on what the user has typed, how would you predict the user's eventual search query?",
+  "answer": "Model it as ranking completions of a prefix. Retrieval of autocomplete candidates: index historical queries in a trie or prefix index (or a finite-state structure) with counts, so every query starting with the typed prefix is found in milliseconds. Baseline score is the estimated probability P(query | prefix), proportional to query frequency among queries sharing that prefix, usually with recency weighting so trending queries rise. Improve with a learning-to-rank model using features such as global and recent frequency, personal history, session context (previous queries), location, language, device and time. For rare or unseen prefixes use a language model (n-gram or neural) to generate or score completions, and handle typos with fuzzy or edit-distance matching. Filter unsafe, offensive or private suggestions. Evaluate offline with MRR or success@k on held-out logged queries and online with keystrokes saved and suggestion acceptance rate; latency is a hard constraint, so precompute and cache popular prefixes.",
+  "key_concepts": [
+   "autocomplete",
+   "prefix trie",
+   "P(query | prefix)",
+   "learning to rank",
+   "n-gram language model",
+   "trending queries",
+   "MRR"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was a short list. Added retrieval structure, scoring formulation, personalisation, rare prefixes, safety and evaluation.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0391",
+  "status": "ok",
+  "question": "Given a database of all previous alumni donations to your university, how would you predict which recent alumni are most likely to donate?",
+  "answer": "Frame it as binary classification: will this alumnus donate within a fixed window (e.g. next 12 months)? Build features as of a cutoff date: giving history in RFM form (recency, frequency, monetary value), including any giving while a student, graduation year, degree and major, location, event attendance, email opens and clicks, volunteering or mentoring, and whether contact details are current. Recent graduates have little giving history, so engagement and demographic features carry more weight. Use logistic regression as an interpretable baseline and gradient-boosted trees as a stronger model. Split by time (train on earlier cutoffs, test on later) to avoid leakage, and make sure features contain nothing recorded after the cutoff. Donors are a small minority, so judge with PR-AUC and lift or precision in the top decile rather than accuracy, and check probability calibration if scores drive budgets. Use the ranked list to prioritise outreach; if the aim is to change behaviour, uplift modelling is more appropriate than plain propensity.",
+  "key_concepts": [
+   "donation propensity",
+   "RFM features",
+   "class imbalance",
+   "temporal split",
+   "data leakage",
+   "PR-AUC and lift",
+   "uplift modelling"
+  ],
+  "difficulty": "Medium",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original listed inputs only. Added label definition, leakage-safe splitting, imbalance-aware metrics, cold-start for recent grads and the uplift caveat.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0392",
+  "status": "ok",
+  "question": "You are Uber and you want to design a heatmap to recommend to drivers where to wait for a passenger. How would you approach this?",
+  "answer": "Divide the city into cells (e.g. a hexagonal grid such as H3 or geohash) and time buckets, then forecast pickup demand per cell and time. Use count regression (Poisson or negative binomial) or gradient-boosted trees with features such as hour, day of week, holidays, lagged demand, weather, scheduled events, and live signals like recent request rate. Demand alone is the wrong thing to show, though: if every driver heads to the hottest cell, supply swamps it. A better score estimates the expected value of waiting in a cell, e.g. forecast demand minus expected nearby supply (or the demand-to-driver ratio), the likelihood and expected wait for a pickup, and expected trip earnings, perhaps discounted by travel distance from the driver. Smooth across space and time so the map is stable and not noisy, and refresh frequently. Backtest the forecast with time-based splits (MAE or Poisson deviance per cell), then run online experiments measuring driver idle time, earnings per hour and rider wait times.",
+  "key_concepts": [
+   "demand forecasting",
+   "grid cells",
+   "Poisson regression",
+   "demand-supply ratio",
+   "driver herding",
+   "time-based backtest",
+   "smoothing"
+  ],
+  "difficulty": "Hard",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original gave inputs only. Added grid/forecast formulation, the herding problem (demand alone is not enough), smoothing and evaluation.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0404",
+  "status": "ok",
+  "question": "Say you are working on Facebook News Feed. What would be some metrics that you think are important? How would you make the news each person gets more relevant?",
+  "answer": "Metrics: engagement (reactions, comments, shares, clicks per user or per session), time spent, and retention (DAU/MAU, return rate), which is closest to long-term value. Pair these with negative signals as guardrails: hides, unfollows, reports, and low-quality or misinformation exposure, plus survey-based measures of whether content was worthwhile. Also watch ecosystem health such as creator reach and content diversity. Be careful that per-impression CTR alone rewards clickbait. Relevance: treat ranking as a prediction problem. From a pool of candidate posts, a model predicts per-user, per-post probabilities of actions (click, like, comment, share, dwell, hide) using features for author-user affinity, past interactions, post type, post age, popularity and predicted content quality. Combine these predictions into a weighted score reflecting value, then re-rank for diversity and integrity rules, and keep some exploration for new items and creators. Judge changes with A/B tests on the metrics above, including long-term holdouts, since short-term engagement gains can reduce retention.",
+  "key_concepts": [
+   "engagement metrics",
+   "retention",
+   "negative feedback guardrails",
+   "affinity",
+   "multi-objective ranking",
+   "exploration",
+   "A/B tests"
+  ],
+  "difficulty": "Hard",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was a list of terms. Added metric roles (primary vs guardrail), the clickbait caveat, ranking formulation and evaluation.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0406",
+  "status": "ok",
+  "question": "You are on the data science team at Uber and you are asked to start thinking about surge pricing. What would be the objectives of such a product and how would you start looking into this?",
+  "answer": "Objective: keep the marketplace balanced in real time. A higher price in a zone should dampen marginal demand and attract more drivers there, so that riders can still get a car with a reasonable ETA and the fulfilment rate (requests that end in a trip) stays high. Secondary objectives are driver earnings and satisfaction, rider trust and fairness, regulatory compliance, and sustainable revenue. Start by defining zones and time windows and measuring imbalance: requests per available driver, ETAs, unfulfilled requests, cancellations. Then estimate how demand and supply respond to price (elasticities), ideally from randomised price multipliers or natural experiments rather than purely observational data, which is confounded because prices rise when demand is already high. Add short-horizon demand forecasts so prices act before shortages form. The pricing rule then chooses a multiplier per zone to maximise a goal such as matched trips or welfare subject to constraints (caps, smoothness over space and time to avoid oscillation and gaming). Test with switchback or geo experiments, since marketplace interference breaks ordinary user-level A/B tests.",
+  "key_concepts": [
+   "supply-demand balance",
+   "price elasticity",
+   "fulfilment rate",
+   "randomised price experiments",
+   "demand forecasts",
+   "switchback experiments",
+   "marketplace interference"
+  ],
+  "difficulty": "Hard",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original named goals only. Added how to start: measure imbalance, estimate elasticities causally, forecast, optimise with constraints, and experiment correctly in a two-sided marketplace.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0407",
+  "status": "ok",
+  "question": "Say that you are Netflix. How would you determine what original series you should invest in and create?",
+  "answer": "Define the objective first: the value a series adds per dollar spent, i.e. subscriber acquisition and retention (and engagement) relative to production cost, over its lifetime. Then gather evidence. Viewing data shows which genres, themes, formats and talent attract and hold different taste segments; completion rate, repeat viewing and abandonment signal quality; search and watch-list data reveal unmet demand; performance of comparable titles (by genre, budget, cast, market) provides a baseline. Cluster members into taste communities and find segments that are large but underserved, including by country. Model expected audience and incremental retention for a proposed title, e.g. a regression or gradient-boosted model on comparable titles, reporting uncertainty because hits are high-variance. Beware confounding: viewership of existing titles depends on promotion and placement, so estimate retention impact with causal methods (matched cohorts or experiments) rather than raw correlation. Treat the slate as a portfolio balancing safe bets and risky ones, compare with licensing as an alternative, and combine the numbers with creative judgement, since data covers only past content.",
+  "key_concepts": [
+   "subscriber retention",
+   "viewing behaviour",
+   "taste segments",
+   "comparable titles",
+   "confounding",
+   "portfolio risk",
+   "licensing alternative"
+  ],
+  "difficulty": "Hard",
+  "domain": "Machine Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was a signal list. Added objective, evidence, modelling with uncertainty, confounding caveat and portfolio view. No claims about Netflix internals.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0410",
+  "status": "ok",
+  "question": "What is SQL?",
+  "answer": "SQL (Structured Query Language) is the standard declarative language for defining, querying and modifying data in relational databases. Declarative means you state what result you want and the database's query optimizer decides how to compute it (which indexes, join order and algorithms). Its statements are usually grouped into: DDL (CREATE, ALTER, DROP) for structure, DML (INSERT, UPDATE, DELETE, and often SELECT) for data, DQL when SELECT is treated separately, DCL (GRANT, REVOKE) for permissions, and TCL (COMMIT, ROLLBACK) for transactions. SQL is standardised by ANSI/ISO, but each system (PostgreSQL, MySQL, SQL Server, Oracle, SQLite) has its own dialect and extensions, so code is only partly portable. It operates on tables made of rows and columns, and results are sets or multisets of rows, so without ORDER BY the row order is not guaranteed.",
+  "key_concepts": [
+   "declarative language",
+   "relational database",
+   "DDL and DML",
+   "query optimizer",
+   "SQL dialects",
+   "ORDER BY"
+  ],
+  "difficulty": "Easy",
+  "domain": "SQL",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was a one-line definition. Added declarative nature, statement categories, standard vs dialects and unordered results.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0411",
+  "status": "ok",
+  "question": "What is a primary key?",
+  "answer": "A primary key is a column or set of columns (a composite key) whose values uniquely identify each row in a table. A table can have only one primary key; it must be unique and, by the SQL standard, cannot contain NULL, so every row can be reliably referenced. Databases enforce this with a unique index, which also makes lookups by key fast, and other tables point to it with foreign keys. Keys can be natural (a real-world attribute such as an ISO country code) or surrogate (an auto-increment integer or UUID with no business meaning); surrogate keys are stable when business data changes, while natural keys can change and be wider. Keep keys small and immutable because they are copied into foreign keys and, in some engines (e.g. InnoDB), into every secondary index. Differences from a UNIQUE constraint: a table may have many UNIQUE constraints, which usually allow NULLs, but only one primary key. A SQLite quirk: in ordinary tables a non-INTEGER primary key column may still accept NULL unless declared NOT NULL.",
+  "key_concepts": [
+   "primary key",
+   "uniqueness",
+   "NOT NULL",
+   "composite key",
+   "surrogate key",
+   "unique constraint",
+   "foreign key"
+  ],
+  "difficulty": "Easy",
+  "domain": "SQL",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was correct but minimal. Added enforcement via unique index, composite/surrogate vs natural keys, difference from UNIQUE, and the SQLite NULL quirk.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0412",
+  "status": "ok",
+  "question": "What is a foreign key?",
+  "answer": "A foreign key is a column (or set of columns) in a child table whose values must match an existing primary key or unique key value in a parent table, or be NULL. It enforces referential integrity: you cannot insert an order for a customer that does not exist, nor delete a customer that still has orders (unless a rule says otherwise). Referential actions on delete or update define what happens to child rows: RESTRICT or NO ACTION (reject), CASCADE (propagate the change), SET NULL or SET DEFAULT. A NULL foreign key means no relationship, and the check is skipped for it; declare the column NOT NULL if the relationship is mandatory. Foreign keys also document the schema and guide joins. Costs: checks add some write overhead, and the child column usually should be indexed, because deletes or updates on the parent need to find child rows (some databases, e.g. PostgreSQL, do not create that index automatically). In SQLite, enforcement is off by default and requires PRAGMA foreign_keys = ON per connection.",
+  "key_concepts": [
+   "foreign key",
+   "referential integrity",
+   "ON DELETE CASCADE",
+   "parent and child table",
+   "NULL foreign key",
+   "indexing foreign keys"
+  ],
+  "difficulty": "Easy",
+  "domain": "SQL",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original said only that it enforces a relationship. Added referential integrity, actions, NULL behaviour, indexing and the SQLite default.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0414",
+  "status": "ok",
+  "question": "What is an INNER JOIN?",
+  "answer": "An INNER JOIN combines rows from two tables and returns only the pairs of rows for which the join condition is true; rows with no match on either side are dropped. Conceptually it is the cross product filtered by the ON condition. Points to know: on a one-to-many relationship each parent row is repeated once per matching child row, so aggregates over the parent's columns can be inflated; NULL never equals NULL, so rows whose join key is NULL do not match; for an inner join, a filter in ON or in WHERE gives the same result (unlike outer joins). Use a LEFT JOIN when you need to keep unmatched rows. Example: list each order with its customer name; customers with no orders and orders with no customer do not appear.\n\n```sql\nSELECT c.name, o.id AS order_id, o.amount\nFROM customers c\nINNER JOIN orders o ON o.customer_id = c.id\nORDER BY o.id;\n```",
+  "key_concepts": [
+   "inner join",
+   "join condition",
+   "matching rows",
+   "one-to-many duplication",
+   "NULL join keys",
+   "left join"
+  ],
+  "difficulty": "Easy",
+  "domain": "SQL",
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE customers(id INTEGER PRIMARY KEY, name TEXT);\nCREATE TABLE orders(id INTEGER PRIMARY KEY, customer_id INTEGER, amount INTEGER);\nINSERT INTO customers VALUES (1,'Ann'),(2,'Bob'),(3,'Cy');\nINSERT INTO orders VALUES (10,1,50),(11,1,20),(12,2,30),(13,NULL,99);",
+   "solution": "SELECT c.name, o.id AS order_id, o.amount\nFROM customers c\nINNER JOIN orders o ON o.customer_id = c.id\nORDER BY o.id;",
+   "expected": [
+    [
+     "Ann",
+     10,
+     50
+    ],
+    [
+     "Ann",
+     11,
+     20
+    ],
+    [
+     "Bob",
+     12,
+     30
+    ]
+   ],
+   "test": ""
+  },
+  "sources": [],
+  "change_notes": "Original: correct but one line. Added semantics, row multiplication, NULL keys, ON vs WHERE and a tested example.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0415",
+  "status": "ok",
+  "question": "What is a LEFT JOIN?",
+  "answer": "A LEFT JOIN (LEFT OUTER JOIN) returns every row from the left table, together with the matching rows from the right table; where there is no match the right table's columns are NULL. If a left row matches several right rows it appears once per match. It is used when you must keep all entities, e.g. all customers including those with no orders, and for anti-joins (find left rows with no match by testing a right-side non-null column IS NULL). Common pitfalls: a WHERE condition on a right-table column (such as o.status = 'paid') discards the NULL-extended rows and silently turns the query into an inner join, so put right-table filters in the ON clause when you want to keep unmatched left rows; and use COUNT(o.id), not COUNT(*), to count matches, because COUNT(*) counts the NULL-extended row as 1. Example: orders per customer, including zero.\n\n```sql\nSELECT c.name, COUNT(o.id) AS n_orders\nFROM customers c\nLEFT JOIN orders o ON o.customer_id = c.id\nGROUP BY c.id, c.name\nORDER BY c.id;\n```",
+  "key_concepts": [
+   "left join",
+   "NULL-extended rows",
+   "anti-join",
+   "ON vs WHERE",
+   "COUNT(column) vs COUNT(*)",
+   "outer join"
+  ],
+  "difficulty": "Easy",
+  "domain": "SQL",
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE customers(id INTEGER PRIMARY KEY, name TEXT);\nCREATE TABLE orders(id INTEGER PRIMARY KEY, customer_id INTEGER, amount INTEGER);\nINSERT INTO customers VALUES (1,'Ann'),(2,'Bob'),(3,'Cy');\nINSERT INTO orders VALUES (10,1,50),(11,1,20),(12,2,30);",
+   "solution": "SELECT c.name, COUNT(o.id) AS n_orders\nFROM customers c\nLEFT JOIN orders o ON o.customer_id = c.id\nGROUP BY c.id, c.name\nORDER BY c.id;",
+   "expected": [
+    [
+     "Ann",
+     2
+    ],
+    [
+     "Bob",
+     1
+    ],
+    [
+     "Cy",
+     0
+    ]
+   ],
+   "test": ""
+  },
+  "sources": [],
+  "change_notes": "Original was a one-line definition. Added NULL-extension, row multiplication, anti-join, the WHERE-turns-into-inner-join pitfall, and a tested example.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0416",
+  "status": "ok",
+  "question": "What is GROUP BY?",
+  "answer": "GROUP BY collapses rows that share the same values in the listed columns into one output row per group, so that aggregate functions (COUNT, SUM, AVG, MIN, MAX) are computed per group. Logical order: FROM/JOIN, WHERE (filters rows before grouping), GROUP BY, HAVING (filters groups, can use aggregates), SELECT, ORDER BY. Every selected column must be either in GROUP BY or inside an aggregate (standard SQL; some databases such as SQLite and older MySQL are lenient and return an arbitrary row's value, which is a bug source). NULLs form a single group. Without GROUP BY, an aggregate treats the whole table as one group. Example: number of employees and average salary per department, keeping departments with more than one employee; the two employees with no department form a single NULL group.\n\n```sql\nSELECT dept, COUNT(*) AS n, AVG(salary) AS avg_salary\nFROM emp\nGROUP BY dept\nHAVING COUNT(*) > 1\nORDER BY dept;\n```",
+  "key_concepts": [
+   "GROUP BY",
+   "HAVING",
+   "aggregate functions",
+   "WHERE vs HAVING",
+   "NULL group",
+   "logical query order"
+  ],
+  "difficulty": "Easy",
+  "domain": "SQL",
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE emp(id INTEGER PRIMARY KEY, name TEXT, dept TEXT, salary INTEGER);\nINSERT INTO emp VALUES (1,'A','eng',100),(2,'B','eng',120),(3,'C','ops',80),(4,'D',NULL,70),(5,'E',NULL,90),(6,'F','hr',60);",
+   "solution": "SELECT dept, COUNT(*) AS n, AVG(salary) AS avg_salary\nFROM emp\nGROUP BY dept\nHAVING COUNT(*) > 1\nORDER BY dept;",
+   "expected": [
+    [
+     null,
+     2,
+     80.0
+    ],
+    [
+     "eng",
+     2,
+     110.0
+    ]
+   ],
+   "test": ""
+  },
+  "sources": [],
+  "change_notes": "Original: one line. Added logical processing order, WHERE vs HAVING, select-list rule, NULL grouping and a tested example.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0417",
+  "status": "ok",
+  "question": "What is DISTINCT?",
+  "answer": "DISTINCT removes duplicate rows from a query result. It applies to the entire combination of selected columns, not to just the first one: SELECT DISTINCT city, country returns unique (city, country) pairs. For this purpose NULLs are treated as equal, so multiple NULLs collapse into one row. It is evaluated after the select list is formed, usually via sorting or hashing, which can be expensive on large results. COUNT(DISTINCT col) counts unique non-NULL values (NULLs are ignored), whereas COUNT(*) counts rows and COUNT(col) counts non-NULL values. Pitfalls: using DISTINCT to hide duplicates caused by a bad join usually masks a logic error and hurts performance; fix the join or aggregate instead. GROUP BY can produce the same unique list. In the example, COUNT(DISTINCT city) is 2 (NULL ignored) while SELECT DISTINCT city returns 3 rows (NULL kept as one):\n\n```sql\nSELECT COUNT(*) AS total_rows,\n       COUNT(city) AS non_null,\n       COUNT(DISTINCT city) AS distinct_non_null,\n       (SELECT COUNT(*) FROM (SELECT DISTINCT city FROM visits)) AS distinct_rows\nFROM visits;\n```",
+  "key_concepts": [
+   "DISTINCT",
+   "duplicate rows",
+   "COUNT(DISTINCT)",
+   "NULL handling",
+   "GROUP BY alternative",
+   "performance cost"
+  ],
+  "difficulty": "Easy",
+  "domain": "SQL",
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE visits(id INTEGER PRIMARY KEY, city TEXT);\nINSERT INTO visits(city) VALUES ('Leeds'),('Leeds'),('York'),(NULL),(NULL);",
+   "solution": "SELECT COUNT(*) AS total_rows,\n       COUNT(city) AS non_null,\n       COUNT(DISTINCT city) AS distinct_non_null,\n       (SELECT COUNT(*) FROM (SELECT DISTINCT city FROM visits)) AS distinct_rows\nFROM visits;",
+   "expected": [
+    [
+     5,
+     3,
+     2,
+     3
+    ]
+   ],
+   "test": ""
+  },
+  "sources": [],
+  "change_notes": "Original: one line. Added whole-row semantics, NULL treatment, COUNT variants, cost and misuse, with a tested example.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0418",
+  "status": "ok",
+  "question": "What is a NULL value?",
+  "answer": "NULL is a marker meaning a value is missing or unknown (or not applicable); it is not zero and not an empty string. SQL uses three-valued logic (TRUE, FALSE, UNKNOWN): any comparison with NULL, including NULL = NULL and NULL <> 1, yields UNKNOWN, and WHERE keeps only rows where the condition is TRUE. So test with IS NULL / IS NOT NULL, not = NULL. Arithmetic with NULL gives NULL. Aggregates (SUM, AVG, COUNT(col), MIN, MAX) ignore NULLs, but COUNT(*) counts rows. GROUP BY and DISTINCT treat NULLs as one group. The classic trap is NOT IN: x NOT IN (1, NULL) can never be TRUE, so a subquery returning a NULL makes NOT IN return no rows; use NOT EXISTS or filter out NULLs. COALESCE(col, default) substitutes a value. Sort position of NULLs differs between databases. The example shows each effect:\n\n```sql\nSELECT\n  (SELECT COUNT(*) FROM t WHERE v = NULL) AS eq_null,\n  (SELECT COUNT(*) FROM t WHERE v IS NULL) AS is_null,\n  (SELECT COUNT(*) FROM t WHERE v NOT IN (1, NULL)) AS not_in_with_null,\n  (SELECT COUNT(*) FROM t) AS count_star,\n  (SELECT COUNT(v) FROM t) AS count_col,\n  (SELECT AVG(v) FROM t) AS avg_v,\n  (SELECT SUM(COALESCE(v, 0)) FROM t) AS sum_coalesce;\n```",
+  "key_concepts": [
+   "NULL",
+   "three-valued logic",
+   "IS NULL",
+   "NOT IN trap",
+   "COALESCE",
+   "aggregates ignore NULL"
+  ],
+  "difficulty": "Easy",
+  "domain": "SQL",
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE t(v INTEGER);\nINSERT INTO t VALUES (1),(2),(NULL);",
+   "solution": "SELECT\n  (SELECT COUNT(*) FROM t WHERE v = NULL) AS eq_null,\n  (SELECT COUNT(*) FROM t WHERE v IS NULL) AS is_null,\n  (SELECT COUNT(*) FROM t WHERE v NOT IN (1, NULL)) AS not_in_with_null,\n  (SELECT COUNT(*) FROM t) AS count_star,\n  (SELECT COUNT(v) FROM t) AS count_col,\n  (SELECT AVG(v) FROM t) AS avg_v,\n  (SELECT SUM(COALESCE(v, 0)) FROM t) AS sum_coalesce;",
+   "expected": [
+    [
+     0,
+     1,
+     0,
+     3,
+     2,
+     1.5,
+     3
+    ]
+   ],
+   "test": ""
+  },
+  "sources": [],
+  "change_notes": "Original: one line. Added three-valued logic, comparison rules, aggregate behaviour, NOT IN trap, COALESCE and a tested example.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0419",
+  "status": "ok",
+  "question": "What are aggregate functions?",
+  "answer": "Aggregate functions compute a single value from a set of rows: COUNT, SUM, AVG, MIN and MAX are the standard ones (databases add others such as string and statistical aggregates). Used with GROUP BY they produce one value per group; without it the whole result is one group and returns one row. Key rules: except COUNT(*), they ignore NULL inputs; COUNT(*) counts rows, COUNT(col) counts non-NULL values, COUNT(DISTINCT col) counts unique non-NULL values; on an empty input COUNT returns 0 but SUM, AVG, MIN and MAX return NULL (and SUM of only NULLs is NULL). AVG divides by the number of non-NULL values, not by the row count. Aggregates cannot appear in WHERE because WHERE runs before grouping; use HAVING for conditions on aggregates. Example on salaries with a NULL:\n\n```sql\nSELECT COUNT(*) AS n_rows, COUNT(salary) AS n_salary, SUM(salary) AS total,\n       AVG(salary) AS avg_salary, MIN(salary) AS lo, MAX(salary) AS hi,\n       (SELECT SUM(salary) FROM emp WHERE id > 100) AS sum_of_empty\nFROM emp;\n```",
+  "key_concepts": [
+   "aggregate functions",
+   "COUNT(*) vs COUNT(column)",
+   "NULL handling",
+   "HAVING",
+   "empty set behaviour",
+   "GROUP BY"
+  ],
+  "difficulty": "Easy",
+  "domain": "SQL",
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE emp(id INTEGER PRIMARY KEY, salary INTEGER);\nINSERT INTO emp VALUES (1,100),(2,200),(3,NULL);",
+   "solution": "SELECT COUNT(*) AS n_rows, COUNT(salary) AS n_salary, SUM(salary) AS total,\n       AVG(salary) AS avg_salary, MIN(salary) AS lo, MAX(salary) AS hi,\n       (SELECT SUM(salary) FROM emp WHERE id > 100) AS sum_of_empty\nFROM emp;",
+   "expected": [
+    [
+     3,
+     2,
+     300,
+     150.0,
+     100,
+     200,
+     null
+    ]
+   ],
+   "test": ""
+  },
+  "sources": [],
+  "change_notes": "Original only listed names. Added definition, NULL and empty-set behaviour, WHERE vs HAVING and a tested example.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0420",
+  "status": "ok",
+  "question": "What is a subquery?",
+  "answer": "A subquery is a SELECT nested inside another statement, in parentheses. It can appear in WHERE or HAVING (with IN, EXISTS, ANY/ALL or a comparison), in FROM as a derived table (needs an alias), or in the SELECT list as a scalar subquery that must return one row and one column. An uncorrelated subquery does not reference the outer query and can be evaluated independently; a correlated subquery refers to outer columns, so it is logically re-evaluated per outer row, although optimizers often rewrite it into a join. Pitfalls: a scalar subquery returning more than one row is an error (or arbitrary in lenient engines); NOT IN with a subquery that can return NULL returns nothing, so prefer NOT EXISTS; EXISTS only checks for existence and is often clearer than IN or a join that creates duplicates. Many subqueries can be rewritten as joins or CTEs for readability or speed. Example: employees paid above their own department's average (correlated).\n\n```sql\nSELECT e.name, e.dept, e.salary\nFROM emp e\nWHERE e.salary > (SELECT AVG(x.salary) FROM emp x WHERE x.dept = e.dept)\nORDER BY e.name;\n```",
+  "key_concepts": [
+   "subquery",
+   "correlated subquery",
+   "derived table",
+   "EXISTS vs IN",
+   "scalar subquery",
+   "NOT IN with NULL"
+  ],
+  "difficulty": "Easy",
+  "domain": "SQL",
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE emp(id INTEGER PRIMARY KEY, name TEXT, dept TEXT, salary INTEGER);\nINSERT INTO emp VALUES (1,'A','eng',100),(2,'B','eng',140),(3,'C','ops',80),(4,'D','ops',90),(5,'E','hr',60);",
+   "solution": "SELECT e.name, e.dept, e.salary\nFROM emp e\nWHERE e.salary > (SELECT AVG(x.salary) FROM emp x WHERE x.dept = e.dept)\nORDER BY e.name;",
+   "expected": [
+    [
+     "B",
+     "eng",
+     140
+    ],
+    [
+     "D",
+     "ops",
+     90
+    ]
+   ],
+   "test": ""
+  },
+  "sources": [],
+  "change_notes": "Original: one line. Added types, correlated vs uncorrelated, placement, pitfalls and a tested example.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0421",
+  "status": "ok",
+  "question": "What is a CTE?",
+  "answer": "A Common Table Expression is a named temporary result set defined with WITH at the start of a statement and usable in that statement only (it is not stored). It makes complex queries readable by splitting them into named steps, lets you reference the same sub-result several times, and chains: later CTEs can use earlier ones. WITH RECURSIVE supports hierarchical or graph traversal (org charts, bill of materials) via an anchor query UNION ALL a recursive step, which stops when the step returns no new rows; guard against cycles. A CTE is not necessarily materialised or faster than an equivalent subquery: whether it is computed once or inlined depends on the engine and version (e.g. PostgreSQL and SQLite offer MATERIALIZED / NOT MATERIALIZED hints), so check the plan. Example: department averages in a CTE, then employees above their department average.\n\n```sql\nWITH dept_avg AS (\n  SELECT dept, AVG(salary) AS avg_salary FROM emp GROUP BY dept\n)\nSELECT e.name, e.dept, e.salary, d.avg_salary\nFROM emp e\nJOIN dept_avg d ON d.dept = e.dept\nWHERE e.salary > d.avg_salary\nORDER BY e.name;\n```",
+  "key_concepts": [
+   "common table expression",
+   "WITH clause",
+   "recursive CTE",
+   "readability",
+   "materialisation",
+   "chained CTEs"
+  ],
+  "difficulty": "Easy",
+  "domain": "SQL",
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE emp(id INTEGER PRIMARY KEY, name TEXT, dept TEXT, salary INTEGER);\nINSERT INTO emp VALUES (1,'A','eng',100),(2,'B','eng',140),(3,'C','ops',80),(4,'D','ops',90),(5,'E','hr',60);",
+   "solution": "WITH dept_avg AS (\n  SELECT dept, AVG(salary) AS avg_salary FROM emp GROUP BY dept\n)\nSELECT e.name, e.dept, e.salary, d.avg_salary\nFROM emp e\nJOIN dept_avg d ON d.dept = e.dept\nWHERE e.salary > d.avg_salary\nORDER BY e.name;",
+   "expected": [
+    [
+     "B",
+     "eng",
+     140,
+     120.0
+    ],
+    [
+     "D",
+     "ops",
+     90,
+     85.0
+    ]
+   ],
+   "test": ""
+  },
+  "sources": [],
+  "change_notes": "Original: one line. Added scope, chaining, recursion, the materialisation caveat and a tested example.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0422",
+  "status": "ok",
+  "question": "What is normalization?",
+  "answer": "Normalization is organising a schema so each fact is stored once, which removes redundancy and prevents update, insert and delete anomalies. It proceeds through normal forms: 1NF (atomic values, no repeating groups, a key), 2NF (1NF plus no non-key attribute depends on only part of a composite key), 3NF (2NF plus no non-key attribute depends on another non-key attribute, i.e. no transitive dependency; informally, every attribute depends on the key, the whole key and nothing but the key), and BCNF (every determinant is a candidate key). Example: an orders table that repeats customer name and address on every order breaks 3NF; if the address changes you must update many rows and can leave them inconsistent. Split into customers and orders linked by a foreign key. The benefits are consistency, smaller storage and simpler updates; the cost is more tables and joins on reads. OLTP systems are usually normalised to about 3NF, while analytic and read-heavy systems often denormalise deliberately.",
+  "key_concepts": [
+   "normalization",
+   "normal forms",
+   "update anomalies",
+   "functional dependency",
+   "3NF and BCNF",
+   "redundancy",
+   "foreign key"
+  ],
+  "difficulty": "Medium",
+  "domain": "SQL",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was one line. Added normal forms with definitions, anomalies, a concrete example and the trade-off.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0423",
+  "status": "ok",
+  "question": "What is denormalization?",
+  "answer": "Denormalization deliberately introduces redundancy into a normalised schema to make reads faster or simpler, typically by avoiding joins or repeated aggregation. Common forms: copying a column into another table (e.g. customer name on the order row), storing precomputed aggregates or counters (order_total, comment_count), summary or reporting tables, and materialized views. Star and snowflake schemas in data warehouses are denormalised by design. The trade-offs: reads become cheaper, but writes get more expensive and complex because every copy must be updated, there is more storage, and the risk of inconsistency rises unless you keep copies in sync with triggers, transactions, application logic or scheduled refreshes. Rule of thumb: normalise first, measure, and denormalise only for a proven bottleneck on a read-heavy path where slight staleness or the extra write work is acceptable. Indexing, caching or query tuning are often cheaper alternatives to try first.",
+  "key_concepts": [
+   "denormalization",
+   "redundancy",
+   "precomputed aggregates",
+   "materialized views",
+   "read vs write trade-off",
+   "data consistency",
+   "star schema"
+  ],
+  "difficulty": "Medium",
+  "domain": "SQL",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original one line. Added typical techniques, costs (write overhead, inconsistency), when to apply, and alternatives.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0424",
+  "status": "ok",
+  "question": "What is an index?",
+  "answer": "An index is a separate data structure, most commonly a B-tree, that stores the values of one or more columns in sorted order with a pointer to the row, letting the database find rows without scanning the whole table: lookup is roughly O(log n) instead of O(n). It speeds up WHERE filters, joins, ORDER BY and GROUP BY on the indexed columns, and enforces UNIQUE and PRIMARY KEY constraints. Costs: extra storage, and every INSERT, UPDATE of an indexed column and DELETE must also maintain the index, so over-indexing slows writes. Design points: in a composite index column order matters (it serves queries on a leftmost prefix); selective columns benefit most, while indexing a low-cardinality column such as a boolean rarely helps; wrapping the column in a function (WHERE lower(name) = 'x') or a leading-wildcard LIKE makes a predicate non-sargable and can prevent index use unless there is a matching expression index; a covering index contains every column a query needs so the table need not be read. The optimizer decides whether to use an index. SQLite shows it here:\n\n```sql\nEXPLAIN QUERY PLAN SELECT id, city FROM users WHERE email = 'b@x.com';\n```",
+  "key_concepts": [
+   "B-tree index",
+   "composite index",
+   "leftmost prefix",
+   "covering index",
+   "write overhead",
+   "selectivity",
+   "sargable predicates"
+  ],
+  "difficulty": "Easy",
+  "domain": "SQL",
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE users(id INTEGER PRIMARY KEY, email TEXT, city TEXT);\nCREATE INDEX idx_users_email ON users(email);\nINSERT INTO users(email, city) VALUES ('a@x.com','Leeds'),('b@x.com','York'),('c@x.com','Hull');",
+   "solution": "EXPLAIN QUERY PLAN SELECT id, city FROM users WHERE email = 'b@x.com';",
+   "expected": [
+    [
+     3,
+     0,
+     0,
+     "SEARCH users USING INDEX idx_users_email (email=?)"
+    ]
+   ],
+   "test": ""
+  },
+  "sources": [],
+  "change_notes": "Original one line. Added structure, complexity, write cost, composite/covering/function pitfalls and a tested SQLite plan example.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0425",
+  "status": "ok",
+  "question": "What is a view?",
+  "answer": "A view is a stored, named SELECT query that you query like a table. A normal view stores no data: the database substitutes its definition into the outer query each time, so results are always current and performance is that of the underlying query. Uses: hide complexity (pre-written joins), present a stable interface when the schema changes, and restrict access by exposing only some columns or rows, with permissions granted on the view rather than on the base tables. Limitations: views can be stacked, which hides expensive queries; many engines allow INSERT/UPDATE through a view only when it maps cleanly to one base table (no aggregates, DISTINCT etc.), and SQLite views are read-only. A materialized view (PostgreSQL, Oracle and others; not SQLite) physically stores the result and must be refreshed, trading freshness for speed. Example:\n\n```sql\nCREATE VIEW active_customers AS\nSELECT id, name FROM customers WHERE active = 1;\n```\n\n```sql\nSELECT * FROM active_customers ORDER BY id;\n```",
+  "key_concepts": [
+   "view",
+   "virtual table",
+   "materialized view",
+   "access control",
+   "query abstraction",
+   "updatable views"
+  ],
+  "difficulty": "Easy",
+  "domain": "SQL",
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE customers(id INTEGER PRIMARY KEY, name TEXT, email TEXT, active INTEGER);\nINSERT INTO customers VALUES (1,'Ann','a@x.com',1),(2,'Bob','b@x.com',0),(3,'Cy','c@x.com',1);\nCREATE VIEW active_customers AS\nSELECT id, name FROM customers WHERE active = 1;",
+   "solution": "SELECT * FROM active_customers ORDER BY id;",
+   "expected": [
+    [
+     1,
+     "Ann"
+    ],
+    [
+     3,
+     "Cy"
+    ]
+   ],
+   "test": ""
+  },
+  "sources": [],
+  "change_notes": "Original one line. Added no-data-stored semantics, uses, updatability limits, materialized views and a tested example.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0426",
+  "status": "ok",
+  "question": "What is a transaction?",
+  "answer": "A transaction is a group of statements executed as one logical unit of work: either all take effect (COMMIT) or none do (ROLLBACK). Relational databases aim to give ACID guarantees: Atomicity (all or nothing), Consistency (constraints hold before and after), Isolation (concurrent transactions do not see each other's partial work, to a degree set by the isolation level) and Durability (committed data survives crashes, usually via a write-ahead log). Classic example: a bank transfer debits one account and credits another; if the second update fails the first must be undone. Isolation levels (READ UNCOMMITTED, READ COMMITTED, REPEATABLE READ, SERIALIZABLE) trade concurrency against anomalies such as dirty reads, non-repeatable reads and phantoms; engines implement them with locking or MVCC. Keep transactions short to reduce lock contention and deadlocks. Most databases run in autocommit mode unless you open a transaction explicitly. Example showing rollback:\n\n```sql\nBEGIN;\nUPDATE accounts SET balance = balance - 30 WHERE id = 1;\nUPDATE accounts SET balance = balance + 30 WHERE id = 2;\nROLLBACK;\nSELECT id, balance FROM accounts ORDER BY id;\n```",
+  "key_concepts": [
+   "transaction",
+   "ACID",
+   "commit and rollback",
+   "isolation levels",
+   "atomicity",
+   "write-ahead log",
+   "MVCC"
+  ],
+  "difficulty": "Easy",
+  "domain": "SQL",
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE accounts(id INTEGER PRIMARY KEY, balance INTEGER);\nINSERT INTO accounts VALUES (1,100),(2,50);",
+   "solution": "BEGIN;\nUPDATE accounts SET balance = balance - 30 WHERE id = 1;\nUPDATE accounts SET balance = balance + 30 WHERE id = 2;\nROLLBACK;\nSELECT id, balance FROM accounts ORDER BY id;",
+   "expected": [
+    [
+     1,
+     100
+    ],
+    [
+     2,
+     50
+    ]
+   ],
+   "test": ""
+  },
+  "sources": [],
+  "change_notes": "Original: one line. Added ACID definitions, isolation levels/anomalies, durability mechanism and a tested rollback example.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0428",
+  "status": "ok",
+  "question": "What is a self join?",
+  "answer": "A self join joins a table to itself, using two different aliases so the database can tell the two roles apart. It is not a separate join type: any join type (INNER, LEFT) can be a self join. Typical uses: hierarchies stored with a parent column (employee to manager), comparing rows within the same table (employees earning more than their manager, products in the same category), and finding pairs such as duplicates or related rows. To avoid pairing a row with itself and listing each pair twice, add a condition like a.id < b.id. Use LEFT JOIN when rows without a partner (e.g. the CEO with no manager) must be kept. A self join only goes one level up or down; for arbitrary depth use a recursive CTE. Make sure the join column is indexed on large tables. Example: employees with their manager's name.\n\n```sql\nSELECT e.name AS employee, m.name AS manager\nFROM emp e\nLEFT JOIN emp m ON m.id = e.manager_id\nORDER BY e.id;\n```",
+  "key_concepts": [
+   "self join",
+   "table alias",
+   "hierarchical data",
+   "left join",
+   "pair comparison",
+   "recursive CTE"
+  ],
+  "difficulty": "Medium",
+  "domain": "SQL",
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE emp(id INTEGER PRIMARY KEY, name TEXT, manager_id INTEGER);\nINSERT INTO emp VALUES (1,'Ceo',NULL),(2,'Mia',1),(3,'Raj',1),(4,'Zoe',2);",
+   "solution": "SELECT e.name AS employee, m.name AS manager\nFROM emp e\nLEFT JOIN emp m ON m.id = e.manager_id\nORDER BY e.id;",
+   "expected": [
+    [
+     "Ceo",
+     null
+    ],
+    [
+     "Mia",
+     "Ceo"
+    ],
+    [
+     "Raj",
+     "Ceo"
+    ],
+    [
+     "Zoe",
+     "Mia"
+    ]
+   ],
+   "test": ""
+  },
+  "sources": [],
+  "change_notes": "Original: one line. Added aliases, uses, avoiding self-pairs, LEFT for top level, depth limit and a tested example.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0429",
+  "status": "ok",
+  "question": "What is a stored procedure?",
+  "answer": "A stored procedure is a named, parameterised block of SQL and procedural code (T-SQL, PL/SQL, PL/pgSQL and similar) that is stored in the database and executed on the server with CALL or EXEC. Benefits: encapsulates business logic in one place, cuts network round trips because many statements run in one call, can be granted EXECUTE permission without exposing the underlying tables, and passing parameters (instead of concatenating strings) helps prevent SQL injection. Some engines can reuse the compiled plan. It can hold multiple statements, control flow, transactions and error handling, and may return result sets or output parameters, whereas a function is meant to return a value and be used inside queries (exact rules differ by database). Drawbacks: logic is split between application and database, version control, testing and debugging are harder, the code is not portable across dialects, and heavy logic loads the database server. SQLite has no stored procedures.",
+  "key_concepts": [
+   "stored procedure",
+   "parameters",
+   "round trips",
+   "permissions",
+   "SQL injection",
+   "function vs procedure",
+   "portability"
+  ],
+  "difficulty": "Easy",
+  "domain": "SQL",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original: one line. Added behaviour, benefits and drawbacks, difference from a function, injection angle and SQLite note.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0430",
+  "status": "ok",
+  "question": "What is a window function?",
+  "answer": "A window function computes a value for each row using a set of related rows (its window) defined by OVER (PARTITION BY ... ORDER BY ... frame), but unlike GROUP BY it does not collapse the rows, so you keep detail and add aggregates, ranks or neighbours alongside. Families: ranking (ROW_NUMBER, RANK, DENSE_RANK, NTILE), value (LAG, LEAD, FIRST_VALUE), and aggregates used as windows (SUM, AVG, COUNT) for running totals and moving averages. PARTITION BY splits rows into independent groups; ORDER BY orders within the partition; the frame (ROWS or RANGE BETWEEN ...) limits which rows are used, and with ORDER BY the default frame is RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW, where ties count as peers. Window functions are evaluated after WHERE, GROUP BY and HAVING, so you cannot filter on them directly; wrap the query in a subquery or CTE (the usual 'top N per group' pattern). Example: rank within department and running total.\n\n```sql\nSELECT name, dept, salary,\n       RANK() OVER (PARTITION BY dept ORDER BY salary DESC) AS rnk,\n       ROW_NUMBER() OVER (PARTITION BY dept ORDER BY salary DESC, id) AS rn,\n       SUM(salary) OVER (PARTITION BY dept ORDER BY id) AS running_total\nFROM emp\nORDER BY dept, id;\n```",
+  "key_concepts": [
+   "window function",
+   "PARTITION BY",
+   "ROW_NUMBER vs RANK",
+   "running total",
+   "window frame",
+   "LAG and LEAD",
+   "top N per group"
+  ],
+  "difficulty": "Medium",
+  "domain": "SQL",
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE emp(id INTEGER PRIMARY KEY, name TEXT, dept TEXT, salary INTEGER);\nINSERT INTO emp VALUES (1,'A','eng',100),(2,'B','eng',140),(3,'C','eng',140),(4,'D','ops',80),(5,'E','ops',90);",
+   "solution": "SELECT name, dept, salary,\n       RANK() OVER (PARTITION BY dept ORDER BY salary DESC) AS rnk,\n       ROW_NUMBER() OVER (PARTITION BY dept ORDER BY salary DESC, id) AS rn,\n       SUM(salary) OVER (PARTITION BY dept ORDER BY id) AS running_total\nFROM emp\nORDER BY dept, id;",
+   "expected": [
+    [
+     "A",
+     "eng",
+     100,
+     3,
+     3,
+     100
+    ],
+    [
+     "B",
+     "eng",
+     140,
+     1,
+     1,
+     240
+    ],
+    [
+     "C",
+     "eng",
+     140,
+     1,
+     2,
+     380
+    ],
+    [
+     "D",
+     "ops",
+     80,
+     2,
+     2,
+     80
+    ],
+    [
+     "E",
+     "ops",
+     90,
+     1,
+     1,
+     170
+    ]
+   ],
+   "test": ""
+  },
+  "sources": [],
+  "change_notes": "Original: one line. Added OVER components, families, frame defaults, evaluation order and a tested example.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0433",
+  "status": "ok",
+  "question": "What is partitioning?",
+  "answer": "Partitioning splits one large logical table (or index) into smaller physical pieces, partitions, inside the same database, while queries still see a single table. Horizontal partitioning divides rows by a partition key: range (e.g. by month), list (by region) or hash (even spread). Vertical partitioning splits columns, for example moving rarely used or large columns to another table. Benefits: partition pruning, where a query filtering on the partition key reads only the relevant partitions; cheap maintenance such as dropping or archiving an old partition instead of a huge DELETE; smaller indexes and per-partition operations; and sometimes parallelism. Costs: queries that do not filter on the partition key touch all partitions; a poor key creates skew or hot partitions; extra operational complexity; and in some systems (e.g. PostgreSQL) unique and primary keys must include the partition key. It differs from sharding, where pieces live on different servers. Support and syntax vary by database, and SQLite has no native partitioning.",
+  "key_concepts": [
+   "table partitioning",
+   "range and hash partitioning",
+   "partition pruning",
+   "partition key",
+   "vertical vs horizontal",
+   "sharding"
+  ],
+  "difficulty": "Medium",
+  "domain": "SQL",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original: one line. Added types, pruning, maintenance benefit, costs, and distinction from sharding.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0434",
+  "status": "ok",
+  "question": "What is a clustered index?",
+  "answer": "A clustered index defines how the table's rows themselves are organised: the leaf level of the index is the data, with rows kept in the order of the clustering key (physically approximately, as linked pages). Because the rows can be in only one order, a table has at most one clustered index. It makes range scans and ORDER BY on the key fast, and lookups by key need no extra step. Trade-offs: inserting keys out of order (random UUIDs) causes page splits and fragmentation, while an ever-increasing key appends efficiently; updating the key moves the row; and the clustering key is carried in every non-clustered index, so a wide key bloats them. Engine specifics: in SQL Server the primary key is clustered by default but you can choose another; in MySQL InnoDB the table is always clustered on the primary key (or a hidden row id); PostgreSQL has no maintained clustered index (the CLUSTER command reorders once and is not kept up). Tables without a clustered index in SQL Server are heaps.",
+  "key_concepts": [
+   "clustered index",
+   "one per table",
+   "leaf level holds rows",
+   "page splits",
+   "range scans",
+   "InnoDB primary key",
+   "heap"
+  ],
+  "difficulty": "Medium",
+  "domain": "SQL",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original said it determines physical order, which is approximately right but imprecise and engine-dependent. Clarified (rows stored in key order in the index leaves), added trade-offs and engine differences.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0435",
+  "status": "ok",
+  "question": "What is a non-clustered index?",
+  "answer": "A non-clustered (secondary) index is a separate structure, usually a B-tree, holding the indexed key columns in sorted order plus a row locator that points back to the table row. The locator is a row id (RID) when the table is a heap, or the clustering key when the table has a clustered index (as in SQL Server and InnoDB). A table can have many of them. A lookup finds the key in the index, then performs a lookup (key lookup / bookmark lookup) into the table to fetch other columns; this extra step is why the optimizer may ignore a non-clustered index when many rows match and a scan is cheaper. A covering index avoids the lookup by containing all columns the query needs, e.g. with INCLUDE columns in SQL Server or PostgreSQL. Trade-offs: each index costs storage and slows INSERT, UPDATE and DELETE, so index the columns used in filters, joins and sorts, not everything.",
+  "key_concepts": [
+   "non-clustered index",
+   "row locator",
+   "key lookup",
+   "covering index",
+   "INCLUDE columns",
+   "write cost"
+  ],
+  "difficulty": "Medium",
+  "domain": "SQL",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original 'stores pointers' was true but thin. Specified what the pointer is, the lookup cost, covering indexes and trade-offs.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0436",
+  "status": "ok",
+  "question": "What is a deadlock?",
+  "answer": "A deadlock is a cycle of transactions in which each holds a lock another needs and waits for it, so none can proceed. Example: T1 locks row A then requests row B, while T2 locks B then requests A. Unlike ordinary blocking, which ends when the holder commits, a deadlock cannot resolve itself. Databases detect it (typically with a wait-for graph, or via lock timeouts) and abort one transaction, the victim, with an error; its work is rolled back and the application must catch that error and retry. So they are not 'indefinite' in practice, but they cost latency and failed requests. Prevention and mitigation: access tables and rows in a consistent order, keep transactions short, avoid user interaction inside a transaction, acquire needed locks early (e.g. SELECT ... FOR UPDATE), use appropriate indexes so fewer rows are locked, use a lower isolation level where acceptable, and implement retry with backoff. Deadlock logs or graphs show which statements collided.",
+  "key_concepts": [
+   "deadlock",
+   "lock cycle",
+   "wait-for graph",
+   "victim rollback",
+   "consistent lock ordering",
+   "retry logic",
+   "blocking vs deadlock"
+  ],
+  "difficulty": "Medium",
+  "domain": "SQL",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original said 'waiting indefinitely', which omits detection. Added the cycle, detection and victim selection, example, and prevention.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0437",
+  "status": "ok",
+  "question": "What is sharding?",
+  "answer": "Sharding is horizontal partitioning of data across multiple independent database servers (shards), each holding a subset of the rows, so storage and read/write load scale out beyond one machine. A shard key decides placement: range-based (simple, supports range queries, but can create hot shards), hash-based (even spread, poor range queries) or directory/lookup-based (flexible, extra lookup layer). Consistent hashing reduces data movement when shards are added. Trade-offs: queries must include the shard key to hit one shard, otherwise they fan out; cross-shard joins and transactions are hard or need distributed commit; rebalancing and resharding are operationally difficult; skewed keys create hotspots; and global unique ids and schema changes need coordination. It differs from replication (copies of the same data for availability and read scaling) and from partitioning within a single server. Prefer simpler options first (indexing, caching, read replicas, vertical scaling) and shard when one node cannot handle the data size or write throughput.",
+  "key_concepts": [
+   "sharding",
+   "shard key",
+   "consistent hashing",
+   "cross-shard queries",
+   "hotspots",
+   "replication",
+   "horizontal scaling"
+  ],
+  "difficulty": "Medium",
+  "domain": "SQL",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original: one line. Added shard-key strategies, trade-offs, difference from replication/partitioning and when to use.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0438",
+  "status": "ok",
+  "question": "How do you improve a slow query?",
+  "answer": "Measure before changing anything. Capture the slow statement (slow query log or monitoring) and read its execution plan with actual row counts (EXPLAIN ANALYZE or equivalent) to see where time goes. Then work through the usual causes. Full scans on large tables: add or fix an index matching the filter, join and sort columns, with composite column order chosen for the query, and consider a covering index. Non-sargable predicates that cannot use an index: functions or casts on the indexed column, implicit type conversion, leading-wildcard LIKE; rewrite them (e.g. a date range instead of wrapping the column in a function). Doing too much work: select only needed columns, filter early, avoid SELECT *, avoid correlated subqueries that run per row if a join works, and replace deep OFFSET pagination with keyset pagination. Bad estimates: update statistics so the optimizer picks good join order and join type. Application patterns: remove N+1 queries and batch. If the query is inherently heavy, precompute (summary table, materialized view), cache, partition or denormalise. Re-measure after each change, since every index slows writes.",
+  "key_concepts": [
+   "execution plan",
+   "index design",
+   "sargable predicates",
+   "statistics",
+   "keyset pagination",
+   "N+1 queries",
+   "materialized view"
+  ],
+  "difficulty": "Hard",
+  "domain": "SQL",
+  "code": null,
+  "sources": [],
+  "change_notes": "Original was three generic words. Added a measure-first method and concrete causes with fixes and trade-offs.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0439",
+  "status": "ok",
+  "question": "What are execution plans?",
+  "answer": "An execution plan is the optimizer's chosen strategy for running a query: a tree of operators such as table scan, index seek or scan, join (nested loop, hash, merge), sort and aggregate, showing the order and method for each step. The optimizer enumerates alternatives and picks the one with the lowest estimated cost, based on table statistics (row counts, value distributions) and available indexes. You view it with EXPLAIN (PostgreSQL, MySQL), EXPLAIN QUERY PLAN (SQLite), or graphical plans in SQL Server. EXPLAIN ANALYZE (PostgreSQL, MySQL 8) actually runs the query and adds real row counts and timings, so be careful with data-changing statements. What to look for: full scans where an index seek was expected, large gaps between estimated and actual rows (stale statistics), expensive sorts, spills to disk, and unsuitable join types. Plans can change with data size, parameters and statistics. SQLite example:\n\n```sql\nEXPLAIN QUERY PLAN SELECT amount FROM orders WHERE customer_id = 1;\n```",
+  "key_concepts": [
+   "execution plan",
+   "query optimizer",
+   "cost estimation",
+   "table statistics",
+   "index seek vs scan",
+   "EXPLAIN ANALYZE",
+   "join algorithms"
+  ],
+  "difficulty": "Medium",
+  "domain": "SQL",
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE orders(id INTEGER PRIMARY KEY, customer_id INTEGER, amount INTEGER);\nCREATE INDEX idx_orders_customer ON orders(customer_id);\nINSERT INTO orders(customer_id, amount) VALUES (1,10),(2,20),(1,30);",
+   "solution": "EXPLAIN QUERY PLAN SELECT amount FROM orders WHERE customer_id = 1;",
+   "expected": [
+    [
+     3,
+     0,
+     0,
+     "SEARCH orders USING INDEX idx_orders_customer (customer_id=?)"
+    ]
+   ],
+   "test": ""
+  },
+  "sources": [],
+  "change_notes": "Original: one line. Added operators, how plans are chosen, tools, what to look for and a tested SQLite example.",
+  "confidence": "medium"
+ },
+ {
+  "id": "smi-0440",
+  "status": "ok",
+  "question": "What are Python decorators and how do they work?",
+  "answer": "A decorator is a callable that takes a function (or class) and returns a replacement, usually a wrapper that adds behaviour before or after the original call. The syntax @deco above def f is exactly f = deco(f), applied once at definition time. Functions are first-class objects and closures let the wrapper remember the original function, which is how it works. Use functools.wraps on the wrapper so the decorated function keeps its __name__, __doc__ and other metadata, and accept *args, **kwargs so it works with any signature. To pass arguments (@retry(3)) you need a decorator factory: a function that returns the real decorator, giving three nested levels. Decorators stack, applied bottom-up (the one nearest the function wraps first). They can also be classes with __call__, and classes can be decorated (e.g. @dataclass). Typical uses: logging, timing, caching (functools.lru_cache), authorisation, retries. Example: a call-counting decorator stacked on a repeat factory.\n\n```python\nimport functools\n\ndef count_calls(func):\n    @functools.wraps(func)\n    def wrapper(*args, **kwargs):\n        wrapper.calls += 1\n        return func(*args, **kwargs)\n    wrapper.calls = 0\n    return wrapper\n\ndef repeat(times):            # decorator factory\n    def decorator(func):\n        @functools.wraps(func)\n        def wrapper(*args, **kwargs):\n            result = None\n            for _ in range(times):\n                result = func(*args, **kwargs)\n            return result\n        return wrapper\n    return decorator\n\n@count_calls\n@repeat(3)\ndef greet(name):\n    \"\"\"Say hi.\"\"\"\n    return f\"hi {name}\"\n```",
+  "key_concepts": [
+   "decorator",
+   "closure",
+   "functools.wraps",
+   "decorator factory",
+   "*args and **kwargs",
+   "stacked decorators",
+   "first-class functions"
+  ],
+  "difficulty": "Medium",
+  "domain": "Python",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import functools\n\ndef count_calls(func):\n    @functools.wraps(func)\n    def wrapper(*args, **kwargs):\n        wrapper.calls += 1\n        return func(*args, **kwargs)\n    wrapper.calls = 0\n    return wrapper\n\ndef repeat(times):            # decorator factory\n    def decorator(func):\n        @functools.wraps(func)\n        def wrapper(*args, **kwargs):\n            result = None\n            for _ in range(times):\n                result = func(*args, **kwargs)\n            return result\n        return wrapper\n    return decorator\n\n@count_calls\n@repeat(3)\ndef greet(name):\n    \"\"\"Say hi.\"\"\"\n    return f\"hi {name}\"\n",
+   "test": "assert greet(\"a\") == \"hi a\"\nassert greet.calls == 1\nassert greet.__name__ == \"greet\" and greet.__doc__ == \"Say hi.\"\ncalls = []\n@repeat(3)\ndef f():\n    calls.append(1)\nf()\nassert len(calls) == 3\n",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "Original defined decorators vaguely ('modify functionality'). Added the exact desugaring, closure mechanism, functools.wraps, arguments via factories, stacking order and tested code.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0444",
+  "status": "ok",
+  "question": "How do you handle exceptions in Python?",
+  "answer": "Wrap risky code in try and handle failures with except clauses, catching specific exception types (ValueError, KeyError, FileNotFoundError) rather than a bare except or a blanket Exception, so you do not hide bugs (a bare except also swallows KeyboardInterrupt and SystemExit). The full form is try / except / else / finally: else runs only if no exception occurred (keep the try body small, put dependent code in else), and finally runs on the way out in every normal case, including after a return, break or an unhandled exception, which makes it the place for cleanup. It can be skipped only if the process dies abruptly (e.g. os._exit or a kill). Prefer context managers (with open(...)) for cleanup. Use raise to re-raise, raise NewError(...) from err to keep the cause chain, define custom exceptions by subclassing Exception, and use except (A, B) to handle several types. Exceptions are idiomatic for flow control (EAFP: easier to ask forgiveness than permission). Example:\n\n```python\ndef parse_age(text, log):\n    try:\n        age = int(text)\n    except ValueError as err:\n        log.append(\"bad\")\n        raise ValueError(f\"invalid age: {text!r}\") from err\n    else:\n        log.append(\"ok\")\n        return age\n    finally:\n        log.append(\"done\")\n```",
+  "key_concepts": [
+   "try-except",
+   "specific exceptions",
+   "else clause",
+   "finally block",
+   "raise from",
+   "context manager",
+   "EAFP"
+  ],
+  "difficulty": "Easy",
+  "domain": "Python",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "def parse_age(text, log):\n    try:\n        age = int(text)\n    except ValueError as err:\n        log.append(\"bad\")\n        raise ValueError(f\"invalid age: {text!r}\") from err\n    else:\n        log.append(\"ok\")\n        return age\n    finally:\n        log.append(\"done\")\n",
+   "test": "log = []\nassert parse_age(\"42\", log) == 42\nassert log == [\"ok\", \"done\"]\nlog = []\ntry:\n    parse_age(\"x\", log)\n    raise AssertionError(\"should raise\")\nexcept ValueError as e:\n    assert isinstance(e.__cause__, ValueError)\nassert log == [\"bad\", \"done\"]\n",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "Original was correct but the finally claim 'always executes' omitted the abrupt-exit exception. Added else, chaining, specificity, context managers and tested code.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0445",
+  "status": "ok",
+  "question": "How to implement a stack using Python lists.",
+  "answer": "Use a list with its end as the top: append() pushes and pop() removes and returns the last item, giving LIFO order. Both are amortised O(1) (append occasionally triggers a resize, so 'amortised' is the accurate term). Peek is stack[-1], and emptiness is checked with `not stack`. Popping an empty list raises IndexError, so check first or wrap it. Never use the front (insert(0, x) / pop(0)) because those are O(n). A small class gives a clean interface and sensible errors. For multi-threaded producers and consumers use queue.LifoQueue, which is thread-safe, and collections.deque also works as a stack with the same O(1) end operations.\n\n```python\nclass Stack:\n    def __init__(self):\n        self._items = []\n\n    def push(self, item):\n        self._items.append(item)\n\n    def pop(self):\n        if not self._items:\n            raise IndexError(\"pop from empty stack\")\n        return self._items.pop()\n\n    def peek(self):\n        if not self._items:\n            raise IndexError(\"peek at empty stack\")\n        return self._items[-1]\n\n    def __len__(self):\n        return len(self._items)\n```",
+  "key_concepts": [
+   "stack",
+   "LIFO",
+   "list append and pop",
+   "amortized O(1)",
+   "IndexError on empty",
+   "queue.LifoQueue"
+  ],
+  "difficulty": "Easy",
+  "domain": "Python",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "class Stack:\n    def __init__(self):\n        self._items = []\n\n    def push(self, item):\n        self._items.append(item)\n\n    def pop(self):\n        if not self._items:\n            raise IndexError(\"pop from empty stack\")\n        return self._items.pop()\n\n    def peek(self):\n        if not self._items:\n            raise IndexError(\"peek at empty stack\")\n        return self._items[-1]\n\n    def __len__(self):\n        return len(self._items)\n",
+   "test": "s = Stack()\ns.push(1); s.push(2); s.push(3)\nassert s.peek() == 3 and len(s) == 3\nassert [s.pop(), s.pop(), s.pop()] == [3, 2, 1]\ntry:\n    s.pop()\n    raise AssertionError\nexcept IndexError:\n    pass\n",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "Original said O(1) average; corrected to amortised O(1) and added the pop(0) pitfall, empty handling, thread-safe alternative and tested code.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0446",
+  "status": "ok",
+  "question": "How do you implement a queue in Python?",
+  "answer": "Use collections.deque: append() enqueues at the right and popleft() dequeues from the left, both O(1), giving FIFO order. A plain list is a poor queue because list.pop(0) shifts every remaining element and is O(n), so it degrades on large queues. deque supports maxlen for a fixed-size sliding buffer (old items are dropped), but indexing in the middle is O(n). deque is not designed as a blocking queue: for producer/consumer code across threads use queue.Queue (thread-safe, blocking get/put, optional maxsize), or asyncio.Queue for coroutines; queue.PriorityQueue or heapq give priority ordering. Wrap the deque in a class to give clear errors on empty dequeue.\n\n```python\nfrom collections import deque\n\nclass Queue:\n    def __init__(self):\n        self._items = deque()\n\n    def enqueue(self, item):\n        self._items.append(item)\n\n    def dequeue(self):\n        if not self._items:\n            raise IndexError(\"dequeue from empty queue\")\n        return self._items.popleft()\n\n    def __len__(self):\n        return len(self._items)\n```",
+  "key_concepts": [
+   "queue",
+   "FIFO",
+   "collections.deque",
+   "popleft",
+   "list.pop(0) is O(n)",
+   "queue.Queue",
+   "maxlen"
+  ],
+  "difficulty": "Medium",
+  "domain": "Python",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "from collections import deque\n\nclass Queue:\n    def __init__(self):\n        self._items = deque()\n\n    def enqueue(self, item):\n        self._items.append(item)\n\n    def dequeue(self):\n        if not self._items:\n            raise IndexError(\"dequeue from empty queue\")\n        return self._items.popleft()\n\n    def __len__(self):\n        return len(self._items)\n",
+   "test": "q = Queue()\nfor i in (1, 2, 3):\n    q.enqueue(i)\nassert [q.dequeue(), q.dequeue()] == [1, 2]\nassert len(q) == 1\nq.dequeue()\ntry:\n    q.dequeue()\n    raise AssertionError\nexcept IndexError:\n    pass\nfrom collections import deque\nd = deque([1, 2, 3], maxlen=2)\nassert list(d) == [2, 3]\n",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "Original correct but did not explain why lists are poor, nor thread-safe options. Added these and tested code.",
+  "confidence": "high"
+ },
+ {
+  "id": "smi-0461",
+  "status": "ok",
+  "question": "How do you handle missing values in a Pandas DataFrame?",
+  "answer": "First detect them: df.isna().sum() gives per-column counts (isna and isnull are aliases); missing data may be NaN, None or pd.NA, and sometimes hides as sentinels ('?', -999) that you convert with replace or na_values at read time. Then choose a strategy based on why data is missing. Drop: df.dropna() removes rows with any missing value; use subset=[cols], how='all' or thresh=n to be selective, or axis=1 to drop columns. Fill: df.fillna(value) with a constant, a dict per column, or a statistic such as df['x'].fillna(df['x'].median()). Propagate: ffill() and bfill() for ordered data such as time series (the old fillna(method=...) form is deprecated or removed in recent pandas versions); interpolate() estimates numeric gaps. Pitfalls: dropping can bias results or lose too much data; mean/median imputation shrinks variance; for machine learning compute fill values on the training set only to avoid leakage (e.g. sklearn SimpleImputer in a pipeline); consider adding a missing-indicator column. Avoid inplace=True; assign the result instead.\n\n```python\nimport pandas as pd\nimport numpy as np\n\ndf = pd.DataFrame({\"a\": [1.0, np.nan, 3.0, np.nan], \"b\": [\"x\", None, \"z\", \"w\"]})\nn_missing = df.isna().sum()\ndropped = df.dropna(subset=[\"a\"])\nfilled = df.assign(a=df[\"a\"].fillna(df[\"a\"].mean()), b=df[\"b\"].fillna(\"unknown\"))\nffilled = df[\"a\"].ffill()\ninterp = df[\"a\"].interpolate()\n```",
+  "key_concepts": [
+   "isna",
+   "dropna",
+   "fillna",
+   "forward fill and backward fill",
+   "interpolate",
+   "imputation leakage",
+   "missing-value indicator"
+  ],
+  "difficulty": "Easy",
+  "domain": "Python",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import pandas as pd\nimport numpy as np\n\ndf = pd.DataFrame({\"a\": [1.0, np.nan, 3.0, np.nan], \"b\": [\"x\", None, \"z\", \"w\"]})\nn_missing = df.isna().sum()\ndropped = df.dropna(subset=[\"a\"])\nfilled = df.assign(a=df[\"a\"].fillna(df[\"a\"].mean()), b=df[\"b\"].fillna(\"unknown\"))\nffilled = df[\"a\"].ffill()\ninterp = df[\"a\"].interpolate()\n",
+   "test": "assert n_missing[\"a\"] == 2 and n_missing[\"b\"] == 1\nassert len(dropped) == 2\nassert filled[\"a\"].tolist() == [1.0, 2.0, 3.0, 2.0]\nassert filled[\"b\"].tolist() == [\"x\", \"unknown\", \"z\", \"w\"]\nassert ffilled.tolist() == [1.0, 1.0, 3.0, 3.0]\nassert interp.tolist() == [1.0, 2.0, 3.0, 3.0]\n",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "Original named methods only. Added detection, selective dropna, fill options, deprecation of fillna(method=), imputation pitfalls and tested code.",
+  "confidence": "high"
+ }
+]

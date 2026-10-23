@@ -1,0 +1,515 @@
+[
+ [
+  "B4-MLO-08-1",
+  "code.solution",
+  "    ref = np.asarray(reference, dtype=float)\n    cur = np.asarray(current, dtype=float)\n    edges = np.unique(np.quantile(ref, np.linspace(0.0, 1.0, n_bins + 1)))\n    inner = edges[1:-1]\n    if inner.size == 0:\n        return 0.0\n",
+  "    ref = np.asarray(reference, dtype=float)\n    cur = np.asarray(current, dtype=float)\n    ref = ref[np.isfinite(ref)]\n    cur = cur[np.isfinite(cur)]\n    if ref.size == 0 or cur.size == 0:\n        raise ValueError(\"reference and current need at least one finite value\")\n    edges = np.unique(np.quantile(ref, np.linspace(0.0, 1.0, n_bins + 1)))\n    inner = edges[1:-1]\n    if inner.size == 0:\n        # constant or two-valued reference: give each value its own bin plus\n        # an open bin on each side, so any change is still visible\n        inner = np.unique(np.concatenate([edges, np.nextafter(edges, np.inf)]))\n",
+  "major"
+ ],
+ [
+  "B4-MLO-08-1",
+  "code.solution",
+  "    Out-of-range current values fall into the first/last bin. Bin\n    proportions are floored at `eps` so an empty bin gives a large but\n    finite term instead of log(0).\n",
+  "    Out-of-range current values fall into the first/last bin. Bin\n    proportions are floored at `eps` so an empty bin gives a large but\n    finite term instead of log(0). NaN/inf are ignored (monitor the null\n    rate separately); a constant or two-valued reference gets one bin per value.\n",
+  "minor"
+ ],
+ [
+  "B4-MLO-08-1",
+  "practical_answer",
+  "    ref = np.asarray(reference, dtype=float)\n    cur = np.asarray(current, dtype=float)\n    edges = np.unique(np.quantile(ref, np.linspace(0.0, 1.0, n_bins + 1)))\n    inner = edges[1:-1]\n    if inner.size == 0:\n        return 0.0\n",
+  "    ref = np.asarray(reference, dtype=float)\n    cur = np.asarray(current, dtype=float)\n    ref = ref[np.isfinite(ref)]\n    cur = cur[np.isfinite(cur)]\n    if ref.size == 0 or cur.size == 0:\n        raise ValueError(\"reference and current need at least one finite value\")\n    edges = np.unique(np.quantile(ref, np.linspace(0.0, 1.0, n_bins + 1)))\n    inner = edges[1:-1]\n    if inner.size == 0:\n        # constant or two-valued reference: give each value its own bin plus\n        # an open bin on each side, so any change is still visible\n        inner = np.unique(np.concatenate([edges, np.nextafter(edges, np.inf)]))\n",
+  "major"
+ ],
+ [
+  "B4-MLO-08-1",
+  "practical_answer",
+  "    Out-of-range current values fall into the first/last bin. Bin\n    proportions are floored at `eps` so an empty bin gives a large but\n    finite term instead of log(0).\n",
+  "    Out-of-range current values fall into the first/last bin. Bin\n    proportions are floored at `eps` so an empty bin gives a large but\n    finite term instead of log(0). NaN/inf are ignored (monitor the null\n    rate separately); a constant or two-valued reference gets one bin per value.\n",
+  "minor"
+ ],
+ [
+  "B4-MLO-08-1",
+  "practical_answer",
+  "Suggested checks, all asserted in the recorded test: PSI of a sample against itself is exactly 0;",
+  "Suggested checks, all asserted in the recorded test: a constant or binary reference still registers a shift (constant reference against 9.0 gives more than 5, binary 50/50 against all ones more than 1) and NaNs are ignored; PSI of a sample against itself is exactly 0;",
+  "minor"
+ ],
+ [
+  "B4-MLO-08-1",
+  "detailed_answer",
+  "simply ends up with fewer bins.",
+  "simply ends up with fewer bins. If only one or two distinct edges survive (a constant or binary feature) there are no interior edges, so the code falls back to one bin per distinct value plus open bins on both sides; otherwise any change would score 0.",
+  "minor"
+ ],
+ [
+  "B4-MLO-08-1",
+  "practical_answer",
+  "split a known-stable period into two random halves 100 times, compute PSI on each pair at your production window size and bin count",
+  "draw 100 pairs of non-overlapping windows of your production window size from a known-stable period (on the real time axis, so autocorrelation and weekly effects are included), compute PSI on each pair at your production bin count",
+  "minor"
+ ],
+ [
+  "B4-MLO-08-1",
+  "code_patch.solution",
+  "import numpy as np\n\n\ndef psi(reference, current, n_bins=10, eps=1e-4):\n    \"\"\"Po",
+  "import numpy as np\n\n\ndef psi(reference, current, n_bins=10, eps=1e-4):\n    \"\"\"Po"
+ ],
+ [
+  "B4-MLO-08-1",
+  "code_patch.test",
+  "rng = np.random.default_rng(0)\nref_big = rng.normal(0, 1, 20000)\nsame = rng.norm",
+  "rng = np.random.default_rng(0)\nref_big = rng.normal(0, 1, 20000)\nsame = rng.norm"
+ ],
+ [
+  "B4-MLO-08-2",
+  "answer",
+  "gave PSI about 8.3 while two plain samples gave about 0.0003",
+  "gave PSI about 8.2 with 10 quantile bins and eps=1e-4 (the ceiling for that setup is about 8.3) while two plain samples gave about 0.0003 (lognormal with sigma 1)",
+  "minor"
+ ],
+ [
+  "B4-MLO-08-2",
+  "answer",
+  "A pure unit change does exactly that.",
+  "A change of units by a large factor such as 100 does exactly that for most amount distributions.",
+  "minor"
+ ],
+ [
+  "B4-MLO-08-2",
+  "answer",
+  "The collapsed scores are a consequence: the model is being fed out-of-support inputs.",
+  "The collapsed scores are most likely a consequence: the model is probably being fed out-of-support inputs (confirm by re-scoring a sample with the amounts rescaled).",
+  "minor"
+ ],
+ [
+  "B4-MLO-08-2",
+  "answer",
+  "a null-to-zero spike moves 9% of the mass into the one bin that already contained the reference zeros. In a similar simulation PSI was only about 0.055 with 10 bins (about 0.09 with 20), under the threshold, although the feature is broken.",
+  "a null-to-zero spike moves about 9% of the mass into the lowest bin. In a simulation with a continuous discount_pct and no reference zeros, PSI was only about 0.055 with 10 bins (about 0.09 with 20); with 20% of the reference already at zero it was about 0.03. All are under the threshold, although the feature is broken.",
+  "minor"
+ ],
+ [
+  "B4-MLO-08-3",
+  "detailed_answer",
+  "Sculley et al. suggest limits broad enough not to trigger spuriously.",
+  "Sculley et al. make a related point about action limits on a system's real-world actions: they should be broad enough not to trigger spuriously, and when one trips an alert should lead to investigation.",
+  "minor"
+ ],
+ [
+  "B4-MLO-08-3",
+  "practical_answer",
+  "Expected result with these rules:",
+  "Intended result with these rules (verify by replaying the last 90 days of metrics through them before enabling paging):",
+  "minor"
+ ],
+ [
+  "B4-MLO-08-4",
+  "answer",
+  "The storm is a sample-size effect, not a bug.",
+  "The storm is most likely a sample-size effect rather than a bug (rule out a systematic logging difference between reference and yesterday).",
+  "minor"
+ ],
+ [
+  "B4-MLO-08-4",
+  "answer",
+  "the KS statistic was about 0.005 and the p-value about 1e-11",
+  "the KS statistic was about 0.004 (0.0035 to 0.0055 over eight seeds) and the p-value between about 1e-5 and 1e-13, far below 0.05 every time",
+  "minor"
+ ],
+ [
+  "B4-MLO-08-7",
+  "detailed_answer",
+  "These are exact over all traffic and tiny",
+  "Counters and histograms are exact over all traffic (quantile sketches are approximate) and tiny",
+  "minor"
+ ],
+ [
+  "B4-MLO-08-7",
+  "detailed_answer",
+  "and the hourly floor becomes about 9 x (0.00001 + 1/417), about 0.02.",
+  "and the hourly floor becomes about 9 x (0.00001 + 1/417), about 0.02 (assuming a 100,000-row reference for the slice; if the slice reference holds only its own 0.5% share, about 500 rows, the floor is 9 x (1/500 + 1/417), about 0.04).",
+  "minor"
+ ],
+ [
+  "B4-MLO-08-7",
+  "detailed_answer",
+  "keep the row if hash(id) mod 10,000 is below 100 for a 1% rate",
+  "keep the row if a stable hash of the ID (for example SHA-256 or xxHash, not Python's salted built-in hash()) mod 10,000 is below 100 for a 1% rate",
+  "minor"
+ ],
+ [
+  "B4-MLO-08-8",
+  "answer",
+  "(C) Pooled previous 7 days: averages out the weekly cycle, so false alarms from seasonality are mostly gone. But its lag is large:",
+  "(C) Pooled previous 7 days: the reference averages out the weekly cycle, but today is a single day, so it is still compared with a weekly mixture. With weekends 25% higher, the weekly average is about 7% above a weekday level, so a weekend day sits about 17% above the pool and a weekday about 7% below it; seasonal false alarms remain unless today is also a 7-day window or the comparison is weekday-adjusted. Its lag is also large:",
+  "major"
+ ],
+ [
+  "B4-MLO-08-8",
+  "answer",
+  "a day-over-day change of 0.05 sd is far below the noise of most daily samples",
+  "a day-over-day change of 0.05 sd is tiny next to the weekly swing and, unless daily volume is large (about 7,200 rows per day are needed to see it at 3 standard errors), within sampling noise",
+  "minor"
+ ],
+ [
+  "B4-MLO-08-8",
+  "answer",
+  "removes seasonality exactly",
+  "removes the weekday effect if the weekly pattern is stable",
+  "minor"
+ ],
+ [
+  "B4-MLO-09-1",
+  "key_concepts",
+  [
+   "continuous training",
+   "retraining triggers",
+   "data validation",
+   "model validation",
+   "CI/CD for ML",
+   "lineage tracking"
+  ],
+  [
+   "continuous training",
+   "retraining triggers",
+   "data validation",
+   "model validation",
+   "CI/CD for ML",
+   "artifact lineage and metadata"
+  ]
+ ],
+ [
+  "B4-MLO-09-3",
+  "answer",
+  "The Sculley et al. paper suggests action limits as sanity checks that are broad enough not to trigger spuriously; a sudden large shift in score distribution or in the importance of income should stop promotion.",
+  "Sculley et al. suggest action limits on a system's real-world actions as sanity checks that are broad enough not to trigger spuriously; a similar bound on champion/challenger change (a sudden large shift in score distribution or in the importance of income) should stop promotion.",
+  "minor"
+ ],
+ [
+  "B4-MLO-10-1",
+  "code.solution",
+  "X2 = X.copy()\n    X2[:, col] = perturb(X[:, col])",
+  "X2 = np.array(X, dtype=float)\n    X2[:, col] = perturb(X[:, col])",
+  "major"
+ ],
+ [
+  "B4-MLO-10-1",
+  "code.solution",
+  "X2 = X.copy()\n    X2[:, col] = X[:, col] + step",
+  "X2 = np.array(X, dtype=float)\n    X2[:, col] = X[:, col] + step",
+  "major"
+ ],
+ [
+  "B4-MLO-10-1",
+  "practical_answer",
+  "X2 = X.copy()\n    X2[:, col] = perturb(X[:, col])",
+  "X2 = np.array(X, dtype=float)\n    X2[:, col] = perturb(X[:, col])",
+  "major"
+ ],
+ [
+  "B4-MLO-10-1",
+  "practical_answer",
+  "X2 = X.copy()\n    X2[:, col] = X[:, col] + step",
+  "X2 = np.array(X, dtype=float)\n    X2[:, col] = X[:, col] + step",
+  "major"
+ ],
+ [
+  "B4-MLO-10-1",
+  "practical_answer",
+  "so each defect trips only its own check.",
+  "so each defect trips only its own check. A final assertion checks that integer-typed matrices are perturbed correctly (they are cast to float first).",
+  "minor"
+ ],
+ [
+  "B4-MLO-10-1",
+  "code_patch.solution",
+  "import numpy as np\n\n\ndef invariance_failures(predict, X, col, perturb, tol=0.01)",
+  "import numpy as np\n\n\ndef invariance_failures(predict, X, col, perturb, tol=0.01)"
+ ],
+ [
+  "B4-MLO-10-1",
+  "code_patch.test",
+  "def _make_model(leak_weight):\n    w = np.array([0.9, 1.1, 0.0, leak_weight])  # ",
+  "def _make_model(leak_weight):\n    w = np.array([0.9, 1.1, 0.0, leak_weight])  # "
+ ],
+ [
+  "B4-MLO-10-2",
+  "detailed_answer",
+  "Comparing feature_ts with label_ts separates two different failures:",
+  "Comparing feature_ts with label_ts (assuming label_ts is never earlier than prediction_ts, so rows_after_label is a subset of rows_from_future) separates two different failures:",
+  "minor"
+ ],
+ [
+  "B4-MLO-10-2",
+  "practical_answer",
+  "and by warning (with the share) when only rows_from_future is positive",
+  "and by blocking promotion (reporting the share) when only rows_from_future is positive, unless a reviewed exception documents the tolerated lag",
+  "minor"
+ ],
+ [
+  "B4-MLO-10-4",
+  "detailed_answer",
+  "Tools generally infer conservatively, and TensorFlow Data Validation's documentation, for example, strongly advises",
+  "Inference tools differ in how aggressively they generalise from a snapshot; TensorFlow Data Validation's documentation, for example, says it uses conservative heuristics and strongly advises",
+  "minor"
+ ],
+ [
+  "B4-MLO-10-4",
+  "detailed_answer",
+  "What to review. Numeric ranges taken from observed min and max will reject",
+  "What to review. Where a tool derives numeric ranges from observed min and max (not every tool does), those ranges will reject",
+  "minor"
+ ],
+ [
+  "B4-MLO-11-1",
+  "detailed_answer",
+  "minimal secrets in the process.",
+  "minimal secrets in the process. Protects against: a payload that gets past the other controls doing damage beyond the loader (exfiltration, lateral movement). Does not protect against: the model's own malicious behaviour or an attacker who controls the data the loader legitimately reads.",
+  "major"
+ ],
+ [
+  "B4-MLO-11-1",
+  "detailed_answer",
+  "base images pinned by digest and rebuilt on a schedule.",
+  "base images pinned by digest and rebuilt on a schedule. Protects against: tampered or typosquatted packages and silent upstream base-image changes. Does not protect against: a malicious or vulnerable version you pinned on purpose, or a flaw the scanner does not yet know.",
+  "minor"
+ ],
+ [
+  "B4-MLO-11-1",
+  "detailed_answer",
+  "linked to run, code commit and data version.",
+  "linked to run, code commit and data version. Protects against: undetected or deniable promotions and slow forensics. Does not protect against: the attack itself, since it detects and attributes after the fact.",
+  "minor"
+ ],
+ [
+  "B4-MLO-11-2",
+  "detailed_answer",
+  "separate from the warehouse and rotatable)",
+  "separate from the warehouse; rotating it changes every pseudonym, so plan a re-keying job or accept broken linkage with older rows)",
+  "minor"
+ ],
+ [
+  "B4-MLO-11-3",
+  "answer",
+  "Models that memorise (small data, high capacity, overfitted) pose more residual risk than large models trained once over many records, so treat that as a factor in how aggressively you retrain.",
+  "Models that memorise (for example small data, high capacity, overfitting, or rare or repeated records) are more likely to retain recognisable traces of individual records, so treat that as a factor in how aggressively you retrain; this is model- and data-dependent and absence of memorisation is hard to demonstrate.",
+  "minor"
+ ],
+ [
+  "B4-MLO-11-4",
+  "detailed_answer",
+  "- Monitoring and rollback: what is tracked in production and who is on call.",
+  "- Ethical and fairness considerations: sensitive attributes used or excluded, subgroup error-rate gaps, and the sign-off decision on them.\n- Monitoring and rollback: what is tracked in production and who is on call.",
+  "minor"
+ ],
+ [
+  "B4-MLO-11-5",
+  "key_concepts",
+  [
+   "membership inference",
+   "overfitting gap",
+   "model inversion",
+   "output rounding",
+   "label-only output",
+   "rate limiting",
+   "differential privacy",
+   "attack AUC measurement"
+  ],
+  [
+   "membership inference",
+   "overfitting gap",
+   "label-only attacks",
+   "output rounding",
+   "label-only output",
+   "rate limiting",
+   "differential privacy",
+   "attack AUC measurement"
+  ]
+ ],
+ [
+  "B4-MLO-11-5",
+  "detailed_answer",
+  "(for example building reference models)",
+  "(for example label-only attacks that probe each record with hundreds or thousands of perturbed queries)",
+  "minor"
+ ],
+ [
+  "B4-MLO-11-5",
+  "practical_answer",
+  "This tests only the simplest attack; a low AUC is not a proof of safety, only evidence that cheap attacks fail.",
+  "This tests only the simplest attack; a low AUC is not a proof of safety, only evidence that cheap attacks fail. Also report the true-positive rate at a low false-positive rate (for example 0.1%), since a near-0.5 AUC can hide a handful of confidently identified records.",
+  "minor"
+ ],
+ [
+  "B4-MLO-12-1",
+  "detailed_answer",
+  "The pattern is the clue: the median barely moved (+3 ms) while the tail more than tripled.",
+  "The pattern is the clue: the median barely moved (+3 ms) while the tail more than tripled, and the unchanged error rate says the slow requests still finish inside client timeouts (check retry counts, because retries can hide a failing tail).",
+  "minor"
+ ],
+ [
+  "B4-MLO-12-4",
+  "practical_answer",
+  "if they are broken (missing or defaulted inputs), shift traffic to 0% on the new model only after enabling the old feature path or a default, and roll forward with the fix behind a feature flag in a small canary first.",
+  "if they are broken (missing or defaulted inputs), restore the old feature path or a safe default first and then roll back; if that cannot be done within minutes, roll forward with the fix behind a feature flag in a small canary first.",
+  "minor"
+ ],
+ [
+  "B4-MLO-12-5",
+  "practical_answer",
+  "| 1 stale cache | 5 consecutive failures or 50% errors in 10 s (circuit opens) | cached features no older than 15 min; others default | 60 min |",
+  "| 1 stale cache | 5 consecutive failures or 50% errors in 10 s (circuit opens) | cached features no older than 15 min; a miss or older entry sends that request to mode 2 | about 15 min (then entries have aged out) |",
+  "minor"
+ ],
+ [
+  "B4-MLO-12-7",
+  "practical_answer",
+  "The 19-day gap between the first and detection is the main finding",
+  "The 19-day gap between the first bad request and detection is the main finding",
+  "minor"
+ ],
+ [
+  "B4-MLO-12-7",
+  "practical_answer",
+  "fix the detection gap before the root cause",
+  "fix the detection gap as well as the root cause, because the detection gap is what turned a column rename into a 19-day loss",
+  "minor"
+ ],
+ [
+  "B4-MLO-12-8",
+  "practical_answer",
+  "returns (1152.0, 4302000, 0.268) for the static fleet",
+  "returns (1152.0, 4302000, 0.26778...) for the static fleet (0.268 rounded)",
+  "minor"
+ ],
+ [
+  "B4-MLO-12-8",
+  "detailed_answer",
+  "Verify before claiming: autoscaling must handle start-up time",
+  "Verify before claiming: the model sizes each hour from its average request rate, so bursts within the hour need extra headroom; autoscaling must also handle start-up time",
+  "minor"
+ ],
+ [
+  "B4-MLO-12-9",
+  "question_type",
+  "business_case",
+  "scenario"
+ ],
+ [
+  "B4-MLO-13-1",
+  "question_type",
+  "scenario",
+  "design"
+ ],
+ [
+  "B4-MLO-13-2",
+  "detailed_answer",
+  "which is the more dangerous failure",
+  "which can be the more dangerous failure because harmful content then passes unnoticed",
+  "minor"
+ ],
+ [
+  "B4-MLO-13-2",
+  "detailed_answer",
+  "Compare per-stage timings with the block-and-retry count.",
+  "Compare per-stage timings with the block-and-retry count, and check whether the release itself added a guardrail call, a longer prompt or a slower model.",
+  "minor"
+ ],
+ [
+  "B4-MLO-13-3",
+  "concise_answer",
+  "The bill outgrew traffic because tokens per request rose, so attribute",
+  "Cost per request must have risen about 30% (1.40/1.08), most likely through more tokens per request (or retries, tool rounds, model mix), so attribute",
+  "minor"
+ ],
+ [
+  "B4-MLO-13-3",
+  "detailed_answer",
+  "Note that every prompt edit invalidates the prefix",
+  "Note that every edit to the fixed prefix (system prompt, policy text, tool definitions) invalidates the cached prefix",
+  "minor"
+ ],
+ [
+  "B4-MLO-13-3",
+  "detailed_answer",
+  "read the provider's documentation and measure the cached-token counts it reports",
+  "read the provider's documentation (including any cache-write surcharge, which this arithmetic ignores) and measure the cached-token counts it reports",
+  "minor"
+ ],
+ [
+  "B4-MLO-14-1",
+  "question_type",
+  "business_case",
+  "scenario"
+ ],
+ [
+  "B4-MLO-14-1",
+  "answer",
+  "A repeat purchase that happens 3 to 6 weeks later cannot show up in a 2-week test by construction",
+  "If the typical repurchase interval is 3 to 6 weeks, most repeat purchases fall outside a 2-week test window by construction",
+  "minor"
+ ],
+ [
+  "B4-MLO-14-2",
+  "answer",
+  "Late events then make shadow scores look better than live scores.",
+  "Late events and missing recent counts then make live feature values differ from what the shadow saw, which can shift live scores (here, lower) without any model change.",
+  "minor"
+ ],
+ [
+  "B4-MLO-14-2",
+  "answer",
+  "Check whether it included feature retrieval, serialisation, timeout and retry behaviour, and peak load.",
+  "Check whether it included feature retrieval, serialisation, timeout and retry behaviour, and peak load. Under live load, feature-fetch timeouts that fall back to default values, plus client retries, could link all three symptoms (slow, lower scores, duplicates).",
+  "minor"
+ ],
+ [
+  "B4-MLO-14-4",
+  "answer",
+  "exploration traffic or counterfactual evaluation (inverse-propensity weighting from logged propensities) are the standard mitigations",
+  "exploration or randomised-ranking traffic is the clean mitigation; counterfactual evaluation (inverse-propensity weighting) works only if the logging policy was stochastic and its propensities were recorded, since items the old ranker never showed cannot be reweighted into the data",
+  "major"
+ ],
+ [
+  "B4-MLO-14-4",
+  "answer",
+  "Hidden Technical Debt in ML Systems describes this class of problem as a direct feedback loop, where a model influences the selection of its own training data",
+  "Hidden Technical Debt in ML Systems describes the related direct feedback loop, where a model influences the selection of its own training data",
+  "minor"
+ ],
+ [
+  "B4-MLO-14-4",
+  "answer",
+  "AUC also weighs the whole list equally",
+  "Pooled AUC also mixes between-query and within-query comparisons and weighs the whole list equally",
+  "minor"
+ ],
+ [
+  "B4-MLO-14-4",
+  "answer",
+  "Plan: reproduce the offline metric per position, replay with propensity weighting,",
+  "Plan (the skew check in item 4 is cheapest and can run first): reproduce the offline metric per position, replay with propensity weighting where propensities were logged,",
+  "minor"
+ ],
+ [
+  "B4-MLO-14-5",
+  "detailed_answer",
+  "Windowed counts that depend on event lateness: allow a documented tolerance or compare only rows whose window is older than the lateness bound.",
+  "Windowed counts that depend on event lateness: keep the tolerance at zero but compare only rows whose window closed before the lateness bound (a non-zero tolerance would hide the off-by-one incident in the question), and track the late-event rate separately.",
+  "major"
+ ],
+ [
+  "B4-MLO-14-5",
+  "detailed_answer",
+  "A scheduled job recomputes the same features",
+  "A scheduled job, run after the lateness allowance has elapsed (for example hourly with a lag of a few hours), recomputes the same features",
+  "minor"
+ ],
+ [
+  "B4-MLO-14-6",
+  "detailed_answer",
+  "A has higher expected value in year 1 but much higher variance and a long payback uncertainty",
+  "A has the higher expected net in year 1 (about 80,000 vs 34,300) and, if the gain persists, in later years too (the build cost is not repeated), but with much higher variance",
+  "minor"
+ ]
+]

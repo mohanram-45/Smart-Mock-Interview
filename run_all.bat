@@ -16,7 +16,8 @@ start "Main Backend - port 5000" cmd /k "cd /d %ROOT%main && call %ROOT%.bot\Scr
 
 start "Frontend - port 3000" cmd /k "cd /d %ROOT%frontend && node server.js"
 
-start "Compare Tool - port 5050" cmd /k "cd /d %ROOT%compare && call %ROOT%.bot\Scripts\activate.bat && python app.py"
+rem Stage 13: the compare tool listens on 127.0.0.1 only and the Flask debugger is forced OFF here (SMART_DEBUG is cleared for this window)
+start "Compare Tool - port 5050" cmd /k "set SMART_DEBUG=&& set SMART_COMPARE_HOST=127.0.0.1&& cd /d %ROOT%compare && call %ROOT%.bot\Scripts\activate.bat && python app.py"
 
 echo.
 echo All services launching in separate windows.

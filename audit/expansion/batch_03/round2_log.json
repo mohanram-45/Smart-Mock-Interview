@@ -1,0 +1,248 @@
+{
+ "applied": [
+  [
+   "B3-MLO-02-4",
+   "question",
+   "regresses by more than slice_tolerance or is missing from the candidate",
+   "regresses by more than slice_tolerance, or if any baseline slice of any size is missing from the candidate",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-02-4",
+   "detailed_answer",
+   "label leakage in the holdout",
+   "slice regressions judged on point estimates (a 200-example slice at accuracy 0.85 has a standard error near 0.025, over twice the 0.01 tolerance, so the slice rule is noisy at the default minimum size); label leakage in the holdout",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-02-5",
+   "practical_answer",
+   "So 0.75 sits within one standard deviation of the mean and fails often, while a floor of 0.70 was never reached in 200 seeds.",
+   "In this illustration 0.75 sits within one standard deviation of the mean and fails often, while a floor of 0.70 is never reached in 200 seeds.",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-02-5",
+   "practical_answer",
+   "If a stricter bound is wanted, set it from a larger multiple of the measured standard deviation below the mean, and re-measure when the fixture or the model changes.",
+   "If a stricter bound is wanted, note that 3 standard deviations below the mean (about 0.72 here) already equals the worst of 200 seeds, so collect more seeds or enlarge the validation set first, and re-measure when the fixture or the model changes.",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-02-5",
+   "detailed_answer",
+   "which is worse than having none",
+   "which is arguably worse than having none",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-03-3",
+   "detailed_answer",
+   "the skl2onnx documentation says float and double comparisons give the same result in most cases)",
+   "the skl2onnx documentation says float and double comparisons give the same result in most cases, though the same page shows a regression example where casting to float produced large errors, so this is an expectation, not a guarantee)",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-03-4",
+   "answer",
+   "- Missing columns, extra columns, wrong shapes.",
+   "- Missing columns and wrong shapes. Extra columns are a policy choice: MLflow's schema enforcement ignores them with a warning, so reject them explicitly if you want strictness.",
+   "recheck_major"
+  ],
+  [
+   "B3-MLO-03-5",
+   "concise_answer",
+   "Promotion moves an alias: atomic in the registry, but replicas change only when redeployed.",
+   "Promotion moves an alias: one registry write (atomic in typical database-backed registries), but replicas change only when redeployed.",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-03-5",
+   "detailed_answer",
+   "(atomic in typical database-backed registries, though the cited page does not state it)",
+   "(atomic in typical database-backed registries; MLflow's documentation does not state this)",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-03-5",
+   "practical_answer",
+   "take model v39 and its image digest.",
+   "take the model version it names (v39 in this scenario) and its image digest.",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-04-1",
+   "answer",
+   "Apply backpressure rather than dropping data silently.",
+   "Prefer backpressure or a durable buffer to silent drops (sensors often cannot be slowed, so if load must be shed, do it deliberately and count it).",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-04-3",
+   "question",
+   "It contains the waiting requests up to max_batch.",
+   "It contains the waiting requests up to max_batch (a request arriving exactly at the dispatch instant counts as waiting).",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-04-4",
+   "detailed_answer",
+   "so up to roughly 9,000 requests (fewer while the ramp is still climbing) arrive faster than they can be served",
+   "so on the order of 9,000 requests (100 requests/s of excess times 90 s, an upper figure that assumes demand is already at 200 requests/s; the two-minute ramp lowers it, scrape and decision delay raise it) arrive faster than they can be served",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-04-6",
+   "practical_answer",
+   "above an SLO burn threshold over a long and a short window (burn-rate rules over a long and a short window, as in a standard 99.9% SLO policy)",
+   "above an SLO burn-rate threshold over both a long and a short window (for a 99.9% SLO the SRE Workbook's starting point pages at burn rate 14.4 over 1 h and 5 min)",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-04-6",
+   "detailed_answer",
+   "avoid raw identifiers or free text where a hash is enough",
+   "avoid raw identifiers or free text where a keyed hash is enough (a plain hash of a low-entropy identifier can be reversed, and pseudonymised data is still personal data)",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-05-3",
+   "answer",
+   "(about 47,000 if the baseline variance is used for both hypotheses)",
+   "(about 48,000 with the usual formula that uses baseline variance under the null; two-sided 5% test, 80% power)",
+   "recheck_major"
+  ],
+  [
+   "B3-MLO-05-3",
+   "answer",
+   "One day at 1% (20,000) gives only about 38% power",
+   "One day at 1% (20,000) gives only about 38 to 48% power depending on the formula",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-05-3",
+   "answer",
+   "about 116 complaints expected at baseline across 58,000 requests",
+   "about 114 complaints expected at baseline across 57,000 requests",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-05-4",
+   "practical_answer",
+   "Any breach triggers a review and, if needed, rollback.",
+   "Any breach triggers a review and, if needed, rollback. After Stage 3 there is no concurrent control, so these comparisons use the Stage 1-2 cohorts (or a small old-model holdout if you keep one), which have few chargeback events; and once the 7-day warm period ends a rollback means redeploying the registered old model rather than flipping traffic.",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-06-2",
+   "detailed_answer",
+   "the 4 data-loader workers add their own overhead, which the measurement should include",
+   "the 4 data-loader workers run only during batch calls, so assume their own interpreter overhead is folded into the 0.6 GiB request-peak figure below, and confirm by measuring every process",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-06-3",
+   "practical_answer",
+   "Then lengthen the simulated load beyond the budget (for example 350 s) and confirm the startup probe fails and the pod is restarted, proving the budget is enforced; a 200 s load would still pass inside the 300 s budget.",
+   "Then, in a setup where loading blocks the HTTP server (so /health/live is unanswered), lengthen the simulated load beyond the budget (for example 350 s) and confirm the startup probe fails and the pod is restarted, proving the budget is enforced; a 200 s load would still pass inside the 300 s budget. If the server answers during background loading, a longer load only keeps the pod unready, not restarted.",
+   "recheck_major"
+  ],
+  [
+   "B3-MLO-06-4",
+   "detailed_answer",
+   "catches crash-on-first-request failures",
+   "gives a window that catches pods which crash shortly after becoming ready",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-06-4",
+   "detailed_answer",
+   "(a pod that is still loading its model counts as unavailable)",
+   "(a pod that is still loading its model counts as unavailable, provided readiness is gated on model load)",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-06-5",
+   "detailed_answer",
+   "and are add-ons beyond the core scheduler",
+   "and have mostly been provided by add-ons beyond the core scheduler (recent Kubernetes versions are adding feature-gated gang scheduling to the core scheduler, so check your cluster version)",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-06-6",
+   "detailed_answer",
+   "and the application must cope with being restarted",
+   "so a step must tolerate duplicate runs",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-07-4",
+   "practical_answer",
+   "the fix is to specify the window in UTC calendar days in the shared definition",
+   "the fix is to state the window explicitly in the shared definition (for example 30 calendar days in a named timezone, or 720 hours if that is what is meant) and implement it once",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-07-4",
+   "detailed_answer",
+   "(as an alpha-stage feature at the time of checking)",
+   "(documented as an alpha feature)",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-07-5",
+   "detailed_answer",
+   "Hence the logged online values are lower (late orders missing)",
+   "Hence the logged online values are lower because of the late orders (deleted orders push the other way, since online counts them and the backfill does not; the observed systematic gap implies late arrivals dominate)",
+   "recheck_minor"
+  ],
+  [
+   "B3-MLO-04-2",
+   "detailed_answer",
+   "(2) browsers cannot call native gRPC directly, so the dashboard keeps REST or uses a gateway",
+   "(2) browsers generally cannot speak native gRPC directly, so the dashboard keeps REST or goes through a gRPC-Web proxy (the gRPC-Web guide's example uses Envoy)",
+   "source_verifier"
+  ],
+  [
+   "B3-MLO-01-5",
+   "concise_answer",
+   "immutable versions, a stage or alias",
+   "numbered versions (treated as immutable by convention), a stage or alias",
+   "source_verifier"
+  ],
+  [
+   "B3-MLO-01-5",
+   "detailed_answer",
+   "It stores promoted model versions as immutable entries, with",
+   "It stores promoted model versions as entries that should be treated as immutable, with",
+   "source_verifier"
+  ],
+  [
+   "B3-MLO-04-5",
+   "answer",
+   "separately from successful ones, as the SRE book recommends.",
+   "separately from successful ones.",
+   "source_verifier"
+  ]
+ ],
+ "skipped": [
+  [
+   "B3-MLO-02-2",
+   "sources[0].supports",
+   "Model quality is sufficient on important data slices",
+   "source_verifier"
+  ],
+  [
+   "B3-MLO-02-4",
+   "sources[0].supports",
+   "Model quality is sufficient on important data slices",
+   "source_verifier"
+  ],
+  [
+   "B3-MLO-02-6",
+   "sources[0].supports",
+   "Model quality is sufficient on important data slices",
+   "source_verifier"
+  ]
+ ]
+}

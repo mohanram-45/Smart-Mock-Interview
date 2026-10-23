@@ -1,0 +1,326 @@
+[
+ {
+  "plan_id": "B1-GEN-06-3",
+  "verdict": "pass",
+  "reasons": [
+   "Applied change (ef-budget hedge plus Qdrant parenthetical) is accurate, hedged, consistent with the rest of the record."
+  ],
+  "parts_answered": {
+   "mechanisms (soft deletes, orphans, withdrawn doc)": true,
+   "design of update and delete path": true
+  },
+  "evidence": [
+   {
+    "claim": "soft deletes keep nodes in HNSW graph; memory not freed",
+    "method": "doc",
+    "evidence": "hnswlib README: mark_deleted omitted from results; replace_deleted 'allows to save memory'"
+   },
+   {
+    "claim": "many soft-deleted points can disconnect Qdrant graph",
+    "method": "doc",
+    "evidence": "Qdrant indexing docs: same can happen with a large number of soft-deleted points in the graph (disconnected components; filter context)"
+   },
+   {
+    "claim": "atomic alias switch",
+    "method": "doc",
+    "evidence": "Qdrant collections docs: alias changes happen atomically"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-symptom diagnosis plus layered update/delete/compaction design with compliance angle.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "mechanisms and design principles"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "step procedure with ids, flags, window trade-off"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All 6 concepts discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close (only lexical hits smi-g0040, smi-i0009; different intent)",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://github.com/nmslib/hnswlib",
+    "status": "supported",
+    "evidence": "mark_deleted omits from results; replace_deleted saves memory"
+   },
+   {
+    "url": "https://qdrant.tech/documentation/concepts/indexing/",
+    "status": "partially",
+    "evidence": "'large number of soft-deleted points in the graph' can cause disconnected components; filter-focused, not ef budget; answer wording is accurate as parenthetical"
+   },
+   {
+    "url": "https://docs.weaviate.io/weaviate/concepts/vector-index",
+    "status": "supported",
+    "evidence": "not re-opened; accepted from earlier reviewers"
+   },
+   {
+    "url": "https://lucene.apache.org/core/9_9_0/core/org/apache/lucene/index/TieredMergePolicy.html",
+    "status": "partially",
+    "evidence": "analogous delete-percentage merge trigger; answer labels it not HNSW-specific"
+   }
+  ],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-06-6",
+  "verdict": "correct",
+  "reasons": [
+   "Re-derived numbers: idf(5/250000)=10.7245, idf(40/250000)=8.7279, 1/61+1/63=0.032266, 2/62=0.032258; all match text.",
+   "Earlier major defect (concise saying fuse by rank, contradicting detailed) is resolved; concise now consistent with detailed (3); concise is 78 words.",
+   "Remaining issues are minor wording: non-sequitur after RRF example, universal-sounding statements, normalised scores described as rank-based."
+  ],
+  "parts_answered": {
+   "why it happens": true,
+   "merging": true,
+   "fusion": true,
+   "scale mismatch": true,
+   "candidate depth": true
+  },
+  "evidence": [
+   {
+    "claim": "Lucene idf 5 vs 40 of 250,000 gives 10.72 vs 8.73",
+    "method": "executed",
+    "evidence": "python math.log: 10.7245, 8.7279"
+   },
+   {
+    "claim": "RRF 1&3 = 0.03227 vs 2&2 = 0.03226",
+    "method": "executed",
+    "evidence": "0.0322665 vs 0.0322581"
+   },
+   {
+    "claim": "shard-local scoring; dfs pre-pass costs extra round trip",
+    "method": "doc",
+    "evidence": "Elastic blog: scores per-shard by default; dfs_query_then_fetch adds an extra round trip, same score as one shard"
+   },
+   {
+    "claim": "RRF k=60 default",
+    "method": "paper",
+    "evidence": "Cormack et al. 2009 use k=60 (not re-opened)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "so consistent mid-high placement competes with one strong placement",
+    "problem": "1&3 vs 2&2 is a near tie; the conclusion does not follow from the example.",
+    "replacement": "so the two are nearly tied: RRF rewards a top rank only slightly more than consistent agreement"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "cosine similarities lie in [-1, 1] and cluster in a narrow band",
+    "problem": "Model-dependent, stated universally.",
+    "replacement": "cosine similarities lie in [-1, 1] and often cluster in a narrow band"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "local statistics approximate the global ones and the problem is small",
+    "problem": "Even with a random split, very rare terms (the query type asked about) have noisy local df; 'small' overstated.",
+    "replacement": "local statistics approximate the global ones for common terms and the problem is usually small (very rare terms stay noisy even then)"
+   },
+   {
+    "severity": "minor",
+    "field": "concise_answer",
+    "claim": "combine them with rank-based fusion such as reciprocal rank fusion or normalised scores",
+    "problem": "Normalised scores are not rank-based; wording conflates them.",
+    "replacement": "combine them with reciprocal rank fusion or tuned, per-list normalised scores"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-step: IDF mechanics with numbers, global-stats trade-offs, fusion choice, candidate depth.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "genuinely shorter, 78 words, consistent with detailed"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "worked numbers and rigor"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "All 6 concepts discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close (only lexical hits smi-g0040, smi-i0009; different intent)",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://lucene.apache.org/core/9_9_0/core/org/apache/lucene/search/similarities/BM25Similarity.html",
+    "status": "supported",
+    "evidence": "idf = log(1+(docCount-docFreq+0.5)/(docFreq+0.5)); matches computation (not re-opened)"
+   },
+   {
+    "url": "https://www.elastic.co/blog/practical-bm25-part-1-how-shards-affect-relevance-scoring-in-elasticsearch",
+    "status": "supported",
+    "evidence": "'By default, Elasticsearch calculates scores on a per-shard basis'; dfs 'adds an extra round trip'"
+   },
+   {
+    "url": "https://cormack.uwaterloo.ca/cormacksigir09-rrf.pdf",
+    "status": "supported",
+    "evidence": "RRF k=60; not re-opened"
+   }
+  ],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-07-4",
+  "verdict": "pass",
+  "reasons": [
+   "Applied alias-rollback caveat is accurate and conditional on keeping the old collection.",
+   "2x2 table consistent: new model +2 points at both sizes, chunk size -7 points at both."
+  ],
+  "parts_answered": {
+   "isolate cause": true,
+   "prevention before migration": true
+  },
+  "evidence": [
+   {
+    "claim": "alias switch atomic, no impact on concurrent requests",
+    "method": "doc",
+    "evidence": "Qdrant: all changes of aliases happen atomically"
+   },
+   {
+    "claim": "2x2 deltas",
+    "method": "derivation",
+    "evidence": "0.90-0.88=0.02; 0.83-0.81=0.02; 0.88-0.81=0.07; 0.90-0.83=0.07"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Multi-factor isolation design plus release hygiene.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "procedure"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked table; slight overlap on k-coverage only"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Concepts all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close (only lexical hits smi-g0040, smi-i0009; different intent)",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://qdrant.tech/documentation/concepts/collections/",
+    "status": "supported",
+    "evidence": "atomic alias switch quote; rollback is labelled inference"
+   },
+   {
+    "url": "https://sbert.net/examples/sentence_transformer/applications/computing-embeddings/README.html",
+    "status": "partially",
+    "evidence": "accepted from earlier reviewer"
+   },
+   {
+    "url": "https://www.elastic.co/docs/manage-data/data-store/aliases",
+    "status": "supported",
+    "evidence": "accepted from earlier reviewer"
+   }
+  ],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-07-5",
+  "verdict": "pass",
+  "reasons": [
+   "Applied hedge is accurate and matches the source caveat.",
+   "Hypothetical table internally consistent (hybrid at least as good as both on each slice)."
+  ],
+  "parts_answered": {
+   "why": true,
+   "confirm with measurements": true,
+   "fixes in order of cost": true
+  },
+  "evidence": [
+   {
+    "claim": "dense underperforms BM25 on entity-centric questions",
+    "method": "paper",
+    "evidence": "Sciavolino et al. 2021 (arXiv 2109.08535); subword/near-miss claims hedged as plausible"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism explanation, slice measurement, cost-ordered fixes.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "mechanism and fixes"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "triage table"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Concepts discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none close (only lexical hits smi-g0040, smi-i0009; different intent)",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2109.08535",
+    "status": "partially",
+    "evidence": "dense below sparse on rare entities; no subword evidence (stated)"
+   },
+   {
+    "url": "https://arxiv.org/abs/2104.08663",
+    "status": "partially",
+    "evidence": "BM25 robust baseline"
+   },
+   {
+    "url": "https://www.elastic.co/docs/reference/elasticsearch/rest-apis/reciprocal-rank-fusion",
+    "status": "supported",
+    "evidence": "accepted from earlier reviewer"
+   }
+  ],
+  "added_sources": [],
+  "code_patch": null
+ }
+]

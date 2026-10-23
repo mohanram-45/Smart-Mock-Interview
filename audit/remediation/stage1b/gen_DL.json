@@ -1,0 +1,386 @@
+[
+ {
+  "id": "P-DL-01",
+  "plan_id": "P-DL-01",
+  "status": "ok",
+  "question": "A single neuron computes a = sigmoid(X @ w + b) and is trained with L = (1/(2N)) * sum_i (a_i - y_i)^2. Derive dL/dw and dL/db, implement them in numpy, and write a numerical gradient check that would catch a forgotten sigmoid-derivative term. What step size and relative error do you expect for a correct implementation?",
+  "answer": "With z = Xw + b and a = sigmoid(z), the chain rule gives dL/dz_i = (a_i - y_i) * a_i * (1 - a_i) / N, because sigmoid'(z) = a(1 - a). Then dL/dw = X^T dL/dz and dL/db = sum_i dL/dz_i. The check compares these against central differences (L(theta + eps) - L(theta - eps)) / (2 eps) for each parameter, using float64 and eps around 1e-6, and reports a relative error ||g_a - g_n|| / (||g_a|| + ||g_n||). A correct implementation typically lands around 1e-7 or smaller (2.7e-10 in the run below); a missing a(1 - a) factor gave about 0.8, so the check catches it clearly.\n\n```python\nimport numpy as np\n\ndef sigmoid(z):\n    return 1.0 / (1.0 + np.exp(-z))\n\ndef forward(w, b, X, y):\n    a = sigmoid(X @ w + b)\n    loss = 0.5 * np.mean((a - y) ** 2)\n    return a, loss\n\ndef grads(w, b, X, y):\n    a, _ = forward(w, b, X, y)\n    n = X.shape[0]\n    dz = (a - y) * a * (1 - a) / n      # dL/dz_i, includes sigmoid'(z) = a(1-a)\n    return X.T @ dz, dz.sum()           # dL/dw, dL/db\n\ndef numeric_grads(w, b, X, y, eps=1e-6):\n    gw = np.zeros_like(w)\n    for i in range(w.size):\n        wp, wm = w.copy(), w.copy()\n        wp[i] += eps\n        wm[i] -= eps\n        gw[i] = (forward(wp, b, X, y)[1] - forward(wm, b, X, y)[1]) / (2 * eps)\n    gb = (forward(w, b + eps, X, y)[1] - forward(w, b - eps, X, y)[1]) / (2 * eps)\n    return gw, gb\n\ndef rel_error(a, b):\n    return np.linalg.norm(a - b) / max(np.linalg.norm(a) + np.linalg.norm(b), 1e-12)\n```\n\nPractical points: use float64 (float32 noise swamps the finite difference), check at a random non-saturated point, and perturb one parameter at a time. Note also that with MSE the a(1 - a) factor makes gradients vanish when the neuron saturates on a wrong answer, which is one reason cross-entropy is preferred for sigmoid outputs.",
+  "key_concepts": [
+   "chain rule",
+   "sigmoid derivative a(1-a)",
+   "central difference gradient check",
+   "relative error",
+   "MSE loss",
+   "vanishing gradient from saturation"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\ndef sigmoid(z):\n    return 1.0 / (1.0 + np.exp(-z))\n\ndef forward(w, b, X, y):\n    a = sigmoid(X @ w + b)\n    loss = 0.5 * np.mean((a - y) ** 2)\n    return a, loss\n\ndef grads(w, b, X, y):\n    a, _ = forward(w, b, X, y)\n    n = X.shape[0]\n    dz = (a - y) * a * (1 - a) / n      # dL/dz_i, includes sigmoid'(z) = a(1-a)\n    return X.T @ dz, dz.sum()           # dL/dw, dL/db\n\ndef numeric_grads(w, b, X, y, eps=1e-6):\n    gw = np.zeros_like(w)\n    for i in range(w.size):\n        wp, wm = w.copy(), w.copy()\n        wp[i] += eps\n        wm[i] -= eps\n        gw[i] = (forward(wp, b, X, y)[1] - forward(wm, b, X, y)[1]) / (2 * eps)\n    gb = (forward(w, b + eps, X, y)[1] - forward(w, b - eps, X, y)[1]) / (2 * eps)\n    return gw, gb\n\ndef rel_error(a, b):\n    return np.linalg.norm(a - b) / max(np.linalg.norm(a) + np.linalg.norm(b), 1e-12)",
+   "test": "rng = np.random.default_rng(0)\nX = rng.normal(size=(20, 4))\ny = rng.integers(0, 2, size=20).astype(float)\nw = rng.normal(size=4)\nb = 0.3\ngw, gb = grads(w, b, X, y)\nnw, nb = numeric_grads(w, b, X, y)\nassert rel_error(gw, nw) < 1e-7, rel_error(gw, nw)\nassert abs(gb - nb) < 1e-8\n# a common bug: forgetting the sigmoid derivative a(1-a) must be caught by the check\na, _ = forward(w, b, X, y)\nbad_gw = X.T @ ((a - y) / 20)\nassert rel_error(bad_gw, nw) > 1e-2\nprint(\"rel_error correct:\", rel_error(gw, nw), \" buggy:\", rel_error(bad_gw, nw))",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "New AI-written original question (pilot batch); not taken from any real interview.",
+  "confidence": "high",
+  "question_type": "coding",
+  "interview_style_note": "Derives the gradient correctly, includes the 1/N factor, and knows to use central differences, float64 and relative error rather than absolute error.",
+  "common_mistakes": [
+   "Forgetting sigmoid'(z) = a(1-a) in the gradient",
+   "Using a forward difference or float32 and then seeing relative errors around 1e-3 and wrongly declaring a bug (or none)",
+   "Comparing absolute rather than relative error"
+  ]
+ },
+ {
+  "id": "P-DL-02",
+  "plan_id": "P-DL-02",
+  "status": "ok",
+  "question": "A classifier trains normally for a few hundred steps and then the printed loss becomes nan and stays nan. Give the order in which you would investigate (data, learning rate, log(0), softmax overflow, exploding gradients, mixed precision), and implement a numerically stable softmax and cross-entropy-from-logits in numpy that survives logits such as [1000, 1001, 1002] and a logit gap of 800.",
+  "answer": "Investigate in order of cheapness and likelihood. (1) Find the first step where something becomes non-finite: log loss and gradient norm every step, and check whether inputs, labels or activations were already nan/inf. Bad data is common: nan/inf features, labels outside the class range, an empty batch averaged to 0/0, or a zero-variance feature in a custom normalisation. (2) If the loss was finite but the gradient norm climbed first, it is exploding gradients or too large a learning rate: lower the rate, add warmup, add gradient clipping. (3) Look at the loss code: log(0) from probabilities that underflow to 0, and softmax overflow because exp(1000) is inf in float64 so inf/inf is nan. Fix by computing from logits with the max-subtraction and log-sum-exp trick, not by adding ad hoc epsilons everywhere. Also watch sqrt(0), division by zero in custom layers. (4) Mixed precision: float16 overflows above 65504 (exp overflows beyond roughly 11), so use loss scaling with skipped steps on overflow, or bfloat16, and keep the softmax/loss reductions in float32. Fix the root cause, not just the symptom.\n\n```python\nimport numpy as np\n\ndef softmax(z):\n    z = z - np.max(z, axis=-1, keepdims=True)      # shift: largest exponent becomes 0\n    e = np.exp(z)\n    return e / e.sum(axis=-1, keepdims=True)\n\ndef log_softmax(z):\n    z = z - np.max(z, axis=-1, keepdims=True)\n    return z - np.log(np.exp(z).sum(axis=-1, keepdims=True))   # log-sum-exp trick\n\ndef cross_entropy_from_logits(z, y_idx):\n    ls = log_softmax(z)\n    return -ls[np.arange(len(y_idx)), y_idx].mean()\n\ndef naive_softmax(z):\n    e = np.exp(z)\n    return e / e.sum(axis=-1, keepdims=True)\n```\n\nSubtracting the row max leaves softmax unchanged and makes the largest exponent exp(0) = 1. For a logit gap of 800, log(softmax) gives -inf while log_softmax returns -800 exactly, so the loss for a confidently wrong prediction is large but finite.",
+  "key_concepts": [
+   "nan diagnosis order",
+   "softmax overflow",
+   "log-sum-exp trick",
+   "log(0)",
+   "gradient clipping",
+   "float16 range and loss scaling",
+   "learning rate warmup"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\ndef softmax(z):\n    z = z - np.max(z, axis=-1, keepdims=True)      # shift: largest exponent becomes 0\n    e = np.exp(z)\n    return e / e.sum(axis=-1, keepdims=True)\n\ndef log_softmax(z):\n    z = z - np.max(z, axis=-1, keepdims=True)\n    return z - np.log(np.exp(z).sum(axis=-1, keepdims=True))   # log-sum-exp trick\n\ndef cross_entropy_from_logits(z, y_idx):\n    ls = log_softmax(z)\n    return -ls[np.arange(len(y_idx)), y_idx].mean()\n\ndef naive_softmax(z):\n    e = np.exp(z)\n    return e / e.sum(axis=-1, keepdims=True)",
+   "test": "import warnings\nz = np.array([[1000.0, 1001.0, 1002.0]])\nwith warnings.catch_warnings():\n    warnings.simplefilter(\"ignore\")\n    assert np.isnan(naive_softmax(z)).all()          # inf/inf\n    assert np.isinf(np.log(naive_softmax(np.array([[0.0, -800.0]])))[0, 1])  # log(0)\np = softmax(z)\nassert np.isfinite(p).all() and abs(p.sum() - 1) < 1e-12\nassert np.allclose(p, softmax(z - 1000.0))           # shift invariance\n# extreme logit gap: log-softmax stays finite and exact, log(softmax) gives -inf\nz2 = np.array([[0.0, -800.0]])\nls = log_softmax(z2)\nassert np.isfinite(ls).all() and abs(ls[0, 1] - (-800.0)) < 1e-9\nwith warnings.catch_warnings():\n    warnings.simplefilter(\"ignore\")\n    assert np.isinf(np.log(softmax(z2))[0, 1])\n# loss for a confidently wrong prediction is large but finite\nloss = cross_entropy_from_logits(z2, np.array([1]))\nassert np.isfinite(loss) and abs(loss - 800.0) < 1e-9\nprint(\"p =\", p, \"loss =\", loss)",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "New AI-written original question (pilot batch); not taken from any real interview.",
+  "confidence": "high",
+  "question_type": "debugging",
+  "interview_style_note": "Gives a prioritised, evidence-driven checklist (locate the first non-finite value) and fixes numerical issues at the source with log-sum-exp.",
+  "common_mistakes": [
+   "Adding a small epsilon inside log everywhere instead of using log-softmax from logits",
+   "Only lowering the learning rate without checking data for nan/inf or bad labels",
+   "Computing softmax first and then taking the log"
+  ]
+ },
+ {
+  "id": "P-DL-03",
+  "plan_id": "P-DL-03",
+  "status": "ok",
+  "question": "Write out Adam's update rule and explain what m and v each track and why bias correction is needed. Implement one Adam step in numpy and test it against a hand-computed first step. Then say when SGD with momentum might still be a better choice.",
+  "answer": "Adam keeps two exponential moving averages per parameter: m = beta1*m + (1-beta1)*g (a smoothed gradient direction) and v = beta2*v + (1-beta2)*g^2 (a smoothed gradient scale). Both start at zero, so early on they are biased toward zero. Bias correction divides by (1 - beta^t): m_hat = m/(1-beta1^t), v_hat = v/(1-beta2^t). The update is theta -= lr * m_hat / (sqrt(v_hat) + eps). On step 1, m = 0.1g and v = 0.001g^2; after correction m_hat = g and v_hat = g^2, so the step is lr*g/(|g|+eps), essentially lr*sign(g) whatever the gradient scale. Without correction the first step would be about 3.16 times lr (0.1/sqrt(0.001)), which is why it matters, especially with beta2 = 0.999.\n\n```python\nimport numpy as np\n\ndef adam_step(theta, grad, m, v, t, lr=1e-3, beta1=0.9, beta2=0.999, eps=1e-8):\n    \"\"\"One Adam update; t is the 1-based step count. Returns new (theta, m, v).\"\"\"\n    m = beta1 * m + (1 - beta1) * grad\n    v = beta2 * v + (1 - beta2) * grad ** 2\n    m_hat = m / (1 - beta1 ** t)\n    v_hat = v / (1 - beta2 ** t)\n    theta = theta - lr * m_hat / (np.sqrt(v_hat) + eps)\n    return theta, m, v\n```\n\nThe test checks m, v and the update for gradient [0.5, -2, 0]: each nonzero coordinate moves by almost exactly lr and the zero-gradient coordinate does not move.\n\nSGD with momentum is worth trying when Adam fits training data fine but generalises worse, which some practitioners observe in certain vision tasks; this is empirical and not guaranteed, and it needs more learning-rate tuning. Also, adding L2 to the gradient under Adam is not the same as weight decay, because the term is rescaled by 1/sqrt(v); AdamW decouples decay from the adaptive step, which is usually the fairer comparison.",
+  "key_concepts": [
+   "Adam update rule",
+   "first moment (m)",
+   "second moment (v)",
+   "bias correction",
+   "per-parameter adaptive step",
+   "SGD with momentum",
+   "AdamW decoupled weight decay"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\ndef adam_step(theta, grad, m, v, t, lr=1e-3, beta1=0.9, beta2=0.999, eps=1e-8):\n    \"\"\"One Adam update; t is the 1-based step count. Returns new (theta, m, v).\"\"\"\n    m = beta1 * m + (1 - beta1) * grad\n    v = beta2 * v + (1 - beta2) * grad ** 2\n    m_hat = m / (1 - beta1 ** t)\n    v_hat = v / (1 - beta2 ** t)\n    theta = theta - lr * m_hat / (np.sqrt(v_hat) + eps)\n    return theta, m, v",
+   "test": "theta = np.array([1.0, -1.0, 0.5])\ng = np.array([0.5, -2.0, 0.0])\nm = np.zeros(3); v = np.zeros(3)\ntheta1, m1, v1 = adam_step(theta, g, m, v, t=1)\n# hand computation of step 1\nassert np.allclose(m1, 0.1 * g)\nassert np.allclose(v1, 0.001 * g ** 2)\n# bias-corrected m_hat = g, v_hat = g^2, so update = lr * g / (|g| + eps) ~ lr * sign(g)\nexpected = theta - 1e-3 * np.array([0.5 / (0.5 + 1e-8), -2.0 / (2.0 + 1e-8), 0.0])\nassert np.allclose(theta1, expected, atol=1e-15)\nassert np.allclose(theta - theta1, [1e-3, -1e-3, 0.0], atol=1e-9)\n# without bias correction the first step would be ~ lr * 0.1g / (sqrt(0.001)|g|) = ~3.16 * lr\nuncorrected = 1e-3 * (0.1 * g) / (np.sqrt(0.001 * g ** 2) + 1e-8)\nassert abs(uncorrected[0] / 1e-3 - 0.1 / np.sqrt(0.001)) < 1e-4\n# second step with a constant gradient: still ~lr per coordinate\ntheta2, m2, v2 = adam_step(theta1, g, m1, v1, t=2)\nassert np.allclose(theta1 - theta2, [1e-3, -1e-3, 0.0], atol=1e-8)\nprint(\"step1 delta:\", theta - theta1, \" uncorrected ratio:\", uncorrected[0] / 1e-3)",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "New AI-written original question (pilot batch); not taken from any real interview.",
+  "confidence": "medium",
+  "question_type": "coding",
+  "interview_style_note": "Can state and implement the update exactly, explain the bias-correction effect with the step-1 numbers, and discuss generalisation claims with appropriate hedging.",
+  "common_mistakes": [
+   "Omitting bias correction or using t=0 (division by zero)",
+   "Saying Adam always generalises worse (or better) than SGD",
+   "Treating L2 regularisation and weight decay as identical under Adam"
+  ]
+ },
+ {
+  "id": "P-DL-04",
+  "plan_id": "P-DL-04",
+  "status": "ok",
+  "question": "You move a model from a CNN with batch norm to a transformer and someone asks why the transformer uses layer norm. Over which axes does each compute its statistics, how does each behave at training versus inference, and what goes wrong with batch norm for small batches or variable-length sequences?",
+  "answer": "For an activation tensor, batch norm computes mean and variance per feature/channel across the batch (and spatial positions for a conv layer, i.e. over N, H, W for each channel). Layer norm computes them per sample across the feature dimension (for a transformer, over d_model of each token independently). Both then apply a learned scale and shift.\n\nTraining vs inference: batch norm normalises with the current mini-batch statistics during training while updating exponential moving averages of mean and variance; at inference it uses those running estimates so a prediction does not depend on the other examples in the batch. Layer norm uses the same computation in both modes, with no batch dependence and no running statistics.\n\nProblems for batch norm: with very small batches the statistics are noisy and the train-time (batch) and test-time (running) normalisation differ; with variable-length padded sequences the statistics are contaminated by padding positions; in autoregressive decoding with batch size 1 there is no meaningful batch statistic; in distributed training the statistics are per device unless synchronised. Layer norm avoids all of these, which is why it is the standard choice in transformers and recurrent models. For CNNs with small batches, group norm is a common alternative.",
+  "key_concepts": [
+   "batch normalisation",
+   "layer normalisation",
+   "normalisation axes",
+   "running mean and variance",
+   "train/inference discrepancy",
+   "small-batch noise",
+   "group normalisation"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "New AI-written original question (pilot batch); not taken from any real interview.",
+  "confidence": "high",
+  "question_type": "concept",
+  "interview_style_note": "Names the exact axes for each, explains running averages at inference, and links the transformer choice to batch-independence and sequence handling.",
+  "common_mistakes": [
+   "Saying layer norm normalises across the batch",
+   "Claiming batch norm behaves identically in train and eval mode",
+   "Attributing the transformer choice only to speed"
+  ]
+ },
+ {
+  "id": "P-DL-05",
+  "plan_id": "P-DL-05",
+  "status": "ok",
+  "question": "You train an image classifier on 15,000 labelled images and see three different runs. Run A: training loss keeps falling towards zero while validation loss bottoms out around epoch 8 and then rises; validation accuracy stalls near 71%. Run B: training and validation loss both flatten at similar, high values after 5 epochs. Run C: training loss is smooth, but validation accuracy swings by several points between epochs and the validation set has 300 images. Diagnose each run and give your actions in priority order.",
+  "answer": "Run A is overfitting. Priority: (1) checkpoint/early-stop at the best validation epoch; (2) more or stronger data augmentation, or more data; (3) regularise: weight decay, dropout, label smoothing, or a smaller or more heavily pretrained model; (4) confirm the validation split has no distribution shift from train. Rising validation loss with flat accuracy often means growing overconfidence rather than worse ranking, so judge by the metric you care about, and consider calibration.\n\nRun B is underfitting or an optimisation or data bug. Priority: (1) sanity check that the model can overfit a tiny subset (e.g. 32 examples) to near-zero loss; if not, look for bugs in labels, preprocessing, loss or learning rate; (2) tune the learning rate and optimiser and train longer; (3) increase capacity or reduce regularisation; (4) revisit features/inputs, since label noise or missing information can cap performance.\n\nRun C is a noisy evaluation, not necessarily a model problem. With 300 images and accuracy near 70%, the binomial standard error is sqrt(0.7*0.3/300), about 2.6 points, so swings of a few points are expected. Priority: (1) enlarge the validation set or use cross-validation; (2) average over seeds or use a weight moving average; (3) decay the learning rate; (4) do not pick epochs or hyperparameters from differences within the noise.",
+  "key_concepts": [
+   "overfitting",
+   "underfitting",
+   "early stopping",
+   "overfit a tiny batch sanity check",
+   "data augmentation",
+   "validation noise and standard error",
+   "loss versus accuracy divergence"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "New AI-written original question (pilot batch); not taken from any real interview.",
+  "confidence": "high",
+  "question_type": "scenario",
+  "interview_style_note": "Distinguishes variance, bias/optimisation and evaluation noise, and orders fixes by cost and diagnostic value (sanity checks before scaling up).",
+  "common_mistakes": [
+   "Adding more layers for Run A",
+   "Treating validation noise in Run C as a real trend",
+   "Skipping the cheap overfit-one-batch test in Run B"
+  ]
+ },
+ {
+  "id": "P-DL-06",
+  "plan_id": "P-DL-06",
+  "status": "ok",
+  "question": "For a classifier with softmax followed by cross-entropy, show that the gradient of the loss with respect to the logits is p - y. Verify it numerically in numpy against finite differences, and explain why frameworks offer a fused cross-entropy-from-logits function instead of softmax followed by log.",
+  "answer": "Let p = softmax(z) and L = -sum_k y_k log p_k. The softmax Jacobian is dp_k/dz_j = p_k (delta_kj - p_j). Then dL/dz_j = -sum_k y_k (1/p_k) p_k (delta_kj - p_j) = -(y_j - p_j sum_k y_k) = p_j - y_j, using sum_k y_k = 1 (one-hot or any label distribution). For a batch mean over N examples the gradient is (p - y)/N. It is simple: the error is predicted probability minus target, and each row sums to zero.\n\n```python\nimport numpy as np\n\ndef softmax(z):\n    z = z - z.max(axis=1, keepdims=True)\n    e = np.exp(z)\n    return e / e.sum(axis=1, keepdims=True)\n\ndef ce_loss(z, y_onehot):\n    zs = z - z.max(axis=1, keepdims=True)\n    log_p = zs - np.log(np.exp(zs).sum(axis=1, keepdims=True))\n    return -(y_onehot * log_p).sum(axis=1).mean()\n\ndef ce_grad(z, y_onehot):\n    \"\"\"dLoss/dlogits for the batch-mean loss: (p - y) / N.\"\"\"\n    return (softmax(z) - y_onehot) / z.shape[0]\n\ndef numeric_grad(z, y_onehot, eps=1e-6):\n    g = np.zeros_like(z)\n    for idx in np.ndindex(*z.shape):\n        zp, zm = z.copy(), z.copy()\n        zp[idx] += eps\n        zm[idx] -= eps\n        g[idx] = (ce_loss(zp, y_onehot) - ce_loss(zm, y_onehot)) / (2 * eps)\n    return g\n```\n\nThe test compares this against central differences (max difference about 1.6e-10 in the run) and checks the row sums.\n\nWhy fuse: (1) numerical stability - computing log(softmax(z)) separately can give -inf (probability underflows to 0), whereas the fused form uses log-softmax via log-sum-exp and stays finite, as the logit-gap-of-800 test shows; (2) the backward pass is the cheap p - y instead of multiplying through the full softmax Jacobian and 1/p, which also avoids dividing by tiny probabilities; (3) no need to materialise the probabilities for the loss.",
+  "key_concepts": [
+   "softmax Jacobian",
+   "cross-entropy gradient p - y",
+   "finite-difference gradient check",
+   "log-sum-exp stability",
+   "fused loss op",
+   "batch mean scaling 1/N"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\ndef softmax(z):\n    z = z - z.max(axis=1, keepdims=True)\n    e = np.exp(z)\n    return e / e.sum(axis=1, keepdims=True)\n\ndef ce_loss(z, y_onehot):\n    zs = z - z.max(axis=1, keepdims=True)\n    log_p = zs - np.log(np.exp(zs).sum(axis=1, keepdims=True))\n    return -(y_onehot * log_p).sum(axis=1).mean()\n\ndef ce_grad(z, y_onehot):\n    \"\"\"dLoss/dlogits for the batch-mean loss: (p - y) / N.\"\"\"\n    return (softmax(z) - y_onehot) / z.shape[0]\n\ndef numeric_grad(z, y_onehot, eps=1e-6):\n    g = np.zeros_like(z)\n    for idx in np.ndindex(*z.shape):\n        zp, zm = z.copy(), z.copy()\n        zp[idx] += eps\n        zm[idx] -= eps\n        g[idx] = (ce_loss(zp, y_onehot) - ce_loss(zm, y_onehot)) / (2 * eps)\n    return g",
+   "test": "rng = np.random.default_rng(1)\nz = rng.normal(size=(5, 4)) * 3\ny = np.eye(4)[rng.integers(0, 4, size=5)]\ng = ce_grad(z, y)\nassert np.allclose(g, numeric_grad(z, y), atol=1e-8)\nassert np.allclose(g.sum(axis=1), 0, atol=1e-12)     # each row of p - y sums to 0\n# naive pipeline: separate softmax then log -> -inf/nan on extreme logits; fused loss stays finite\nz_ext = np.array([[0.0, -800.0]]); y_ext = np.array([[0.0, 1.0]])\nimport warnings\nwith warnings.catch_warnings():\n    warnings.simplefilter(\"ignore\")\n    naive = -(y_ext * np.log(softmax(z_ext))).sum()\nassert np.isinf(naive) or np.isnan(naive)\nassert np.isfinite(ce_loss(z_ext, y_ext)) and np.allclose(ce_grad(z_ext, y_ext), [[1.0, -1.0]], atol=1e-12)\nprint(\"max abs diff analytic vs numeric:\", np.abs(g - numeric_grad(z, y)).max())",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "New AI-written original question (pilot batch); not taken from any real interview.",
+  "confidence": "high",
+  "question_type": "coding",
+  "interview_style_note": "Derives p - y cleanly, handles the batch mean factor, and explains fusion in terms of stability and a simpler backward pass.",
+  "common_mistakes": [
+   "Forgetting the 1/N factor when the loss is a batch mean",
+   "Applying softmax before a loss that already expects logits",
+   "Giving the gradient as p - y only for hard labels and not noting it holds when y sums to 1"
+  ]
+ },
+ {
+  "id": "P-DL-07",
+  "plan_id": "P-DL-07",
+  "status": "ok",
+  "question": "Implement inverted dropout in numpy with separate training and evaluation behaviour, including the backward pass. Why do we scale by 1/(1-p) during training rather than at test time? Write a test with a fixed seed that checks the expectation of the activations is preserved.",
+  "answer": "In inverted dropout, p is the probability of dropping a unit. During training each unit is kept with probability 1-p and the kept values are multiplied by 1/(1-p), so E[out] = (1-p) * x/(1-p) = x. At evaluation the layer is the identity. Scaling at train time means the test-time network needs no change and no extra multiplication; the alternative (scale by 1-p at test) works but puts the correction in every deployed model. The backward pass multiplies the upstream gradient by the same mask (including the 1/(1-p) factor) and a fresh mask must be drawn on every forward pass.\n\n```python\nimport numpy as np\n\ndef dropout_forward(x, p, training, rng):\n    \"\"\"Inverted dropout. p = probability of dropping a unit. Returns (out, mask).\"\"\"\n    if not training or p == 0.0:\n        return x, None\n    if not 0.0 <= p < 1.0:\n        raise ValueError(\"p must be in [0, 1)\")\n    mask = (rng.random(x.shape) >= p) / (1.0 - p)   # 0 or 1/(1-p)\n    return x * mask, mask\n\ndef dropout_backward(dout, mask):\n    return dout if mask is None else dout * mask\n```\n\nThe test uses one million ones with seed 42 and p = 0.3: the mean after dropout is 1.0002 (standard error about 0.0007, tolerance 0.005), the dropped fraction is 0.2999, and the unscaled variant has mean 0.6998, showing what goes wrong without scaling. Pitfalls: some libraries parameterise by drop probability and others by keep probability, so check the convention; and forgetting to switch to eval mode makes predictions stochastic and shrinks or distorts outputs.",
+  "key_concepts": [
+   "inverted dropout",
+   "drop vs keep probability",
+   "1/(1-p) scaling",
+   "expectation preservation",
+   "train vs eval mode",
+   "dropout mask in backward pass"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\ndef dropout_forward(x, p, training, rng):\n    \"\"\"Inverted dropout. p = probability of dropping a unit. Returns (out, mask).\"\"\"\n    if not training or p == 0.0:\n        return x, None\n    if not 0.0 <= p < 1.0:\n        raise ValueError(\"p must be in [0, 1)\")\n    mask = (rng.random(x.shape) >= p) / (1.0 - p)   # 0 or 1/(1-p)\n    return x * mask, mask\n\ndef dropout_backward(dout, mask):\n    return dout if mask is None else dout * mask",
+   "test": "rng = np.random.default_rng(42)\nx = np.ones(1_000_000)\np = 0.3\nout, mask = dropout_forward(x, p, True, rng)\n# expectation preserved: E[out] = x\nassert abs(out.mean() - 1.0) < 0.005, out.mean()\nassert abs((out == 0).mean() - p) < 0.005\nassert set(np.unique(out)) == {0.0, 1.0 / 0.7}\n# eval mode: identity, no scaling needed\nout_eval, m_eval = dropout_forward(x, p, False, rng)\nassert out_eval is x and m_eval is None\n# non-inverted dropout (no scaling) would shrink the mean to 1-p at train time\nplain = x * (rng.random(x.shape) >= p)\nassert abs(plain.mean() - (1 - p)) < 0.005\n# backward uses the same mask\nd = dropout_backward(np.ones_like(x), mask)\nassert np.array_equal(d, mask)\nprint(\"train mean:\", out.mean(), \"drop fraction:\", (out == 0).mean(), \"plain mean:\", plain.mean())",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "New AI-written original question (pilot batch); not taken from any real interview.",
+  "confidence": "high",
+  "question_type": "coding",
+  "interview_style_note": "Implements the mask/scaling correctly, links scaling to expectation preservation, and writes a statistical test with a justified tolerance.",
+  "common_mistakes": [
+   "Scaling by 1/p instead of 1/(1-p) when p is the drop probability",
+   "Leaving dropout active at evaluation",
+   "Reusing one mask across steps or using a different mask in backward"
+  ]
+ },
+ {
+  "id": "P-DL-08",
+  "plan_id": "P-DL-08",
+  "status": "ok",
+  "question": "Very deep plain convolutional networks were observed to get worse training error than shallower ones. How do residual (skip) connections address this, what is the gradient argument, and what do you do when the input and output of a residual block have different shapes?",
+  "answer": "That observation is the degradation problem: deeper plain networks can show higher training error than shallower ones, so it is an optimisation difficulty rather than overfitting. A residual block computes y = x + F(x). If an identity mapping is optimal, the layers only need to drive F towards zero, which is easier than making a stack of nonlinear layers approximate the identity.\n\nGradient argument: dy/dx = I + dF/dx, so the backward signal has a direct additive identity path from later layers to earlier ones instead of only a product of many layer Jacobians. This helps gradients reach early layers and eases optimisation, though it does not remove every training difficulty (normalisation, initialisation and learning rate still matter).\n\nWhen shapes differ, the element-wise addition needs matching dimensions: use a projection shortcut, typically a 1x1 convolution (with the same stride) on the skip path to match channels and spatial size, or in some designs pad extra channels with zeros and subsample. Concatenation (as in DenseNet) is a different design that grows the channel count instead of adding.",
+  "key_concepts": [
+   "residual connection",
+   "identity mapping",
+   "degradation problem",
+   "gradient path",
+   "projection shortcut (1x1 conv)",
+   "y = x + F(x)"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "New AI-written original question (pilot batch); not taken from any real interview.",
+  "confidence": "high",
+  "question_type": "concept",
+  "interview_style_note": "Explains that the issue is optimisation not overfitting, gives the I + dF/dx gradient argument, and handles shape mismatch with a projection.",
+  "common_mistakes": [
+   "Saying skip connections prevent overfitting",
+   "Claiming they completely solve vanishing gradients",
+   "Confusing residual addition with DenseNet concatenation"
+  ]
+ },
+ {
+  "id": "P-DL-09",
+  "plan_id": "P-DL-09",
+  "status": "ok",
+  "question": "You have about 2,000 labelled images from a specialised domain (for example industrial surface defects or microscopy) and a CNN pretrained on a large natural-image dataset. Describe how you would decide between feature extraction and fine-tuning, which layers to unfreeze, what learning rates to start with, what augmentation to use, and how you would validate the result.",
+  "answer": "Start with a cheap baseline: freeze the backbone, extract features (or train only a new classification head). With 2,000 images this is fast, low-variance and gives a number any fine-tuning must beat. Then fine-tune, since a specialised domain often differs from natural images: unfreeze gradually from the top (last block first, then more blocks) while comparing validation results; the further the domain is from the pretraining data, the more layers usually need to adapt, while early layers (edges, textures) transfer most readily. Use the pretraining input normalisation and resolution.\n\nLearning rates (starting points to tune, not rules): head around 1e-3 and backbone 10 to 100 times smaller (about 1e-4 to 1e-5 with AdamW), or SGD with momentum 0.9 around 1e-2 for the head and 1e-3 for the backbone, with warmup and a decay schedule. Keep weight decay modest. With small batches consider keeping batch-norm layers in eval mode (frozen statistics) because noisy batch statistics can hurt.\n\nAugmentation must preserve the label: flips/rotations only if the class is invariant to them, colour jitter only if colour is not the signal; crops, mild scale and noise are usual. Validation: with 2,000 images use stratified k-fold or a fixed hold-out, split by the unit that can leak (patient, part, session, scene) rather than by image, keep a test set untouched until the end, and report per-class metrics against the frozen-feature baseline and a majority-class baseline. If domain gap is large, consider domain-specific or self-supervised pretrained weights.",
+  "key_concepts": [
+   "feature extraction versus fine-tuning",
+   "gradual unfreezing",
+   "discriminative learning rates",
+   "domain gap",
+   "label-preserving augmentation",
+   "group-aware validation split",
+   "frozen batch norm statistics"
+  ],
+  "difficulty": "Hard",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "New AI-written original question (pilot batch); not taken from any real interview.",
+  "confidence": "medium",
+  "question_type": "scenario",
+  "interview_style_note": "Builds from a cheap baseline, justifies unfreezing and learning-rate choices, and explicitly protects against leakage in validation.",
+  "common_mistakes": [
+   "Fine-tuning every layer at a high learning rate and destroying pretrained features",
+   "Random image-level splits when images from the same patient/part appear in both train and validation",
+   "Applying augmentations that change the label"
+  ]
+ },
+ {
+  "id": "P-DL-10",
+  "plan_id": "P-DL-10",
+  "status": "ok",
+  "question": "Write a helper that computes the output spatial size of a convolution given input size, kernel size, padding, stride and dilation, and another that counts the parameters of a conv layer (with optional groups and bias). Test them on worked examples, including a 7x7 stride-2 stem on a 224x224 input and a depthwise-separable pair.",
+  "answer": "Effective kernel extent is d*(k-1)+1, and the output size is floor((n + 2p - d*(k-1) - 1)/s) + 1. Parameters: c_out * (c_in/groups) * k * k, plus c_out if there is a bias. The floor means trailing positions that do not fit a full window are ignored.\n\n```python\nimport numpy as np\n\ndef conv_out_size(n, k, padding=0, stride=1, dilation=1):\n    eff_k = dilation * (k - 1) + 1                 # effective kernel extent\n    if n + 2 * padding < eff_k:\n        raise ValueError(\"kernel larger than padded input\")\n    return (n + 2 * padding - eff_k) // stride + 1\n\ndef conv_params(c_in, c_out, k, groups=1, bias=True):\n    if c_in % groups or c_out % groups:\n        raise ValueError(\"groups must divide c_in and c_out\")\n    return c_out * (c_in // groups) * k * k + (c_out if bias else 0)\n```\n\nWorked results asserted by the test (each verified by brute-force counting of window positions): 224 with k=7, p=3, s=2 gives 112; then a 3x3, stride-2, pad-1 pool gives 56; a 3x3 kernel with dilation 2 and pad 2 keeps size 32; the same without padding gives 28; n=10, k=3, s=2 gives 4. Parameters: a 7x7 conv from 3 to 64 channels has 9,472; a 3x3 conv from 64 to 128 has 73,856; a depthwise 3x3 on 64 channels (groups=64) has 640 and a following 1x1 pointwise conv from 64 to 128 has 8,320, so the separable pair has 8,960 versus 73,856 for the standard conv. Parameter count does not depend on input size, unlike FLOPs.",
+  "key_concepts": [
+   "convolution output size formula",
+   "padding and stride",
+   "dilation and effective kernel",
+   "conv parameter count",
+   "depthwise separable convolution",
+   "floor in output size"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\ndef conv_out_size(n, k, padding=0, stride=1, dilation=1):\n    eff_k = dilation * (k - 1) + 1                 # effective kernel extent\n    if n + 2 * padding < eff_k:\n        raise ValueError(\"kernel larger than padded input\")\n    return (n + 2 * padding - eff_k) // stride + 1\n\ndef conv_params(c_in, c_out, k, groups=1, bias=True):\n    if c_in % groups or c_out % groups:\n        raise ValueError(\"groups must divide c_in and c_out\")\n    return c_out * (c_in // groups) * k * k + (c_out if bias else 0)",
+   "test": "# independent check: count the window start positions by brute force\ndef brute(n, k, p, s, d):\n    eff = d * (k - 1) + 1\n    return len(range(0, n + 2 * p - eff + 1, s))\nfor n in (7, 8, 32, 224):\n    for k in (1, 3, 5, 7):\n        for p in (0, 1, 2, 3):\n            for s in (1, 2, 3):\n                for d in (1, 2):\n                    if n + 2 * p >= d * (k - 1) + 1:\n                        assert conv_out_size(n, k, p, s, d) == brute(n, k, p, s, d)\nassert conv_out_size(224, 7, 3, 2) == 112      # 7x7 stride-2 stem\nassert conv_out_size(112, 3, 1, 2) == 56       # 3x3 stride-2 pool, pad 1\nassert conv_out_size(32, 3, 2, 1, 2) == 32     # dilation 2, pad 2 keeps size\nassert conv_out_size(32, 3, 0, 1, 2) == 28\nassert conv_out_size(10, 3, 0, 2) == 4         # floor: last column ignored\nassert conv_params(3, 64, 7) == 9472\nassert conv_params(64, 128, 3) == 73856\nassert conv_params(64, 64, 3, groups=64) == 640                 # depthwise 3x3\nassert conv_params(64, 128, 1) == 8320                           # pointwise\nassert conv_params(64, 128, 3, bias=False) == 73728\nassert conv_params(64, 64, 3, groups=64) + conv_params(64, 128, 1) == 8960   # separable\nprint(\"ok\")",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "New AI-written original question (pilot batch); not taken from any real interview.",
+  "confidence": "high",
+  "question_type": "coding",
+  "interview_style_note": "Applies the formula with dilation correctly, notes parameters are independent of input size, and validates against an independent brute-force count.",
+  "common_mistakes": [
+   "Omitting the +1 or the floor in the output formula",
+   "Ignoring dilation in the kernel extent",
+   "Counting the bias wrongly or including input size in the parameter count"
+  ]
+ },
+ {
+  "id": "P-DL-11",
+  "plan_id": "P-DL-11",
+  "status": "ok",
+  "question": "An embedding layer is described as 'a lookup table'. Show in numpy that looking up rows of an embedding matrix equals multiplying one-hot vectors by that matrix, implement the gradient for both, and explain why the lookup form is used and how gradients reach only the rows that were used.",
+  "answer": "With E of shape (V, d) and token ids idx, E[idx] equals onehot(idx) @ E. In backward, with upstream gradient dout of shape (len(idx), d), dE = onehot^T @ dout: row v of dE is the sum of dout rows for positions where idx == v. Rows of tokens not in the batch get exactly zero gradient, and a token that appears several times gets the sum of its gradients, so use np.add.at (or an equivalent scatter-add) rather than assignment.\n\n```python\nimport numpy as np\n\ndef embed_lookup(E, idx):\n    return E[idx]                                   # row gather: O(len(idx) * d)\n\ndef embed_onehot(E, idx):\n    onehot = np.zeros((len(idx), E.shape[0]))\n    onehot[np.arange(len(idx)), idx] = 1.0\n    return onehot @ E                               # O(len(idx) * V * d)\n\ndef embed_grad_lookup(V, idx, dout):\n    dE = np.zeros((V, dout.shape[1]))\n    np.add.at(dE, idx, dout)                        # accumulates repeated indices\n    return dE\n\ndef embed_grad_onehot(V, idx, dout):\n    onehot = np.zeros((len(idx), V))\n    onehot[np.arange(len(idx)), idx] = 1.0\n    return onehot.T @ dout\n```\n\nThe test confirms the forward and backward results match, that repeated index 2 accumulates dout[0] + dout[2], that unused rows are exactly zero, and that naive assignment would overwrite instead of accumulate.\n\nWhy lookup is used: the one-hot matmul costs O(len(idx) * V * d) time and needs a (len(idx), V) matrix, which is infeasible for vocabularies of tens of thousands or more, while gathering rows costs O(len(idx) * d). The mathematics is identical. Practical consequence: the gradient is sparse, so optimisers with per-parameter state (Adam) or weight decay can behave differently on rarely seen rows, and some frameworks offer sparse-gradient options for embeddings (check the docs of the framework you use).",
+  "key_concepts": [
+   "embedding lookup",
+   "one-hot matrix multiplication equivalence",
+   "sparse gradient",
+   "scatter-add for repeated indices",
+   "vocabulary size cost",
+   "gradient flow to used rows"
+  ],
+  "difficulty": "Medium",
+  "domain": "Deep Learning",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import numpy as np\n\ndef embed_lookup(E, idx):\n    return E[idx]                                   # row gather: O(len(idx) * d)\n\ndef embed_onehot(E, idx):\n    onehot = np.zeros((len(idx), E.shape[0]))\n    onehot[np.arange(len(idx)), idx] = 1.0\n    return onehot @ E                               # O(len(idx) * V * d)\n\ndef embed_grad_lookup(V, idx, dout):\n    dE = np.zeros((V, dout.shape[1]))\n    np.add.at(dE, idx, dout)                        # accumulates repeated indices\n    return dE\n\ndef embed_grad_onehot(V, idx, dout):\n    onehot = np.zeros((len(idx), V))\n    onehot[np.arange(len(idx)), idx] = 1.0\n    return onehot.T @ dout",
+   "test": "rng = np.random.default_rng(3)\nV, d = 10, 4\nE = rng.normal(size=(V, d))\nidx = np.array([2, 7, 2, 5])                       # note the repeated index 2\nassert np.allclose(embed_lookup(E, idx), embed_onehot(E, idx))\ndout = rng.normal(size=(4, d))\ng1 = embed_grad_lookup(V, idx, dout)\ng2 = embed_grad_onehot(V, idx, dout)\nassert np.allclose(g1, g2)\nassert np.allclose(g1[2], dout[0] + dout[2])       # repeated token: gradients add\nunused = [i for i in range(V) if i not in idx]\nassert np.all(g1[unused] == 0)                     # untouched rows get exactly zero gradient\n# the buggy version E_grad[idx] = dout overwrites instead of accumulating\nbad = np.zeros((V, d)); bad[idx] = dout\nassert not np.allclose(bad[2], g1[2])\nprint(\"ok\")",
+   "expected": []
+  },
+  "sources": [],
+  "change_notes": "New AI-written original question (pilot batch); not taken from any real interview.",
+  "confidence": "high",
+  "question_type": "coding",
+  "interview_style_note": "Shows the equivalence concretely, handles repeated indices in backward, and explains cost and sparsity.",
+  "common_mistakes": [
+   "Assigning dE[idx] = dout and losing gradients for repeated tokens",
+   "Claiming the lookup is an approximation of the one-hot product",
+   "Saying embeddings receive gradient for the whole table every step"
+  ]
+ },
+ {
+  "id": "P-DL-12",
+  "plan_id": "P-DL-12",
+  "status": "ok",
+  "question": "A trained model is too slow and too large for its target hardware (say a mid-range phone or a small CPU-only server). Walk through how you would shrink and speed it up using quantisation, pruning, distillation, architecture changes and batching, what the trade-offs are, and how you would validate that accuracy loss is acceptable.",
+  "answer": "First define the target: latency percentile, memory budget, throughput, and an agreed accuracy budget; then profile on the real hardware to see whether the bottleneck is compute, memory bandwidth, preprocessing or the runtime. Go from cheap to costly.\n\n1. Engineering: export to an optimised inference runtime, fuse operators, use half precision where supported, and batch or dynamically batch requests when throughput matters (batching raises throughput but can raise per-request latency).\n2. Post-training quantisation, e.g. int8: weights take a quarter of the memory of float32, and speedups depend on hardware int8 support. Use representative calibration data; if accuracy drops, use quantisation-aware training or keep sensitive layers in higher precision.\n3. Pruning: unstructured sparsity shrinks the stored model but gives little speed on dense hardware without sparse kernels; structured pruning (channels, heads, layers) gives real speedups but usually needs fine-tuning.\n4. Distillation: train a smaller student on the teacher's soft outputs (plus labels); costs a training run but changes the architecture freely.\n5. Architecture changes: efficient blocks such as depthwise separable convolutions, a smaller backbone or lower input resolution.\n\nValidation: a frozen held-out set matching production, compare the compressed model against the original on the overall metric and on important slices and classes, check calibration, measure latency on the target device with warm-up and report p50/p95/p99, then run shadow or canary traffic before rollout. Expect trade-offs to be task- and hardware-specific; measure rather than assume.",
+  "key_concepts": [
+   "post-training quantisation",
+   "quantisation-aware training",
+   "structured versus unstructured pruning",
+   "knowledge distillation",
+   "profiling on target hardware",
+   "dynamic batching",
+   "accuracy regression validation"
+  ],
+  "difficulty": "Hard",
+  "domain": "Deep Learning",
+  "code": null,
+  "sources": [],
+  "change_notes": "New AI-written original question (pilot batch); not taken from any real interview.",
+  "confidence": "medium",
+  "question_type": "design",
+  "interview_style_note": "Starts from requirements and profiling, orders techniques by cost, distinguishes size from speed gains, and validates on target hardware with slice-level accuracy checks.",
+  "common_mistakes": [
+   "Pruning weights unstructured and expecting a latency win on dense hardware",
+   "Measuring latency on a development GPU instead of the target device",
+   "Checking only aggregate accuracy and missing regressions on important classes"
+  ]
+ }
+]

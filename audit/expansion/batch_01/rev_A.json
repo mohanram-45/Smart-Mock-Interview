@@ -1,0 +1,1102 @@
+[
+ {
+  "plan_id": "B1-GEN-01-1",
+  "verdict": "correct",
+  "reasons": [
+   "Arithmetic, mechanisms and shortlist are right; one dangling cross-reference ('see drift') points to nothing in the record.",
+   "Type 'design' is right but needs rubric_points (supplied below)."
+  ],
+  "parts_answered": {
+   "compare HNSW/IVF-Flat/IVF-PQ on recall": true,
+   "latency": true,
+   "memory": true,
+   "build cost": true,
+   "update behaviour": true,
+   "with/without re-ranking": true,
+   "shortlist and why": true
+  },
+  "evidence": [
+   {
+    "claim": "50M x 768 x 4 B = 153.6 GB",
+    "method": "executed",
+    "evidence": "153.6"
+   },
+   {
+    "claim": "PQ 96 B/vector = 4.8 GB; 3072/96 = 32x",
+    "method": "executed",
+    "evidence": "4.8 GB, 32.0"
+   },
+   {
+    "claim": "HNSW M=32: 2M=64 links x 4 B = 256 B/vector = 12.8 GB; total 166.4 GB so >=3 nodes at 64 GB",
+    "method": "executed",
+    "evidence": "12.8; 166.4; 166.4/64=2.6 -> 3"
+   },
+   {
+    "claim": "HNSW memory per vector = d*4 + M*2*4 bytes",
+    "method": "doc",
+    "evidence": "FAISS wiki: 'The memory usage is (d * 4 + M * 2 * 4) bytes per vector.'"
+   },
+   {
+    "claim": "1M/day ~ 12 inserts per second",
+    "method": "executed",
+    "evidence": "11.57/s"
+   },
+   {
+    "claim": "nlist 30k-100k plausible starting range",
+    "method": "doc",
+    "evidence": "FAISS wiki: K between 4*sqrt(N) and 16*sqrt(N); for N=50M that is 28.3k to 113k"
+   },
+   {
+    "claim": "HNSW best latency at high recall; tombstone deletes implementation-dependent; PQ recall ceiling fixed by re-rank",
+    "method": "background_only",
+    "evidence": "Standard ANN folklore, hedged in the text ('usually', 'implementation-dependent')"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Its weakness is that the centroids are trained on a snapshot of the data (see drift).",
+    "problem": "Dangling reference: 'see drift' refers to nothing in this record.",
+    "replacement": "Its weakness is that the centroids are trained on a snapshot of the data, so they go stale if the content distribution shifts."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-constraint capacity design with trade-offs across three index families, sizing arithmetic and a measurement plan.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Do the memory arithmetic first (153.6 GB raw vs 64 GB/node)",
+    "tradeoff": "Rules out any full-vector in-RAM index on one node before debating recall; forces sharding, compression or disk"
+   },
+   {
+    "decision": "Compress with PQ (about 96 B/vector) and keep full vectors on NVMe for re-ranking",
+    "tradeoff": "Memory 32x smaller and fits one node, paid for with extra I/O and re-rank latency, and a recall ceiling without re-ranking"
+   },
+   {
+    "decision": "Set re-rank depth (top 100-200 by PQ distance) as a tunable",
+    "tradeoff": "Deeper re-rank raises recall@10 toward 0.95 but adds random reads against the 50 ms p95 budget"
+   },
+   {
+    "decision": "Alternative: HNSW sharded across >=3 nodes (or on compressed vectors)",
+    "tradeoff": "Best latency/recall per query and incremental inserts, but about 166 GB RAM, slow build and tombstone churn"
+   },
+   {
+    "decision": "Plan for 1M inserts/day and few deletes: IVF assigns to centroids cheaply; tombstones plus periodic rebuild",
+    "tradeoff": "Cheap updates vs centroid drift and graph degradation over time; needs a retrain/rebuild schedule"
+   },
+   {
+    "decision": "Choose by measured recall-vs-p95 curves on a 2-5M sample with held-out queries and exact ground truth",
+    "tradeoff": "Costs an experiment up front but avoids picking by reputation; re-check after a month of ingestion"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "77 words, answer first, genuinely shorter than detailed."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanism and conditions per index family."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Worked sizing (4.8 GB, 12.8 GB, 166 GB, nlist range) and selection procedure; sizing overlaps slightly with detailed but numbers agree."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "All 8 concepts are discussed in the answer; 'tombstone deletes' is slightly implementation-specific but hedged. Fine.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "FAISS wiki: Guidelines to choose an index",
+    "url": "https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index",
+    "supports": "nlist roughly 4*sqrt(N) to 16*sqrt(N); HNSW memory (d*4 + M*2*4) bytes per vector; PQ m bytes per vector"
+   }
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-01-2",
+  "verdict": "correct",
+  "reasons": [
+   "Code passes on 3.13, 3.10, 3.11 and the fenced code equals code.solution; reported recall figures match the executed output.",
+   "Question names ToyIVF(base, nlist, seed) but the implementation signature is (base, nlist, iters=15, seed=0), so a third positional argument silently sets iters, not seed (patched).",
+   "Monotone/=1.0 claim needs the 'barring exact distance ties' condition."
+  ],
+  "parts_answered": {
+   "how to measure recall properly": true,
+   "exact_topk": true,
+   "ann_recall_at_k with -1 padding": true,
+   "ToyIVF with search(queries,k,nprobe)": true,
+   "recall vs nprobe": true,
+   "nprobe == nlist": true
+  },
+  "evidence": [
+   {
+    "claim": "Recall for nprobe=1,2,4,8,20 = 0.665, 0.8775, 0.9625, 0.995, 1.0",
+    "method": "executed",
+    "evidence": "[0.665, 0.8775000000000001, 0.9625, 0.9949999999999999, 1.0] on all three interpreters"
+   },
+   {
+    "claim": "Recall is non-decreasing in nprobe (nested probe sets, exact ranking inside)",
+    "method": "executed",
+    "evidence": "20 random seeds x nprobe 1..12 on 400x6 data: monotone and 1.0 at nprobe=nlist in every case"
+   },
+   {
+    "claim": "Self-queries inflate recall",
+    "method": "executed",
+    "evidence": "nprobe=1: base-vector queries 0.58 vs noisy/fresh queries 0.48 on the same index"
+   },
+   {
+    "claim": "-1 padding counts as miss, denominator stays k",
+    "method": "executed",
+    "evidence": "ToyIVF k=50 nprobe=1: 196 pad entries; recall 0.266; ann_recall_at_k([[1,2]],[[-1,-1]]) == 0.0"
+   },
+   {
+    "claim": "Duplicate base vectors (ties), nprobe=nlist",
+    "method": "executed",
+    "evidence": "recall 1.0 (ties resolved identically); float32 inputs also 1.0"
+   },
+   {
+    "claim": "ToyIVF(base, 20, 0) treats 0 as iters",
+    "method": "executed",
+    "evidence": "third positional arg -> iters=0; centroids differ from seed=0 build (allclose False)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "def __init__(self, base, nlist, iters=15, seed=0):",
+    "problem": "Question specifies ToyIVF(base, nlist, seed); with this order ToyIVF(base, 20, 0) passes 0 as iters (zero k-means iterations).",
+    "replacement": "def __init__(self, base, nlist, seed=0, iters=15):"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "recall is non-decreasing in nprobe and equals 1.0 when nprobe = nlist (it degenerates to brute force)",
+    "problem": "Holds up to exact distance ties at the k-th boundary (tie order inside candidates may differ from the ground-truth tie order).",
+    "replacement": "recall is non-decreasing in nprobe (barring exact distance ties at the k-th place) and equals 1.0 when nprobe = nlist (it degenerates to brute force)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short numpy implementation plus a mechanism explanation; no deep algorithmic subtlety beyond nested probe sets.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Method, pitfalls (self-queries, padding, ties, ANN vs task recall) and IVF logic."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Runnable code and a measured recall curve, not in detailed."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All discussed. 'recall-latency trade-off' is only mentioned, not demonstrated (no latency in code); acceptable.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0010",
+   "same_intent": false
+  },
+  "code_findings": "Re-run from scratch on dep 3.13, v310 and v311: all exit 0, identical recall list. Extra cases: padding (196 pads, recall 0.266, all -1 -> 0.0), duplicates in base with nprobe=nlist (1.0), float32 (1.0), nprobe > nlist (clipped, 1.0), k > n (exact_topk returns 5 columns), 20 random seeds monotone and exact at nprobe=nlist, self-query inflation (0.58 vs 0.48). Only stdlib+numpy, no 3.11+ features. exact_topk materialises an (nq, nb, d) array (toy-scale only). Signature order patched.",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": {
+   "solution": "import numpy as np\n\n\ndef exact_topk(queries, base, k):\n    \"\"\"Exact L2 top-k ids (ground truth), best first, ties by lower id.\"\"\"\n    d = ((queries[:, None, :] - base[None, :, :]) ** 2).sum(axis=2)\n    return np.argsort(d, axis=1, kind=\"stable\")[:, :k]\n\n\ndef ann_recall_at_k(exact_ids, approx_ids):\n    \"\"\"Mean over queries of |exact ∩ approx| / k. Entries of -1 are padding.\"\"\"\n    exact_ids = np.asarray(exact_ids)\n    approx_ids = np.asarray(approx_ids)\n    k = exact_ids.shape[1]\n    hits = [len(set(e.tolist()) & (set(a.tolist()) - {-1}))\n            for e, a in zip(exact_ids, approx_ids)]\n    return float(np.mean(hits)) / k\n\n\nclass ToyIVF:\n    \"\"\"Inverted-file index: k-means coarse quantiser, exact rerank inside probed lists.\"\"\"\n\n    def __init__(self, base, nlist, seed=0, iters=15):\n        rng = np.random.default_rng(seed)\n        self.base = base\n        cent = base[rng.choice(len(base), nlist, replace=False)].copy()\n        for _ in range(iters):\n            assign = self._nearest(base, cent, 1)[:, 0]\n            for c in range(nlist):\n                members = base[assign == c]\n                if len(members):\n                    cent[c] = members.mean(axis=0)\n        self.cent = cent\n        assign = self._nearest(base, cent, 1)[:, 0]\n        self.lists = [np.flatnonzero(assign == c) for c in range(nlist)]\n\n    @staticmethod\n    def _nearest(x, cent, n):\n        d = ((x[:, None, :] - cent[None, :, :]) ** 2).sum(axis=2)\n        return np.argsort(d, axis=1, kind=\"stable\")[:, :n]\n\n    def search(self, queries, k, nprobe):\n        out = np.full((len(queries), k), -1, dtype=np.int64)\n        probes = self._nearest(queries, self.cent, nprobe)\n        for qi, q in enumerate(queries):\n            cand = np.concatenate([self.lists[c] for c in probes[qi]])\n            if len(cand) == 0:\n                continue\n            d = ((self.base[cand] - q) ** 2).sum(axis=1)\n            top = cand[np.argsort(d, kind=\"stable\")[:k]]\n            out[qi, :len(top)] = top\n        return out",
+   "test": null
+  }
+ },
+ {
+  "plan_id": "B1-GEN-01-3",
+  "verdict": "correct",
+  "reasons": [
+   "Diagnosis, worked example and fix are correct.",
+   "Two hedges/clarifications needed: the link between large norms and 'long generic chunks' is model-dependent, and cos = 1 - d^2/2 requires d to be the Euclidean (not squared) distance, which common libraries do not return.",
+   "Partial topical overlap with smi-h0009 (dot product vs cosine, long-vector documents) but different intent: this record is an index-metric migration with threshold recalibration and rebuild; no code."
+  ],
+  "parts_answered": {
+   "diagnose scores >1, threshold failure, generic long chunks": true,
+   "fix": true,
+   "what to do with existing index": true
+  },
+  "evidence": [
+   {
+    "claim": "Dot products 0.9, 3.0, 2.0 vs cosines 0.994, 0.707, 0.9997 for the toy check",
+    "method": "executed",
+    "evidence": "0.9, 3.0, 2.0; 0.99388, 0.70711, 0.99969"
+   },
+   {
+    "claim": "Normalising only the query cannot change document ranking",
+    "method": "derivation",
+    "evidence": "q'=q/|q| scales every dot product by the same constant 1/|q|"
+   },
+   {
+    "claim": "On unit vectors ||a-b||^2 = 2 - 2cos",
+    "method": "derivation",
+    "evidence": "expand |a|^2+|b|^2-2a.b with |a|=|b|=1"
+   },
+   {
+    "claim": "FAISS L2 indexes return squared distances",
+    "method": "background_only",
+    "evidence": "Library convention; so cos = 1 - d_sq/2 there"
+   },
+   {
+    "claim": "Large-norm / long-chunk link",
+    "method": "background_only",
+    "evidence": "Depends on the encoder; not a universal property"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "which explains the generic chunks",
+    "problem": "Stated as certain; whether long/generic chunks have larger norms is encoder-dependent.",
+    "replacement": "which is consistent with the generic chunks if this encoder gives such chunks larger norms (encoder-dependent, so plot the norm distribution to confirm)"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "convert thresholds with cos = 1 - d^2/2",
+    "problem": "Ambiguous: d must be Euclidean distance; many libraries return squared L2, where cos = 1 - d_sq/2.",
+    "replacement": "convert thresholds with cos = 1 - d^2/2 (d = Euclidean distance; if the library returns squared L2, as FAISS does, use cos = 1 - d_sq/2)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Symptom-to-cause diagnosis with a short derivation and a multi-part fix; no deep implementation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All six discussed and specific.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0009",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-01-4",
+  "verdict": "correct",
+  "reasons": [
+   "Answer is right on the central point (same dimensionality does not imply a shared space) and gives a sound blue/green migration.",
+   "'collapses toward noise' is stated as universal; models that share a base checkpoint or are trained for backward compatibility may be partly aligned, so hedge."
+  ],
+  "parts_answered": {
+   "is it safe": true,
+   "what happens": true,
+   "rollout plan": true
+  },
+  "evidence": [
+   {
+    "claim": "Independently trained embedding models have unrelated coordinate systems",
+    "method": "background_only",
+    "evidence": "Standard; backward-compatible embedding work (e.g. compatibility-trained encoders) exists precisely because this is not free"
+   },
+   {
+    "claim": "Linear map between embedding spaces is a lossy bridge to be validated",
+    "method": "background_only",
+    "evidence": "Hedged in the text ('validated empirically')"
+   },
+   {
+    "claim": "Blue/green index, dual-write, atomic cut-over are standard migration patterns",
+    "method": "background_only",
+    "evidence": "Engineering practice"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "retrieval of the old corpus collapses toward noise",
+    "problem": "Universal-sounding; behaviour depends on how related the two models are.",
+    "replacement": "retrieval of the old corpus typically collapses toward noise (unless the two models were deliberately trained to be compatible)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Scenario with a mechanism and a staged plan; no calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Specific; 'linear space mapping' and 'model version metadata' are both discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-01-5",
+  "verdict": "correct",
+  "reasons": [
+   "Concept is stated accurately and hedged; reported numbers (266.6, 4.22, 0.484, 0.115, 36.0) match the executed run on all three interpreters.",
+   "The practical numbers come from a single query per setting and a perfectly linear 3-d structure; add the seed spread and a realism caveat."
+  ],
+  "parts_answered": {
+   "evaluate the claim": true,
+   "what distance concentration says": true,
+   "when it applies": true,
+   "why ANN still works on text embeddings": true
+  },
+  "evidence": [
+   {
+    "claim": "Relative contrast (dmax-dmin)/dmin shrinks with dimension for iid-like data",
+    "method": "background_only",
+    "evidence": "Beyer et al. 1999 result; a search confirmed the paper exists but I did not open the text, so treated as background."
+   },
+   {
+    "claim": "Contrasts for uniform 2,10,100,1000 dims = 266.6, 4.22, 0.484, 0.115; 3-intrinsic-in-1000 = 36.0",
+    "method": "executed",
+    "evidence": "[266.635, 4.222, 0.484, 0.115], 36.0 on all three interpreters"
+   },
+   {
+    "claim": "Ordering holds across seeds",
+    "method": "executed",
+    "evidence": "Seeds 0-9: uniform contrast strictly decreasing in every seed; 2-d value ranged 38.3-266.6; low-rank value 21.1-47.2 and >10x the 1000-d uniform value every time"
+   },
+   {
+    "claim": "Contrast follows intrinsic not ambient dimension",
+    "method": "executed",
+    "evidence": "uniform 3-d: 31.0; 3-d linearly embedded in 3 dims: 38.6; in 1000 dims: 36.0 (seed 0)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "The absolute values depend on the seed and sample size; the ordering is the lesson.",
+    "problem": "Single query per setting; spread over seeds is large and a perfectly linear 3-d structure is friendlier than real embeddings.",
+    "replacement": "The absolute values depend on the seed (over seeds 0-9 the 2-d value ranged from about 38 to 267 and the low-intrinsic value from about 21 to 47) and on the sample size; the ordering held for all ten seeds and is the lesson. This is a single-query toy with a perfectly linear 3-d structure; real embeddings have a higher, messier intrinsic dimension, so expect contrast between the two extremes, which is why you measure it on your own data."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Evaluating a claim requires knowing the theorem's conditions, intrinsic dimension and the ANN link, but no multi-step derivation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "71 words, answer first."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanism, conditions, where it matters."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Seeded experiment with numbers and runnable functions; not in detailed. It lacks the driver loop (the test is the driver) - the text does say what was run."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "Specific; 'ANN recall' and 'contrastive training' are only briefly discussed but present.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0139",
+   "same_intent": false
+  },
+  "code_findings": "Fenced code == code.solution. Test passes on dep 3.13, v310, v311 (stdlib+numpy, no 3.11+ features). Extra: seeds 0-9 monotone and low-rank >10x uniform-1000 in all; uniform 3-d vs linear 3-in-3 vs 3-in-1000 comparison.",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-01-6",
+  "verdict": "correct",
+  "reasons": [
+   "All arithmetic recomputed and correct (30.72/61.44/81.92 GB; 40.96/20.48 GB; 2.56 GB HNSW links; totals 33.28/33.28/43.52/23.04/64.0 GB).",
+   "The 'What fits' sentence omits several options that do fit (384-d float16/int8, 768-d int8), so it reads as the full list when it is not."
+  ],
+  "parts_answered": {
+   "memory arithmetic fp32/fp16/int8": true,
+   "HNSW M=16 overhead": true,
+   "which options fit": "partially (list incomplete)",
+   "what beyond arithmetic": true
+  },
+  "evidence": [
+   {
+    "claim": "20M x d x bytes for d=384,768,1024",
+    "method": "executed",
+    "evidence": "30.72/61.44/81.92 GB (fp32); 15.36/30.72/40.96 (fp16); 7.68/15.36/20.48 (int8)"
+   },
+   {
+    "claim": "HNSW M=16: 32 links x 4 B = 128 B/vector = 2.56 GB",
+    "method": "executed",
+    "evidence": "2.56 GB; FAISS wiki formula d*4 + M*2*4 gives the same 128 B link part"
+   },
+   {
+    "claim": "Totals with links",
+    "method": "executed",
+    "evidence": "384 fp32 33.28; 768 fp16 33.28; 1024 fp16 43.52; 1024 int8 23.04; 768 fp32 64.0; 1024 fp32 84.48; 384 fp16 17.92; 384 int8 10.24; 768 int8 17.92"
+   },
+   {
+    "claim": "Matryoshka-style truncation only if documented",
+    "method": "background_only",
+    "evidence": "Hedged in the text"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "What fits in 64 GB: 384-d float32 (about 33 GB with links), 768-d float16 (about 33 GB), 1,024-d float16 (about 43.5 GB) and 1,024-d int8 (about 23 GB).",
+    "problem": "Incomplete list presented as 'what fits': 384-d float16 (about 18 GB), 384-d int8 (about 10 GB) and 768-d int8 (about 18 GB) also fit.",
+    "replacement": "What fits in 64 GB (with links): everything except 768-d float32 (about 64 GB, no headroom) and 1,024-d float32 (about 84.5 GB). The notable ones are 384-d float32 (about 33 GB), 768-d float16 (about 33 GB), 1,024-d float16 (about 43.5 GB) and 1,024-d int8 (about 23 GB); 384-d float16/int8 and 768-d int8 need only about 10-18 GB."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Straightforward arithmetic plus an application judgement; no deep reasoning.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Specific and discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0009",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "FAISS wiki: Guidelines to choose an index",
+    "url": "https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index",
+    "supports": "nlist roughly 4*sqrt(N) to 16*sqrt(N); HNSW memory (d*4 + M*2*4) bytes per vector; PQ m bytes per vector"
+   }
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-01-7",
+  "verdict": "correct",
+  "reasons": [
+   "Core diagnosis (stale coarse quantiser, skewed lists) and the remedy are right; arithmetic (30M/4096 = 7,324) checks.",
+   "One vague phrase ('diluted in oversized cells') does not describe a real recall mechanism; recall drops because the new content is split by arbitrary old Voronoi boundaries across more cells than nprobe covers."
+  ],
+  "parts_answered": {
+   "explain recall drop and latency rise": true,
+   "fix": true,
+   "monitoring": true
+  },
+  "evidence": [
+   {
+    "claim": "30M/4096 = 7,324 vectors per list on average; 200k/4096 ~ 49 training points per centroid",
+    "method": "executed",
+    "evidence": "7324.2; 48.8"
+   },
+   {
+    "claim": "Stale centroids give imbalanced lists, larger scan and lower recall at fixed nprobe for new content; retraining fixes both",
+    "method": "executed",
+    "evidence": "Toy sim (32-d, 64 lists trained on old clusters, new clusters appended): max/mean list size 27.8 stale vs 3.5 retrained; new-content recall@10 at nprobe 4: 0.942 stale vs 1.0 retrained; nprobe 8: 0.987 vs 1.0"
+   },
+   {
+    "claim": "Raising nprobe is a stopgap that worsens latency",
+    "method": "derivation",
+    "evidence": "Scan cost grows with number of probed list sizes"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "so many true neighbours sit in cells that are not probed or are diluted in oversized cells",
+    "problem": "'Diluted in oversized cells' is not a mechanism: scanning an oversized cell is exact, it costs time rather than recall.",
+    "replacement": "so many true neighbours sit in cells that are not probed (the new content is cut into more oversized cells than nprobe = 16 covers, along boundaries that were fit to the old data)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-symptom debugging requiring a single-cause explanation, diagnosis steps, fix and prevention.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Specific; all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0003",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-03-1",
+  "verdict": "pass",
+  "reasons": [
+   "Per-query predictions come from mechanism (idf of rare tokens, lexical mismatch, tokenisation), are hedged ('more likely', 'do not claim a universal ranking') and lead to a sound hybrid design with sliced evaluation."
+  ],
+  "parts_answered": {
+   "(a) error code": true,
+   "(b) paraphrase": true,
+   "(c) SKU in natural language": true,
+   "design implication": true
+  },
+  "evidence": [
+   {
+    "claim": "BM25 favours rare exact tokens through high idf",
+    "method": "derivation",
+    "evidence": "idf = ln(1+(N-df+0.5)/(df+0.5)) is large for df=1 (checked in the 03-4 code: e4417 query ranks doc 0 first)"
+   },
+   {
+    "claim": "Dense encoders can blur rare identifiers",
+    "method": "background_only",
+    "evidence": "Hedged with 'may'"
+   },
+   {
+    "claim": "RRF or calibrated weighted fusion",
+    "method": "paper",
+    "evidence": "Cormack et al. 2009 for RRF; fusion trade-offs in 03-2"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Compare retriever families on three concrete cases and derive design implications.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Specific and each discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0003",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "Reciprocal Rank Fusion outperforms Condorcet and individual rank learning methods",
+    "url": "https://cormack.uwaterloo.ca/cormacksigir09-rrf.pdf",
+    "supports": "RRF as a score-free fusion of rankings (opened)"
+   }
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-03-2",
+  "verdict": "correct",
+  "reasons": [
+   "Explanation of incomparable scales is correct and the numbers are illustrative as labelled.",
+   "'RRF ... is robust' is stronger than the literature: the original RRF paper says k=60 was near-optimal and not critical, whereas a later analysis reports a tuned convex combination beating RRF and RRF being sensitive to its parameters. Hedge it.",
+   "The question presents a faulty implementation, so 'debugging' is a slightly better type than 'concept'."
+  ],
+  "parts_answered": {
+   "why adding is wrong": true,
+   "options for combining": true,
+   "trade-offs": true
+  },
+  "evidence": [
+   {
+    "claim": "BM25 differences (4.4, 6.7) swamp cosine differences (0.02, 0.05) in a sum",
+    "method": "executed",
+    "evidence": "14.2-9.8=4.4; 9.8-3.1=6.7 vs 0.71-0.69=0.02; 0.69-0.64=0.05"
+   },
+   {
+    "claim": "RRF k=60 near-optimal but not critical",
+    "method": "paper",
+    "evidence": "Cormack et al.: 'k = 60 was near-optimal, but ... the choice was not critical.' (opened)"
+   },
+   {
+    "claim": "Convex combination can outperform RRF; RRF sensitive to parameters",
+    "method": "paper",
+    "evidence": "Bruch et al., arXiv 2210.11934 abstract: CC 'outperforms RRF in in-domain and out-of-domain settings'; RRF 'sensitive to its parameters' (opened)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "It uses ranks only, needs no calibration and is robust, but throws away score margins",
+    "problem": "'Robust' is overstated; evidence is mixed on RRF vs a tuned convex combination.",
+    "replacement": "It uses ranks only and needs no score calibration, which makes it a safe default (though some studies find a tuned convex combination beats it and that RRF is sensitive to its parameters), but it throws away score margins"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Explain incompatibility and compare four fusion approaches with trade-offs.",
+  "type_ok": false,
+  "suggested_type": "debugging",
+  "rubric_points": null,
+  "answer_set_findings": [],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Specific; all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "An Analysis of Fusion Functions for Hybrid Retrieval (Bruch et al.)",
+    "url": "https://arxiv.org/abs/2210.11934",
+    "supports": "Convex combination vs RRF; RRF parameter sensitivity"
+   },
+   {
+    "title": "Reciprocal Rank Fusion outperforms Condorcet and individual rank learning methods",
+    "url": "https://cormack.uwaterloo.ca/cormacksigir09-rrf.pdf",
+    "supports": "RRF formula, k=60 not critical"
+   }
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-03-3",
+  "verdict": "pass",
+  "reasons": [
+   "Spec, code and explanation agree; test passes on 3.13/3.10/3.11 and fenced code equals code.solution.",
+   "Explanation of k is correct and appropriately hedged ('a widely used default, not a theorem')."
+  ],
+  "parts_answered": {
+   "implement rrf": true,
+   "dedupe within list": true,
+   "tie-break": true,
+   "empty inputs": true,
+   "explain k": true
+  },
+  "evidence": [
+   {
+    "claim": "RRF score = sum 1/(k + rank), k=60 widely used",
+    "method": "paper",
+    "evidence": "Cormack et al.: 'RRFscore(d) = sum 1/(k + r(d))' and 'k = 60 was fixed during a pilot investigation'; 'near-optimal, but the choice was not critical' (opened)"
+   },
+   {
+    "claim": "Rank-2-in-both (2/62) beats rank-1-in-one (1/61) at k=60",
+    "method": "executed",
+    "evidence": "0.03226 vs 0.01639"
+   },
+   {
+    "claim": "k=0 gives 1 vs 1/2 for ranks 1 and 2",
+    "method": "derivation",
+    "evidence": "1/(0+1), 1/(0+2)"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short, fully specified function with tie/dedupe rules; low algorithmic depth but several edge conventions.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Specific; all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0010",
+   "same_intent": false
+  },
+  "code_findings": "All three interpreters exit 0. Extras: top_n=0 -> []; triple repeat -> one score 1/61; symmetric lists tie resolved to first appearance; k=1 and k=0 cases correct; non-integer k (60.5) raises TypeError because of Fraction(1, k+pos) (acceptable, spec implies integer k); tuple input accepted; negative top_n silently drops last item (not in spec). Fenced code identical. stdlib only.",
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "Reciprocal Rank Fusion outperforms Condorcet and individual rank learning methods",
+    "url": "https://cormack.uwaterloo.ca/cormacksigir09-rrf.pdf",
+    "supports": "RRF formula and k=60"
+   }
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-03-4",
+  "verdict": "correct",
+  "reasons": [
+   "BM25 formula, idf variant, saturation and b extremes are correct; code passes on all interpreters and matches rank_bm25 once its idf is swapped.",
+   "One misleading condition: tf_part approaches k1+1 for any length factor (only the speed differs), not 'when the length factor is 1'.",
+   "A first-person authoring note ('I also cross-checked...') sits in a reference answer; I verified the claim and replaced it with a neutral, accurate sentence."
+  ],
+  "parts_answered": {
+   "idf": true,
+   "score": true,
+   "rank": true,
+   "repeated query terms once": true,
+   "saturation": true,
+   "length normalisation": true,
+   "b=0 and b=1": true
+  },
+  "evidence": [
+   {
+    "claim": "tf_part f(k1+1)/(f+k1*norm) -> k1+1 as f->inf for any norm>0",
+    "method": "derivation",
+    "evidence": "lim f->inf f(k1+1)/(f+k1*norm) = k1+1"
+   },
+   {
+    "claim": "Tenth occurrence adds far less than second (k1=1.2, norm=1)",
+    "method": "executed",
+    "evidence": "tf_part 1.0, 1.375 (f=2), 1.941 (f=9), 1.964 (f=10): increments 0.375 vs 0.023"
+   },
+   {
+    "claim": "Old idf negative for df > N/2",
+    "method": "derivation",
+    "evidence": "(N-df+0.5)/(df+0.5) < 1 iff df > N/2"
+   },
+   {
+    "claim": "Scores match rank_bm25 BM25Okapi with idf overridden",
+    "method": "executed",
+    "evidence": "(k1,b) in {(1.2,.75),(1.5,0),(0.9,1.0)} x 3 queries: np.allclose True for all; rank_bm25 does not de-duplicate query terms (repeat query doubles its score)"
+   },
+   {
+    "claim": "Lucene-style idf ln(1+(N-df+0.5)/(df+0.5))",
+    "method": "background_only",
+    "evidence": "Widely documented variant"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "as f grows, tf_part approaches k1 + 1 (when the length factor is 1), so",
+    "problem": "The limit k1+1 holds for every document length; the length factor only changes how quickly it is approached.",
+    "replacement": "as f grows, tf_part approaches k1 + 1 for any document length (the length factor only changes how fast), so"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "I also cross-checked the scores against rank_bm25's BM25Okapi with its idf replaced by the formula above (its default idf differs), and the values matched on three queries.",
+    "problem": "First-person authoring note in a reference answer; the content is true but the useful part is the difference list.",
+    "replacement": "The scores agree with rank_bm25's BM25Okapi once its idf is replaced by the formula above (its default idf differs, and it does not de-duplicate repeated query terms)."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Implementation from a given formula plus explanation of two mechanisms.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Formula, idf variants, saturation, length normalisation, pitfalls."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Tested code and test description."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Specific; 'tokenisation' only in pitfalls but present.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0341",
+   "same_intent": false
+  },
+  "code_findings": "Fenced code == code.solution; passes on dep 3.13, v310, v311. Extras: empty doc among others scores 0 and ranks last; unknown query term -> 0; top_n slice works; b=1 shorter doc scores higher for same tf (0.329 vs 0.126); empty corpus ([] or [[]]) raises ZeroDivisionError (avgdl=0) - acceptable, not in spec. stdlib only.",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-03-5",
+  "verdict": "correct",
+  "reasons": [
+   "Code correct (matches my independent reference MMR on 300 random cases; passes on all three interpreters; fenced code identical).",
+   "The explanation wrongly states that lam = 0 'ignores the query after the start' and that the first pick is always the most relevant document: at lam = 0 every first-step score is 0, so the first pick is just the lowest index (verified: q=[1,0,0], docs [[0,1,0],[0.2,1,0],[1,0.1,0]] -> [0,2,1] while the most relevant is index 2).",
+   "The stated cost O(k x n x d) does not describe the code, which builds the full n x n similarity matrix."
+  ],
+  "parts_answered": {
+   "greedy MMR implementation": true,
+   "ties to lower index": true,
+   "zero vectors": true,
+   "how lam behaves": "partially wrong at lam=0 (fixed)",
+   "where MMR is not right": true
+  },
+  "evidence": [
+   {
+    "claim": "MMR = argmax[lam*Sim1(d,q) - (1-lam)*max Sim2(d,s)]",
+    "method": "paper",
+    "evidence": "Carbonell & Goldstein 1998 (opened; formula text garbled in extraction, components confirmed: lambda weights relevance vs novelty, Sim2 between documents)"
+   },
+   {
+    "claim": "lam=0: first pick is index 0 regardless of relevance",
+    "method": "executed",
+    "evidence": "mmr([1,0,0],[[0,1,0],[0.2,1,0],[1,0.1,0]],3,lam=0.0) == [0,2,1]; lam=0.01 -> [2,0,1]"
+   },
+   {
+    "claim": "Implementation agrees with an independent loop MMR",
+    "method": "executed",
+    "evidence": "0 mismatches on 300 random 12x5 cases, lam in {0.1..0.9}, k=6"
+   },
+   {
+    "claim": "Pair matrix cost",
+    "method": "derivation",
+    "evidence": "d @ d.T is O(n^2 d)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "detailed_answer",
+    "claim": "lam = 0 ignores the query after the start and selects maximally different items",
+    "problem": "Wrong: at lam = 0 the relevance term is multiplied by zero from the very first step, so the query is ignored entirely (first pick = lowest index by tie-break).",
+    "replacement": "lam = 0 ignores the query entirely (every first-step score is 0, so in this implementation the first pick is just the lowest index) and then selects maximally different items"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "The first pick is the most relevant document (redundancy is zero)",
+    "problem": "True only for lam > 0.",
+    "replacement": "For lam > 0 the first pick is the most relevant document (redundancy is zero)"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Cost: O(k x n x d) similarity work for n candidates",
+    "problem": "Code precomputes all n x n similarities, O(n^2 x d) time and O(n^2) memory.",
+    "replacement": "Cost: the candidate-to-candidate similarities cost O(n^2 x d) as in the code below (O(k x n x d) if computed lazily against the selected items only)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short greedy algorithm with several conventions and an explanation of a trade-off parameter.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Behaviour of lam, cost, limits."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Tested code; test description adds scale invariance and clipping."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Specific; all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0009",
+   "same_intent": false
+  },
+  "code_findings": "Fenced == solution; pass on 3.13/3.10/3.11. Extras: lam=0 -> [0,3,2,1]; lam=1 -> [0,1,2,3]; all-zero query -> index-order tie-break; duplicate docs; integer array input; k=-1 -> []; lam=1.5 raises ValueError; negative cosine handled; empty docs list raises a numpy matmul ValueError (not a clean [] - minor, outside spec). stdlib+numpy only.",
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "The Use of MMR, Diversity-Based Reranking (Carbonell & Goldstein, 1998)",
+    "url": "https://www.cs.cmu.edu/~jgc/publication/The_Use_MMR_Diversity_Based_LTMIR_1998.pdf",
+    "supports": "MMR formula with lambda, Sim1 (query) and Sim2 (inter-document) terms"
+   }
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-03-6",
+  "verdict": "pass",
+  "reasons": [
+   "Each technique is tied to the failure it addresses with risks; claims are hedged; evaluation plan (slices, keep original query, latency/cost) is sound."
+  ],
+  "parts_answered": {
+   "what each does": true,
+   "when helps/hurts": true,
+   "what to test before adding": true
+  },
+  "evidence": [
+   {
+    "claim": "HyDE embeds an LLM-written hypothetical document; it is unreal and may contain false details, with the encoder's bottleneck filtering some",
+    "method": "paper",
+    "evidence": "Gao et al., arXiv 2212.10496 abstract: 'unreal and may contain false details'; 'dense bottleneck filtering out the incorrect details' (opened)"
+   },
+   {
+    "claim": "Multi-query + RRF fusion raises recall for ambiguous queries at extra load",
+    "method": "background_only",
+    "evidence": "Hedged in the text"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Compare three techniques against a diagnosed failure and propose an experiment.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "Specific; all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0003",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "Precise Zero-Shot Dense Retrieval without Relevance Labels (HyDE)",
+    "url": "https://arxiv.org/abs/2212.10496",
+    "supports": "HyDE method and the risk of false details in the hypothetical document"
+   }
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-03-7",
+  "verdict": "correct",
+  "reasons": [
+   "Numbers recomputed and correct (0.99^10 = 0.904, 0.99^100 = 0.366, P(X>=10 | Bin(1000, 0.01)) = 0.543); mechanisms hedged as implementation-dependent.",
+   "The question's own tenant (1% of 80M = 800,000 chunks) falls in none of the explicit bands (brute force is advised only below ~100k), so the recommendation for the asked case is left implicit.",
+   "'oversampling of about 2/selectivity' is missing k."
+  ],
+  "parts_answered": {
+   "why 0-2 results": true,
+   "post vs pre vs filter-aware compared": true,
+   "strategy as function of selectivity": true,
+   "applied to the 1% case": "implicit only"
+  },
+  "evidence": [
+   {
+    "claim": "Expected matches in top-10 at p=0.01 = 0.1; P(zero in 10) = 0.904",
+    "method": "executed",
+    "evidence": "0.99^10=0.9044"
+   },
+   {
+    "claim": "P(zero matches in top-100) = 0.366; expected 1",
+    "method": "executed",
+    "evidence": "0.3660"
+   },
+   {
+    "claim": "P(at least 10 matches in top-1000) = 0.54",
+    "method": "executed",
+    "evidence": "0.5427 (exact binomial)"
+   },
+   {
+    "claim": "Filtered HNSW traversal can lose recall or latency at restrictive filters",
+    "method": "background_only",
+    "evidence": "Hedged as implementation-dependent"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "(3) otherwise run filter-aware ANN",
+    "problem": "The question's tenant (800,000 chunks) is not placed in any band.",
+    "replacement": "(3) otherwise run filter-aware ANN (the 1% tenant in this question, about 800,000 chunks, lands here, or in its own per-tenant partition if it is large and stable)"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "oversampling of about 2/selectivity",
+    "problem": "Missing k: to expect k survivors you need about k/selectivity candidates.",
+    "replacement": "oversampling to about 2k/selectivity candidates (twice the number needed on average for k survivors)"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Combines probability reasoning, ANN filtering behaviour and a strategy by selectivity band.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanisms, comparison, strategy by selectivity."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Probability arithmetic and an operational routine; routine partly restates detailed bands but adds numbers and alerting."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Specific; all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0011",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-03-8",
+  "verdict": "pass",
+  "reasons": [
+   "Correctly identifies pooling bias, tuning/reporting on the same queries, noise at n=300, slice hiding, wrong metric for a candidate generator and distribution mismatch; protocol is sound and numbers are explicitly hypothetical/illustrative.",
+   "The practical answer overlaps the detailed answer on items 1-4 but adds the 5-fold protocol, decision rule and post-launch monitoring, so it keeps distinct value."
+  ],
+  "parts_answered": {
+   "what is wrong": true,
+   "proper evaluation": true,
+   "proper tuning": true
+  },
+  "evidence": [
+   {
+    "claim": "Unjudged documents counted non-relevant under dense-only pooling understate other systems",
+    "method": "background_only",
+    "evidence": "Standard IR pooling-bias result; hedged correctly"
+   },
+   {
+    "claim": "Paired bootstrap/test for per-query differences",
+    "method": "derivation",
+    "evidence": "Metric differences per query are paired; resampling queries gives an interval for the mean difference"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Several interacting experimental-design flaws and a defensible protocol with decision rule.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Flaws and remedies."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Procedure with decision rule; ~40% overlaps detailed but not a pure paraphrase (kept)."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Specific; 'RRF k tuning' is thin but discussed in tuning hygiene.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0003",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ }
+]

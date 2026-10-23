@@ -1,0 +1,482 @@
+[
+ {
+  "plan_id": "B1-GEN-01-1",
+  "verdict": "correct",
+  "reasons": [
+   "Arithmetic all re-derived and correct; rubric (6 points) is adequate for a design question.",
+   "Applied source_finder edits (concise 'FAISS's guide recommends it'; detailed 'often among the lowest-latency options') are accurate in themselves, but the concise phrase over-reads the guide: the guide says HNSW is best when you have lots of RAM or a small dataset, which is exactly NOT this 153.6 GB / 64 GB case. Minor fix given.",
+   "nlist '30k-100k' is the 4-16*sqrt(N) heuristic, but the cited FAISS guide recommends 262,144 for 10M-100M; say so. Minor.",
+   "Concise is 77 words now; the suggested replacement brings it to 80 (still within limit)."
+  ],
+  "parts_answered": {
+   "compare HNSW/IVF-Flat/IVF-PQ(+/- rerank) on recall, latency, memory, build, updates": true,
+   "shortlist and why": true,
+   "sizing vs 64 GB": true,
+   "1M/day + deletes": true
+  },
+  "evidence": [
+   {
+    "claim": "50M x 768 x 4 B = 153.6 GB",
+    "method": "executed",
+    "evidence": "python: 153.6"
+   },
+   {
+    "claim": "PQ 96 B/vector = 32x smaller, 4.8 GB codes",
+    "method": "executed",
+    "evidence": "3072/96=32; 50M*96=4.8e9"
+   },
+   {
+    "claim": "HNSW M=32: 2M=64 links x 4 B = 256 B/vec, 12.8 GB; total 166.4 GB so >=3 nodes",
+    "method": "executed",
+    "evidence": "FAISS wiki formula 4*d+M*2*4 (opened): 3072+256 B; 166.4/64=2.6 -> 3 before headroom/replicas"
+   },
+   {
+    "claim": "1M/day ~ 12/s",
+    "method": "executed",
+    "evidence": "11.6/s"
+   },
+   {
+    "claim": "HNSW does not support removing vectors (FAISS), so tombstones/rebuild",
+    "method": "doc",
+    "evidence": "FAISS guidelines + indexes wiki, both opened: 'does not support removing vectors from the index'"
+   },
+   {
+    "claim": "FAISS guide HNSW 'best option if lots of RAM or small dataset'",
+    "method": "doc",
+    "evidence": "opened guide; conditional recommendation"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "concise_answer",
+    "claim": "(FAISS's guide recommends it)",
+    "problem": "The guide's recommendation is conditional (lots of RAM or small dataset), which does not hold here; as worded it reads as an unconditional recommendation at 50M x 768-d.",
+    "replacement": "(FAISS's guide: best when RAM is plentiful)"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "so values around 30k-100k are typical starting points to try, then tuned.",
+    "problem": "FAISS's own guide recommends 262,144 (usually with an HNSW coarse quantiser) for 10M-100M vectors; the 30k-100k range is just 4-16*sqrt(N). Say both.",
+    "replacement": "so about 30k-100k is the 4-16 x sqrt(N) starting range, while FAISS's guide goes up to 262,144 (with an HNSW coarse quantiser) for 10M-100M vectors; tune from there."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-constraint capacity design with trade-offs across three index families and re-rank depth.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "genuinely shorter, 77 words"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "per-index mechanics"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked sizing + procedure; small overlap with detailed shortlist"
+   }
+  ],
+  "suggested_answer_set": "keep concise+detailed+practical",
+  "key_concepts_findings": "8 concepts, all discussed; good.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [
+   {
+    "url": "https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index",
+    "status": "supported",
+    "evidence": "'(d*4 + M*2*4) bytes per vector'; 'HNSW ... does not support removing vectors'; 'K is 4*sqrt(N) to 16*sqrt(N)'; PQ option 'requires a re-ranking stage'"
+   },
+   {
+    "url": "https://github.com/facebookresearch/faiss/wiki/Faiss-indexes",
+    "status": "supported",
+    "evidence": "'HNSW does not support removing vectors from the index.'"
+   },
+   {
+    "url": "https://arxiv.org/abs/1603.09320",
+    "status": "partially",
+    "evidence": "abstract: layered proximity graphs, outperforms earlier open-source vector-only methods; 'built incrementally' is body-text, not in abstract"
+   },
+   {
+    "url": "https://arxiv.org/abs/1807.05614",
+    "status": "supported",
+    "evidence": "'very different approaches to k-NN search yield comparable quality-performance trade-offs.'"
+   }
+  ],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-01-6",
+  "verdict": "pass",
+  "reasons": [
+   "Every figure recomputed (see evidence); fit statements, 45-50 GB usable heuristic and compression caveats are consistent.",
+   "Applied float16 edit is accurate and hedged; FAISS wiki says fp16 'may cause some loss of precision'.",
+   "Tiny stylistic nit only: 'everything except ...' fits-claim precedes the 45-50 GB usable rule; 1,024-d fp16 (43.5 GB) is correctly flagged tight."
+  ],
+  "parts_answered": {
+   "memory arithmetic f32/f16/int8 for 3 dims": true,
+   "HNSW M=16 overhead": true,
+   "which fit": true,
+   "beyond arithmetic": true
+  },
+  "evidence": [
+   {
+    "claim": "raw sizes 30.72/61.44/81.92 GB; fp16 halves, int8 quarters",
+    "method": "executed",
+    "evidence": "python loop over d,bytes"
+   },
+   {
+    "claim": "HNSW M=16 -> 128 B/vec -> 2.56 GB for 20M",
+    "method": "executed",
+    "evidence": "2*16*4=128; FAISS formula M*2*4"
+   },
+   {
+    "claim": "totals: 384-f32 33.28, 768-f16 33.28, 1024-f16 43.52, 1024-int8 23.04, 768-f32 64.00, 1024-f32 84.48, 384-f16/768-int8 17.92, 384-int8 10.24",
+    "method": "executed",
+    "evidence": "python"
+   },
+   {
+    "claim": "fp16 may lose some precision",
+    "method": "doc",
+    "evidence": "FAISS Faiss-indexes wiki quote"
+   },
+   {
+    "claim": "MRL-trained embeddings usable at lower dimension",
+    "method": "paper",
+    "evidence": "arXiv 2205.13147 abstract"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Straight arithmetic plus judgement about headroom and compression evaluation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field, fine"
+   }
+  ],
+  "suggested_answer_set": "keep single",
+  "key_concepts_findings": "7 concepts, all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0402",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [
+   {
+    "url": "https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index",
+    "status": "supported",
+    "evidence": "(d*4+M*2*4) bytes per vector"
+   },
+   {
+    "url": "https://github.com/facebookresearch/faiss/wiki/Faiss-indexes",
+    "status": "partially",
+    "evidence": "'SQfp16: 2*d+8' and 'may cause some loss of precision' present; the 'halves per-vector storage' is inference"
+   },
+   {
+    "url": "https://arxiv.org/abs/2205.13147",
+    "status": "supported",
+    "evidence": "MRL packs information at multiple granularities so one embedding adapts to resource budgets"
+   }
+  ],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-01-7",
+  "verdict": "correct",
+  "reasons": [
+   "Extra scrutiny done: I ran my own FAISS IVFFlat experiment (d=32, nlist=64, nprobe=4; trained on old-distribution sample, then added 20k old + 100k new vectors; compared with a retrained quantiser). Results support the answer's mechanism and its hedge: stale cells become 10-40x the mean list size, new-content queries scan 4-10x more vectors (latency up), and recall at equal nprobe is usually NOT lower than the fresh quantiser (0.997 vs 0.813, 0.991 vs 1.000, 0.960 vs 0.741) -- 'skew alone would usually raise recall and cost latency' is correct. A recall DROP did appear when the new content spans many clusters (sd=2, 50 new clusters: stale 0.888 vs fresh 1.000 on new-content queries, 33k vs 8k vectors scanned), matching the 'region spans more oversized cells than nprobe can probe / boundaries cut through neighbourhoods' branch. Mean squared distance to assigned centroid for new vs old data: 737 vs 140 (stale), 143 vs 323 (retrained), so the quantisation-error monitor is valid.",
+   "No central error found; the earlier defects (recall fall explained by skew alone) are fixed and the current hedge is accurate. Remaining items are minor: 'must be retrained' for PQ is slightly absolute, the need to re-sweep nprobe after retraining is missing, and 'is not a bug' is stated as certain before diagnosis.",
+   "Note (not an error): the answer treats the drop to 0.80 as consistent with drift; it correctly says to measure recall per content type to confirm."
+  ],
+  "parts_answered": {
+   "explain what happened": true,
+   "fix": true,
+   "monitor": true,
+   "links recall drop and latency rise": true
+  },
+  "evidence": [
+   {
+    "claim": "Stale centroids -> new region squeezed into few cells, giant lists, latency up",
+    "method": "executed",
+    "evidence": "FAISS experiment: max/mean list 34-42 and 4-10x more vectors scanned for new-content queries"
+   },
+   {
+    "claim": "Skew alone usually raises recall at fixed nprobe",
+    "method": "executed",
+    "evidence": "stale recall >= fresh in 3 of 4 configs"
+   },
+   {
+    "claim": "Recall can fall when the new region spans many oversized cells",
+    "method": "executed",
+    "evidence": "0.888 stale vs 1.000 retrained (50 new clusters, sd 2)"
+   },
+   {
+    "claim": "Quantisation error rises for new data",
+    "method": "executed",
+    "evidence": "737 vs 140 mean sq dist"
+   },
+   {
+    "claim": "30M/4096 = ~7,300 per cell",
+    "method": "executed",
+    "evidence": "7324"
+   },
+   {
+    "claim": "FAISS larger IVF for 10M-100M",
+    "method": "doc",
+    "evidence": "guide: 262144 for 10M-100M, K = 4-16*sqrt(N)"
+   },
+   {
+    "claim": "HNSW graphs degrade under churn rather than centroid drift",
+    "method": "background_only",
+    "evidence": "implementation-dependent"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "If PQ is used, its codebooks must be retrained and vectors re-encoded too, otherwise quantisation error stays high.",
+    "problem": "With residual PQ the vectors must be re-encoded against the new centroids; retraining the codebooks on the new residuals is strongly advisable rather than strictly mandatory.",
+    "replacement": "If PQ is used, the vectors must be re-encoded against the new centroids and the codebooks should be retrained on the new residuals, otherwise quantisation error stays high."
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "which means a full re-add.",
+    "problem": "After rebuilding, nprobe = 16 will not give the same recall/latency on the new cell layout and 30M-vector scale; re-tuning is missing.",
+    "replacement": "which means a full re-add; then re-sweep nprobe against exact search, because nprobe = 16 will not behave the same on the new layout."
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "This is data drift for the clustering and is not a bug in the search code.",
+    "problem": "Stated as certain before the diagnostics are run.",
+    "replacement": "This most likely reflects drift relative to the trained clustering rather than a bug in the search code, which the diagnosis below confirms or rules out."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Subtle mechanism: skew vs recall interaction, two distinct failure branches, fix and monitoring design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field is fine"
+   }
+  ],
+  "suggested_answer_set": "keep single",
+  "key_concepts_findings": "7 concepts, all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": "n/a (experiment run in /tmp scratch only; no recorded code)",
+  "sources_findings": [
+   {
+    "url": "https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index",
+    "status": "partially",
+    "evidence": "Supports K=4-16*sqrt(N) and 262144 cells for 10M-100M; says nothing about drift or stale centroids, which rest on derivation and my experiment"
+   }
+  ],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-02-4",
+  "verdict": "correct",
+  "reasons": [
+   "Re-derived the growth logic: one copy per ingestion, so a paragraph in a page edited twice exists 3 times; re-inserting every page would add ~100% of the baseline per night (not 4%), so ~4% implies ~4% of chunks re-inserted. The previous defective statements are now correct.",
+   "Remaining minor inconsistency: detailed step 1 keys chunks by (doc, position/section, hash) whereas the practical key is doc_id:hash with no position; a position in the key would make an inserted paragraph shift every later key (contradicting the 'small diffs' goal), and without it identical chunks within a page collapse to one key. Pick one and say so.",
+   "Concise is 73 words and consistent. Practical thresholds are labelled hypothetical; 3 points on 40 canary queries is about one query, acceptable as a tripwire."
+  ],
+  "parts_answered": {
+   "likely bug": true,
+   "idempotent update path": true,
+   "edits": true,
+   "deletions": true,
+   "rollback": true
+  },
+  "evidence": [
+   {
+    "claim": "one-copy-per-edit => 3 copies after 2 edits",
+    "method": "derivation",
+    "evidence": "original + 2 re-inserts"
+   },
+   {
+    "claim": "re-inserting all pages nightly => +100% of baseline/night",
+    "method": "derivation",
+    "evidence": "each night adds one full corpus copy"
+   },
+   {
+    "claim": "growth ~ share of chunks re-inserted per night",
+    "method": "derivation",
+    "evidence": "4% growth <=> ~4% of chunks (pages) re-inserted"
+   },
+   {
+    "claim": "Fixed-size chunk boundary shifts re-hash following chunks",
+    "method": "derivation",
+    "evidence": "insertion moves all later offsets"
+   },
+   {
+    "claim": "Alias swap rollback; partial crawl guard",
+    "method": "background_only",
+    "evidence": "standard practice"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "a chunk by (document ID, chunk position or section path, content hash)",
+    "problem": "Inconsistent with the practical answer's key (doc_id + hash, no position). Including a plain position makes keys of all later chunks change after an insertion; omitting it merges identical chunks within a page.",
+    "replacement": "a chunk by (document ID, content hash of the normalised chunk text), adding a section path only if identical chunks in one page must stay separate"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Debugging diagnosis with a design response; moderate multi-step reasoning on growth numbers.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "73 words, interview-ready"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "growth arithmetic, redesign"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "concrete run recipe with thresholds; overlaps detailed steps 2-4 partially but adds numbers and checks"
+   }
+  ],
+  "suggested_answer_set": "keep concise+detailed+practical",
+  "key_concepts_findings": "8 concepts, all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [],
+  "added_sources": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B1-GEN-03-6",
+  "verdict": "correct",
+  "reasons": [
+   "Applied source_verifier edits are accurate: HyDE abstract says the encoder's dense bottleneck filters out incorrect details, and the answer hedges correctly.",
+   "But the RAG-Fusion edit places a citation-meta remark inside an interview answer ('not shown by the RAG-Fusion abstract; measure it'); reword as a plain hedge. The abstract does say answers can stray off-topic when generated queries are not relevant enough, which the answer reflects.",
+   "'it is weak for exact identifiers' is stated as universal model behaviour; hedge."
+  ],
+  "parts_answered": {
+   "what each does": true,
+   "when helps/hurts": true,
+   "what to test": true
+  },
+  "evidence": [
+   {
+    "claim": "HyDE: LLM-written hypothetical doc, may contain false details, encoder bottleneck filters",
+    "method": "paper",
+    "evidence": "arXiv 2212.10496 abstract opened"
+   },
+   {
+    "claim": "RAG-Fusion: multi-query + RRF; off-topic when generated queries not relevant",
+    "method": "paper",
+    "evidence": "arXiv 2402.03367 abstract opened"
+   },
+   {
+    "claim": "RRF combines rankings and beats individual rankers (system fusion)",
+    "method": "paper",
+    "evidence": "Cormack 2009 abstract opened"
+   },
+   {
+    "claim": "hybrid retrieval often helps terse keyword queries",
+    "method": "background_only",
+    "evidence": "hedged 'often'"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "(not shown by the RAG-Fusion abstract; measure it)",
+    "problem": "References a source's abstract inside an interview answer; odd for a grader. The point is that the recall gain is a hypothesis to test.",
+    "replacement": "(a hypothesis to test, not a given)"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "it is weak for exact identifiers",
+    "problem": "Stated as universal; model and corpus dependent.",
+    "replacement": "it tends to be weak for exact identifiers"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Compare three techniques, failure modes and an evaluation plan; no multi-step calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field fine"
+   }
+  ],
+  "suggested_answer_set": "keep single",
+  "key_concepts_findings": "7 concepts, all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0010",
+   "same_intent": false
+  },
+  "code_findings": "n/a",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2212.10496",
+    "status": "supported",
+    "evidence": "'with the encoder's dense bottleneck filtering out the incorrect details'; 'unreal and may contain false details'"
+   },
+   {
+    "url": "https://arxiv.org/abs/2402.03367",
+    "status": "supported",
+    "evidence": "answers accurate and comprehensive but some strayed off topic when generated queries not sufficiently relevant; abstract does not claim recall gains"
+   },
+   {
+    "url": "https://cormack.uwaterloo.ca/cormacksigir09-rrf.pdf",
+    "status": "supported",
+    "evidence": "abstract: RRF 'consistently yields better results than any individual system, and better results than the standard method Condorcet Fuse'"
+   }
+  ],
+  "added_sources": [],
+  "code_patch": null
+ }
+]

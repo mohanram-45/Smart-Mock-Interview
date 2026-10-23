@@ -1,0 +1,24 @@
+{% from "_macros.html" import legacy_card, modular_panel, code_panel, grounded_panel, assessment_panel %}
+<div class="evals" data-n="{{ a.n }}" data-modular-status="{{ a.modular.status }}">
+  {{ assessment_panel(assess(a, q)) }}
+  {{ legacy_card(a.legacy, answer_kind(a.answer) if a.answer else None, compact|default(false)) }}
+  {% if a.code and a.code.requested %}{{ code_panel(a.code) }}{% endif %}
+  {% if a.skipped or a.legacy.status == 'not_scored' %}
+  {% elif a.modular.mode == 'off' %}
+  <section class="panel panel-off"><p class="muted">Experimental modular evaluation is <strong>off</strong> for this interview (the default).</p>
+    <p class="needs-exp"><strong>No strengths or missing concepts are listed.</strong> The similarity score cannot say which ideas your answer covered. To see concept-level findings, turn on the experimental concept check when you set up an interview. It is not validated.</p></section>
+  {% elif a.modular.status == 'pending' %}
+  <section class="panel panel-modular pending" data-poll="1" aria-live="polite">
+    <header class="panel-head"><h4>Experimental modular evaluation</h4><div><span class="chip chip-{{ 'real' if a.modular.mode == 'live' else 'mock' }}">{{ 'REAL MODEL (local, running)' if a.modular.mode == 'live' else 'MOCK VERIFIER' }}</span></div></header>
+    <p><span class="spinner" aria-hidden="true"></span> Running. A local model can take 30–90 seconds. You can carry on with the interview; the result will appear here and in the summary.</p>
+  </section>
+  {% elif a.modular.status in ('interrupted', 'failed') or not a.modular.view %}
+  <section class="panel panel-modular state-unavailable">
+    <header class="panel-head"><h4>Experimental modular evaluation</h4><div><span class="chip chip-unavail">UNAVAILABLE</span><span class="chip chip-nohv">NOT human-validated</span></div></header>
+    <div class="banner banner-bad"><strong>Evaluation unavailable</strong><span>{% if a.modular.status == 'interrupted' %}The server was restarted while this answer was being evaluated, so there is no experimental result for it.{% else %}{{ a.modular.error or 'The experimental evaluator did not produce a result.' }}{% endif %} No score and no penalty were given.</span></div>
+  </section>
+  {% else %}
+  {% set g = grounded(a) %}{% if g %}{{ grounded_panel(g) }}{% endif %}
+  {{ modular_panel(a.modular.view, a.answer) }}
+  {% endif %}
+</div>

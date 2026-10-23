@@ -1,0 +1,168 @@
+[
+ {
+  "plan_id": "B1-GEN-05-5",
+  "claims": [
+   {"claim": "LLM-written questions copy chunk vocabulary, favouring lexical retrievers (BM25)", "field": "concise_answer, detailed_answer", "status": "not_found", "source_index": null, "note": "BEIR documents lexical bias in human-annotated pools built from lexical systems, which is a different mechanism from LLM question generation; the synthetic-test-collection paper (2405.07767) explicitly does not analyse lexical systems. Our text already hedges ('likely, not guaranteed; measure it'), so keep the hedge."},
+   {"claim": "Pools built from lexical systems bias a benchmark towards lexical retrieval; remedy is diverse pooling", "field": "detailed_answer", "status": "supported", "source_index": 0, "note": "Supports the pooled-from-several-diverse-retrievers recommendation and the general direction of lexical bias in golden sets (not the LLM-generation case specifically)."},
+   {"claim": "Synthetic questions differ from real queries / are easier than real ones", "field": "concise_answer, detailed_answer", "status": "partially", "source_index": 1, "note": "Paper shows synthetic queries differ in length and have fewer relevant documents and that synthetic collections tend to be easier than real queries; it does not say they are shorter or vaguer, and it found no clear systematic bias towards LLM-based systems."},
+   {"claim": "Unjudged/duplicate alternative chunks are scored as misses, penalising systems that find valid alternatives", "field": "detailed_answer", "status": "supported", "source_index": 2, "note": "Zobel: unjudged documents are assumed not relevant; a technique that did not contribute to the pool may be underestimated."}
+  ],
+  "sources": [
+   {"title": "BEIR: A Heterogenous Benchmark for Zero-shot Evaluation of Information Retrieval Models (Thakur et al., 2021)", "url": "https://arxiv.org/pdf/2104.08663", "type": "paper", "quote": "Such a lexical bias disfavours approaches that don't rely on lexical matching, like dense retrieval methods; ... the annotation pool is still biased towards lexical approaches.; Better datasets, that use diverse pooling strategies", "supports": "Annotation pools drawn from lexical systems bias evaluation towards lexical retrievers, and diverse pooling is the remedy.", "status": "partially"},
+   {"title": "Synthetic Test Collections for Retrieval Evaluation (Rahmani et al., 2024)", "url": "https://arxiv.org/pdf/2405.07767", "type": "paper", "quote": "synthetic queries contain much fewer relevant documents; ... synthetic test collections tend to be easier than real queries", "supports": "LLM-generated queries are not interchangeable with real queries (they differ in length, relevant-document counts and difficulty).", "status": "partially"},
+   {"title": "How Reliable are the Results of Large-Scale Information Retrieval Experiments? (Zobel, SIGIR 1998)", "url": "https://www.cs.cornell.edu/courses/cs574/2002fa/assignments.org/zobel-sigir98.pdf", "type": "paper", "quote": "unjudged documents are assumed to be not relevant.; a technique that did not have an opportunity to contribute to the pool may have its effectiveness underestimated.", "supports": "Single-gold or narrowly pooled labels score valid but unlabelled results as misses and disadvantage systems outside the pool.", "status": "supported"}
+  ],
+  "fixes": [],
+  "residual_background_only": ["LLM-written questions copy chunk vocabulary, favouring BM25 (no source found for this specific mechanism; already hedged in text)"]
+ },
+ {
+  "plan_id": "B1-GEN-05-6",
+  "claims": [
+   {"claim": "With long contexts, models often use evidence in the middle less reliably than at the edges", "field": "detailed_answer", "status": "supported", "source_index": 0, "note": "Direct match to the abstract."},
+   {"claim": "Extra irrelevant chunks can distract the generator", "field": "detailed_answer", "status": "partially", "source_index": 0, "note": "The retrieved abstract covers position effects only; distraction by irrelevant context was not confirmed in the text I opened."},
+   {"claim": "SE of 61% at n=200 is 3.4 points; paired SE sqrt(flips)/200", "field": "detailed_answer", "status": "covered_by_execution", "source_index": null, "note": "Executed."},
+   {"claim": "Oracle-context and no-context baselines establish the ceiling / parametric knowledge", "field": "detailed_answer", "status": "not_found", "source_index": null, "note": "Experimental-design recommendation; no source sought."}
+  ],
+  "sources": [
+   {"title": "Lost in the Middle: How Language Models Use Long Contexts (Liu et al., 2023)", "url": "https://arxiv.org/abs/2307.03172", "type": "paper", "quote": "performance is often highest when relevant information occurs at the beginning or end of the input context, and significantly degrades when models must access relevant information in the middle of long contexts.", "supports": "Position effect: models use middle-of-context evidence less reliably than evidence at the edges.", "status": "supported"}
+  ],
+  "fixes": [],
+  "residual_background_only": ["extra irrelevant chunks can distract the generator (position-effect part sourced; distraction part not confirmed)"]
+ },
+ {
+  "plan_id": "B1-GEN-05-7",
+  "claims": [
+   {"claim": "Metrics treat unjudged documents as non-relevant", "field": "answer", "status": "supported", "source_index": 0, "note": "BEIR states this directly and measures Hole@10."},
+   {"claim": "Pooling bias: systems that did not contribute to the pool are underestimated", "field": "answer", "status": "supported", "source_index": 1, "note": "Zobel."},
+   {"claim": "Judging the unjudged holes of the new system raises its scores (fix 2)", "field": "answer", "status": "supported", "source_index": 0, "note": "BEIR manually annotated the holes for TREC-COVID, which raised nDCG@10 for non-lexical systems such as ANCE."},
+   {"claim": "Pool several diverse systems and re-pool when adding a system (fix 1)", "field": "answer", "status": "supported", "source_index": 0, "note": "BEIR calls for datasets using diverse pooling strategies."},
+   {"claim": "Condensed lists drop unjudged documents (fix 3, sensitivity check)", "field": "answer", "status": "supported", "source_index": 2, "note": "Definition matches. Sakai also finds condensed-list metrics are not necessarily better under biased judgments, so 'sensitivity check' is the correct framing."},
+   {"claim": "Example numbers (recall@5 2/3, precision 2/5 vs 4/5)", "field": "answer", "status": "covered_by_execution", "source_index": null, "note": "Executed/derived."},
+   {"claim": "More queries do not fix systematic missing labels", "field": "answer", "status": "not_found", "source_index": null, "note": "Reasoning claim; follows from bias being systematic."}
+  ],
+  "sources": [
+   {"title": "BEIR (Thakur et al., 2021)", "url": "https://arxiv.org/pdf/2104.08663", "type": "paper", "quote": "All other unseen documents are assumed to be irrelevant.; manually added for all systems, the missing annotation (or holes); Better datasets, that use diverse pooling strategies", "supports": "Unjudged documents count as irrelevant, holes can be annotated, and diverse pooling is the remedy.", "status": "supported"},
+   {"title": "How Reliable are the Results of Large-Scale Information Retrieval Experiments? (Zobel, SIGIR 1998)", "url": "https://www.cs.cornell.edu/courses/cs574/2002fa/assignments.org/zobel-sigir98.pdf", "type": "paper", "quote": "unjudged documents are assumed to be not relevant.; a technique that did not have an opportunity to contribute to the pool may have its effectiveness underestimated.", "supports": "Pooling bias against systems that did not contribute to the judged pool.", "status": "supported"},
+   {"title": "On the Robustness of Information Retrieval Metrics to Biased Relevance Assessments (Sakai, 2009)", "url": "https://ipsj.ixsq.nii.ac.jp/records/66516", "type": "paper", "quote": "metrics based on a condensed list, obtained by removing all unjudged documents from the original ranked list; these results do not hold when the relevance data are biased towards particular systems or towards the top of the pools", "supports": "Defines condensed lists; shows they are not a guaranteed remedy under biased judgments, so use as a sensitivity check only.", "status": "supported"}
+  ],
+  "fixes": [],
+  "residual_background_only": ["More queries do not help because missing labels bias every query in the same direction (reasoning, no source)"]
+ },
+ {
+  "plan_id": "B1-GEN-05-8",
+  "claims": [
+   {"claim": "Evidence-coverage metric, k=3 and k=4 aggregates", "field": "detailed_answer, practical_answer", "status": "covered_by_execution", "source_index": null, "note": "Executed."},
+   {"claim": "Multi-chunk questions need all evidence present; mean coverage vs full-coverage rate", "field": "detailed_answer", "status": "not_found", "source_index": null, "note": "Metric-design argument; no external source needed."}
+  ],
+  "sources": [],
+  "fixes": [],
+  "residual_background_only": []
+ },
+ {
+  "plan_id": "B1-GEN-06-1",
+  "claims": [
+   {"claim": "Post-filtering can leave few or no matches because the unfiltered search may contain no match at all", "field": "concise_answer, detailed_answer", "status": "supported", "source_index": 0, "note": "Weaviate filtering docs."},
+   {"claim": "Filtered traversal can fragment the graph so recall fails past a selectivity threshold", "field": "detailed_answer", "status": "supported", "source_index": 1, "note": "Qdrant article: graph decomposes into small connected components; extra edges fix it."},
+   {"claim": "Engines switch to brute force / full scan when the filter is selective (implementations differ)", "field": "concise_answer, detailed_answer", "status": "supported", "source_index": 2, "note": "Qdrant planner uses cardinality estimation and full scan; Weaviate uses a flat-search cutoff (source 0)."},
+   {"claim": "Traversal-time filtering 'still walking through non-matching nodes' and the graph of matching nodes disconnecting", "field": "detailed_answer", "status": "partially", "source_index": 1, "note": "Qdrant's described naive method restricts the greedy search to matching nodes, which is what disconnects. Weaviate/ACORN keeps following all links. Our sentence mixes the two variants."},
+   {"claim": "Post-filter when most data matches; traversal filtering in the middle range; thresholds ('more than half')", "field": "detailed_answer", "status": "not_found", "source_index": null, "note": "Only engine-specific cutoffs found (Weaviate ~15% of dataset size); the generic bands are heuristics."},
+   {"claim": "Arithmetic (100 x 0.005, ef ~2000, 307 MB)", "field": "detailed_answer", "status": "covered_by_execution", "source_index": null, "note": "Executed."}
+  ],
+  "sources": [
+   {"title": "Weaviate docs: Filtering (concepts)", "url": "https://docs.weaviate.io/weaviate/concepts/filtering", "type": "official_doc", "quote": "there is a chance that the original vector search does not contain any match at all; ... The cut-off is configured at ~15% of the dataset size.", "supports": "Post-filtering can return nothing for restrictive filters, and engines fall back to flat search of the matching subset.", "status": "supported"},
+   {"title": "Qdrant: Filterable HNSW", "url": "https://qdrant.tech/articles/filterable-hnsw/", "type": "official_doc", "quote": "This threshold is due to the decomposition of the graph into small connected components.", "supports": "Applying the filter to graph nodes during search can disconnect the graph and make search fail past a threshold.", "status": "supported"},
+   {"title": "Qdrant docs: Indexing", "url": "https://qdrant.tech/documentation/concepts/indexing/", "type": "official_doc", "quote": "The index is also used to accurately estimate the filter cardinality; ... the query planner will use full-scan search instead of HNSW index", "supports": "Engines estimate filter cardinality and switch to full scan when a filter is selective.", "status": "supported"}
+  ],
+  "fixes": [
+   {"field": "detailed_answer", "claim": "still walking through non-matching nodes", "problem": "Sources describe two variants: Qdrant's naive method walks only matching nodes (and disconnects); Weaviate/ACORN keeps traversing all links. The text attributes the disconnection to the variant that walks non-matching nodes.", "replacement": "in some engines still walking through non-matching nodes and in others restricting the walk to matching ones"}
+  ],
+  "residual_background_only": ["generic selectivity bands for choosing post-filter vs traversal vs pre-filter", "post-filter failure when the filter correlates with the query (reasoned, not quoted)"]
+ },
+ {
+  "plan_id": "B1-GEN-06-2",
+  "claims": [
+   {"claim": "HNSW layer 0 allows up to 2M links per node", "field": "detailed_answer, practical_answer", "status": "supported", "source_index": 0, "note": "Paper: 2*M is a good choice for Mmax0."},
+   {"claim": "Level assigned with exponentially decaying probability; upper layers hold about n/(M-1) entries", "field": "detailed_answer", "status": "partially", "source_index": 0, "note": "Paper gives mL=1/ln(M), i.e. skip-list p=1/M; the n/(M-1) total follows from the geometric sum n/M + n/M^2 + ... (derivation, not quoted). 'Up to M links each' in upper layers not confirmed from the text read."},
+   {"claim": "SQ8 uses 1 byte per dimension; PQ code size = ceil(M*nbits/8) bytes", "field": "detailed_answer", "status": "supported", "source_index": 1, "note": "FAISS wiki table. With 96 sub-quantizers x 8 bits = 96 bytes."},
+   {"claim": "HNSW flat memory is vector bytes plus graph links (about M*2*4 bytes per vector on layer 0)", "field": "detailed_answer", "status": "partially", "source_index": 1, "note": "FAISS lists 4*d + x*M*2*4 bytes per vector with x undefined on the page; consistent with ours, but not an exact confirmation of the upper-layer term."},
+   {"claim": "int8 recall loss often small but data/model-dependent", "field": "detailed_answer", "status": "not_found", "source_index": null, "note": "Hedged already; no source quoted."},
+   {"claim": "160.2 / 480.6 / 45.0 / 11.4 / 6.6 GB and node counts", "field": "detailed_answer, practical_answer", "status": "covered_by_execution", "source_index": null, "note": "Executed."}
+  ],
+  "sources": [
+   {"title": "Efficient and robust approximate nearest neighbor search using Hierarchical Navigable Small World graphs (Malkov & Yashunin)", "url": "https://arxiv.org/pdf/1603.09320", "type": "paper", "quote": "2∙M is a good choice for Mmax0; ... corresponds to the skip list parameter p=1/M", "supports": "Layer-0 degree cap of 2M and the exponentially decaying layer assignment behind the ~1/M node fraction per layer.", "status": "supported"},
+   {"title": "Faiss wiki: Faiss indexes", "url": "https://github.com/facebookresearch/faiss/wiki/Faiss-indexes", "type": "official_doc", "quote": "IndexScalarQuantizer SQ8: d bytes per vector; IndexPQ: ceil(M * nbits / 8) bytes per vector; IndexHNSWFlat: 4*d + x * M * 2 * 4", "supports": "int8 scalar quantisation costs one byte per dimension, PQ code size follows ceil(M*nbits/8), and HNSW adds M*2*4-byte link storage per vector.", "status": "supported"}
+  ],
+  "fixes": [],
+  "residual_background_only": ["int8 recall loss is usually small but data-dependent", "upper layers hold up to M links each (not confirmed)"]
+ },
+ {
+  "plan_id": "B1-GEN-06-3",
+  "claims": [
+   {"claim": "Deleted vectors are marked, omitted from results, and remain in the index until later cleanup or replacement", "field": "detailed_answer", "status": "supported", "source_index": 0, "note": "hnswlib: mark_deleted omits from search; elements can later be replaced to save memory."},
+   {"claim": "Deleted objects stay connected to the HNSW graph until an async cleanup rebuilds edges", "field": "detailed_answer", "status": "supported", "source_index": 1, "note": "Weaviate docs."},
+   {"claim": "Many soft-deleted points in the graph degrade filtered search quality", "field": "detailed_answer", "status": "partially", "source_index": 2, "note": "Qdrant says the same problem (poor filtered traversal) can happen with many soft-deleted points. This supports a recall effect but not that deleted nodes consume ef budget."},
+   {"claim": "Deleted documents are reclaimed through segment merges based on a delete-percentage threshold", "field": "detailed_answer", "status": "partially", "source_index": 3, "note": "Lucene TieredMergePolicy is a text index, but supports the compaction-by-merge pattern."},
+   {"claim": "Deleted nodes consume search ef budget; repeated inserts around deleted nodes reduce graph quality", "field": "detailed_answer", "status": "not_found", "source_index": null, "note": "Stated as 'can' but not found in docs."},
+   {"claim": "Versioned ids, validity filter, alias swap, reconciliation design", "field": "detailed_answer, practical_answer", "status": "not_found", "source_index": null, "note": "Design recommendations."}
+  ],
+  "sources": [
+   {"title": "hnswlib README", "url": "https://github.com/nmslib/hnswlib", "type": "official_doc", "quote": "marks the element as deleted, so it will be omitted from search results.; (by marking them in index, later can be replaced with other elements)", "supports": "Delete in hnswlib is a mark; the element remains until replaced.", "status": "supported"},
+   {"title": "Weaviate docs: Vector index concepts", "url": "https://docs.weaviate.io/weaviate/concepts/vector-index", "type": "official_doc", "quote": "Prior to cleanup, objects are marked as deleted, but they are still connected to the HNSW graph.; Cleanup is an async process runs that rebuilds the HNSW graph after deletes and updates.", "supports": "Deleted vectors stay in the graph until asynchronous cleanup.", "status": "supported"},
+   {"title": "Qdrant docs: Indexing", "url": "https://qdrant.tech/documentation/concepts/indexing/", "type": "official_doc", "quote": "The same can happen when there are a large number of soft-deleted points in the graph.", "supports": "Many soft-deleted points can degrade graph search in the way described for filters.", "status": "partially"},
+   {"title": "Lucene TieredMergePolicy javadoc", "url": "https://lucene.apache.org/core/9_9_0/core/org/apache/lucene/index/TieredMergePolicy.html", "type": "official_doc", "quote": "Controls the maximum percentage of deleted documents that is tolerated in the index.", "supports": "Deleted entries accumulate until merges reclaim them, governed by a delete-percentage threshold.", "status": "partially"}
+  ],
+  "fixes": [],
+  "residual_background_only": ["deleted nodes consume part of ef budget during traversal", "inserting around deleted nodes reduces graph quality", "versioned-id/validity-filter/alias-swap design (recommendations)"]
+ },
+ {
+  "plan_id": "B1-GEN-06-4",
+  "claims": [
+   {"claim": "Newly written vectors/documents are invisible until the next refresh or commit; refresh interval controls freshness", "field": "detailed_answer", "status": "supported", "source_index": 0, "note": "Elasticsearch NRT docs."},
+   {"claim": "Segments written and opened make documents searchable without full commit", "field": "detailed_answer", "status": "supported", "source_index": 0, "note": "Same page."},
+   {"claim": "Small segments merged in the background in the style of log-structured merge designs", "field": "detailed_answer", "status": "not_found", "source_index": null, "note": "Lucene merge policy is analogous but not sourced as LSM; leave as general background."},
+   {"claim": "200/s x 3600 = 720,000 chunks, 2.2 GB per scan", "field": "detailed_answer", "status": "covered_by_execution", "source_index": null, "note": "Executed."},
+   {"claim": "Embedding batching and queueing often dominate the 30 s lag", "field": "concise_answer, detailed_answer", "status": "not_found", "source_index": null, "note": "Practical heuristic; text says 'often' and says to measure."}
+  ],
+  "sources": [
+   {"title": "Elasticsearch guide: Near real-time search", "url": "https://www.elastic.co/guide/en/elasticsearch/reference/current/near-real-time.html", "type": "official_doc", "quote": "A refresh makes all operations performed on an index since the last refresh available for search.; Lucene allows new segments to be written and opened, making the documents they contain visible to search", "supports": "Newly written documents become searchable only after a refresh that opens new segments; refresh interval is a freshness knob.", "status": "supported"}
+  ],
+  "fixes": [],
+  "residual_background_only": ["LSM-style compaction analogy", "embedding batching/queueing dominating the lag (heuristic)"]
+ },
+ {
+  "plan_id": "B1-GEN-06-5",
+  "claims": [
+   {"claim": "Payload-partitioned single collection is efficient for many small similarly sized tenants; collection per tenant carries overhead", "field": "concise_answer, detailed_answer", "status": "supported", "source_index": 0, "note": "Qdrant multitenancy guide. It says separate collections suit only a limited number of tenants needing strict isolation, which agrees with our hybrid (dedicated for large tenants)."},
+   {"claim": "In a shared collection isolation depends on every query filtering on the tenant field", "field": "detailed_answer", "status": "supported", "source_index": 0, "note": "Same page."},
+   {"claim": "Per-tenant shards give isolation, and deleting a tenant deletes all its objects without affecting others", "field": "detailed_answer", "status": "supported", "source_index": 1, "note": "Weaviate multi-tenancy."},
+   {"claim": "Engines differ in how many indexes they handle well", "field": "detailed_answer", "status": "supported", "source_index": 1, "note": "Weaviate cites 50,000+ active shards per node bounded by file limits; Qdrant Cloud caps 1000 collections by default (source 0)."},
+   {"claim": "Selective tenant filter hurts ANN recall in a shared index; exact scan for small tenants", "field": "detailed_answer", "status": "partially", "source_index": 2, "note": "Qdrant: planner full-scan for selective filters and tenant-aware indexing; recall impact itself is covered in B1-GEN-06-1 sources."},
+   {"claim": "300/100M = 3e-6", "field": "detailed_answer", "status": "covered_by_execution", "source_index": null, "note": "Executed."}
+  ],
+  "sources": [
+   {"title": "Qdrant docs: Multitenancy (multiple partitions)", "url": "https://qdrant.tech/documentation/guides/multiple-partitions/", "type": "official_doc", "quote": "Creating a separate collection for each tenant is rarely the most efficient approach.; Each collection carries its own resource overhead, so creating many collections can quickly become expensive.; Only create multiple collections when you have a limited number of tenants that need strict isolation.", "supports": "Shared partitioned collection for many small tenants, dedicated collections only for a few that need strict isolation, and per-collection overhead.", "status": "supported"},
+   {"title": "Weaviate docs: Data concepts (multi-tenancy)", "url": "https://docs.weaviate.io/weaviate/concepts/data", "type": "official_doc", "quote": "Each tenant's data is isolated on a dedicated shard.; deleting a tenant also deletes all of its objects.", "supports": "Dedicated per-tenant storage gives isolation and simple tenant erasure.", "status": "supported"},
+   {"title": "Qdrant docs: Indexing", "url": "https://qdrant.tech/documentation/concepts/indexing/", "type": "official_doc", "quote": "the query planner will use full-scan search instead of HNSW index", "supports": "Engines fall back to exact scan for very selective filters, as for a small tenant in a shared collection.", "status": "partially"}
+  ],
+  "fixes": [],
+  "residual_background_only": ["gateway-derived tenant id, canary documents, per-tenant encryption keys (security recommendations)", "noisy-neighbour effects (general)"]
+ },
+ {
+  "plan_id": "B1-GEN-06-6",
+  "claims": [
+   {"claim": "Lucene-style idf = ln(1 + (N - n + 0.5)/(n + 0.5))", "field": "detailed_answer", "status": "supported", "source_index": 0, "note": "Lucene BM25Similarity javadoc; docCount is per field."},
+   {"claim": "Shards score with shard-local statistics, so scores differ across shards; a mode gathering global term/document frequencies first fixes it at the cost of an extra round trip", "field": "concise_answer, detailed_answer", "status": "supported", "source_index": 1, "note": "Elastic blog (vendor-authored, hence secondary). The official search_type reference could not be read: the page text was truncated and the API markdown was blocked by robots."},
+   {"claim": "RRF scores sum 1/(k + rank) with k=60 as a widely used default", "field": "detailed_answer", "status": "supported", "source_index": 2, "note": "Cormack et al."},
+   {"claim": "Per-shard rank merging or score normalisation are unsafe fallbacks when shards differ", "field": "concise_answer, detailed_answer", "status": "not_found", "source_index": null, "note": "Stated cautiously, no source."},
+   {"claim": "Min-max / z-score normalisation is sensitive to outliers and list length", "field": "detailed_answer", "status": "not_found", "source_index": null, "note": "General statement, no source."},
+   {"claim": "idf values 10.72 and 8.73; RRF 0.03227 vs 0.03226", "field": "detailed_answer", "status": "covered_by_execution", "source_index": null, "note": "Executed."}
+  ],
+  "sources": [
+   {"title": "Lucene BM25Similarity javadoc", "url": "https://lucene.apache.org/core/9_9_0/core/org/apache/lucene/search/similarities/BM25Similarity.html", "type": "official_doc", "quote": "Implemented as log(1 + (docCount - docFreq + 0.5)/(docFreq + 0.5)).", "supports": "The Lucene idf formula used in the worked example.", "status": "supported"},
+   {"title": "Elastic blog: Practical BM25 Part 1 - How Shards Affect Relevance Scoring in Elasticsearch", "url": "https://www.elastic.co/blog/practical-bm25-part-1-how-shards-affect-relevance-scoring-in-elasticsearch", "type": "secondary", "quote": "By default, Elasticsearch calculates scores on a per-shard basis.; dfs_query_then_fetch first gathers the distributed term frequencies; In fact, this returns the same score as having just 1 shard.", "supports": "Shard-local scoring makes scores differ across shards; a global-statistics pre-pass removes the difference at the cost of an extra round trip.", "status": "supported"},
+   {"title": "Reciprocal Rank Fusion outperforms Condorcet and individual Rank Learning Methods (Cormack, Clarke, Buettcher, SIGIR 2009)", "url": "https://cormack.uwaterloo.ca/cormacksigir09-rrf.pdf", "type": "paper", "quote": "where k = 60 was fixed during a pilot investigation and not altered during subsequent validation.; k = 60 was near-optimal, but that the choice was not critical.", "supports": "RRF = sum of 1/(k + rank) with k = 60 as a near-optimal, non-critical default.", "status": "supported"}
+  ],
+  "fixes": [],
+  "residual_background_only": ["rank merging and score normalisation are unsafe fallbacks when shards differ", "min-max/z-score sensitivity to outliers and list length"]
+ }
+]

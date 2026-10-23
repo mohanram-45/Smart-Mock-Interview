@@ -1,0 +1,439 @@
+[
+ {
+  "plan_id": "B3-MLO-01-5",
+  "verdict": "pass",
+  "reasons": [
+   "Applied source_verifier edits ('treated as immutable by convention', 'entries that should be treated as immutable') are accurate and consistent with the page not stating immutability; concise is 76 words (<=80).",
+   "Minor non-blocking: rubric point 6 (retention/garbage collection) is not discussed in the answers, and rubric/key_concepts say 'immutable' without the 'by convention' hedge; acceptable as design guidance."
+  ],
+  "parts_answered": {
+   "all": true
+  },
+  "evidence": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "76 words, interview-ready"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "adds chain-of-links lineage, pitfalls"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Tracker vs registry plus lineage chain; design but conceptual.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "claim": "concise <=80 words",
+    "method": "executed",
+    "evidence": "76 words"
+   },
+   {
+    "claim": "MLflow docs claims",
+    "method": "doc",
+    "evidence": "WebFetch of both pages"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed ok",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none (max token Jaccard 0.15, smi-0379 unrelated)",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/ml/tracking/",
+    "status": "supported",
+    "evidence": "WebFetch: 'The MLflow Tracking is an API and UI for logging parameters, code versions, metrics, and output files'; 'Each run records metadata (... metrics, parameters, start and end times)' and 'artifacts (output files ... such as model weights...)'."
+   },
+   {
+    "url": "https://mlflow.org/docs/latest/ml/model-registry/",
+    "status": "supported",
+    "evidence": "'Model aliases allow you to assign a mutable, named reference to a particular version'; 'Each registered model version is linked to the MLflow run, logged model or notebook that produced it'. Page does not state immutability; answer now hedges that."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-02-4",
+  "verdict": "pass",
+  "reasons": [
+   "Recomputed: 0.910 vs 0.900, se 0.002 each -> se_diff 0.002828, lower bound 0.00446 (about 0.0045); 0.905 se 0.02 -> lower -0.0344 (about -0.034); accuracy 0.85, n=200 -> se 0.0252 (>2x 0.01). All match.",
+   "Applied edits: question now states 'any baseline slice of any size is missing' which matches the code (missing check precedes the n test); new slice-noise sentence is correct and hedged. Fenced code equals tested solution (verified)."
+  ],
+  "parts_answered": {
+   "all": true
+  },
+  "evidence": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "design rationale + limits"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "code + worked numbers"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-condition gate with CI, float tolerance, fail-closed handling and statistical critique.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "claim": "solution + tests pass on 3.13.16, 3.10.20, 3.11.17",
+    "method": "executed",
+    "evidence": "prints ok on all three"
+   },
+   {
+    "claim": "extra edge cases: slice n=199 regress -> needs_review; n=200 regress -> reject; missing small slice (n=50) -> reject; extra candidate slice ignored -> promote; mixed hard+review -> reject with both reasons; inf se -> reject; baseline without 'slices' key -> promote",
+    "method": "executed",
+    "evidence": "identical output on all three interpreters (md5 match)"
+   },
+   {
+    "claim": "lower-bound and standard-error numbers",
+    "method": "derivation",
+    "evidence": "recomputed"
+   }
+  ],
+  "suggested_answer_set": "",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none (max Jaccard 0.11)",
+   "same_intent": false
+  },
+  "code_findings": "stdlib only (math); no 3.11+ features; all pass on three interpreters; fence==solution.",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "WebFetch: 'Offline and online metrics correlate' and 'Model quality is sufficient on all important data slices' are listed in the Model tests section; used sentence in answer is supported."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-02-5",
+  "verdict": "pass",
+  "reasons": [
+   "Recomputed: 14% = 28/200 ~ 1 in 7 (14.3%); 0.75 is (0.762-0.75)/0.0135 = 0.89 sd below mean (within one sd); mean-3sd = 0.7215 ~ 0.72 = stated minimum; floor 0.70 below minimum 0.72; tail shares 2%/0.5%/0% consistent with min 0.72 (0.5% = 1 seed) and 0.01 accuracy granularity of a 100-row validation set.",
+   "Applied edits ('In this illustration', 'arguably worse', 3-sd sentence) are correct, consistent and properly labelled hypothetical. Numbers are not reproduced but explicitly labelled illustrative."
+  ],
+  "parts_answered": {
+   "all": true
+  },
+  "evidence": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "diagnosis, can/cannot establish, redesign"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked numbers, not in detailed"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Diagnose flakiness as noise vs threshold; redesign with measured spread; hypothetical numbers.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "claim": "hypothetical numbers internally consistent",
+    "method": "derivation",
+    "evidence": "see reasons"
+   }
+  ],
+  "suggested_answer_set": "",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0005",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "WebFetch: 'Training is reproducible' and 'The ML pipeline is Integration tested' are Infrastructure tests (section IV), as the answer says. (Supports text slightly misquotes 'Data invariants hold for inputs'; irrelevant to the answer.)"
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "'Rule #5: Test the infrastructure independently from the machine learning'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-03-3",
+  "verdict": "pass",
+  "reasons": [
+   "Recomputed 0.8% of 200,000 = 1,600. Applied float/double hedge is accurate: sklearn-onnx page says 'In most cases, float and double comparison gives the same result' and shows a regression example with significant discrepancies (max abs diff ~150.75). Wording 'casting to float produced large errors' fits the example.",
+   "Tolerances in practical (1e-6 / 1e-4 / 1e-3) are labelled as to be justified; consistent across steps 2-3. 'Float32 usually flips far fewer than 0.8%' is hedged and background."
+  ],
+  "parts_answered": {
+   "all": true
+  },
+  "evidence": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": ""
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked parity test"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-cause diagnosis of ONNX parity, numerics and test design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "claim": "1,600 rows",
+    "method": "derivation",
+    "evidence": "0.008*200000"
+   }
+  ],
+  "suggested_answer_set": "",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none (max Jaccard 0.13)",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://github.com/onnx/onnx/blob/main/docs/IR.md",
+    "status": "supported",
+    "evidence": "'ONNX specifies the portable, serialized format of a computation graph'; 'Each model MUST explicitly name the operator sets...'; 'An implementation must support all operators in the set or reject the model'; 'Operator sets other than the default ... MUST specify a domain'."
+   },
+   {
+    "url": "https://scikit-learn.org/stable/model_persistence.html",
+    "status": "supported",
+    "evidence": "'ONNX runtime does not require python'; 'not all scikit-learn models are supported'; 'arbitrary computations can be represented ... sandboxed environment'."
+   },
+   {
+    "url": "https://onnx.ai/sklearn-onnx/auto_tutorial/plot_ebegin_float_double.html",
+    "status": "supported",
+    "evidence": "'In most cases, float and double comparison gives the same result.'; 'The discrepencies are significant' (max abs diff 150.75); 'only allows float coefficients for the operator TreeEnsembleRegressor'. Now matches the hedged wording."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'loading a model does not unpickle Python objects' is background knowledge of the protobuf format"
+  ],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-03-4",
+  "verdict": "pass",
+  "reasons": [
+   "Round-two defect re-checked: MLflow source (mlflow/models/utils.py, _enforce_schema lines ~1270-1274) logs 'Found extra inputs in the model input that are not defined in the model signature ... These inputs will be ignored.' so the replaced bullet 'Extra columns are a policy choice: MLflow's schema enforcement ignores them with a warning' is correct; missing columns raise 'Model is missing inputs'.",
+   "Float->int: source lines 850-878 reject 'Can not safely convert float64 to int64', so rejecting 3.7 is correct (and the answer words it generically). String '34' (object dtype) is also rejected by MLflow, but the answer correctly leaves strict-vs-lenient as a decision. Inference claim: mlflow/types/utils.py maps int and np.int64 to DataType.long, so an integer-looking example column is inferred integer; the signatures docs page does not state it, so the claim rests on source code (added as source). Single answer, 326 words, all three clients and 'what to add' covered. No other defect found."
+  ],
+  "parts_answered": {
+   "all": true
+  },
+  "evidence": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single complete answer"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Applied knowledge of what type schemas catch vs semantic errors; MLflow specifics.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "claim": "extra columns ignored with warning in MLflow",
+    "method": "doc",
+    "evidence": "mlflow/models/utils.py _enforce_schema"
+   },
+   {
+    "claim": "float 3.7 -> long rejected",
+    "method": "doc",
+    "evidence": "utils.py _enforce_mlflow_datatype raises 'Can not safely convert float64 to int64'"
+   },
+   {
+    "claim": "int examples infer integer/long",
+    "method": "doc",
+    "evidence": "mlflow/types/utils.py SCALAR_TO_DATATYPE_MAPPING int->long, np.int64->long, np.int32->integer"
+   }
+  ],
+  "suggested_answer_set": "",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none (max Jaccard 0.09)",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/ml/model/signatures/",
+    "status": "supported",
+    "evidence": "'Defines the expected format for model inputs, outputs, and parameters.'; 'MLflow automatically generates model signatures when you provide an input_example during model logging.' Page does not state integer inference or extra-column handling."
+   },
+   {
+    "url": "https://raw.githubusercontent.com/mlflow/mlflow/master/mlflow/models/utils.py",
+    "status": "supported",
+    "evidence": "Opened: '# NB: conversion between incompatible types (e.g. floats -> ints or double -> float) are not allowed'; also supports the extra-columns-ignored-with-warning sentence (logger.warning ... 'These inputs will be ignored.')."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "MLflow source: type inference (mlflow/types/utils.py)",
+    "url": "https://raw.githubusercontent.com/mlflow/mlflow/master/mlflow/types/utils.py",
+    "supports": "Integer-valued example data (Python int, np.int64) is inferred as an integer type (long), not double.",
+    "quote": "int: DataType.long,\n    np.int64: DataType.long,\n    np.int32: DataType.integer,",
+    "type": "secondary"
+   }
+  ],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-03-5",
+  "verdict": "pass",
+  "reasons": [
+   "concise_answer 70 words. Applied edits are consistent: 'one registry write (atomic in typical database-backed registries)' in concise matches the detailed hedge 'MLflow's documentation does not state this' (verified: registry page silent on atomicity). 'v39 in this scenario' fix is OK (record shown is for v41; step 1 implies an audit date before that release).",
+   "Minor non-blocking: interview_style_note says 'registry operations are atomic' and a rubric tradeoff says 'Atomic registry pointer', slightly less hedged than the answers; not a factual error for typical DB-backed registries."
+  ],
+  "parts_answered": {
+   "all": true
+  },
+  "evidence": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "70 words"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": ""
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked audit + drill"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Audit-grade reproducibility design with atomicity nuance and trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "claim": "concise <=80 words",
+    "method": "executed",
+    "evidence": "70"
+   }
+  ],
+  "suggested_answer_set": "",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none (max Jaccard 0.11)",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/ml/model-registry/",
+    "status": "supported",
+    "evidence": "'Model aliases ... mutable, named reference to a particular version'; versions numbered from 1; lineage to run; tags and annotations. Immutability and atomicity not stated (answer hedges both)."
+   },
+   {
+    "url": "https://docs.docker.com/reference/cli/docker/image/pull/",
+    "status": "supported",
+    "evidence": "'When pulling an image by digest, you specify exactly which version of an image to pull.'"
+   },
+   {
+    "url": "https://pip.pypa.io/en/stable/topics/secure-installs/",
+    "status": "supported",
+    "evidence": "'This mode uses local hashes, embedded in a requirements.txt file, to protect against remote tampering and network issues.'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ },
+ {
+  "plan_id": "B3-MLO-04-1",
+  "verdict": "pass",
+  "reasons": [
+   "Applied backpressure edit is correct and better hedged (sensors cannot always be slowed; shed deliberately and count). Rest consistent: 50,000/s sizing, 100 ms budget with tens of ms for model, at-least-once implies idempotent alerts. No numbers needing recomputation; no documented-behaviour claims requiring sources."
+  ],
+  "parts_answered": {
+   "all": true
+  },
+  "evidence": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer covering a/b/c and hybrid"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mapping requirements to serving modes with hybrid reasoning; standard design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [],
+  "suggested_answer_set": "",
+  "key_concepts_findings": "ok",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "none (max Jaccard 0.09)",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null,
+  "sources_to_drop": []
+ }
+]

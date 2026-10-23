@@ -1,0 +1,419 @@
+[
+ {
+  "id": "P3-SQL-01",
+  "verdict": "correct",
+  "reasons": [
+   "All facts verified (UNION dedup, NULL=NULL in dedup, same column count, ORDER BY only at end, left-to-right grouping, names from first SELECT) by running 3.37.2 and against lang_select.html.",
+   "One unhedged performance claim ('cannot stream rows out immediately') is background knowledge, not verified; minor hedge only."
+  ],
+  "parts_answered": {
+   "UNION vs UNION ALL difference": true,
+   "cost of each": true,
+   "column-list rules": true,
+   "ORDER BY rules": true,
+   "count query with columns op,n_rows ordered by n_rows": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "so it does extra work and cannot stream rows out immediately",
+    "problem": "Engine-internal behaviour stated as a certainty; not derivable from the data or the SQLite page (I did not verify it per engine).",
+    "replacement": "so it does extra work and usually has to consume its input before the final rows are known"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Comparison of two operators plus several syntax rules and a short query; no multi-step reasoning, so not Easy (several parts) and not Hard.",
+  "key_concepts_findings": "All 7 are specific and each is discussed (NULL equality, ORDER BY on compound, positional column matching). None weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0037",
+   "same_intent": false,
+   "note": "g0037 also contrasts UNION/UNION ALL row counts but as part of a segment query; this one adds NULL-in-dedup, ORDER BY/column-list rules and a count query. Partial overlap only."
+  },
+  "code_findings": "Run from scratch on real SQLite 3.37.2 (LD_LIBRARY_PATH lib, sqlite3.sqlite_version printed 3.37.2) and on sandbox 3.45.1: result equals `expected`; the single fenced sql block in the answer is byte-identical to code.solution. Extra cases I ran on 3.37.2: mismatched column counts -> error 'SELECTs to the left and right of UNION do not have the same number of result columns'; ORDER BY before UNION -> error 'ORDER BY clause should come after UNION not before'; ORDER BY lower(email) on a compound -> error '1st ORDER BY term does not match any column in the result set' (confirms 'resolved against output columns'); output column name comes from first SELECT (alias a vs b); A UNION B UNION ALL C grouped left to right. Subqueries in FROM have no alias: fine in SQLite, rejected by some engines (not claimed).",
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/lang_select.html",
+    "status": "supported",
+    "evidence": "'duplicate rows are removed' for UNION; 'NULL values are considered equal to other NULL values'; 'all the constituent SELECTs must return the same number of result columns'; 'only the last or right-most simple SELECT may have an ORDER BY clause. That ORDER BY clause will apply across all elements of the compound'; 'group from left to right'."
+   }
+  ]
+ },
+ {
+  "id": "P3-SQL-02",
+  "verdict": "pass",
+  "reasons": [
+   "Query correct on 3.37.2 and 3.45.1; NOT EXISTS version really returns [1,1,4], with DISTINCT [1,4], NOT IN with DISTINCT [1,4] (all run).",
+   "Every part answered; claims about NULL/NOT IN are standard and consistent with the existing bank (g0031)."
+  ],
+  "parts_answered": {
+   "EXCEPT query": true,
+   "what each form returns for customer 1": true,
+   "when to prefer which": true
+  },
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Compare two formulations, predict duplicate behaviour; needs set-op vs row-filter reasoning but no multi-step design.",
+  "key_concepts_findings": "All 6 discussed (NOT IN NULL trap is brief but present).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0037",
+   "same_intent": false,
+   "note": "g0037 uses EXCEPT for 'jan_not_feb' but asks about set operators vs UNION; this one is about EXCEPT vs NOT EXISTS duplicate semantics. Related, intent differs."
+  },
+  "code_findings": "Run from scratch on real SQLite 3.37.2 (LD_LIBRARY_PATH lib, sqlite3.sqlite_version printed 3.37.2) and on sandbox 3.45.1: result equals `expected`; the single fenced sql block in the answer is byte-identical to code.solution. Extras: adding customer 9 (Aviator only) -> EXCEPT returns 1,4,9 as expected; NOT EXISTS without DISTINCT returns (1,1,4) exactly as claimed; common-mistake 3 (product='Aviator' AND product<>'Wayfarer') excludes nobody - true by logic.",
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/lang_select.html",
+    "status": "supported",
+    "evidence": "'The EXCEPT operator returns the subset of rows returned by the left SELECT that are not also returned by the right-hand SELECT. Duplicate rows are removed from the results of INTERSECT and EXCEPT operators'."
+   }
+  ]
+ },
+ {
+  "id": "P3-SQL-03",
+  "verdict": "correct",
+  "reasons": [
+   "Query and result verified on 3.37.2/3.45.1; the NOT EXISTS/LEFT JOIN with = on phone does return ids 2,3,4 (run), and with IS it returns 3,4.",
+   "Minor wording problems: first-person 'I ran this' in a reference answer, a misleading UNION vs UNION ALL rationale (UNION returns identical rows here, verified), and a muddled common_mistake."
+  ],
+  "parts_answered": {
+   "query with side,id,email,phone ordered by id then side": true,
+   "row 2 not reported": true,
+   "why join on phone gets row 2 wrong": true,
+   "why EXCEPT does not": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "(I ran this: it returns ids 2, 3 and 4)",
+    "problem": "First-person claim in a reference answer; the exact anti-join is not shown. Verified true for an anti-join on id, email and phone with =.",
+    "replacement": "(on this data it returns ids 2, 3 and 4)"
+   },
+   {
+    "severity": "minor",
+    "claim": "Pick UNION ALL, not UNION, for stacking, so nothing is dropped.",
+    "problem": "Misleading: the side tag makes the two halves distinct, and replacing UNION ALL by UNION gives identical rows on this data (verified). UNION ALL is preferable only to skip needless dedup.",
+    "replacement": "Use UNION ALL for the stacking: the side tag already keeps the two halves distinct, so UNION would return the same rows here and only add a pointless duplicate-removal step."
+   },
+   {
+    "severity": "minor",
+    "claim": "Using UNION instead of UNION ALL and relying on EXCEPT for multiplicity, forgetting both are set-based and ignore duplicate counts.",
+    "problem": "Confused common_mistake (UNION vs UNION ALL is not what hides multiplicity differences).",
+    "replacement": "Assuming EXCEPT reports a row that appears a different number of times in each table; it is set-based and ignores duplicate counts."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Needs symmetric difference construction plus the NULL-vs-= explanation; short, no design trade-offs.",
+  "key_concepts_findings": "All 6 discussed. 'three-valued logic' is covered only implicitly (NULL = NULL is unknown) but adequate.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0031",
+   "same_intent": false,
+   "note": "g0031 is about NOT IN with NULLs; this one is NULL equality in set operators vs = for reconciliation. Related theme, intent differs."
+  },
+  "code_findings": "Run from scratch on real SQLite 3.37.2 (LD_LIBRARY_PATH lib, sqlite3.sqlite_version printed 3.37.2) and on sandbox 3.45.1: result equals `expected`; the single fenced sql block in the answer is byte-identical to code.solution. Extras on 3.37.2: duplicate row (6,'f@x.com','1') twice in crm and absent in billing -> reported once as crm_only; after adding one copy to billing -> not reported (confirms 'EXCEPT ignores multiplicity'). 'NULL IS NOT DISTINCT FROM NULL' is a syntax error on 3.37.2 (added in SQLite 3.39) - the answer only recommends IS for SQLite, which works on 3.37.2.",
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/lang_select.html",
+    "status": "supported",
+    "evidence": "'NULL values are considered equal to other NULL values and distinct from all non-NULL values'; EXCEPT definition quoted from the page."
+   }
+  ]
+ },
+ {
+  "id": "P3-SQL-04",
+  "verdict": "pass",
+  "reasons": [
+   "Query verified; plain self-join returns exactly 9 rows (1 x6, 4 x1, 5 x2); IN without DISTINCT returns 1,1,4,5,5; with DISTINCT 1,4,5 (all run).",
+   "Core retrieval (users active in two months via INTERSECT) overlaps the 'both' segment of existing smi-g0037; the join-fan-out comparison is the new part. Owner should accept that overlap knowingly."
+  ],
+  "parts_answered": {
+   "INTERSECT query": true,
+   "compare with self-join and IN versions": true,
+   "what plain join returns and why": true
+  },
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Set-intersection query plus explaining and counting join fan-out; mostly single-concept reasoning with a comparison.",
+  "key_concepts_findings": "All 6 present and discussed (half-open ranges covered).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0037",
+   "same_intent": false,
+   "note": "Overlap: smi-g0037's 'both' segment is the same INTERSECT of two monthly user lists. This record differs by asking for join/IN equivalents and join fan-out; flagged as high overlap."
+  },
+  "code_findings": "Run from scratch on real SQLite 3.37.2 (LD_LIBRARY_PATH lib, sqlite3.sqlite_version printed 3.37.2) and on sandbox 3.45.1: result equals `expected`; the single fenced sql block in the answer is byte-identical to code.solution. Extras: user 6 with '2024-10-31 23:59:59' and user 7 with '2024-09-30 23:59:59' + '2024-10-01 00:00:00' -> INTERSECT returns 1,4,5,7 (half-open ranges work on timestamps); BETWEEN '2024-10-01' AND '2024-10-31' misses 23:59:59 on the 31st (empty result for user 6) - confirms common mistake 3; empty table -> empty result.",
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/lang_select.html",
+    "status": "supported",
+    "evidence": "'The INTERSECT operator returns the intersection of the results of the left and right SELECTs... Duplicate rows are removed from the results of INTERSECT and EXCEPT'."
+   }
+  ]
+ },
+ {
+  "id": "P3-SQL-05",
+  "verdict": "correct",
+  "reasons": [
+   "Median query verified for odd/even counts, ties, NULL exclusion; without the filter Ops gives 55.0 as stated (run).",
+   "Question premise 'SQLite has no MEDIAN function' is true for standard builds but the sqlite3 shell since 3.47.0 and opt-in builds (3.51+) ship median(); hedge it."
+  ],
+  "parts_answered": {
+   "one query dept, median_salary ordered by dept": true,
+   "handling of odd and even counts": true,
+   "what goes wrong if NULL not excluded": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "SQLite has no MEDIAN function.",
+    "problem": "Over-absolute: per sqlite.org/changes.html, 3.47.0 added median()/percentile() to the CLI and 3.51.0 built the percentile extension into the amalgamation (opt-in at compile time). Not in default library builds, incl. 3.37.2.",
+    "replacement": "Standard SQLite builds (including the 3.37.2 library) have no built-in MEDIAN aggregate."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Window-function arithmetic for both parities plus NULL handling; one technique, moderately tricky index math.",
+  "key_concepts_findings": "All 7 discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0027",
+   "same_intent": false,
+   "note": "Same employees table, but g0027 is top-N salary levels with RANK/DENSE_RANK; this is median. Nearest by table only; smi-g0035 (second highest) also differs."
+  },
+  "code_findings": "Run from scratch on real SQLite 3.37.2 (LD_LIBRARY_PATH lib, sqlite3.sqlite_version printed 3.37.2) and on sandbox 3.45.1: result equals `expected`; the single fenced sql block in the answer is byte-identical to code.solution. Extras on 3.37.2: single-row dept (77) -> 77.0; two rows (10,20) -> 15.0; six rows 1..6 -> 3.5; negative salaries (-5,-7) -> -6.0; all-NULL dept disappears (as claimed); empty table -> no rows. AVG returns float (140.0) as claimed. No-filter variant gives Ops 55.0.",
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/windowfunctions.html",
+    "status": "supported",
+    "evidence": "'Window function support was first added to SQLite with release version 3.25.0'; 'row_number(): The number of the row within the current partition. Rows are numbered starting from 1 in the order defined by the ORDER BY clause'."
+   },
+   {
+    "url": "https://www.sqlite.org/lang_aggfunc.html",
+    "status": "supported",
+    "evidence": "'The result of avg() is always a floating point value whenever there is at least one non-NULL input' (used for the 140.0 remark; not the listed source but checked)."
+   }
+  ]
+ },
+ {
+  "id": "P3-SQL-06",
+  "verdict": "pass",
+  "reasons": [
+   "Result, rn/rnk values and cutoff_tie flag verified; RANK<=2 returns 4 Lenses and 3 Sunglasses rows, DENSE_RANK<=2 adds Retro in Frames (RANK 1,1,3 does not) - all run.",
+   "cutoff_tie condition rnk + n_same - 1 > 2 is correct (extra 3-way tie, 2-way tie at rank 1, single product tested).",
+   "Overlaps the conceptual core of smi-g0027 but adds aggregate-before-rank and tie-at-cutoff detection."
+  ],
+  "parts_answered": {
+   "aggregated product revenue": true,
+   "rn, rnk, cutoff_tie columns and order": true,
+   "explain each ranking function with ties": true,
+   "business consequence": true
+  },
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Aggregate first, three window functions, derive a tie-at-cutoff predicate, and weigh business trade-offs; multi-step.",
+  "key_concepts_findings": "All 7 discussed (DENSE_RANK in prose only, acceptable).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0027",
+   "same_intent": false,
+   "note": "Both ask how ROW_NUMBER/RANK/DENSE_RANK treat ties and which to choose; this one adds aggregation, exactly-two-slots rule and the cutoff_tie flag. High conceptual overlap, different task."
+  },
+  "code_findings": "Run from scratch on real SQLite 3.37.2 (LD_LIBRARY_PATH lib, sqlite3.sqlite_version printed 3.37.2) and on sandbox 3.45.1: result equals `expected`; the single fenced sql block in the answer is byte-identical to code.solution. Extras: category T with three products at 10 -> rn 1,2 both cutoff_tie=1; category Z (9,9,1) -> both fit, flag 0; single-product category -> flag 0; empty table -> no rows.",
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/windowfunctions.html",
+    "status": "supported",
+    "evidence": "'rank(): The row_number() of the first peer in each group - the rank of the current row with gaps'; 'dense_rank(): ... rank of the current row without gaps'."
+   }
+  ]
+ },
+ {
+  "id": "P3-SQL-07",
+  "verdict": "correct",
+  "reasons": [
+   "Sessionisation query verified (exact 1800 s stays; 31 min splits; midnight crossing; duplicate timestamps) and the julianday claim is true: for 960 of 1440 exact-30-minute gaps julianday*86400 > 1800 (e.g. 1800.0000134).",
+   "One overstated claim about duplicate-timestamp ordering and a questionable 'be explicit' recommendation; in SQLite both windows sort identically so results are right, but this is not guaranteed."
+  ],
+  "parts_answered": {
+   "user_id, session_id, session_start, session_end, n_events ordered": true,
+   "uses LAG and running SUM": true,
+   "why running SUM works": true,
+   "edge cases": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "duplicate timestamps give a zero gap, so their LAG order does not change the sessions.",
+    "problem": "Overstated. The tied rows' order inside LAG and inside the ROWS-frame SUM is not defined by ORDER BY event_ts; if the two windows ordered ties differently, the flagged tied row could land in the previous session. SQLite sorts identical windows the same way (my duplicate tests at session start were correct), but it is not guaranteed.",
+    "replacement": "duplicate timestamps give a zero gap, so they never start a session of their own; the order of tied rows is not defined by ORDER BY event_ts alone, so for a guaranteed-deterministic result add a unique tie-breaker such as rowid to both ORDER BY clauses."
+   },
+   {
+    "severity": "minor",
+    "claim": "the default RANGE frame would also work here but treats equal timestamps as peers, so be explicit.",
+    "problem": "The default RANGE frame is actually the order-insensitive choice for tied timestamps (all peers get the same running sum), so 'be explicit' with ROWS is only safe with a tie-breaker.",
+    "replacement": "the default RANGE frame would also work here and treats equal timestamps as peers (tied rows all get the same running sum); an explicit ROWS frame is the usual idiom but then needs a unique tie-breaker in the ORDER BY."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-step window pipeline (LAG, flag, cumulative sum, group) with boundary and tie subtleties.",
+  "key_concepts_findings": "All 7 discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0034",
+   "same_intent": false,
+   "note": "Same events table shape but g0034 is day-1 retention; sessionisation here. smi-g0030 (streaks via date-minus-row_number) is the same gaps-and-islands family but different rule."
+  },
+  "code_findings": "Run from scratch on real SQLite 3.37.2 (LD_LIBRARY_PATH lib, sqlite3.sqlite_version printed 3.37.2) and on sandbox 3.45.1: result equals `expected`; the single fenced sql block in the answer is byte-identical to code.solution. Extras on 3.37.2 and 3.45.1: user 4 (09:00, then three events at 10:00) -> sessions (1 event),(3 events) under both ROWS and default RANGE frames; user 5 with 09:30:00 then 09:30:01 after 09:00 -> one session of 3 (gap 1800 then 1 s; 09:00->09:30 = exactly 1800 stays); user 6 23:59:59 -> 00:29:59 (exactly 1800) stays, +00:30:01 splits; empty table -> no rows. strftime('%s') works on 3.37.2.",
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/windowfunctions.html",
+    "status": "supported",
+    "evidence": "'lag()... returns the result of evaluating expression expr against the previous row in the partition. Or, if there is no previous row... NULL'; default frame 'RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW ... current row and its peers'. strftime/julianday claims checked by running code, not by the page."
+   }
+  ]
+ },
+ {
+  "id": "P3-SQL-08",
+  "verdict": "correct",
+  "reasons": [
+   "Funnel numbers verified (7/4/3, 57.1, 75.0, 42.9; 10 view events; 4 purchase events incl. user 6).",
+   "Answer does not flag that using only the FIRST cart event vs first view can drop users who viewed then carted after an earlier pre-view cart; and one key concept ('COUNT DISTINCT users vs events') is not what the solution does."
+  ],
+  "parts_answered": {
+   "one row with viewed, carted, purchased, three pct columns (1 decimal)": true,
+   "counts users not events": true,
+   "order rules applied": true,
+   "design choices explained": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "and decide up front whether ties on timestamps count as ordered (here >= does).",
+    "problem": "Missing limitation: comparing the first cart with the first view is stricter than 'carted after viewing'. A user with cart 10:00, view 10:05, cart 10:10 is dropped from the cart step although a later cart follows a view (by the question's literal rule this is intended, but the answer should say so).",
+    "replacement": "and decide up front whether ties on timestamps count as ordered (here >= does). Also note the literal rule compares only each user's first cart with their first view, so a user with cart 10:00, view 10:05, cart 10:10 is not counted as carted; if that should count, use the earliest cart at or after the first view instead."
+   },
+   {
+    "severity": "minor",
+    "claim": "COUNT DISTINCT users vs events",
+    "problem": "Listed key concept, but the solution never uses COUNT DISTINCT; it counts users via GROUP BY user_id and COUNT(column).",
+    "replacement": "users vs events"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Conditional aggregation with order gating; several rules but each straightforward.",
+  "key_concepts_findings": "'COUNT DISTINCT users vs events' not discussed as such; others fine.",
+  "suggested_key_concepts": [
+   "conditional aggregation",
+   "funnel analysis",
+   "users vs events",
+   "COUNT(column) ignores NULL",
+   "step ordering",
+   "NULLIF division guard",
+   "conversion rate"
+  ],
+  "nearest_existing": {
+   "id": "smi-g0034",
+   "same_intent": false,
+   "note": "Different analysis (day-1 retention vs step funnel); both user-level conditional aggregation over an events table."
+  },
+  "code_findings": "Run from scratch on real SQLite 3.37.2 (LD_LIBRARY_PATH lib, sqlite3.sqlite_version printed 3.37.2) and on sandbox 3.45.1: result equals `expected`; the single fenced sql block in the answer is byte-identical to code.solution. Extras on 3.37.2: empty events -> one row (0,0,0,NULL,NULL,NULL); only views -> (7,0,0,0.0,NULL,0.0); simultaneous timestamps for view/cart/purchase count as ordered (>=); a user with purchase but no cart is dropped at purchase (NULL propagates); user with cart before first view dropped from cart and later steps.",
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/lang_aggfunc.html",
+    "status": "supported",
+    "evidence": "'The count(X) function returns a count of the number of times that X is not NULL in a group. The count(*) function... returns the total number of rows in the group.'"
+   }
+  ]
+ },
+ {
+  "id": "P3-SQL-09",
+  "verdict": "pass",
+  "reasons": [
+   "Result verified against expected on both versions; gap-year, zero-previous and first-year NULL rules all work; SQLite division by zero -> NULL claim true.",
+   "Extra cases (zero totals, negative revenue, all-zero year, duplicate region-year rows aggregated first) behave sensibly; no claim in the answer is wrong."
+  ],
+  "parts_answered": {
+   "share_pct per year": true,
+   "prev_revenue with NULL on first year and gap year": true,
+   "yoy_pct NULL when prev 0": true,
+   "ordered by year, region": true,
+   "explain traps": true
+  },
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "LAG + window total with a gap check and zero guard; several traps but one technique each.",
+  "key_concepts_findings": "All 7 discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0039",
+   "same_intent": false,
+   "note": "g0039 does MoM % with a generated month list and a zero guard; this one adds share-of-total and detects gaps with LAG(year). Overlap on the zero/gap theme only."
+  },
+  "code_findings": "Run from scratch on real SQLite 3.37.2 (LD_LIBRARY_PATH lib, sqlite3.sqlite_version printed 3.37.2) and on sandbox 3.45.1: result equals `expected`; the single fenced sql block in the answer is byte-identical to code.solution. Extras on 3.37.2: West 0,0,-50 -> yoy NULL (prev 0); N2 2022->2024 gap -> prev/yoy NULL; total of a year = 0 -> share NULL; duplicate region-year rows are summed first; empty table -> no rows. Negative base revenue would give a misleading sign of yoy_pct (not claimed).",
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/windowfunctions.html",
+    "status": "supported",
+    "evidence": "lag(): 'if there is no previous row (because the current row is the first), NULL'. Window functions in SELECT list used throughout page examples."
+   }
+  ]
+ },
+ {
+  "id": "P3-SQL-10",
+  "verdict": "correct",
+  "reasons": [
+   "ROW_NUMBER result verified; correlated form returns ids 5 and 6 for user 2; GROUP BY ... MAX returned id 5 on 3.37.2 and 3.45.1 (also with an index and reversed insert order), consistent with the documented arbitrary choice.",
+   "Minor: 'covering index' is imprecise, and the NULL behaviour of the GROUP BY form (asked in the question) is only implicit."
+  ],
+  "parts_answered": {
+   "ROW_NUMBER version": true,
+   "correlated subquery ties": true,
+   "correlated subquery NULL": true,
+   "GROUP BY MAX ties": true,
+   "GROUP BY MAX NULL": false
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "it needs a covering index on (user_id, updated_at) to avoid a scan per row",
+    "problem": "'Covering' is wrong here: the select list has other columns, so the index is a supporting, not covering, index.",
+    "replacement": "it benefits from an index on (user_id, updated_at) so each outer row does not scan all of that user's rows"
+   },
+   {
+    "severity": "minor",
+    "claim": "Do not use it where the tie matters or the code must be portable.",
+    "problem": "The question asks what each form does with the NULL; the GROUP BY form is not addressed. Verified: MAX ignores NULL (user 4 -> id 9); a user whose timestamps are all NULL returns an arbitrary row from GROUP BY, no row from the correlated form, and the highest id from ROW_NUMBER.",
+    "replacement": "Do not use it where the tie matters or the code must be portable. NULLs: MAX ignores them, so user 4 still gets id 9; a user whose timestamps are all NULL would get an arbitrary one of their rows from this form, no row at all from the correlated form (updated_at = NULL is never true), and the highest id from ROW_NUMBER."
+   },
+   {
+    "severity": "minor",
+    "claim": "users 2's rows 5 and 6",
+    "problem": "Typo in question.",
+    "replacement": "user 2's rows 5 and 6"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Latest-row-per-group with a three-way comparison of tie/NULL semantics; known pattern.",
+  "key_concepts_findings": "All 7 discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0028",
+   "same_intent": false,
+   "note": "g0028 keeps the earliest row per normalised email with DELETE; this keeps the latest per user with ROW_NUMBER and compares alternatives. Same 'one row per group' family, different intent."
+  },
+  "code_findings": "Run from scratch on real SQLite 3.37.2 (LD_LIBRARY_PATH lib, sqlite3.sqlite_version printed 3.37.2) and on sandbox 3.45.1: result equals `expected`; the single fenced sql block in the answer is byte-identical to code.solution. Extras on 3.37.2: user 5 with two NULL timestamps -> ROW_NUMBER returns id 11 (highest id), correlated returns nothing for user 5, GROUP BY returns id 11 arbitrary; user 6 tied (12,13) -> ROW_NUMBER 13, correlated both; empty table -> no rows. Subquery in FROM without an alias is accepted by SQLite but rejected by e.g. MySQL and PostgreSQL before 16 (not claimed).",
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/lang_select.html",
+    "status": "supported",
+    "evidence": "'If there is exactly one min() or max() aggregate in the query, then all bare columns... take values from an input row which also contains the minimum or maximum.' 'If the same minimum or maximum value occurs on two or more rows... The choice is arbitrary.' 'SQLite considers NULL values to be smaller than any other values for sorting purposes. Hence, NULLs naturally appear... at the end of a DESC order-by.'"
+   },
+   {
+    "url": "https://www.sqlite.org/lang_aggfunc.html",
+    "status": "supported",
+    "evidence": "'Aggregate max() returns NULL if and only if there are no non-NULL values in the group.'"
+   }
+  ]
+ }
+]

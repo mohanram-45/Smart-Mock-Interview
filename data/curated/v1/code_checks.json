@@ -1,0 +1,54 @@
+{
+ "smi-0063": {
+  "blocks": 0,
+  "code": "import numpy as np; a=np.array([[1,2],[3,4]]); b=np.array([[5,6],[7,8]]); assert (a*b==np.array([[5,12],[21,32]])).all()\n"
+ },
+ "smi-0447": {
+  "blocks": 1,
+  "code": "a = [1, 2, 3]\nb = a[::-1]          # new reversed list; a unchanged\nc = list(reversed(a)) # iterator -> new list; a unchanged\na.reverse()          # in place; returns None\n\na=[1,2,3]; b=a[::-1]; c=list(reversed(a)); r=a.reverse()\nassert b==[3,2,1] and c==[3,2,1] and a==[3,2,1] and r is None\n"
+ },
+ "smi-0448": {
+  "blocks": 1,
+  "code": "class Node:\n    def __init__(self, key):\n        self.key, self.left, self.right = key, None, None\n\nclass BST:\n    def __init__(self):\n        self.root = None\n\n    def insert(self, key):\n        if self.root is None:\n            self.root = Node(key)\n            return\n        cur = self.root\n        while True:\n            if key < cur.key:\n                if cur.left is None:\n                    cur.left = Node(key); return\n                cur = cur.left\n            elif key > cur.key:\n                if cur.right is None:\n                    cur.right = Node(key); return\n                cur = cur.right\n            else:\n                return  # ignore duplicates\n\n    def search(self, key):\n        cur = self.root\n        while cur:\n            if key == cur.key:\n                return True\n            cur = cur.left if key < cur.key else cur.right\n        return False\n\n    def inorder(self):\n        out, stack, cur = [], [], self.root\n        while stack or cur:\n            while cur:\n                stack.append(cur); cur = cur.left\n            cur = stack.pop(); out.append(cur.key); cur = cur.right\n        return out\n\nimport random\nt=BST()\nvals=random.sample(range(1000),200)\nfor v in vals: t.insert(v)\nassert t.inorder()==sorted(vals)\nassert all(t.search(v) for v in vals) and not t.search(-5)\nt.insert(vals[0]); assert t.inorder()==sorted(vals)\n"
+ },
+ "smi-0450": {
+  "blocks": 1,
+  "code": "def fizzbuzz(n):\n    out = []\n    for i in range(1, n + 1):\n        if i % 15 == 0:\n            out.append(\"FizzBuzz\")\n        elif i % 3 == 0:\n            out.append(\"Fizz\")\n        elif i % 5 == 0:\n            out.append(\"Buzz\")\n        else:\n            out.append(str(i))\n    return out\n\nr=fizzbuzz(15)\nassert r[2]==\"Fizz\" and r[4]==\"Buzz\" and r[14]==\"FizzBuzz\" and r[0]==\"1\" and len(r)==15\nassert fizzbuzz(0)==[]\n"
+ },
+ "smi-0451": {
+  "blocks": 1,
+  "code": "import heapq\n\ndef dijkstra(graph, source):\n    \"\"\"graph: {node: [(neighbour, weight), ...]} with non-negative weights.\"\"\"\n    dist = {node: float(\"inf\") for node in graph}\n    dist[source] = 0\n    heap = [(0, source)]\n    while heap:\n        d, u = heapq.heappop(heap)\n        if d > dist[u]:\n            continue  # stale entry\n        for v, w in graph[u]:\n            nd = d + w\n            if nd < dist[v]:\n                dist[v] = nd\n                heapq.heappush(heap, (nd, v))\n    return dist\n\ng={\"A\":[(\"B\",1),(\"C\",4)],\"B\":[(\"C\",2),(\"D\",5)],\"C\":[(\"D\",1)],\"D\":[],\"E\":[]}\nd=dijkstra(g,\"A\")\nassert d[\"A\"]==0 and d[\"B\"]==1 and d[\"C\"]==3 and d[\"D\"]==4 and d[\"E\"]==float(\"inf\")\n"
+ },
+ "smi-0452": {
+  "blocks": 1,
+  "code": "def quicksort(arr):\n    if len(arr) <= 1:\n        return arr\n    pivot = arr[len(arr) // 2]\n    left = [x for x in arr if x < pivot]\n    mid = [x for x in arr if x == pivot]\n    right = [x for x in arr if x > pivot]\n    return quicksort(left) + mid + quicksort(right)\n\nimport random\nfor _ in range(50):\n    a=[random.randint(-50,50) for _ in range(random.randint(0,60))]\n    assert quicksort(a)==sorted(a)\n"
+ },
+ "smi-0455": {
+  "blocks": 1,
+  "code": "class Singleton:\n    _instance = None\n\n    def __new__(cls, *args, **kwargs):\n        if cls._instance is None:\n            cls._instance = super().__new__(cls)\n        return cls._instance\n\na=Singleton(); b=Singleton()\nassert a is b\n"
+ },
+ "smi-0456": {
+  "blocks": 1,
+  "code": "class Animal:\n    def __init__(self, name):\n        self.name = name\n\n    def speak(self):\n        return f\"{self.name} makes a sound\"\n\nclass Dog(Animal):\n    def speak(self):               # method overriding\n        return f\"{self.name} barks\"\n\nclass Cat(Animal):\n    def __init__(self, name, indoor=True):\n        super().__init__(name)     # reuse parent initialiser\n        self.indoor = indoor\n\nassert Dog(\"Rex\").speak()==\"Rex barks\"\nassert Cat(\"Tom\").speak()==\"Tom makes a sound\" and Cat(\"Tom\").indoor is True\nassert isinstance(Dog(\"a\"),Animal) and issubclass(Cat,Animal)\n"
+ },
+ "smi-0460": {
+  "blocks": 1,
+  "code": "import matplotlib.pyplot as plt\n\nx = [1, 2, 3, 4, 5]\ny = [2, 4, 5, 4, 5]\nplt.scatter(x, y, c=\"tab:blue\", s=40, alpha=0.8, label=\"samples\")\nplt.xlabel(\"x\"); plt.ylabel(\"y\"); plt.title(\"Scatter plot\")\nplt.legend()\nplt.show()\n\nimport matplotlib\nmatplotlib.use(\"Agg\")\nimport matplotlib.pyplot as plt\nfig,ax=plt.subplots()\nsc=ax.scatter([1,2,3],[3,2,1],s=40)\nassert len(sc.get_offsets())==3\n"
+ },
+ "smi-0462": {
+  "blocks": 1,
+  "code": "import numpy as np\n\ndef fit_linear_regression(X, y):\n    \"\"\"Ordinary least squares via the normal equation; adds an intercept.\"\"\"\n    X = np.asarray(X, dtype=float).reshape(len(X), -1)\n    Xb = np.c_[np.ones(len(X)), X]\n    theta = np.linalg.pinv(Xb.T @ Xb) @ Xb.T @ np.asarray(y, dtype=float)\n    return theta  # theta[0] = intercept, theta[1:] = coefficients\n\ndef predict(theta, X):\n    X = np.asarray(X, dtype=float).reshape(len(X), -1)\n    return np.c_[np.ones(len(X)), X] @ theta\n\nrng=np.random.default_rng(0)\nX=rng.normal(size=(200,2)); y=3+2*X[:,0]-1.5*X[:,1]+rng.normal(scale=0.01,size=200)\nth=fit_linear_regression(X,y)\nassert np.allclose(th,[3,2,-1.5],atol=0.05)\nassert np.allclose(predict(th,X),y,atol=0.05)\n"
+ },
+ "smi-0465": {
+  "blocks": 1,
+  "code": "import unittest\n\ndef add(a, b):\n    return a + b\n\nclass TestAdd(unittest.TestCase):\n    def test_add_positive(self):\n        self.assertEqual(add(2, 3), 5)\n\n    def test_add_negative(self):\n        self.assertEqual(add(-1, 1), 0)\n\nif __name__ == \"__main__\":\n    unittest.main()\n\nimport unittest\nsuite=unittest.defaultTestLoader.loadTestsFromTestCase(TestAdd)\nres=unittest.TextTestRunner(verbosity=0).run(suite)\nassert res.wasSuccessful() and res.testsRun==2\n"
+ },
+ "smi-0466": {
+  "blocks": 1,
+  "code": "import asyncio\n\nasync def fetch(name, delay):\n    await asyncio.sleep(delay)        # stands in for an I/O call\n    return f\"{name} done\"\n\nasync def main():\n    results = await asyncio.gather(\n        fetch(\"a\", 1), fetch(\"b\", 1), fetch(\"c\", 1)\n    )\n    return results                    # takes about 1 second, not 3\n\n# asyncio.run(main())\n\nimport time\nt=time.time()\nr=asyncio.run(main())\ndt=time.time()-t\nassert r==[\"a done\",\"b done\",\"c done\"] and dt<2.0\n"
+ },
+ "smi-0467": {
+  "blocks": 1,
+  "code": "def fibonacci(limit):\n    a, b = 0, 1\n    while a < limit:\n        yield a\n        a, b = b, a + b\n\nimport types\ng=fibonacci(50)\nassert isinstance(g,types.GeneratorType)\nassert list(g)==[0,1,1,2,3,5,8,13,21,34]\n"
+ }
+}

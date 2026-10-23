@@ -1,0 +1,548 @@
+[
+ {
+  "plan_id": "B4-MLO-14-6",
+  "verdict": "correct",
+  "reasons": [
+   "Option A arithmetic (180,000 gross, +80,000 net; 90,000/-10,000 and 270,000/+170,000 at 25%/75%) is exact. Option B arithmetic verified: 24M x 0.02 x 6/52 = 55,385; x 3/365 = 3,945; saving 51,439; x3 = 154,318; net +34,318 yr1, +94,318 later; break-even 2.33 and 1.17 incidents. 'Recompute everything' after the last rounding edit: the rounded intermediate figures are mutually inconsistent (55,400-3,900=51,500 vs 51,400 vs 51,430) and 85,700 should be 85,800.",
+   "Major: the key ambiguity (2% as loss rate vs 2% of annual margin per incident) is resolved silently in favour of the reading that makes A look better, and no sensitivity is shown to it.",
+   "Recommendation sequencing (monitor first, then ship, use monitoring to read the A/B) is coherent with the numbers and the 'B enables A' argument; the 'later years' comparison for A ignores A's own upkeep/decay, which is covered by the 'if the gain persists' hedge.",
+   "Both sources open and support their sentences (see sources_findings). No contradiction with prior answers (smi-i0009, smi-l0043/44 agree on serving-feature logging and skew checks)."
+  ],
+  "parts_answered": {
+   "expected value of A": true,
+   "expected value of B": true,
+   "sensitivity to least-trusted assumptions": "partly (realisation factor and incident count yes; reading of the 2% no)",
+   "recommendation": true
+  },
+  "evidence": [
+   {
+    "claim": "A: 0.015*0.5*24M=180,000; net 80,000; 25% -> -10,000; 75% -> +170,000",
+    "method": "executed",
+    "evidence": "python arithmetic"
+   },
+   {
+    "claim": "B per-incident cost 55,385 vs 3,945, saving 51,439; 3 incidents 154,318; net 34,318 / 94,318; break-even 2.33 and 1.17",
+    "method": "executed",
+    "evidence": "python arithmetic"
+   },
+   {
+    "claim": "B net for 1/2/3/4 incidents: -68,561 / -17,121 / +34,318 / +85,758",
+    "method": "executed",
+    "evidence": "python arithmetic"
+   },
+   {
+    "claim": "Alternative reading saving 24M*0.02*(1-3/42)=445,714",
+    "method": "executed",
+    "evidence": "python arithmetic"
+   },
+   {
+    "claim": "external world rarely stable (Sculley section 7)",
+    "method": "paper",
+    "evidence": "fetched: 'Experience has shown that the external world is rarely stable.'"
+   },
+   {
+    "claim": "ML Test Score has 28 tests; Monitor 3 training/serving features compute the same values; Monitor 4 models not too stale; Monitor 7 prediction quality",
+    "method": "paper",
+    "evidence": "fetched text"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "detailed_answer",
+    "claim": "Saving per incident about 51,400 (assuming monitoring catches every incident within 3 days);",
+    "problem": "The whole B result (and so 'A has the higher expected net') rests on one reading of 'each costing about 2% of the model's margin until noticed': a loss RATE of 2% while the incident lasts. The other natural reading (2% of annual margin = 480,000 is the pre-detection cost of an incident) gives a saving of 24M x 0.02 x (1 - 3/42) = about 445,700 per incident, roughly 9x larger, and flips the ranking. The answer states its reading but never shows the sensitivity to it, although it is the assumption the data least pin down and the question asks for sensitivity to the least-trusted assumptions. Also 51,400 is inconsistent with the other rounded figures (55,400 - 3,900 = 51,500; unrounded 51,439).",
+    "replacement": "Saving per incident about 51,440 (assuming monitoring catches every incident within 3 days and reading the 2% as a loss rate while the incident lasts; if the 2% is instead the whole pre-detection cost of an incident, the saving is 24M x 0.02 x (1 - 3/42), about 445,700, and B wins by a wide margin, so confirm how the 2% was measured);"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "24M x 0.02 x 6/52 = 55,400",
+    "problem": "Rounded to 100 here but 55,400 - 3,900 = 51,500 does not give the stated saving; unrounded value is 55,385.",
+    "replacement": "24M x 0.02 x 6/52 = 55,385"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "24M x 0.02 x 3/365 = 3,900",
+    "problem": "Unrounded 3,945; with the 55,385 above gives 51,440 as the stated saving.",
+    "replacement": "24M x 0.02 x 3/365 = 3,945"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "(120,000 / 51,400)",
+    "problem": "Use the same saving figure as elsewhere (120,000/51,439 = 2.33).",
+    "replacement": "(120,000 / 51,440)"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "+85,700 for 1 to 4",
+    "problem": "4 incidents: 4 x 51,439 - 120,000 = 85,758, which rounds to 85,800 (85,700 is a truncation/mixed-rounding artefact; 1 incident -68,561 -> -68,600 is correct).",
+    "replacement": "+85,800 for 1 to 4"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "so the incident rate is unlikely to fall by itself.",
+    "problem": "Sculley et al. only say the external world is rarely stable; silent degradations also come from pipeline/feature bugs, so the paper supports a hedge, not a prediction about the incident rate.",
+    "replacement": "so the incident rate should not be assumed to fall by itself."
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "(saving about 51,430 each, year-1 cost 120,000)",
+    "problem": "Third different value for the same saving (51,400 in detailed, unrounded 51,439).",
+    "replacement": "(saving about 51,440 each, year-1 cost 120,000)"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "4 -> net +85,700",
+    "problem": "See detailed_answer: exact 85,758.",
+    "replacement": "4 -> net +85,800"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "(60,000 / 51,400)",
+    "problem": "Consistency with 51,440.",
+    "replacement": "(60,000 / 51,440)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Straightforward expected-value arithmetic with two sensitivities; the judgement is in interpreting ambiguous inputs and sequencing.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Full model and recommendation; identical to canonical_answer."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Adds 1 and 2 incident cases, later-year break-even and meeting questions; numbers repeat the detailed ones so must be kept in sync (they were not: 51,430 vs 51,400)."
+   },
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": false,
+    "note": "empty, consistent with answer_set detailed+practical"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All seven are discussed in the answer. OK.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0010",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "supported",
+    "evidence": "Section 7: 'Experience has shown that the external world is rarely stable.' Prediction Bias bullet also present. Supports the sentence, but not the inference about the incident rate (hedged above)."
+   },
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "28 tests in four groups of seven; Monitor 3 'Training and serving features compute the same values'; Monitor 4 'Models are not too stale'; Monitor 7 'Prediction quality has not regressed'. Supports the cited sentence."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'Variance is high' for new-model launches and 'past launches realised about half' are hypothetical inputs, labelled as such"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-08-1",
+  "verdict": "pass",
+  "reasons": [
+   "Re-ran solution+test on 3.13, 3.10, 3.11: identical outputs (0.232 shift PSI; 12.434 at eps=1e-6; 3.937 at eps=1e-2; null mean/sd 0.0894/0.0457 at 10 bins and 0.5049/0.1533 at 40 bins), matching the 12.4, 3.9, 0.089 (0.046), 0.50 (0.15) quoted in the answer. Independent 2,000-run check (different seed): 97.7% of 40-bin null PSIs above 0.25 and 100% above 0.1, consistent with '98%' and 'nearly every run'. Expected-null formula 9*(1/200+1/200)=0.09 and 39*0.01=0.39 correct.",
+   "Fenced code equals code.solution (checked by string equality); stdlib+numpy only; no 3.11+ features.",
+   "Degenerate-edge claims verified: 50/50 binary gives edges [0,0.5,1]; 5% ones gives edges [0,1] and falls back; constant reference registers a change.",
+   "Minor non-answer observations only: psi(..., n_bins=1) on a continuous reference hits the 'two-edge' fallback and returns a spurious ~0.24 for same-distribution samples; not claimed in the text."
+  ],
+  "parts_answered": {
+   "numpy-only implementation": true,
+   "quantile edges from reference": true,
+   "out-of-range counted": true,
+   "empty bin safety": true,
+   "why 200/200/40 bins is poor": true
+  },
+  "evidence": [
+   {
+    "claim": "null simulations 0.089/0.046 and 0.50/0.15",
+    "method": "executed",
+    "evidence": "identical on 3.10/3.11/3.13"
+   },
+   {
+    "claim": "98% of 40-bin null runs above 0.25",
+    "method": "executed",
+    "evidence": "2000 runs, seed 5: 97.7%"
+   },
+   {
+    "claim": "12.4 / 3.9 for all-5.0 current at eps 1e-6 / 1e-2",
+    "method": "executed",
+    "evidence": "12.4339, 3.9374"
+   },
+   {
+    "claim": "PSI cut-offs 0.1/0.25 are rules of thumb that ignore sample size and bin count",
+    "method": "paper",
+    "evidence": "arXiv 2303.01227 section 3.2 thresholds; cites Du Pisanie & Visagie: critical value decreases with sample size and increases with number of groups"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short numpy function; the edge-case handling and the noise-floor argument add depth but no multi-step design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Design choices and noise-floor explanation."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Code, test description and calibration recipe."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All seven discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0006",
+   "same_intent": false
+  },
+  "code_findings": "3.13/3.10/3.11 pass. Extra cases: imbalanced binary (95/5) same-sample 0.0, vs all ones 11.5; below-min / far-above-max values counted (8.28); integer reference; spike at zero; empty input raises ValueError; NaN in current ignored; 0.5 value into 50/50 binary ref gives 4.6 (middle bin). No failures except the n_bins=1 oddity noted.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/pdf/2303.01227",
+    "status": "supported",
+    "evidence": "Section 3.2 gives 0.1 / 0.25 bands (attributed to Lewis); cites that asymptotic critical values depend on both sample size and number of groups. The paper does not discuss quantile binning, but the attached sentence does not claim it."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Quantile-bin and np.unique behaviour are mechanism, covered by executed code"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-08-8",
+  "verdict": "correct",
+  "reasons": [
+   "All arithmetic recomputed: weekly mean (5+2*1.25)/7 = 1.0714 (+7.1%); weekend day 1.25/1.0714 = +16.7% over the pool, weekday -6.7%; mean age of C pool 4 days -> 0.20 sd; D mean age 17.5 days -> 0.875 sd; A after 60 days 3.0 sd; B needs n >= 2*(3/0.05)^2 = 7,200 rows/day for 3 SE of a day-over-day difference; 0.05 sd < 0.25*mean iff sd < 5*mean. All correct.",
+   "No sources are cited; the claims are arithmetic and standard practice, no paper results or defaults are asserted.",
+   "Question type 'evaluation' is acceptable; 'recommend a setup' has several acceptable answers, so a rubric would be useful but is not required.",
+   "No contradiction with smi-i0006 (fixed reference window plus alert thresholds from historical variation) or smi-l0013 (compare with concurrent control, not last week); this answer's fixed-plus-rolling pair is compatible."
+  ],
+  "parts_answered": {
+   "A": true,
+   "B": true,
+   "C": true,
+   "D": true,
+   "false alarms": true,
+   "slow creep": true,
+   "recommendation": true
+  },
+  "evidence": [
+   {
+    "claim": "+7.1% weekly mean, +16.7% weekend, -6.7% weekday vs pool",
+    "method": "derivation",
+    "evidence": "(5*1+2*1.25)/7=1.0714"
+   },
+   {
+    "claim": "ages 4 and 17.5 days -> 0.2 and 0.875 sd",
+    "method": "derivation",
+    "evidence": "(1..7)/7=4; (7+14+21+28)/4=17.5"
+   },
+   {
+    "claim": "7,200 rows/day for 3 SE",
+    "method": "derivation",
+    "evidence": "0.05 = 3*sqrt(2/n) -> n=7200"
+   },
+   {
+    "claim": "0.05 sd below weekly swing unless sd > 5x mean",
+    "method": "derivation",
+    "evidence": "0.05 sd < 0.25 mean"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "That is a constant small offset, easy to miss, and it does not accumulate.",
+    "problem": "'Easy to miss' is not general: 0.2 sd is a z-score above 10 at the 7,200 rows/day the answer itself uses for B, so a sensitive test would flag it every day; it is missed only when seasonal swings (weekend about 17% above the pool) and tolerance are of similar size. Also the offset persists, so it can be mistaken for a stable level difference.",
+    "replacement": "That is a constant small offset, easy to miss when seasonal swings and alert tolerances are of similar size, and it does not accumulate."
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "so its noise floor is higher and holidays contaminate it.",
+    "problem": "'Higher' is ambiguous: higher than C's 7-day pool (4 days of rows vs 7), but lower than B's single day.",
+    "replacement": "so its noise floor is higher than C's 7-day pool (4 days of rows instead of 7) and holidays contaminate it."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Four options compared on two criteria with quantitative lag/seasonality reasoning and a composite recommendation; multi-step but no implementation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Fixed training reference for 'distance from what the model learned' and slow-creep detection",
+    "tradeoff": "Catches creep (3 sd after 60 days) but is permanently red once shifted and gives no onset time"
+   },
+   {
+    "decision": "Seasonal-aware rolling reference (same weekday x 4 weeks, or pooled week with weekday adjustment)",
+    "tradeoff": "Removes weekend false alarms; 17.5-day lag makes creep visible but 4-day samples are noisy and holidays contaminate"
+   },
+   {
+    "decision": "Avoid yesterday as reference",
+    "tradeoff": "Weekly cycle causes recurring false alarms and 0.05 sd/day is below both the swing and daily noise unless volume is large"
+   },
+   {
+    "decision": "Alert thresholds from historical variability and a staleness limit triggering retrain review",
+    "tradeoff": "Fewer constant-threshold false alarms vs need for history"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single-field answer; no variants (consistent with answer_set single)"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All seven are discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0006",
+   "same_intent": false
+  },
+  "code_findings": "No code.",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-10-1",
+  "verdict": "correct",
+  "reasons": [
+   "Code re-run on 3.13, 3.10, 3.11: identical results (rates 0/0/0; flipped sign 1.0 on directional only; leaky postcode 0.524 on postcode invariance only), matching '100% of 500 rows' and '52.4%'. Fenced code equals code.solution.",
+   "Defect found: in-place perturb functions silently defeat invariance_failures and mutate the caller's matrix (see issue); patched with .copy() and re-run on all three interpreters with an added assertion.",
+   "Other edge cases: direction=-1, list-of-lists input is converted and works, integer matrix with fractional step handled, (n,1) predict output handled, empty X raises ZeroDivisionError, missing max_fail_rate key raises KeyError. None contradict the prose.",
+   "CheckList (INV/DIR/MFT) and XGBoost monotone_constraints sources open and support the sentences. smi-l0010 states directional 'should not decrease' tests without the tree-ensemble caveat; this record is the more careful one and not in contradiction (l0010 does not require zero failures)."
+  ],
+  "parts_answered": {
+   "invariance_failures": true,
+   "directional_failures": true,
+   "behavioural_report": true,
+   "how to set tolerances": true,
+   "why strict monotonicity may fail for tree ensembles": true
+  },
+  "evidence": [
+   {
+    "claim": "postcode leak fails 52.4% rows; sign flip 100% of 500",
+    "method": "executed",
+    "evidence": "3 interpreters identical"
+   },
+   {
+    "claim": "in-place perturb silently passes and mutates X",
+    "method": "executed",
+    "evidence": "0 failures of 50 and X changed"
+   },
+   {
+    "claim": "CheckList defines MFT/INV/DIR",
+    "method": "paper",
+    "evidence": "fetched definitions"
+   },
+   {
+    "claim": "XGBoost supports monotone_constraints",
+    "method": "doc",
+    "evidence": "fetched docs page"
+   },
+   {
+    "claim": "Unconstrained ensembles can dip locally",
+    "method": "background_only",
+    "evidence": "hedged in text as 'often'"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "code.solution",
+    "claim": "X2[:, col] = perturb(X[:, col])",
+    "problem": "perturb receives a live view of X[:, col]. A perturb function that works in place (c *= -1; return c) mutates the caller's evaluation matrix, then X2 and X are identical and the check silently passes with 0 failures (reproduced: 50 rows, 0 failures, X mutated). This contradicts the answer's own 'never mutate the evaluation set in place' and 'a test that can never fail' warnings.",
+    "replacement": "X2[:, col] = perturb(X[:, col].copy())"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "X2[:, col] = perturb(X[:, col])",
+    "problem": "Same change so the fenced code equals code.solution.",
+    "replacement": "X2[:, col] = perturb(X[:, col].copy())"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "then fix tol before looking at the candidate; the allowed failure rate is usually at or near zero.",
+    "problem": "'Usually at or near zero' for invariance is a recommendation, not a universal; also repeated later ('fix thresholds before looking at the candidate's results').",
+    "replacement": "then fix tol before looking at the candidate; for invariance checks the allowed failure rate is typically set at or near zero."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Three short numpy functions plus judgement on tolerances; the subtlety (dtype cast, NaN) is edge handling, not design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Concepts, tolerance policy, tree-ensemble caveat."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Code, executed-test summary and wiring; no paraphrase of detailed."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "All seven discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0010",
+   "same_intent": false
+  },
+  "code_findings": "Original passes on 3.13/3.10/3.11. Extra: in-place perturb -> silent pass (bug); direction=-1 -> 50/50 fail on increasing score; integer matrix step 0.5 -> correct; NaN scores counted as failures; empty X ZeroDivisionError (minor). Patched version (X[:, col].copy()) plus an extra assertion passes on all three.",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/pdf/2005.04118",
+    "status": "supported",
+    "evidence": "MFT: 'A collection of simple examples (and labels) to check a behavior within a capability.' INV: 'we apply label-preserving perturbations to inputs and expect the model prediction to remain the same.' DIR: 'similar, except that the label is expected to change in a certain way.'"
+   },
+   {
+    "url": "https://xgboost.readthedocs.io/en/stable/tutorials/monotonic.html",
+    "status": "supported",
+    "evidence": "Monotonic constraints make features bear a monotonic relationship to the predicted response; enabled via a single monotone_constraints parameter."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'unconstrained tree ensemble ... can dip locally' (hedged background)"
+  ],
+  "code_patch": {
+   "solution": "import numpy as np\n\n\ndef _as_float(X):\n    \"\"\"Float matrix (integer input is cast so a fractional step is not truncated; float32 stays float32).\"\"\"\n    X = np.asarray(X)\n    return X if X.dtype.kind == \"f\" else X.astype(float)\n\n\ndef invariance_failures(predict, X, col, perturb, tol=0.01):\n    \"\"\"Row indices where changing column `col` with perturb() moves the score by more than tol (a NaN score counts as a failure).\"\"\"\n    X = _as_float(X)\n    X2 = X.copy()\n    X2[:, col] = perturb(X[:, col].copy())\n    return np.flatnonzero(~(np.abs(predict(X2) - predict(X)) <= tol))\n\n\ndef directional_failures(predict, X, col, step, direction=1, tol=1e-9):\n    \"\"\"Row indices where adding `step` to column `col` moves the score against `direction` (+1 or -1); NaN scores count as failures.\"\"\"\n    X = _as_float(X)\n    X2 = X.copy()\n    X2[:, col] = X[:, col] + step\n    delta = (predict(X2) - predict(X)) * direction\n    return np.flatnonzero(~(delta >= -tol))\n\n\ndef behavioural_report(predict, X, checks, max_fail_rate):\n    \"\"\"checks: name -> function(predict, X) returning failing row indices. Returns (passed, rates).\"\"\"\n    rates = {name: len(fn(predict, X)) / len(X) for name, fn in checks.items()}\n    passed = all(rates[name] <= max_fail_rate[name] for name in checks)\n    return passed, rates",
+   "test": "def _make_model(leak_weight):\n    w = np.array([0.9, 1.1, 0.0, leak_weight])  # missed_payments, utilisation, customer_hash, postcode_hash\n    def predict(X):\n        return 1.0 / (1.0 + np.exp(-(X @ w - 0.2)))\n    return predict\n\n\nrng = np.random.default_rng(7)\nX = np.column_stack([\n    rng.integers(0, 6, 500).astype(float),   # missed_payments (col 0)\n    rng.uniform(0, 1, 500),                  # utilisation (col 1)\n    rng.uniform(0, 1, 500),                  # customer_hash (col 2)\n    rng.uniform(0, 1, 500),                  # postcode_hash (col 3)\n])\nchecks = {\n    \"hash_invariance\": lambda p, A: invariance_failures(p, A, 2, lambda c: 1.0 - c, tol=0.01),\n    \"postcode_invariance\": lambda p, A: invariance_failures(p, A, 3, lambda c: 1.0 - c, tol=0.01),\n    \"more_missed_not_safer\": lambda p, A: directional_failures(p, A, 0, 1.0, direction=+1),\n}\nlimits = {\"hash_invariance\": 0.0, \"postcode_invariance\": 0.0, \"more_missed_not_safer\": 0.0}\n\nok, rates = behavioural_report(_make_model(0.0), X, checks, limits)\nassert ok and all(v == 0.0 for v in rates.values()), rates\n# the missed-payments weight has the wrong sign here, so the directional check must trip\nw_bad = np.array([-0.9, 1.1, 0.0, 0.0])\nbad = lambda A: 1.0 / (1.0 + np.exp(-(A @ w_bad)))\nbad_ok, bad_rates = behavioural_report(bad, X, checks, limits)\nassert not bad_ok and bad_rates[\"more_missed_not_safer\"] == 1.0, bad_rates\n# a model that leaks the postcode feature trips only the postcode invariance check\nleaky_ok, leaky_rates = behavioural_report(_make_model(0.8), X, checks, limits)\nassert not leaky_ok\nassert leaky_rates[\"postcode_invariance\"] > 0.5 and leaky_rates[\"hash_invariance\"] == 0.0\n# integer-typed feature matrices must not silently truncate the perturbation\nXi = np.column_stack([np.arange(6), np.arange(6)])\nassert len(directional_failures(lambda A: A @ np.array([-1.0, 0.0]), Xi, 0, 0.5, direction=+1)) == 6\nassert len(invariance_failures(lambda A: A @ np.array([1.0, 0.0]), Xi, 0, lambda c: c + 0.5, tol=0.1)) == 6\n# float32 input stays float32 (no cast noise), and NaN scores are failures rather than silent passes\nXf = np.random.default_rng(0).uniform(size=(100, 2)).astype(np.float32)\nf32 = lambda A: A @ np.array([0.5, 0.0], dtype=A.dtype)\nassert len(directional_failures(f32, Xf, 0, 0.0)) == 0\nnan_model = lambda A: np.where(A[:, 0] > 0.5, np.nan, A[:, 0])\nn_nan = int((Xf[:, 0] > 0.5).sum())\nassert n_nan > 0 and len(invariance_failures(nan_model, Xf, 1, lambda c: 1 - c)) == n_nan\nassert len(directional_failures(nan_model, Xf, 1, 1.0)) == n_nan\n# a perturb function that mutates its argument in place must not corrupt X or hide the failure\nXm = np.random.default_rng(3).uniform(0.1, 1.0, size=(50, 3))\nXm0 = Xm.copy()\ndef _flip_inplace(c):\n    c *= -1\n    return c\nassert len(invariance_failures(lambda A: A[:, 0], Xm, 0, _flip_inplace, tol=0.01)) == 50\nassert np.array_equal(Xm, Xm0)\nprint(rates, bad_rates, leaky_rates)"
+  }
+ },
+ {
+  "plan_id": "B4-MLO-11-1",
+  "verdict": "correct",
+  "reasons": [
+   "Code re-run on 3.13/3.10/3.11 ('ok'); fenced code equals code.solution; stdlib only. Extra cases: padded/whitespace digest accepted after strip; 'sha256:' prefix, empty or short digest -> ValueError; non-ASCII digest -> TypeError and None -> AttributeError (still fail closed); empty file hashes to e3b0c442...; missing file -> FileNotFoundError.",
+   "Pickle doc quotes verified (never unpickle data from untrusted source or that could have been tampered with; consider signing with hmac). pip hash-checking mode verified: hashes required for all requirements and transitive dependencies, pinned with ==.",
+   "No config blocks. No contradiction with smi-l0017 (registry-promoted explicit version, digest recorded where writers cannot edit, non-code-executing format) or smi-l0020 (base image by digest, lock files with hashes); the record is consistent and broader. Not a duplicate of smi-l0017 (compatibility plus loading path) though it overlaps in the integrity control.",
+   "Rubric: the 'reviewer fatigue' trade-off and 'alerts on alias moves' are not discussed in the answer (alerts fixed via replacement; fatigue is a rubric-only trade-off, harmless).",
+   "Central weakness is item 1 overclaiming protection (see issue); mitigated by item 2 and 'Residual risk'."
+  ],
+  "parts_answered": {
+   "identities and permissions": true,
+   "artifact integrity": true,
+   "dependency and image hygiene": true,
+   "approval flow": true,
+   "what each control protects/does not": true,
+   "without blocking experimentation": true
+  },
+  "evidence": [
+   {
+    "claim": "verify_artifact accepts uppercase digest, rejects one appended byte",
+    "method": "executed",
+    "evidence": "test prints ok on 3 interpreters"
+   },
+   {
+    "claim": "pickle can execute arbitrary code; never unpickle untrusted/tampered data; hmac signing suggested",
+    "method": "doc",
+    "evidence": "docs.python.org pickle warning box"
+   },
+   {
+    "claim": "pip hash-checking mode requires hashes for all requirements incl. transitive",
+    "method": "doc",
+    "evidence": "pip secure-installs page"
+   },
+   {
+    "claim": "typosquatting/mirror, base-image digest, sandbox loader",
+    "method": "background_only",
+    "evidence": "listed in unverified_claims_listed"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Protects against: a stolen notebook token reaching production. Does not protect against: an insider who holds the promotion role.",
+    "problem": "Overstated as worded: if the stolen identity can also launch pipeline jobs, the pipeline identity will register whatever that code produces (including a pickle with a payload), so the token can still get a malicious artifact to the approval step. Production is then protected only by the approval and the integrity/loader controls, which the answer covers only generically. Also experiment-namespace artifacts remain a lateral-movement path between notebooks.",
+    "replacement": "Protects against: a stolen notebook token writing to the production bucket path or moving the alias directly. If that identity can also launch pipeline jobs, it can still get a malicious artifact registered, so the approval step and the loader hardening below carry that case; artifacts in the experiment namespace stay untrusted. Does not protect against: an insider who holds the promotion role."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Immutable log of who registered, approved and moved each alias, linked to run, code commit and data version.",
+    "problem": "The rubric point (and a useful control) is alerting on production-alias moves; the answer's audit item describes only a passive log.",
+    "replacement": "Immutable log of who registered, approved and moved each alias, linked to run, code commit and data version, with an alert on every production-alias move."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-control design with threat modelling and per-control limits, not a single recall item.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Controls and limits."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Working digest check and start-up procedure; not duplicated in detailed."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "Eight concepts, all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0017",
+   "same_intent": false
+  },
+  "code_findings": "Passes on all three interpreters; edge cases as in reasons. Non-ASCII/None expected digest raise TypeError/AttributeError rather than ValueError; still aborts start-up, so not worth a patch.",
+  "sources_findings": [
+   {
+    "url": "https://docs.python.org/3/library/pickle.html",
+    "status": "supported",
+    "evidence": "'It is possible to construct malicious pickle data which will execute arbitrary code during unpickling. Never unpickle data that could have come from an untrusted source, or that could have been tampered with. Consider signing data with hmac'"
+   },
+   {
+    "url": "https://pip.pypa.io/en/stable/topics/secure-installs/",
+    "status": "supported",
+    "evidence": "'Hashes are required for all requirements.' 'Hashes are required for all dependencies.' Requirements must be pinned (== or URL/path)."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "typosquatting protection from an internal mirror; sandboxing the loader (no egress, read-only fs, non-root); base image rebuild cadence (background practice, listed as such)"
+  ],
+  "code_patch": null
+ }
+]

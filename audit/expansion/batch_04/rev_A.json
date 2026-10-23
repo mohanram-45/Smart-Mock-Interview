@@ -1,0 +1,1185 @@
+[
+ {
+  "plan_id": "B4-MLO-08-1",
+  "verdict": "correct",
+  "reasons": [
+   "Central claims and all numbers reproduce; but the reference implementation silently returns 0.0 for constant/binary references (major) and mishandles NaN/empty input. Fixed by code_patch."
+  ],
+  "parts_answered": {
+   "implement psi with numpy, quantile edges from reference": true,
+   "out-of-range current counted": "True except constant/binary reference (bug)",
+   "empty bins no log(0)/div0": true,
+   "explain why 200/200/40-bin PSI is poor with no change": true
+  },
+  "evidence": [
+   {
+    "claim": "Code passes its own test on 3.10, 3.11, 3.13 (psi shifted 0.232, v_small 12.43, v_big 3.94, null10 mean 0.0894 sd 0.0457, null40 mean 0.505 sd 0.153)",
+    "method": "executed",
+    "evidence": "ran on v310, v311, dep(3.13): identical output"
+   },
+   {
+    "claim": "PSI ~ sum (q-p)^2/p so null expectation (B-1)(1/n+1/m): B=10,n=m=200 -> 0.09; B=40 -> 0.39",
+    "method": "derivation",
+    "evidence": "sim mean 0.089 for B=10 matches; B=40 sim 0.50 exceeds 0.39 (approximation breaks at ~5 rows per bin, as the answer says)"
+   },
+   {
+    "claim": "all-5.0 current vs N(0,1) reference: eps=1e-6 -> 12.4, eps=1e-2 -> 3.9",
+    "method": "derivation",
+    "evidence": "9 empty bins x 0.1 x ln(0.1/eps) + 0.9 ln 10 = 12.4 (eps 1e-6); executed output 12.43"
+   },
+   {
+    "claim": "Constant / binary reference returns 0.0",
+    "method": "executed",
+    "evidence": "psi(zeros,full 9.0)=0.0, psi(binary,ones)=0.0 on all interpreters; patched version gives >5 and >1 and passes extended test on all three"
+   },
+   {
+    "claim": "0.1/0.25 cut-offs are rules of thumb and PSI critical values depend on n and bins",
+    "method": "paper",
+    "evidence": "arXiv 2303.01227 sec 3.2"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "code.solution",
+    "claim": "    ref = np.asarray(reference, dtype=float)\n    cur = np.asarray(current, dtype=float)\n    edges = np.unique(np.quantile(ref, np.linspace(0.0, 1.0, n_bins + 1)))\n    inner = edges[1:-1]\n    if inner.size == 0:\n        return 0.0\n",
+    "problem": "psi() returns 0.0 whenever the reference has fewer than three distinct quantile edges (constant feature, binary 0/1 feature): `inner` is empty so `return 0.0`. Reproduced on 3.10/3.11/3.13: psi(zeros(100), full(100, 9.0)) == 0.0 and psi(binary 50/50, all ones) == 0.0. The question requires current values outside the reference range to be counted; for a constant or binary reference they are silently ignored, i.e. the monitor reports 'no drift' for the most extreme possible shift. NaN in the reference also returns 0.0 and NaN in current is silently counted in the top bin; an empty current gives nan.",
+    "replacement": "    ref = np.asarray(reference, dtype=float)\n    cur = np.asarray(current, dtype=float)\n    ref = ref[np.isfinite(ref)]\n    cur = cur[np.isfinite(cur)]\n    if ref.size == 0 or cur.size == 0:\n        raise ValueError(\"reference and current need at least one finite value\")\n    edges = np.unique(np.quantile(ref, np.linspace(0.0, 1.0, n_bins + 1)))\n    inner = edges[1:-1]\n    if inner.size == 0:\n        # constant or two-valued reference: give each value its own bin plus\n        # an open bin on each side, so any change is still visible\n        inner = np.unique(np.concatenate([edges, np.nextafter(edges, np.inf)]))\n"
+   },
+   {
+    "severity": "minor",
+    "field": "code.solution",
+    "claim": "    Out-of-range current values fall into the first/last bin. Bin\n    proportions are floored at `eps` so an empty bin gives a large but\n    finite term instead of log(0).\n",
+    "problem": "Docstring must state the new NaN and degenerate-reference behaviour.",
+    "replacement": "    Out-of-range current values fall into the first/last bin. Bin\n    proportions are floored at `eps` so an empty bin gives a large but\n    finite term instead of log(0). NaN/inf are ignored (monitor the null\n    rate separately); a constant or two-valued reference gets one bin per value.\n"
+   },
+   {
+    "severity": "major",
+    "field": "practical_answer",
+    "claim": "    ref = np.asarray(reference, dtype=float)\n    cur = np.asarray(current, dtype=float)\n    edges = np.unique(np.quantile(ref, np.linspace(0.0, 1.0, n_bins + 1)))\n    inner = edges[1:-1]\n    if inner.size == 0:\n        return 0.0\n",
+    "problem": "Fenced code must equal the tested solution; same defect as code.solution.",
+    "replacement": "    ref = np.asarray(reference, dtype=float)\n    cur = np.asarray(current, dtype=float)\n    ref = ref[np.isfinite(ref)]\n    cur = cur[np.isfinite(cur)]\n    if ref.size == 0 or cur.size == 0:\n        raise ValueError(\"reference and current need at least one finite value\")\n    edges = np.unique(np.quantile(ref, np.linspace(0.0, 1.0, n_bins + 1)))\n    inner = edges[1:-1]\n    if inner.size == 0:\n        # constant or two-valued reference: give each value its own bin plus\n        # an open bin on each side, so any change is still visible\n        inner = np.unique(np.concatenate([edges, np.nextafter(edges, np.inf)]))\n"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "    Out-of-range current values fall into the first/last bin. Bin\n    proportions are floored at `eps` so an empty bin gives a large but\n    finite term instead of log(0).\n",
+    "problem": "Keep fenced docstring identical to code.solution.",
+    "replacement": "    Out-of-range current values fall into the first/last bin. Bin\n    proportions are floored at `eps` so an empty bin gives a large but\n    finite term instead of log(0). NaN/inf are ignored (monitor the null\n    rate separately); a constant or two-valued reference gets one bin per value.\n"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "Suggested checks, all asserted in the recorded test: PSI of a sample against itself is exactly 0;",
+    "problem": "The new degenerate-reference and NaN assertions should be listed.",
+    "replacement": "Suggested checks, all asserted in the recorded test: a constant or binary reference still registers a shift (constant reference against 9.0 gives more than 5, binary 50/50 against all ones more than 1) and NaNs are ignored; PSI of a sample against itself is exactly 0;"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "simply ends up with fewer bins.",
+    "problem": "Omits that when only one or two distinct edges survive the interior edges vanish; without a fallback the function cannot see any change.",
+    "replacement": "simply ends up with fewer bins. If only one or two distinct edges survive (a constant or binary feature) there are no interior edges, so the code falls back to one bin per distinct value plus open bins on both sides; otherwise any change would score 0."
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "split a known-stable period into two random halves 100 times, compute PSI on each pair at your production window size and bin count",
+    "problem": "Random halves of a stable period remove autocorrelation, seasonality and batch effects, so the null PSI is underestimated; also 'halves' and 'production window size' conflict.",
+    "replacement": "draw 100 pairs of non-overlapping windows of your production window size from a known-stable period (on the real time axis, so autocorrelation and weekly effects are included), compute PSI on each pair at your production bin count"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Non-trivial numpy implementation plus a quantitative argument about the PSI null distribution.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Design rationale, eps artefact, null-PSI derivation and simulation."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Code + checks + operational calibration recipe; not duplicated in detailed."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "All 7 are discussed. 'reference sample' is generic but acceptable.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0045",
+   "same_intent": false
+  },
+  "code_findings": "Original: runs on 3.10/3.11/3.13 identically, stdlib+numpy only, no 3.11+ features. Edge cases I added: constant ref (BUG: 0.0), binary ref (BUG: 0.0), 50% spike ref vs lower spike (0.62, fine), current below min / above max (8.28, counted), NaN in current (silently top bin, 0.0197), NaN in reference (0.0), empty current (nan + RuntimeWarning), n_bins=1 (0.0, mathematically correct), integer arrays (fine). Patched version: degenerate refs handled via nextafter bins, NaN/inf dropped, empty -> ValueError; original test plus 5 new asserts passes on all three interpreters; non-degenerate outputs unchanged.",
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "A critical review of existing and new population stability testing procedures in credit risk scoring",
+    "url": "https://arxiv.org/pdf/2303.01227",
+    "supports": "PSI rule-of-thumb cut-offs (0.1, 0.25) and that PSI critical values depend on sample size and number of bins",
+    "quote": "the critical value of the PSI decreases with sample size and increases with the number of groups",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [
+   "Simulated null PSI means/SDs (executed, reproducible)",
+   "'Commonly quoted' 0.1/0.25 cut-offs now covered by added source"
+  ],
+  "code_patch": {
+   "solution": "import numpy as np\n\n\ndef psi(reference, current, n_bins=10, eps=1e-4):\n    \"\"\"Population Stability Index with quantile bins fixed from `reference`.\n\n    Out-of-range current values fall into the first/last bin. Bin\n    proportions are floored at `eps` so an empty bin gives a large but\n    finite term instead of log(0). NaN/inf are ignored (monitor the null\n    rate separately); a constant or two-valued reference gets one bin per value.\n    \"\"\"\n    ref = np.asarray(reference, dtype=float)\n    cur = np.asarray(current, dtype=float)\n    ref = ref[np.isfinite(ref)]\n    cur = cur[np.isfinite(cur)]\n    if ref.size == 0 or cur.size == 0:\n        raise ValueError(\"reference and current need at least one finite value\")\n    edges = np.unique(np.quantile(ref, np.linspace(0.0, 1.0, n_bins + 1)))\n    inner = edges[1:-1]\n    if inner.size == 0:\n        # constant or two-valued reference: give each value its own bin plus\n        # an open bin on each side, so any change is still visible\n        inner = np.unique(np.concatenate([edges, np.nextafter(edges, np.inf)]))\n    ref_idx = np.searchsorted(inner, ref, side=\"right\")\n    cur_idx = np.searchsorted(inner, cur, side=\"right\")\n    k = inner.size + 1\n    p = np.bincount(ref_idx, minlength=k) / ref.size\n    q = np.bincount(cur_idx, minlength=k) / cur.size\n    p = np.maximum(p, eps)\n    q = np.maximum(q, eps)\n    return float(np.sum((q - p) * np.log(q / p)))",
+   "test": "rng = np.random.default_rng(0)\nref_big = rng.normal(0, 1, 20000)\nsame = rng.normal(0, 1, 20000)\nassert psi(ref_big, same) < 0.01\nassert psi(ref_big, ref_big) == 0.0\nshifted = rng.normal(0.5, 1, 20000)\nassert 0.15 < psi(ref_big, shifted) < 0.35\n# empty bin: all current values above the reference's 90th percentile region\ncur = np.full(1000, 5.0)\nv_small = psi(ref_big, cur, eps=1e-6)\nv_big = psi(ref_big, cur, eps=1e-2)\nassert v_small > v_big > 0\n# degenerate references: constant and binary features must still register a change\nassert psi(np.zeros(100), np.zeros(100)) == 0.0\nassert psi(np.zeros(100), np.full(100, 9.0)) > 5\nbinary = np.r_[np.zeros(50), np.ones(50)]\nassert psi(binary, binary) == 0.0\nassert psi(binary, np.ones(100)) > 1\n# NaNs are ignored rather than silently counted in the top bin\nnan_cur = np.r_[ref_big[:5000], np.full(50, np.nan)]\nassert np.isfinite(psi(ref_big, nan_cur))\n# small-sample instability: same distribution, 200 vs 200\ndef null_stats(bins, n=200, reps=300):\n    r = np.random.default_rng(1)\n    vals = [psi(r.normal(size=n), r.normal(size=n), n_bins=bins) for _ in range(reps)]\n    return float(np.mean(vals)), float(np.std(vals))\nm10, s10 = null_stats(10)\nm40, s40 = null_stats(40)\nassert m40 > 3 * m10\nassert 0.05 < m10 < 0.15 and m40 > 0.25\nprint(round(psi(ref_big, shifted),3), v_small, v_big, m10, s10, m40, s40, 9*0.01, 39*0.01)"
+  }
+ },
+ {
+  "plan_id": "B4-MLO-08-2",
+  "verdict": "correct",
+  "reasons": [
+   "Triage logic sound; four simulation figures/causal statements need hedging or re-specification (minor)."
+  ],
+  "parts_answered": {
+   "how to triage": true,
+   "what the two numbers tell you": true,
+   "what changes in monitoring": true,
+   "respond to 'retrain' instinct": true
+  },
+  "evidence": [
+   {
+    "claim": "x100 on lognormal: PSI 8.18-8.19, plain 0.0002-0.0004",
+    "method": "executed",
+    "evidence": "3 seeds, sigma=1, n=50,000, 10 bins, eps=1e-4; analytic ceiling 0.9 ln(1e4*... ) = 9*0.1*ln(0.1/1e-4)+0.9 ln10 = 8.28"
+   },
+   {
+    "claim": "discount_pct 9% nulls->0 gives PSI 0.054 (10 bins), 0.090 (20 bins) for continuous ref",
+    "method": "executed",
+    "evidence": "beta(2,5)*50 reference, 50k rows; with 20% ref zeros 0.030/0.030"
+   },
+   {
+    "claim": "ML Test Score: measure whether data matches schema and alert on divergence",
+    "method": "paper",
+    "evidence": "Monitor 2 'Data invariants hold in training and serving inputs': 'measure whether data matches the schema and alert when they diverge significantly'"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "gave PSI about 8.3 while two plain samples gave about 0.0003",
+    "problem": "Reproduced 8.2 (sigma=1, 10 bins, eps=1e-4); 8.3 is the ceiling of that setup, so the figure is eps- and spread-dependent and the simulation is under-specified.",
+    "replacement": "gave PSI about 8.2 with 10 quantile bins and eps=1e-4 (the ceiling for that setup is about 8.3) while two plain samples gave about 0.0003 (lognormal with sigma 1)"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "A pure unit change does exactly that.",
+    "problem": "Overstated: with a wide distribution a x100 factor still leaves overlap (sigma=2 gave PSI about 4.3).",
+    "replacement": "A change of units by a large factor such as 100 does exactly that for most amount distributions."
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "The collapsed scores are a consequence: the model is being fed out-of-support inputs.",
+    "problem": "Causal claim stated as fact; plausible but unverified.",
+    "replacement": "The collapsed scores are most likely a consequence: the model is probably being fed out-of-support inputs (confirm by re-scoring a sample with the amounts rescaled)."
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "a null-to-zero spike moves 9% of the mass into the one bin that already contained the reference zeros. In a similar simulation PSI was only about 0.055 with 10 bins (about 0.09 with 20), under the threshold, although the feature is broken.",
+    "problem": "The 0.055/0.09 figures reproduce for a continuous discount_pct with NO reference zeros; with 20% of the reference at zero PSI is about 0.03, so 'bin that already contained the reference zeros' does not match the simulation quoted.",
+    "replacement": "a null-to-zero spike moves about 9% of the mass into the lowest bin. In a simulation with a continuous discount_pct and no reference zeros, PSI was only about 0.055 with 10 bins (about 0.09 with 20); with 20% of the reference already at zero it was about 0.03. All are under the threshold, although the feature is broken."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Application of PSI behaviour to a two-symptom incident; checks and process rather than computation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field; fine"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All discussed (quantile ratio check, imputation before monitoring are explicit).",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0040",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/46555.pdf",
+    "status": "supported",
+    "evidence": "'measure whether data matches the schema and alert when they diverge significantly' (Monitor 2)"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'Real behavioural drift rarely multiplies every quantile by the same constant' (reasonable, hedged)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-08-3",
+  "verdict": "correct",
+  "reasons": [
+   "Arithmetic correct (1.2 expected hits/day; 1-0.99^120 = 0.7006); one source sentence applied beyond what it says; one outcome claim unsupported."
+  ],
+  "parts_answered": {
+   "redesign alerting so someone acts": true,
+   "explain the noise (multiple testing, large n)": true,
+   "explain the missed null-rate incident": true
+  },
+  "evidence": [
+   {
+    "claim": "120 x 0.01 = 1.2; 1-0.99^120 = 70.06%",
+    "method": "executed",
+    "evidence": "python: 0.7006196"
+   },
+   {
+    "claim": "ML Test Score: alert thresholds need careful tuning for false positive/negative balance",
+    "method": "paper",
+    "evidence": "Monitor 2: 'careful tuning of alerting thresholds is needed to achieve a useful balance between false positive and false negative rates'"
+   },
+   {
+    "claim": "Sculley action limits",
+    "method": "paper",
+    "evidence": "'it can be useful to set and enforce action limits as a sanity check... These limits should be broad enough not to trigger spuriously' (for systems taking real-world actions)"
+   },
+   {
+    "claim": "Tiered rule false-alarm rates (3 of last 5 days above 99th pct)",
+    "method": "derivation",
+    "evidence": "independent days: 10*0.01^3 ~ 1e-5/feature -> ~1e-3/day over 120 features; days are autocorrelated so real rate higher"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Sculley et al. suggest limits broad enough not to trigger spuriously.",
+    "problem": "The paper's sentence concerns action limits on a system's real-world actions, not alert rules for drift tests; as placed it reads as support for alert-rule review.",
+    "replacement": "Sculley et al. make a related point about action limits on a system's real-world actions: they should be broad enough not to trigger spuriously, and when one trips an alert should lead to investigation."
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "Expected result with these rules:",
+    "problem": "The outcome is asserted, never simulated or replayed.",
+    "replacement": "Intended result with these rules (verify by replaying the last 90 days of metrics through them before enabling paging):"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Multiple-testing arithmetic plus standard alert-design practice.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Alert on symptoms (score distribution, data-quality invariants, quality proxies) and demote per-feature drift to diagnostics",
+    "tradeoff": "Fewer pages vs slower root-cause hints; risk of missing a feature fault that does not move outputs"
+   },
+   {
+    "decision": "Use effect size with thresholds taken from the metric's own history (percentile, same weekday) instead of p<0.01",
+    "tradeoff": "Needs history and re-tuning vs ignoring statistically significant but trivial differences"
+   },
+   {
+    "decision": "Require persistence (k of n windows) except for hard failures such as schema violations",
+    "tradeoff": "Lower false alarms vs added detection delay"
+   },
+   {
+    "decision": "Severity tiers (page / ticket / dashboard) by feature importance and failure type, each with an owner",
+    "tradeoff": "Triage effort and importance estimates vs attention spent only where it matters"
+   },
+   {
+    "decision": "Absolute data-quality rules (null/zero rate, range) with their own bands, independent of drift scores",
+    "tradeoff": "Extra rules to maintain vs catching the missed null-rate regression"
+   },
+   {
+    "decision": "Review loop: track actionability of each alert, retire or retune never-actioned rules",
+    "tradeoff": "Ongoing ownership cost vs alert rot returning"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "diagnosis + principles"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "concrete tier table distinct from principles"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "All 7 discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0026",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/46555.pdf",
+    "status": "supported",
+    "evidence": "Monitor 2 threshold-tuning quote"
+   },
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "partially",
+    "evidence": "'direct feedback' sentence supported; the action-limit sentence is about real-world actions, not drift alerts"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'with large daily volumes a p-value flags differences far too small to matter' (standard statistics, derivation)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-08-4",
+  "verdict": "correct",
+  "reasons": [
+   "Conceptually right; simulation figures cited are an unrepresentative seed (minor) and one over-certain opening."
+  ],
+  "parts_answered": {
+   "compare what KS and PSI measure": true,
+   "explain alert storm": true,
+   "what neither tells you": true
+  },
+  "evidence": [
+   {
+    "claim": "0.01 sd shift, n=1e6: D~0.004 (8 seeds 0.0035-0.0055), p 1e-5..1e-13, PSI ~1e-4",
+    "method": "executed",
+    "evidence": "scipy 1.18 ks_2samp; own PSI"
+   },
+   {
+    "claim": "0.3 sd shift n=1000: D 0.134-0.168, p 1e-8..1e-12, PSI 0.076-0.147",
+    "method": "executed",
+    "evidence": "claimed D 0.14, p ~8e-9, PSI ~0.10 are within the spread"
+   },
+   {
+    "claim": "KS statistic = max abs ECDF difference; H0 identical; continuous assumed",
+    "method": "doc",
+    "evidence": "scipy ks_2samp page"
+   },
+   {
+    "claim": "PSI null floor (B-1)(1/n+1/m); PSI critical values depend on n and bins",
+    "method": "derivation/paper",
+    "evidence": "arXiv 2303.01227 confirms dependence on sample size and groups"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "The storm is a sample-size effect, not a bug.",
+    "problem": "Stated as certain; with 1M rows both a trivial real difference and non-iid rows/logging changes would produce the same storm.",
+    "replacement": "The storm is most likely a sample-size effect rather than a bug (rule out a systematic logging difference between reference and yesterday)."
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "the KS statistic was about 0.005 and the p-value about 1e-11",
+    "problem": "Cherry-picked seed: over 8 seeds D was 0.0035-0.0055 (typically 0.0042) and p ranged 1e-5 to 1e-13 (seed 0: 0.0043, 3e-8).",
+    "replacement": "the KS statistic was about 0.004 (0.0035 to 0.0055 over eight seeds) and the p-value between about 1e-5 and 1e-13, far below 0.05 every time"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Comparison of two drift metrics with a sample-size argument.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0005",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.ks_2samp.html",
+    "status": "supported",
+    "evidence": "'maximum absolute difference between the empirical distribution functions'; 'null hypothesis is that the two distributions are identical'; 'assumed to be drawn from a continuous distribution'. Page does not mention ties explicitly; the answer's tie advice is an inference from the continuity assumption."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "A critical review of existing and new population stability testing procedures in credit risk scoring",
+    "url": "https://arxiv.org/pdf/2303.01227",
+    "supports": "PSI rule-of-thumb cut-offs (0.1, 0.25) and that PSI critical values depend on sample size and number of bins",
+    "quote": "the critical value of the PSI decreases with sample size and increases with the number of groups",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [
+   "'KS is often more sensitive to the bulk than far tails' (well-known but not verified from an official page)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-08-5",
+  "verdict": "pass",
+  "reasons": [
+   "Sound label-free triage; no numerical claims; hedged appropriately. (Optional improvement: resample drifted features jointly in the counterfactual check to avoid impossible combinations.)"
+  ],
+  "parts_answered": {
+   "decide harmful vs harmless drift without labels": true,
+   "what would change the answer": true,
+   "response to retrain-tonight": true
+  },
+  "evidence": [
+   {
+    "claim": "Unchanged score distribution does not exclude concept drift",
+    "method": "derivation",
+    "evidence": "P(y|x) can change with P(score) fixed; only labels reveal it"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Multi-step triage with conceptual trade-offs but no computation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0005",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Tree models flatten / neural nets unpredictable outside training support (widely known; no source opened)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-08-6",
+  "verdict": "pass",
+  "reasons": [
+   "All figures reproduce: mean 52.96-53.05, aggregate PSI 0.061-0.063, slice PSI 6.0-6.2 (>5), rest 0.00016-0.00018 (stated 'about 0.0001', acceptable)."
+  ],
+  "parts_answered": {
+   "why aggregate stayed green": true,
+   "how to change monitoring": true,
+   "what it costs": true
+  },
+  "evidence": [
+   {
+    "claim": "0.9*50+0.1*80=53; aggregate PSI ~0.06; slice >5; rest ~0.0002",
+    "method": "executed",
+    "evidence": "3 seeds, n=100k, 10 quantile bins, eps=1e-4 (slice 6.5-7.4 with eps=1e-6)"
+   },
+   {
+    "claim": "ML Test Score: zero bias in aggregate and on slices",
+    "method": "paper",
+    "evidence": "Monitor 7 'The model has not experienced a regression in prediction quality on served data': 'models should have zero bias, in aggregate and on slices'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Dilution arithmetic plus cost trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0045",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/46555.pdf",
+    "status": "supported",
+    "evidence": "Monitor 7 text 'models should have zero bias, in aggregate and on slices' (about prediction bias, which the answer calls prediction quality - acceptable)"
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "A critical review of existing and new population stability testing procedures in credit risk scoring",
+    "url": "https://arxiv.org/pdf/2303.01227",
+    "supports": "PSI rule-of-thumb cut-offs (0.1, 0.25) and that PSI critical values depend on sample size and number of bins",
+    "quote": "the critical value of the PSI decreases with sample size and increases with the number of groups",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-08-7",
+  "verdict": "correct",
+  "reasons": [
+   "Arithmetic all verified (20,000/day, 80 MB vs 8 GB, floors 0.0005 / 0.18 / 0.02, 100 rows/day, 417/h); three precision fixes (exactness of sketches, slice reference size, stable hash)."
+  ],
+  "parts_answered": {
+   "what to log and how to sample": true,
+   "supports daily PSI per feature": true,
+   "hourly slice checks": true,
+   "label join weeks later": true,
+   "privacy": true,
+   "show sample is big enough": true
+  },
+  "evidence": [
+   {
+    "claim": "2e6*0.01=20,000; *4KB=80MB; 2e6*4KB=8GB; floors 5.4e-4, 0.180, 0.0217; slice rows 100/day (4.2/h) and 10,000/day (417/h)",
+    "method": "executed",
+    "evidence": "python arithmetic"
+   },
+   {
+    "claim": "Slice floor with 500-row slice reference",
+    "method": "executed",
+    "evidence": "9*(1/500+1/417)=0.0396"
+   },
+   {
+    "claim": "PSI(1% sample vs full) ~ (B-1)/n_sample = 4.5e-4 ('a few 0.0001s')",
+    "method": "derivation",
+    "evidence": "subset-of-full variance 9*(1/20000-1/2e6)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "These are exact over all traffic and tiny",
+    "problem": "Counters and histograms are exact; quantile sketches (listed in the same sentence) are approximate.",
+    "replacement": "Counters and histograms are exact over all traffic (quantile sketches are approximate) and tiny"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "and the hourly floor becomes about 9 x (0.00001 + 1/417), about 0.02.",
+    "problem": "Assumes a 100,000-row reference for the 0.5% slice; a reference holding only the slice's own share (about 500 rows) doubles the floor.",
+    "replacement": "and the hourly floor becomes about 9 x (0.00001 + 1/417), about 0.02 (assuming a 100,000-row reference for the slice; if the slice reference holds only its own 0.5% share, about 500 rows, the floor is 9 x (1/500 + 1/417), about 0.04)."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "keep the row if hash(id) mod 10,000 is below 100 for a 1% rate",
+    "problem": "Python's built-in hash() is salted per process, so the sample would not be reproducible across jobs; a stable hash is needed for the label join to work.",
+    "replacement": "keep the row if a stable hash of the ID (for example SHA-256 or xxHash, not Python's salted built-in hash()) mod 10,000 is below 100 for a 1% rate"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-part design with quantitative sizing and sampling-weight reasoning.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Stream exact aggregates (counters, histograms on frozen edges) over all traffic, no raw rows",
+    "tradeoff": "Tiny storage and exactness vs no raw values for ad-hoc tests"
+   },
+   {
+    "decision": "Deterministic hash-of-request-ID sampling stored with the sampling weight",
+    "tradeoff": "Reproducible, label-joinable and coordination-free vs possible correlation with ID structure (validate it)"
+   },
+   {
+    "decision": "Size samples with the PSI noise floor (B-1)(1/n+1/m) per slice and window",
+    "tradeoff": "Quantifies adequacy vs rough approximation at few rows per bin"
+   },
+   {
+    "decision": "Oversample (100% capture) rare slices, errors and low-confidence scores, with weights",
+    "tradeoff": "Adequate slice power vs more stored data and privacy exposure"
+   },
+   {
+    "decision": "Minimise and pseudonymise logged data, set retention",
+    "tradeoff": "Security/privacy vs debugging depth and label-join keys"
+   },
+   {
+    "decision": "Validate the sampler against full logging for a few days",
+    "tradeoff": "Short-term extra storage vs detecting a biased sampling key"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "design + sizing"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "policy + validation procedure"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0026",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "A critical review of existing and new population stability testing procedures in credit risk scoring",
+    "url": "https://arxiv.org/pdf/2303.01227",
+    "supports": "PSI rule-of-thumb cut-offs (0.1, 0.25) and that PSI critical values depend on sample size and number of bins",
+    "quote": "the critical value of the PSI decreases with sample size and increases with the number of groups",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [
+   "Privacy statement is generic and appropriately hedged (jurisdiction/legal advice)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-08-8",
+  "verdict": "correct",
+  "reasons": [
+   "Lag arithmetic correct (4 days -> 0.2 sd; 17.5 days -> 0.875 sd; 60 days -> 3 sd) but option C's false-alarm assessment is wrong for a single-day check (major)."
+  ],
+  "parts_answered": {
+   "false alarms for A-D": "C wrong",
+   "slow-creep detection for A-D": true,
+   "recommend a setup": true
+  },
+  "evidence": [
+   {
+    "claim": "avg age 4 and 17.5 days; offsets 0.2, 0.875, 3.0 sd",
+    "method": "executed",
+    "evidence": "python"
+   },
+   {
+    "claim": "Weekly mean 1.0714; Saturday +16.7%, weekday -6.7% vs pooled-week mean",
+    "method": "executed",
+    "evidence": "(5*1+2*1.25)/7"
+   },
+   {
+    "claim": "n needed to see 0.05 sd at 3 SE: 2*(3/0.05)^2 = 7,200",
+    "method": "derivation",
+    "evidence": "SE(diff of means)=sd*sqrt(2/n)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "answer",
+    "claim": "(C) Pooled previous 7 days: averages out the weekly cycle, so false alarms from seasonality are mostly gone. But its lag is large:",
+    "problem": "Wrong for a DAILY check: the reference averages the cycle but today is one day, so it is still compared with a weekly mixture. With weekends 25% higher the weekly mean is 1.0714 x weekday level, so a weekend day is +16.7% and a weekday -6.7% relative to the pool; seasonal false alarms persist.",
+    "replacement": "(C) Pooled previous 7 days: the reference averages out the weekly cycle, but today is a single day, so it is still compared with a weekly mixture. With weekends 25% higher, the weekly average is about 7% above a weekday level, so a weekend day sits about 17% above the pool and a weekday about 7% below it; seasonal false alarms remain unless today is also a 7-day window or the comparison is weekday-adjusted. Its lag is also large:"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "a day-over-day change of 0.05 sd is far below the noise of most daily samples",
+    "problem": "Overstated: SE of a difference of daily means is sd*sqrt(2/n); 3 SE = 0.05 sd needs n of about 7,200 per day, which many production features exceed.",
+    "replacement": "a day-over-day change of 0.05 sd is tiny next to the weekly swing and, unless daily volume is large (about 7,200 rows per day are needed to see it at 3 standard errors), within sampling noise"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "removes seasonality exactly",
+    "problem": "Only if the weekly pattern is stable (holidays, trend break it).",
+    "replacement": "removes the weekday effect if the weekly pattern is stable"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Comparing four baselines on two competing criteria with lag arithmetic.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0044",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-09-1",
+  "verdict": "pass",
+  "reasons": [
+   "Definition and differences match Google's guidance; concise is 61 words and a genuinely shorter version."
+  ],
+  "parts_answered": {
+   "define continuous training": true,
+   "differences from CI/CD": true
+  },
+  "evidence": [
+   {
+    "claim": "CT definition, triggers, data validation required before training, model validation after",
+    "method": "doc",
+    "evidence": "Google Cloud MLOps architecture page: 'CT is a new property, unique to ML systems, that's concerned with automatically retraining and serving the models'; triggers include on schedule, new data, performance degradation, significant changes in data distributions (plus on demand); data validation 'required before model training to decide whether you should retrain'; model validation 'occurs after you successfully train the model'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Easy",
+  "difficulty_rationale": "Single-concept definition plus contrast.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "61 words, interview-ready"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "adds gates, artifacts, pitfalls beyond the concise version"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed (as is)",
+  "key_concepts_findings": "'lineage tracking' is only implicit (answer says record data version/params/metrics); optionally rename to 'metadata and artifact lineage'.",
+  "suggested_key_concepts": [
+   "continuous training",
+   "retraining triggers",
+   "data validation",
+   "model validation",
+   "CI/CD for ML",
+   "artifact lineage and metadata"
+  ],
+  "nearest_existing": {
+   "id": "smi-l0015",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://docs.cloud.google.com/architecture/mlops-continuous-delivery-and-automation-pipelines-in-machine-learning",
+    "status": "supported",
+    "evidence": "quotes above; 'on demand' is also listed as a trigger, answer says 'such as', fine"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-09-2",
+  "verdict": "pass",
+  "reasons": [
+   "Correct diagnosis; numbers verify (60% of 50,000=30,000; 2% -> 600; weight 50; 15% -> 90 defaults); hedged on legal aspects."
+  ],
+  "parts_answered": {
+   "what is going on": true,
+   "redesign retraining data": true
+  },
+  "evidence": [
+   {
+    "claim": "30,000 rejected; 2% = 600; weight 50; 90 defaults; 95% CI half-width for 15% on 600 loans = 2.9 pp",
+    "method": "executed",
+    "evidence": "python"
+   },
+   {
+    "claim": "Direct feedback loop sentence",
+    "method": "paper",
+    "evidence": "Sculley: 'A model may directly influence the selection of its own future training data.'"
+   },
+   {
+    "claim": "Accepts-only evaluation overestimates performance; random-approval data gives unbiased evaluation; reject inference has modest potential",
+    "method": "paper",
+    "evidence": "Kozodoi et al., arXiv 2407.13009"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Causal diagnosis of a feedback loop plus a counterfactual-data redesign with sizing.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "diagnosis and redesign"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "sizing and promotion rule"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0010",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "supported",
+    "evidence": "'A model may directly influence the selection of its own future training data.'"
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Fighting Sampling Bias: A Framework for Training and Evaluating Credit Scoring Models",
+    "url": "https://arxiv.org/html/2407.13009",
+    "supports": "Outcomes of rejected applicants are unobserved; evaluating on accepted applicants overestimates scorecard performance; randomly approved loans give unbiased evaluation data; reject inference has modest potential",
+    "quote": "testing RI methods using a test set drawn from previously accepted clients is inappropriate",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [
+   "Inverse-propensity weighting for exploration data (standard; no source opened)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-09-3",
+  "verdict": "correct",
+  "reasons": [
+   "Guardrails and stage placement correct; one source over-attribution (minor)."
+  ],
+  "parts_answered": {
+   "which guardrails would have stopped it": true,
+   "where each sits in the pipeline": true
+  },
+  "evidence": [
+   {
+    "claim": "Data validation required before training to decide whether to retrain",
+    "method": "doc",
+    "evidence": "Google MLOps page quote"
+   },
+   {
+    "claim": "Action limits sentence",
+    "method": "paper",
+    "evidence": "Sculley: limits 'should be broad enough not to trigger spuriously' for real-world actions"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "The Sculley et al. paper suggests action limits as sanity checks that are broad enough not to trigger spuriously; a sudden large shift in score distribution or in the importance of income should stop promotion.",
+    "problem": "Sculley's action limits are limits on a system's real-world actions; applying them to champion/challenger change is an analogy, not what the paper says.",
+    "replacement": "Sculley et al. suggest action limits on a system's real-world actions as sanity checks that are broad enough not to trigger spuriously; a similar bound on champion/challenger change (a sudden large shift in score distribution or in the importance of income) should stop promotion."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-stage pipeline design with failure analysis.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Separate data-quality alerts from drift alerts; quality failures block retraining; add persistence and cooldown",
+    "tradeoff": "Prevents chained retrains vs slower response to genuine drift"
+   },
+   {
+    "decision": "Data validation before training with quarantine of bad partitions",
+    "tradeoff": "Protects training data vs lost recent rows or failed runs"
+   },
+   {
+    "decision": "Trusted holdout: time-based validated data plus a fixed curated set",
+    "tradeoff": "Independent grading vs staleness of the curated set"
+   },
+   {
+    "decision": "Model validation vs champion on trusted slices with bounded prediction/importance change",
+    "tradeoff": "Catches AUC-gaming and corrupted behaviour vs may block legitimate large improvements"
+   },
+   {
+    "decision": "Human approval and staged rollout with rollback when money is involved or change exceeds limit",
+    "tradeoff": "Safety vs automation speed"
+   },
+   {
+    "decision": "Record data versions and excluded partitions",
+    "tradeoff": "Auditability vs bookkeeping"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0010",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://docs.cloud.google.com/architecture/mlops-continuous-delivery-and-automation-pipelines-in-machine-learning",
+    "status": "supported",
+    "evidence": "'This step is required before model training to decide whether you should retrain the model'"
+   },
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "partially",
+    "evidence": "action-limit sentence supported only for real-world actions"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-09-4",
+  "verdict": "pass",
+  "reasons": [
+   "Balanced trade-off; hedged ('implementation-specific'); Rule 8 supported."
+  ],
+  "parts_answered": {
+   "compare warm start with sliding-window full retrain": true,
+   "what can go wrong": true,
+   "how to decide with data": true
+  },
+  "evidence": [
+   {
+    "claim": "Rule 8: freshness requirements",
+    "method": "doc",
+    "evidence": "'How much does performance degrade if you have a model that is a day old? A week old? A quarter old?'"
+   },
+   {
+    "claim": "14h vs 40 min",
+    "method": "derivation",
+    "evidence": "21x compute reduction"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Cost-risk comparison and experimental design; no calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0006",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule 8 'Know the freshness requirements of your system'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Catastrophic forgetting/recency bias of last-day-only updates (general ML knowledge, hedged as risks)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-09-5",
+  "verdict": "pass",
+  "reasons": [
+   "Practical, complete rollback checklist; no numerical claims."
+  ],
+  "parts_answered": {
+   "what else to check for rollback": true,
+   "how to avoid recurrence on next retrain": true
+  },
+  "evidence": [
+   {
+    "claim": "Process checklist",
+    "method": "background_only",
+    "evidence": "no quantitative or documented-behaviour claims"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Checklist-style scenario; breadth over depth.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single field"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0032",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Registry/canary practices are general MLOps practice"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-10-1",
+  "verdict": "correct",
+  "reasons": [
+   "Content, numbers (0.0/1.0/0.524) and hedging are good, but the reference code silently fails to perturb integer-typed arrays (major, fixed by code_patch)."
+  ],
+  "parts_answered": {
+   "invariance_failures": true,
+   "directional_failures": true,
+   "behavioural_report": true,
+   "how to set tolerances": true,
+   "why strict monotonicity may fail for tree ensembles": true
+  },
+  "evidence": [
+   {
+    "claim": "Test output 0/0/0; bad sign 1.0; leak 0.524 (postcode) with hash 0.0",
+    "method": "executed",
+    "evidence": "v310, v311, 3.13 identical"
+   },
+   {
+    "claim": "INV / DIR / MFT families",
+    "method": "paper",
+    "evidence": "CheckList: INV 'label-preserving perturbations to inputs and expect the model prediction to remain the same'; DIR 'the label is expected to change in a certain way'; MFT 'a collection of simple examples (and labels) to check a behavior within a capability'"
+   },
+   {
+    "claim": "Monotonic constraints available in libraries",
+    "method": "doc",
+    "evidence": "XGBoost: 'ability to enforce monotonicity constraints on any features'; sklearn HistGradientBoosting monotonic_cst (docs note constraints only marginally constrain effects)"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "code.solution",
+    "claim": "X2 = X.copy()\n    X2[:, col] = perturb(X[:, col])",
+    "problem": "With an integer-typed X (e.g. a missed_payments count column) X.copy() keeps int dtype, so X2[:, col] = X[:, col] + 0.5 truncates the perturbation to 0: directional_failures returns [] for a model with the wrong sign (reproduced on all interpreters, 20 rows -> 0 failures vs 20 with float X). The check silently passes, the exact 'perturbation that leaves values unchanged' pitfall the answer warns about. The test only passes because its matrix is built as float.",
+    "replacement": "X2 = np.array(X, dtype=float)\n    X2[:, col] = perturb(X[:, col])"
+   },
+   {
+    "severity": "major",
+    "field": "code.solution",
+    "claim": "X2 = X.copy()\n    X2[:, col] = X[:, col] + step",
+    "problem": "With an integer-typed X (e.g. a missed_payments count column) X.copy() keeps int dtype, so X2[:, col] = X[:, col] + 0.5 truncates the perturbation to 0: directional_failures returns [] for a model with the wrong sign (reproduced on all interpreters, 20 rows -> 0 failures vs 20 with float X). The check silently passes, the exact 'perturbation that leaves values unchanged' pitfall the answer warns about. The test only passes because its matrix is built as float.",
+    "replacement": "X2 = np.array(X, dtype=float)\n    X2[:, col] = X[:, col] + step"
+   },
+   {
+    "severity": "major",
+    "field": "practical_answer",
+    "claim": "X2 = X.copy()\n    X2[:, col] = perturb(X[:, col])",
+    "problem": "Fenced code must equal the tested solution; same integer-dtype defect.",
+    "replacement": "X2 = np.array(X, dtype=float)\n    X2[:, col] = perturb(X[:, col])"
+   },
+   {
+    "severity": "major",
+    "field": "practical_answer",
+    "claim": "X2 = X.copy()\n    X2[:, col] = X[:, col] + step",
+    "problem": "Fenced code must equal the tested solution; same integer-dtype defect.",
+    "replacement": "X2 = np.array(X, dtype=float)\n    X2[:, col] = X[:, col] + step"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "so each defect trips only its own check.",
+    "problem": "Add the integer-matrix assertion now in the test.",
+    "replacement": "so each defect trips only its own check. A final assertion checks that integer-typed matrices are perturbed correctly (they are cast to float first)."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Implement three coupled checks and justify tolerances/limits of the approach.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "families, tolerance policy, pitfalls"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "code + executed result + wiring"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (as is)",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0010",
+   "same_intent": false
+  },
+  "code_findings": "Original passes on 3.10/3.11/3.13 (stdlib+numpy). Edge cases I added: int X with step 0.5 (BUG: 0 failures; float X: 20), input not mutated (True), no-op perturb (0 failures), direction -1 vs +1 on a correct increasing model (20 / 0), column-vector predict output (broadcasts to an n x n matrix: np.abs(predict(X2)-predict(X)) is n x 1, flatnonzero flattens; works by accident), empty X (ZeroDivisionError in behavioural_report), missing key in max_fail_rate (KeyError). Patched version casts to float; original test plus two new integer-matrix asserts passes on all three interpreters with unchanged printed rates.",
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "Beyond Accuracy: Behavioral Testing of NLP Models with CheckList",
+    "url": "https://arxiv.org/pdf/2005.04118",
+    "supports": "Minimum functionality, invariance and directional expectation test families",
+    "quote": "label-preserving perturbations to inputs and expect the model prediction to remain the same",
+    "type": "paper"
+   },
+   {
+    "title": "XGBoost: Monotonic Constraints",
+    "url": "https://xgboost.readthedocs.io/en/stable/tutorials/monotonic.html",
+    "supports": "Libraries can enforce monotonicity constraints so a guarantee can be built into training",
+    "quote": "XGBoost has the ability to enforce monotonicity constraints on any features used in a boosted model.",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "'tree ensembles and neural networks are piecewise and can wiggle locally' (general knowledge, hedged)"
+  ],
+  "code_patch": {
+   "solution": "import numpy as np\n\n\ndef invariance_failures(predict, X, col, perturb, tol=0.01):\n    \"\"\"Row indices where changing column `col` with perturb() moves the score by more than tol.\"\"\"\n    X2 = np.array(X, dtype=float)\n    X2[:, col] = perturb(X[:, col])\n    return np.flatnonzero(np.abs(predict(X2) - predict(X)) > tol)\n\n\ndef directional_failures(predict, X, col, step, direction=1, tol=1e-9):\n    \"\"\"Row indices where adding `step` to column `col` moves the score against `direction` (+1 or -1).\"\"\"\n    X2 = np.array(X, dtype=float)\n    X2[:, col] = X[:, col] + step\n    delta = (predict(X2) - predict(X)) * direction\n    return np.flatnonzero(delta < -tol)\n\n\ndef behavioural_report(predict, X, checks, max_fail_rate):\n    \"\"\"checks: name -> function(predict, X) returning failing row indices. Returns (passed, rates).\"\"\"\n    rates = {name: len(fn(predict, X)) / len(X) for name, fn in checks.items()}\n    passed = all(rates[name] <= max_fail_rate[name] for name in checks)\n    return passed, rates",
+   "test": "def _make_model(leak_weight):\n    w = np.array([0.9, 1.1, 0.0, leak_weight])  # missed_payments, utilisation, customer_hash, postcode_hash\n    def predict(X):\n        return 1.0 / (1.0 + np.exp(-(X @ w - 0.2)))\n    return predict\n\n\nrng = np.random.default_rng(7)\nX = np.column_stack([\n    rng.integers(0, 6, 500).astype(float),   # missed_payments (col 0)\n    rng.uniform(0, 1, 500),                  # utilisation (col 1)\n    rng.uniform(0, 1, 500),                  # customer_hash (col 2)\n    rng.uniform(0, 1, 500),                  # postcode_hash (col 3)\n])\nchecks = {\n    \"hash_invariance\": lambda p, A: invariance_failures(p, A, 2, lambda c: 1.0 - c, tol=0.01),\n    \"postcode_invariance\": lambda p, A: invariance_failures(p, A, 3, lambda c: 1.0 - c, tol=0.01),\n    \"more_missed_not_safer\": lambda p, A: directional_failures(p, A, 0, 1.0, direction=+1),\n}\nlimits = {\"hash_invariance\": 0.0, \"postcode_invariance\": 0.0, \"more_missed_not_safer\": 0.0}\n\nok, rates = behavioural_report(_make_model(0.0), X, checks, limits)\nassert ok and all(v == 0.0 for v in rates.values()), rates\n# the missed-payments weight has the wrong sign here, so the directional check must trip\nw_bad = np.array([-0.9, 1.1, 0.0, 0.0])\nbad = lambda A: 1.0 / (1.0 + np.exp(-(A @ w_bad)))\nbad_ok, bad_rates = behavioural_report(bad, X, checks, limits)\nassert not bad_ok and bad_rates[\"more_missed_not_safer\"] == 1.0, bad_rates\n# a model that leaks the postcode feature trips only the postcode invariance check\nleaky_ok, leaky_rates = behavioural_report(_make_model(0.8), X, checks, limits)\nassert not leaky_ok\nassert leaky_rates[\"postcode_invariance\"] > 0.5 and leaky_rates[\"hash_invariance\"] == 0.0\n# integer-typed feature matrices must not silently truncate the perturbation\nXi = np.column_stack([np.arange(6), np.arange(6)])\nassert len(directional_failures(lambda A: A @ np.array([-1.0, 0.0]), Xi, 0, 0.5, direction=+1)) == 6\nassert len(invariance_failures(lambda A: A @ np.array([1.0, 0.0]), Xi, 0, lambda c: c + 0.5, tol=0.1)) == 6\nprint(rates, bad_rates, leaky_rates)"
+  }
+ }
+]

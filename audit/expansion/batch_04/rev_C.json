@@ -1,0 +1,1095 @@
+[
+ {
+  "plan_id": "B4-MLO-12-7",
+  "verdict": "correct",
+  "reasons": [
+   "Content sound and both sources support the sentences; two wording defects (garbled interval sentence, ambiguous prioritisation advice) worth fixing."
+  ],
+  "parts_answered": {
+   "quantify impact": true,
+   "why detection was slow": true,
+   "action items": true,
+   "runbook": true,
+   "what to avoid": true
+  },
+  "evidence": [
+   {
+    "claim": "SRE Book: blameless postmortem assumes good intentions; monitoring failure listed as trigger",
+    "method": "doc",
+    "evidence": "Fetched sre.google/sre-book/postmortem-culture: 'A blamelessly written postmortem assumes that everyone involved in an incident had good intentions'; trigger list includes 'A monitoring failure (which usually implies manual incident discovery)'."
+   },
+   {
+    "claim": "Rules of ML Rule 10: joined table no longer updated degrades slowly",
+    "method": "doc",
+    "evidence": "Fetched Rules of ML: 'Suppose that a particular table that is being joined is no longer being updated. The machine learning system will adjust, and behavior will continue to be reasonably good, decaying gradually.'"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "The 19-day gap between the first and detection is the main finding",
+    "problem": "Sentence is missing a noun ('first' what?).",
+    "replacement": "The 19-day gap between the first bad request and detection is the main finding"
+   },
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "fix the detection gap before the root cause",
+    "problem": "Ambiguous/misleading: the root cause (silent default fallback) is already mitigated in step 5; the point is that the detection gap needs its own fix, not that it ranks above root-cause repair.",
+    "replacement": "fix the detection gap as well as the root cause, because the detection gap is what turned a column rename into a 19-day loss"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Open-ended postmortem outline needing structured judgement, but no calculation or subtle mechanism.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Postmortem content: impact method, causes, format, action items."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Distinct first-60-minutes runbook and timeline template; little paraphrase."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (keep)",
+  "key_concepts_findings": "All seven concepts appear in the answers; none weak.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0032",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://sre.google/sre-book/postmortem-culture/",
+    "status": "supported",
+    "evidence": "'assumes that everyone involved in an incident had good intentions'; 'A monitoring failure (which usually implies manual incident discovery)'."
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule 10 silent failures: stale joined table, behaviour 'decaying gradually'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Counterfactual-baseline methods (same period earlier, holdout/shadow) are standard practice, background_only.",
+   "Candidate causes of slow detection are plausible and hedged ('Likely ones')."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-8",
+  "verdict": "correct",
+  "reasons": [
+   "All numbers recomputed and match; code reproduces on 3.10, 3.11, 3.13 and dep venv; two minor wording/limitation fixes."
+  ],
+  "parts_answered": {
+   "cost per 1k today": true,
+   "(a) autoscaling floor 2 @70%": true,
+   "(b) + quantised 1.6x": true,
+   "(c) + 20% cache": true,
+   "what to report": true,
+   "what to verify": true
+  },
+  "evidence": [
+   {
+    "claim": "Daily requests 4,302,000; static 4 x 24 x 12 = 1,152 units; 0.2678 per 1,000",
+    "method": "executed",
+    "evidence": "calc.py and code run: (1152.0, 4302000, 0.26778)."
+   },
+   {
+    "claim": "Autoscaled 792 (0.184, -31.25%); quantised 612 (0.142); +cache 576 (0.134, exactly 50% of today)",
+    "method": "executed",
+    "evidence": "Re-ran with floor 2, util 0.7: 792/612/576; savings 31.25%, 46.9%, 50.0%."
+   },
+   {
+    "claim": "Average load 49.8 rps vs 160 capacity = 31%; peak 100/28 = 3.57 -> 4 replicas",
+    "method": "derivation",
+    "evidence": "4,302,000/86,400 = 49.79; 49.79/160 = 0.311; ceil(100/28)=4."
+   },
+   {
+    "claim": "Floor of 3 raises autoscaled cost",
+    "method": "executed",
+    "evidence": "min_replicas=3 gives 936 vs 792."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "practical_answer",
+    "claim": "returns (1152.0, 4302000, 0.268) for the static fleet",
+    "problem": "The function returns 0.26778..., 0.268 is the rounded value asserted in the test.",
+    "replacement": "returns (1152.0, 4302000, 0.26778...) for the static fleet (0.268 rounded)"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Verify before claiming: autoscaling must handle start-up time",
+    "problem": "The model sizes each hour from its hourly average request rate, so intra-hour bursts are not represented; this limitation is not stated.",
+    "replacement": "Verify before claiming: the model sizes each hour from its average request rate, so bursts within the hour need extra headroom; autoscaling must also handle start-up time"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short arithmetic model plus judgement on which savings are real; no subtle mechanism.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Metric definition, results, verification list."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Runnable model and test; numbers repeated from detailed but the code is new."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (keep)",
+  "key_concepts_findings": "Specific and all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0024",
+   "same_intent": false
+  },
+  "code_findings": "Fenced block equals code.solution (checked). Test output identical on v310, v311, python3 (3.13) and dep venv. Extra edge cases: all-zero traffic -> ZeroDivisionError at cost-per-1k (undefended, acceptable for a model; not patched); floor 3 -> 936; cache_hit=1.0 -> floor cost only (576, 0.0667/1k); exact boundary 28 rps/replica and 89.6 rps at 44.8 capacity both give the expected replica count (no float ceil error); cache-only without quantisation 684. stdlib only, no 3.11+ features.",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Start-up time and queue-based scaling signal for accelerators: background_only (standard practice).",
+   "Stale-cache risk for fraud scores: background_only."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-12-9",
+  "verdict": "correct",
+  "reasons": [
+   "Arithmetic correct and advice sound; question_type should be scenario (open-ended capacity choice without a cost model); \"short notice\" claim can be sourced."
+  ],
+  "parts_answered": {
+   "nightly fine-tune strategy": true,
+   "internal classifier strategy": true,
+   "customer endpoint strategy": true,
+   "what would change my mind": true
+  },
+  "evidence": [
+   {
+    "claim": "2 interruptions x (15 min redo + 5 min restore) = 40 min = 9.5% of 420 min",
+    "method": "derivation",
+    "evidence": "40/420 = 0.095."
+   },
+   {
+    "claim": "07:45-18:00 = 10.25 h vs 24 h",
+    "method": "derivation",
+    "evidence": "Arithmetic."
+   },
+   {
+    "claim": "Spot notice is short",
+    "method": "doc",
+    "evidence": "AWS EC2 docs: interruption notice issued two minutes before stop/terminate; 'emitted on a best effort basis'."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Matching three workloads to capacity types; judgement, small arithmetic.",
+  "type_ok": false,
+  "suggested_type": "scenario",
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer, appropriate; slightly long (332 words) but structured."
+   }
+  ],
+  "suggested_answer_set": "single (keep)",
+  "key_concepts_findings": "Specific; all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0025",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "Spot Instance interruption notices (Amazon EC2 User Guide)",
+    "url": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-instance-termination-notices.html",
+    "supports": "Reclaimable capacity gives short, best-effort warning before interruption.",
+    "quote": "A Spot Instance interruption notice is a warning that is issued two minutes before Amazon EC2 stops or terminates your Spot Instance. ... Interruption notices are emitted on a best effort basis.",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Checkpoint-interval trade-off and scale-to-zero cold-start options are standard engineering reasoning; provider notice times vary and the answer says only 'short'."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-13-1",
+  "verdict": "correct",
+  "reasons": [
+   "Content accurate and hedged; question says \"Design the release process\" with several acceptable answers, so type should be design with rubric; pinning/retirement claims were unsourced and can be sourced."
+  ],
+  "parts_answered": {
+   "what you pin and record": true,
+   "what you test before switching": true,
+   "how you roll out": true,
+   "retirement date handling": true
+  },
+  "evidence": [
+   {
+    "claim": "ML Test Score lists 'Dependency changes result in notification' (monitoring) and canarying models (infra)",
+    "method": "paper",
+    "evidence": "Fetched paper: Monitor 1 'Dependency changes result in notification'; Infra 6 'Models are tested via a canary process before they enter production serving environments'."
+   },
+   {
+    "claim": "Aliases move; model IDs pinned; serving infrastructure can change; every ID has retirement schedule",
+    "method": "doc",
+    "evidence": "Anthropic Model IDs and versioning page (opened)."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Release-process design for a hosted dependency; conceptually clear, many parts, no calculation.",
+  "type_ok": false,
+  "suggested_type": "design",
+  "rubric_points": [
+   {
+    "decision": "Pin a dated snapshot and log the full release tuple (model id, prompt version, decoding params, schemas, guardrail versions)",
+    "tradeoff": "Reproducibility and diagnosability vs. missing silent provider improvements and having to manage retirements."
+   },
+   {
+    "decision": "Gate with golden set including replayed human-labelled production tickets, compared per route",
+    "tradeoff": "Labelling cost vs. catching class-level shifts hidden in an overall accuracy number."
+   },
+   {
+    "decision": "Shadow then user-hash canary with route distribution, schema validity and feedback as guardrails",
+    "tradeoff": "Extra calls/cost and slower rollout vs. limited blast radius."
+   },
+   {
+    "decision": "Rollback by configuration to previous pin plus tested fallback model",
+    "tradeoff": "Availability if the old snapshot is retired vs. maintaining a second integration."
+   },
+   {
+    "decision": "Retirement calendar with migration lead time",
+    "tradeoff": "Planned effort now vs. a forced, untested migration at the deadline."
+   },
+   {
+    "decision": "Scheduled golden-set replay as drift alarm even on a pinned snapshot",
+    "tradeoff": "Ongoing eval spend vs. detecting serving-side behaviour changes."
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single comprehensive answer."
+   }
+  ],
+  "suggested_answer_set": "single (keep)",
+  "key_concepts_findings": "Specific; all discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0032",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Monitor 1 'Dependency changes result in notification'; Infra 6 canary test."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Model IDs and versioning (Claude API docs)",
+    "url": "https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions",
+    "supports": "Aliases are convenience pointers to the most recent snapshot; a model ID stays fixed; infrastructure around it can change; every ID has its own retirement schedule.",
+    "quote": "An alias such as claude-sonnet-4-5 is a convenience pointer that resolves to the most recent dated snapshot for that minor version. ... Model weights are fixed for a given ID, but the serving infrastructure around the model can change over time. ... Every model ID, whether dated or dateless, has its own distinct deprecation and retirement schedule.",
+    "type": "official_doc"
+   },
+   {
+    "title": "Deprecations (OpenAI API docs)",
+    "url": "https://developers.openai.com/api/docs/deprecations",
+    "supports": "Providers announce model retirements in advance with migration guidance.",
+    "quote": "Impacted customers will always be notified by email and in our documentation.",
+    "type": "official_doc"
+   }
+  ],
+  "unsourced_claims": [
+   "Provider-specific behaviour (which providers offer dated snapshots) is correctly hedged ('where the provider offers one')."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-13-2",
+  "verdict": "correct",
+  "reasons": [
+   "Sound; MLflow claim supported; one overstated comparative and one missed latency cause."
+  ],
+  "parts_answered": {
+   "real traffic vs change vs miscalibration": true,
+   "latency clue": true,
+   "what to log for a 30-minute diagnosis": true
+  },
+  "evidence": [
+   {
+    "claim": "3.9% - 1.2% = 2.7 points",
+    "method": "derivation",
+    "evidence": "Arithmetic."
+   },
+   {
+    "claim": "MLflow prompt versions immutable; aliases mutable",
+    "method": "doc",
+    "evidence": "Fetched MLflow prompt registry: 'prompt versions are immutable once created'; alias is 'An mutable named reference to the prompt.'"
+   },
+   {
+    "claim": "Concise answer length",
+    "method": "executed",
+    "evidence": "73 words (<=80)."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "which is the more dangerous failure",
+    "problem": "Universal comparative; over-blocking vs under-blocking harm depends on context.",
+    "replacement": "which can be the more dangerous failure because harmful content then passes unnoticed"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Compare per-stage timings with the block-and-retry count.",
+    "problem": "Misses the other obvious latency cause: the release itself may have added a guardrail call, a longer prompt or a slower model.",
+    "replacement": "Compare per-stage timings with the block-and-retry count, and check whether the release itself added a guardrail call, a longer prompt or a slower model."
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Segmentation and attribution reasoning; no calculation.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Genuinely shorter, interview-ready (73 words)."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Adds reasoning, sampling, log schema, pitfalls."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed (keep)",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0039",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/genai/prompt-registry/",
+    "status": "supported",
+    "evidence": "'Prompt versions in MLflow are immutable'; alias 'An mutable named reference to the prompt'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Step-change vs gradual interpretation heuristics: background_only."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-13-3",
+  "verdict": "correct",
+  "reasons": [
+   "All arithmetic verified; three minor overstatement fixes (cause stated as fact, \"every prompt edit\", cache-write cost ignored)."
+  ],
+  "parts_answered": {
+   "baseline cost per request": true,
+   "80% prefix cache saving": true,
+   "half traffic to 0.25x model": true,
+   "attribution controls": true,
+   "budgets and alerts": true,
+   "release checks": true
+  },
+  "evidence": [
+   {
+    "claim": "Baseline 3.2 + 1.4 = 4.6 units; 1.38M units/day",
+    "method": "executed",
+    "evidence": "calc.py."
+   },
+   {
+    "claim": "Cache: 2.4 x (0.8x0.5+0.2) + 0.8 + 1.4 = 3.64 (-20.9%)",
+    "method": "executed",
+    "evidence": "calc.py."
+   },
+   {
+    "claim": "Routing + cache 2.275 (-50.5%); routing alone 2.875 (-37.5%)",
+    "method": "executed",
+    "evidence": "calc.py."
+   },
+   {
+    "claim": "Tenant example 4.6 -> 6.2 (+34.8%)",
+    "method": "executed",
+    "evidence": "2.4+2.4+1.4=6.2."
+   },
+   {
+    "claim": "Cost per request implied by +40% bill on +8% traffic",
+    "method": "derivation",
+    "evidence": "1.40/1.08 = 1.296, about +30%."
+   },
+   {
+    "claim": "Concise answer length",
+    "method": "executed",
+    "evidence": "70 words."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "concise_answer",
+    "claim": "The bill outgrew traffic because tokens per request rose, so attribute",
+    "problem": "Stated as established fact; the data only show cost per request rose (~30%), which may also come from retries, tool rounds or model mix.",
+    "replacement": "Cost per request must have risen about 30% (1.40/1.08), most likely through more tokens per request (or retries, tool rounds, model mix), so attribute"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "Note that every prompt edit invalidates the prefix",
+    "problem": "Overstated: only an edit inside the cached prefix (system prompt, policy text, tool definitions) invalidates it; edits to the variable tail do not.",
+    "replacement": "Note that every edit to the fixed prefix (system prompt, policy text, tool definitions) invalidates the cached prefix"
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "read the provider's documentation and measure the cached-token counts it reports",
+    "problem": "The arithmetic ignores cache-write surcharges some providers apply (OpenAI doc fetched mentions cache writes at 1.25x for some models).",
+    "replacement": "read the provider's documentation (including any cache-write surcharge, which this arithmetic ignores) and measure the cached-token counts it reports"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Unit arithmetic plus operational controls.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "Numbers and conclusion in 70 words."
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Derivations, why the bill outgrew traffic, caching mechanics."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Operational controls and release gate, not in detailed."
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical (keep)",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0027",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://developers.openai.com/api/docs/guides/prompt-caching",
+    "status": "supported",
+    "evidence": "'Prompt caching reuses work when requests share the same prompt prefix.' 'Cache reuse requires the entire rendered prefix to match.' 'Put stable developer instructions and shared reference material first.' dynamic content 'at the end rather than the beginning'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Alert threshold 1.5x trailing median and 80%/100% budget warnings are labelled illustrative."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-13-4",
+  "verdict": "pass",
+  "reasons": [
+   "Technically correct and all numbers verified. FLAG: intent overlaps heavily with existing smi-k0015 (200-case regression suite, fixes 15 / breaks 9, sampling variance, how many cases for a gate); curator should decide whether to keep."
+  ],
+  "parts_answered": {
+   "is it enough to ship": true,
+   "what to change in the gate": true,
+   "set size for a true 3-point gain": true
+  },
+  "evidence": [
+   {
+    "claim": "sd of pass rate sqrt(.8*.2/200)=2.83 points; +/-5.5 at 95%",
+    "method": "executed",
+    "evidence": "0.0283, 0.0554."
+   },
+   {
+    "claim": "Sign test 14 vs 8 two-sided p = 0.286",
+    "method": "executed",
+    "evidence": "exact binomial."
+   },
+   {
+    "claim": "Paired Wald interval -1.6 to +7.6",
+    "method": "executed",
+    "evidence": "-1.58, +7.58."
+   },
+   {
+    "claim": "n ~ 951 for 80% power with 11% discordance and 3-point gain",
+    "method": "executed",
+    "evidence": "(1.96+0.8416)^2*(0.11-0.0009)/0.03^2 = 951; power at 950 = 0.799."
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Paired inference, power calculation and gate design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Statistics and gate."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Decision table; repeats 14/8/p/interval but adds rule."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (keep)",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0015",
+   "same_intent": true
+  },
+  "code_findings": null,
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Temperature 0 not bitwise reproducible on hosted models: hedged ('In many hosted setups'); could not open the OpenAI reproducible-outputs page (fetch error), so background_only."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-1",
+  "verdict": "correct",
+  "reasons": [
+   "Content sound, sources support; \"by construction\" horizon claim needs its condition; type should be scenario."
+  ],
+  "parts_answered": {
+   "mechanisms": true,
+   "evidence to separate": true,
+   "release practice": true
+  },
+  "evidence": [
+   {
+    "claim": "Rule 39: A/B-measurable metrics are only a proxy for long-term goals",
+    "method": "doc",
+    "evidence": "Fetched: 'These metrics that are measureable in A/B tests in themselves are only a proxy for more long-term goals'."
+   },
+   {
+    "claim": "SRE workbook: canary 'sizeable and last long enough to be representative'",
+    "method": "doc",
+    "evidence": "Fetched sre.google/workbook/canarying-releases."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "A repeat purchase that happens 3 to 6 weeks later cannot show up in a 2-week test by construction",
+    "problem": "Holds only if the typical repurchase interval exceeds the test window; stated unconditionally.",
+    "replacement": "If the typical repurchase interval is 3 to 6 weeks, most repeat purchases fall outside a 2-week test window by construction"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism enumeration and counterfactual design.",
+  "type_ok": false,
+  "suggested_type": "scenario",
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer, appropriate."
+   }
+  ],
+  "suggested_answer_set": "single (keep)",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0033",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule 39 proxy statement."
+   },
+   {
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "status": "supported",
+    "evidence": "'It should be sizeable and last long enough to be representative of the overall deployment.'"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Novelty effect and difference-in-differences (parallel-trends assumption not stated) are background_only."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-2",
+  "verdict": "correct",
+  "reasons": [
+   "Good analysis; one imprecise sentence and a missed unifying cause (timeouts to default features plus retries)."
+  ],
+  "parts_answered": {
+   "why shadow gave clean pass (latency, duplicates, lower live scores)": true,
+   "what to change next": true
+  },
+  "evidence": [
+   {
+    "claim": "Rule 29: save features used at serving time, even for a small fraction",
+    "method": "doc",
+    "evidence": "Fetched: 'save the set of features used at serving time'; 'Even if you can't do this for every example, do it for a small fraction'."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "Late events then make shadow scores look better than live scores.",
+    "problem": "Imprecise: the question says live scores are lower; the point is that feature values differed (here live values are less complete), not that scores look 'better'.",
+    "replacement": "Late events and missing recent counts then make live feature values differ from what the shadow saw, which can shift live scores (here, lower) without any model change."
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "Check whether it included feature retrieval, serialisation, timeout and retry behaviour, and peak load.",
+    "problem": "Misses that one cause may link all three symptoms: under live load, feature-fetch timeouts that fall back to defaults and client retries could produce slow responses, lower scores and duplicate notifications.",
+    "replacement": "Check whether it included feature retrieval, serialisation, timeout and retry behaviour, and peak load. Under live load, feature-fetch timeouts that fall back to default values, plus client retries, could link all three symptoms (slow, lower scores, duplicates)."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-cause diagnosis of a system gap between shadow and live path.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer; item 4 (no feedback) overlaps item 2 but is acceptable."
+   }
+  ],
+  "suggested_answer_set": "single (keep)",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0029",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule 29 text quoted."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Duplicate notifications from retries without idempotency keys are hedged ('if'); background_only."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-3",
+  "verdict": "pass",
+  "reasons": [
+   "All numbers verified (chi-square 40.0, p 2.54e-10); claims hedged; source supports. Partial overlap with smi-h0037 (SRM chi-square code) but this record adds cache/learner interference and A/A testing."
+  ],
+  "parts_answered": {
+   "effect of SRM": true,
+   "effect of cache": true,
+   "effect of shared learner": true,
+   "how to test": true,
+   "how to fix": true
+  },
+  "evidence": [
+   {
+    "claim": "chi2 = 2*(1000^2/50000) = 40.0, p = 2.54e-10",
+    "method": "executed",
+    "evidence": "calc.py."
+   },
+   {
+    "claim": "Direct feedback loop quote",
+    "method": "paper",
+    "evidence": "Sec 4 'Feedback Loops': 'A model may directly influence the selection of its own future training data.'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Experiment validity plus two interference channels and fixes.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Mechanisms and fixes."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Ordered diagnostic checklist; chi-square repeated but brief."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (keep)",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0037",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "supported",
+    "evidence": "Section 4 Feedback Loops direct feedback loop sentence."
+   }
+  ],
+  "added_sources": [
+   {
+    "title": "Sample ratio mismatch (Spotify Confidence glossary)",
+    "url": "https://confidence.spotify.com/glossary/sample-ratio-mismatch",
+    "supports": "SRM is flagged at a strict p-value cutoff (typically 0.001) and results should not be interpreted until the imbalance is explained.",
+    "quote": "typically 0.001, which is deliberately strict to avoid false alarms ... don't interpret these results until you've investigated and resolved the imbalance.",
+    "type": "secondary"
+   }
+  ],
+  "unsourced_claims": [
+   "Direction of bias from interference hedged in answer."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-4",
+  "verdict": "correct",
+  "reasons": [
+   "One missing condition on IPW (needs stochastic logging) and one overreach in the feedback-loop attribution; plus pooled-AUC point."
+  ],
+  "parts_answered": {
+   "logged-data explanations": true,
+   "order of checks": "partially (order not justified)",
+   "change offline evaluation": true
+  },
+  "evidence": [
+   {
+    "claim": "Rule 37 measure training/serving skew",
+    "method": "doc",
+    "evidence": "Fetched Rules of ML Rule 37 heading and 'exactly the same result' sentence."
+   },
+   {
+    "claim": "Direct feedback loop",
+    "method": "paper",
+    "evidence": "Hidden Technical Debt Sec 4."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "answer",
+    "claim": "exploration traffic or counterfactual evaluation (inverse-propensity weighting from logged propensities) are the standard mitigations",
+    "problem": "IPW is valid only if the logging policy was stochastic with recorded propensities; a deterministic old ranker gives zero propensity to unseen items and cannot be corrected by reweighting.",
+    "replacement": "exploration or randomised-ranking traffic is the clean mitigation; counterfactual evaluation (inverse-propensity weighting) works only if the logging policy was stochastic and its propensities were recorded, since items the old ranker never showed cannot be reweighted into the data"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "Hidden Technical Debt in ML Systems describes this class of problem as a direct feedback loop, where a model influences the selection of its own training data",
+    "problem": "Overreach: position and selection bias in logs are related to, not defined as, the paper's direct feedback loop.",
+    "replacement": "Hidden Technical Debt in ML Systems describes the related direct feedback loop, where a model influences the selection of its own training data"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "AUC also weighs the whole list equally",
+    "problem": "Pooled AUC also mixes between-query and within-query comparisons, which a ranker evaluation should separate.",
+    "replacement": "Pooled AUC also mixes between-query and within-query comparisons and weighs the whole list equally"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "Plan: reproduce the offline metric per position, replay with propensity weighting,",
+    "problem": "Question asks for an order; the numbered order is not justified and the cheap training-serving skew check could be run first. Also IPW needs logged propensities.",
+    "replacement": "Plan (the skew check in item 4 is cheapest and can run first): reproduce the offline metric per position, replay with propensity weighting where propensities were logged,"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Several interacting causes of the offline/online gap and corrective evaluation methods.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "Single answer, appropriate."
+   }
+  ],
+  "suggested_answer_set": "single (keep)",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0009",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "partially",
+    "evidence": "Sec 4 sentence supports the model-influences-training-data statement, not position bias in logs."
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule 37 skew measurement; same example should give same result (page attribution of the sentence is via fetch tool summary)."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Position/selection bias and IPW assumptions: background_only (standard counterfactual LTR literature, not opened)."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-5",
+  "verdict": "correct",
+  "reasons": [
+   "SQL and test reproduce; tolerance advice for windowed counts conflicts with the question (an off-by-one incident) and the code; rubric_points needed for a design question."
+  ],
+  "parts_answered": {
+   "what to log": true,
+   "how/when to recompute": "partially (cadence not stated)",
+   "tolerances per type": true,
+   "timestamps for root cause": true,
+   "alerts": true,
+   "SQL executed": true
+  },
+  "evidence": [
+   {
+    "claim": "Test outputs match claimed rows",
+    "method": "executed",
+    "evidence": "Ran on v310, v311, 3.13, dep venv: [('2026-03-01 14:00','avg_basket',11,0,1),('2026-03-01 14:00','orders_24h',11,1,4)]."
+   },
+   {
+    "claim": "Rule of three 3/20,000 = 0.015%",
+    "method": "derivation",
+    "evidence": "0.00015."
+   },
+   {
+    "claim": "ML Test Score monitoring test 'Training and serving features compute the same values'",
+    "method": "paper",
+    "evidence": "Monitor 3 body heading."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "major",
+    "field": "detailed_answer",
+    "claim": "Windowed counts that depend on event lateness: allow a documented tolerance or compare only rows whose window is older than the lateness bound.",
+    "problem": "A non-zero tolerance on counts would hide exactly the off-by-one incident the check is meant to catch, and contradicts the exact tolerance (0.0) used in the recorded test.",
+    "replacement": "Windowed counts that depend on event lateness: keep the tolerance at zero but compare only rows whose window closed before the lateness bound (a non-zero tolerance would hide the off-by-one incident in the question), and track the late-event rate separately."
+   },
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "A scheduled job recomputes the same features",
+    "problem": "'When' to recompute is not stated.",
+    "replacement": "A scheduled job, run after the lateness allowance has elapsed (for example hourly with a lag of a few hours), recomputes the same features"
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open design combining logging, point-in-time correctness, tolerances, statistics and SQL.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Log sampled serving-time feature values with request id, entity id, timestamps, model and pipeline versions",
+    "tradeoff": "Storage/privacy/overhead and sample rate vs detection power."
+   },
+   {
+    "decision": "Recompute point-in-time as of served_at after the lateness bound",
+    "tradeoff": "Detection delay vs false mismatches from late events."
+   },
+   {
+    "decision": "Typed tolerances: exact for ids, categories and windowed counts; abs+rel for floats; NULL mismatch always",
+    "tradeoff": "Sensitivity to off-by-one vs noise false alarms."
+   },
+   {
+    "decision": "Track rows without recomputation separately",
+    "tradeoff": "Visibility of coverage gaps vs extra alert surface."
+   },
+   {
+    "decision": "Aggregate mismatch by feature, hour and version to attribute to deploys, batch jobs or cold start",
+    "tradeoff": "Granularity vs sample size per bucket."
+   },
+   {
+    "decision": "Alert per feature with sample-size-aware thresholds (rule of three) and higher sampling during canary",
+    "tradeoff": "Time to detect vs paging noise and compute cost."
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "Design."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Executed SQL, outputs; adds code."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (keep)",
+  "key_concepts_findings": "All discussed; \"NULL mismatch\" is minor but present.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0044",
+   "same_intent": false
+  },
+  "code_findings": "Fenced python block equals code.solution; SQL config equals the SQL inside solution (checked). sqlite3 execution: test passes on v310, v311, 3.13 and dep venv. Extra edge cases (all four interpreters identical): empty tables -> []; both NULL -> not a mismatch; off-by-one count flagged and a float within abs+rel tolerance not; duplicate rows in recomputed double-count (2 vs 1); a feature absent from tolerances is silently dropped by the inner join (blind spot, minor); served NULL vs recomputed value and the reverse both flagged. Stdlib only. No config claimed 'built/applied'. No contradiction found in mlops_existing.txt (questions only).",
+  "sources_findings": [
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule 29 'save the set of features used at serving time' ... 'do it for a small fraction'."
+   },
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Monitor 3 'Training and serving features compute the same values'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Lateness bound and sampling rate are illustrative."
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B4-MLO-14-6",
+  "verdict": "correct",
+  "reasons": [
+   "All numbers verified; one framing fix (horizon comparison of A vs B)."
+  ],
+  "parts_answered": {
+   "EV of A": true,
+   "EV of B": true,
+   "sensitivity": true,
+   "recommendation": true
+  },
+  "evidence": [
+   {
+    "claim": "A: 0.015*0.5*24M = 180,000; net 80,000; at 25% net -10,000; at 75% net 170,000",
+    "method": "executed",
+    "evidence": "calc.py."
+   },
+   {
+    "claim": "B: 55,385 - 3,945 = 51,439 per incident; x3 = 154,318; net year 1 34,318; later 94,318",
+    "method": "executed",
+    "evidence": "calc.py."
+   },
+   {
+    "claim": "Break-even 2.33 incidents (year 1), 1.17 (ongoing cost only)",
+    "method": "executed",
+    "evidence": "120,000/51,439; 60,000/51,439."
+   },
+   {
+    "claim": "Sensitivity 1,2,4 incidents -> -68,561; -17,121; +85,758",
+    "method": "executed",
+    "evidence": "matches -68,600/-17,100/+85,800."
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "detailed_answer",
+    "claim": "A has higher expected value in year 1 but much higher variance and a long payback uncertainty",
+    "problem": "Compares A's year 1 with B's year 1 only; A's uplift can persist (build cost not repeated: about 180,000 vs 94,300 in later years if the gain holds), which the answer omits.",
+    "replacement": "A has the higher expected net in year 1 (about 80,000 vs 34,300) and, if the gain persists, in later years too (the build cost is not repeated), but with much higher variance"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Expected-value arithmetic and sensitivity; judgement on sequencing.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "EV derivation and recommendation."
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "Sensitivity table and questions; numbers consistent."
+   }
+  ],
+  "suggested_answer_set": "detailed+practical (keep)",
+  "key_concepts_findings": "All discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-l0033",
+   "same_intent": false
+  },
+  "code_findings": null,
+  "sources_findings": [
+   {
+    "url": "https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf",
+    "status": "supported",
+    "evidence": "Sec 7 'Experience has shown that the external world is rarely stable.'"
+   },
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "28 tests; Monitor tests include training/serving skew and prediction quality regression."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Mixed 6/52 and 3/365 conventions (55,385 vs 6*7/365=55,233); immaterial."
+  ],
+  "code_patch": null
+ }
+]

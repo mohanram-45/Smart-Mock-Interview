@@ -1,0 +1,78 @@
+{
+ "name": "stage11t_memory_pairs_v1",
+ "src": "holdout5",
+ "evidence": "author-written controls for memory attribution on four cases that are NOT in the benchmark and not paraphrases of M01-M07; expectations were written before the rules were run on them. Same author as the rules: a sanity set, not independent evidence.",
+ "expect": "'mem' = accepted with the stored statement attributed by code; 'plain' = accepted with no attribution; 'refuse' = not shown. 'known_gap' marks a bad question the author expects the word-level rules to miss.",
+ "items": [
+  {
+   "id": "T5-01",
+   "topic": "Caching",
+   "question": "What is a cache eviction policy?",
+   "answer": "When the cache is full it removes an entry to make room for a new one.",
+   "concepts": [["E1", "least recently used"], ["E2", "time to live"], ["S1", "cache hit ratio"]],
+   "reference": "An eviction policy decides which entry to remove when the cache is full. Least recently used removes the entry that has gone longest without being read. A time to live expires an entry after a fixed period whether or not it is full. The cache hit ratio is the share of reads served from the cache.",
+   "memory": {"kind": "project", "quote": "I built a Redis cache in front of our product catalogue API.", "subject": "a Redis cache in front of our product catalogue API"},
+   "good": [
+    {"q": "If your Redis cache filled up during a sale, which entries would a least recently used policy remove first?", "expect": "mem"},
+    {"q": "Under a least recently used policy, which entry goes first when a full cache needs room for one more?", "expect": "plain"}
+   ],
+   "bad": [
+    {"q": "Why would the least recently used policy in your Redis cache remove the oldest entry?", "why": "places a policy inside their cache that they never said it uses, behind a 'would'"},
+    {"q": "How does least recently used eviction work in your Redis cache?", "why": "states as fact that their cache uses least recently used eviction"},
+    {"q": "How did you choose the least recently used policy for your Redis cache?", "why": "presupposes a decision they never described"},
+    {"q": "Earlier you said you built a Redis cache. How would least recently used eviction help it?", "why": "a second 'earlier you said' in front of the code-built lead"}
+   ]
+  },
+  {
+   "id": "T5-02",
+   "topic": "Statistics",
+   "question": "What does a p-value tell you?",
+   "answer": "How likely data this extreme would be if the null hypothesis were true.",
+   "concepts": [["E1", "significance level"], ["E2", "multiple comparisons"]],
+   "reference": "The significance level is the threshold, often 0.05, below which a p-value leads you to reject the null hypothesis. Running many tests at once inflates the chance of a false alarm; this is the multiple comparisons problem.",
+   "memory": {"kind": "explanation", "quote": "A confidence interval gives a range of plausible values for the true effect.", "subject": "confidence intervals"},
+   "good": [
+    {"q": "How would a 0.05 significance level relate to whether a 95% confidence interval for the effect includes zero?", "expect": "mem"},
+    {"q": "What would a 0.05 significance level mean for the chance of a false alarm in a single test?", "expect": "plain"}
+   ],
+   "bad": [
+    {"q": "How does your confidence interval analysis use the significance level?", "why": "an explanation of a concept presented as their own analysis"},
+    {"q": "How does a significance level of 0.05 hold when the null hypothesis is both true and false?", "why": "contradictory premise"}
+   ]
+  },
+  {
+   "id": "T5-03",
+   "topic": "Containers",
+   "question": "What is a layer in a container image?",
+   "answer": "Each instruction in the Dockerfile adds a layer on top of the previous one.",
+   "concepts": [["E1", "build cache"], ["E2", "multi-stage build"]],
+   "reference": "Docker reuses an unchanged layer from the build cache, so instructions that change rarely should come first. A multi-stage build compiles in one stage and copies only the result into a small final image.",
+   "memory": {"kind": "tool", "quote": "I use Docker Compose to run our Django app and Postgres locally.", "subject": "Docker Compose to run our Django app and Postgres"},
+   "good": [
+    {"q": "If the Dockerfile for your Django app copied the requirements before the source code, how would the build cache speed up rebuilds?", "expect": "mem"},
+    {"q": "How would the build cache behave if a rarely changing install step came before copying the source code?", "expect": "plain"}
+   ],
+   "bad": [
+    {"q": "How does the build cache in your Django app's Dockerfile skip the install step?", "why": "states how their Dockerfile is built"},
+    {"q": "Why would the build cache you rely on for your Django app break when the source changes?", "why": "'you rely on' asserts a practice they never described"},
+    {"q": "How did you use the build cache when you containerised your Django app?", "why": "presupposes past use"}
+   ]
+  },
+  {
+   "id": "T5-04",
+   "topic": "Concurrency",
+   "question": "What is a race condition?",
+   "answer": "Two threads change shared data at the same time and the result depends on timing.",
+   "concepts": [["E1", "mutex"], ["E2", "atomic operation"]],
+   "reference": "A mutex lets only one thread at a time enter the critical section that touches the shared data. An atomic operation completes as one indivisible step, so no other thread sees it half done.",
+   "memory": {"kind": "project", "quote": "I built a React dashboard for weekly sales reports.", "subject": "a React dashboard for weekly sales reports"},
+   "good": [
+    {"q": "How would a mutex stop two threads from updating the same counter at the same moment?", "expect": "plain"}
+   ],
+   "bad": [
+    {"q": "How would a mutex protect the shared data in your React dashboard?", "why": "superficial link: a browser dashboard is not where the candidate's threads share data; only meaning can tell", "known_gap": true},
+    {"q": "As you mentioned, your dashboard used locks; how would a mutex help there?", "why": "attributes a statement they never made (that the dashboard used locks)"}
+   ]
+  }
+ ]
+}

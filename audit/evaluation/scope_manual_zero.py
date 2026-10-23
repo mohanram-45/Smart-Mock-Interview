@@ -1,0 +1,85 @@
+"""Stage 3C-0 manual AI review of the 37 records that had NO essential concept under heuristic v1 (31) or v2 (27) - union 37.
+Drafted by Claude (AI) reading question + key concepts + reference. NOT human-verified. Concept strings must come from the record's key_concepts
+unless listed in 'added' (flagged). 'G' = essential group: at least `min` of its concepts must be demonstrated (any valid member counts)."""
+
+
+def g(label, concepts, mn):
+    return {"label": label, "concepts": concepts, "min_required": mn}
+
+
+OPEN = "open_ended_requirement"
+LIST = "list_type_question_any_valid_members"
+MULTI = "multi_part_question"
+REFAMB = "reference_broader_than_question"
+
+ZERO = {
+ "smi-0001": dict(E=["R-squared", "overfitting"], G=[g("alternative metric(s) better than R2, with a reason", ["adjusted R-squared", "cross-validation", "RMSE", "MAE", "AIC/BIC"], 1)], S=[], B=[],
+   flags=[MULTI], note="Two-part question: define R2 and say why/which metrics are better. 'Overfitting' is the 'why' (R2 never falls when predictors are added). Any one well-reasoned alternative suffices."),
+ "smi-0015": dict(E=["occupancy estimation", "utilisation vs capacity"], G=[], S=["peak vs average", "segmentation", "ground-truth calibration"], B=["MAC randomisation", "privacy"], flags=[OPEN],
+   note="Open case question; the core is estimating usage per room and comparing it with capacity. Privacy is good practice but not asked."),
+ "smi-0023": dict(E=[], G=[g("a scalable text-similarity method", ["shingling", "Jaccard similarity", "MinHash and LSH", "winnowing fingerprints", "paraphrase detection with embeddings"], 2)], S=["text normalisation"], B=[],
+   flags=[OPEN, LIST], alt=["Embedding-based semantic similarity with approximate nearest-neighbour search, or n-gram/TF-IDF cosine similarity, are valid alternatives to shingling+MinHash."],
+   note="Algorithm-design question; several valid families. Needs a human decision on the minimum acceptable depth."),
+ "smi-0024": dict(E=[], G=[g("a clustering method on customer features", ["k-means"], 1), g("a way to choose the number of clusters", ["elbow method", "silhouette score", "gap statistic"], 1)],
+   S=["RFM features", "feature scaling", "k-means++ initialisation"], B=[], flags=[MULTI],
+   alt=["Hierarchical clustering with a dendrogram cut, Gaussian mixtures with BIC, or DBSCAN (no k needed) are valid alternatives; the first group should accept them."],
+   note="The first group lists k-means only because the key-concept list does; any reasonable clustering algorithm should satisfy it (flag for the verifier)."),
+ "smi-0073": dict(E=[], G=[g("common applications of deep learning", ["computer vision", "natural language processing", "speech recognition", "recommender systems"], 3)], S=["convolutional neural networks", "transformers"], B=[],
+   flags=[LIST], alt=["Other genuine applications (healthcare imaging, autonomous driving, drug discovery, fraud detection, games) count toward the group."],
+   note="Easy list question; any three valid applications are enough. Architectures are supporting."),
+ "smi-0100": dict(E=[], G=[g("types of autoencoders", ["undercomplete autoencoder", "sparse autoencoder", "denoising autoencoder", "contractive autoencoder", "variational autoencoder"], 3)], S=["bottleneck", "reconstruction loss"], B=[],
+   flags=[LIST, REFAMB], note="The reference itself says there is no canonical list; 3 of 5 is a judgement call that should be confirmed by a human."),
+ "smi-0119": dict(E=["parameter sharing"], G=[g("further CNN advantages for images", ["local connectivity", "translation equivariance", "translation invariance", "hierarchical features", "overfitting"], 2)], S=["pooling"], B=[],
+   flags=[], alt=["Fewer parameters / lower memory than dense layers is an equivalent way to state parameter sharing."],
+   note="Translation invariance vs equivariance are technically different; treat either as acceptable here."),
+ "smi-0134": dict(E=["labelled training data"], G=[], S=["classification", "regression", "loss minimisation", "generalisation", "train/test split"], B=[], flags=[],
+   note="Easy definition question. The essential idea is learning input->output mapping from labelled examples; tasks and generalisation are supporting."),
+ "smi-0153": dict(E=["unlabelled data"], G=[g("an unsupervised task", ["clustering", "dimensionality reduction", "anomaly detection"], 1)], S=["evaluation without labels"], B=[], flags=[], note="Easy definition; one example task suffices."),
+ "smi-0185": dict(E=["multicollinearity", "coefficient instability"], G=[], S=["variance inflation factor", "feature importance dilution"], B=["ridge regression", "lasso", "PCA"], flags=[REFAMB],
+   alt=["Tree-based models are largely unaffected for prediction but dilute feature importance - a valid model-dependent answer."],
+   note="The question asks what happens, not remedies; remedies are background. The reference says effects depend on the model."),
+ "smi-0192": dict(E=[], G=[g("a way to handle mostly-zero features", ["sparse matrix format (CSR)", "L1 regularisation", "truncated SVD", "feature hashing", "linear SVM", "Naive Bayes", "embeddings"], 2)], S=[], B=[],
+   flags=[LIST, "ambiguous_term_sparse"], note="'Sparse' can mean mostly zeros or missing values; the reference only covers mostly zeros. An answer on missing-value imputation should be flagged for review, not marked wrong."),
+ "smi-0223": dict(E=[], G=[g("variable-selection algorithms/families", ["filter methods", "wrapper methods", "embedded methods", "recursive feature elimination", "permutation importance"], 2)], S=["impurity importance bias"], B=[], flags=[LIST],
+   note="Easy list question; naming families or concrete algorithms both count."),
+ "smi-0229": dict(E=["nominal vs ordinal", "linearity assumption"], G=[], S=["ordinal encoding", "misspecification"], B=["one-hot encoding", "tree-based models"], flags=[MULTI],
+   note="Two-part: when (ordinal, roughly equal gaps) and what effect (assumes linear spacing). One-hot and trees are context."),
+ "smi-0267": dict(E=["error versus genuine outlier"], G=[g("an outlier detection or treatment method", ["IQR rule", "z-score", "winsorising", "robust statistics", "isolation forest"], 2)], S=[], B=[], flags=[LIST]),
+ "smi-0297": dict(E=[], G=[g("candidate generation / ranking approach", ["two-stage retrieval and ranking", "candidate generation", "collaborative filtering", "content-based filtering"], 2), g("evaluation", ["NDCG@K", "A/B testing"], 1)],
+   S=["cold start", "implicit feedback"], B=[], flags=[OPEN], note="Hard open design question; there is no single required component. Human review needed before any scoring of design answers."),
+ "smi-0308": dict(E=[], G=[g("variable-selection approach", ["filter wrapper embedded methods", "lasso feature selection", "recursive feature elimination", "mutual information", "permutation importance"], 2)], S=["correlated features", "data leakage in feature selection"], B=[], flags=[LIST]),
+ "smi-0314": dict(E=["68-95-99.7 rule", "tail probability"], G=[], S=["normal distribution", "z-score", "symmetry of the normal"], B=["truncated distribution"], added=["result: about 31.7% remains"], flags=["numeric_answer"],
+   alt=["0.317 / 31.7% / roughly 32% / 'about a third'; 1 - erf(1/sqrt(2)); 100% - 68.27% are all equivalent."],
+   note="The question needs a number (~31.7%). The key-concept list does not contain it, so a derived essential 'result' is added and flagged. Mathematically equivalent forms must match."),
+ "smi-0339": dict(E=["NLP"], G=[], S=["tokenization", "POS tagging", "NER", "sentiment analysis"], B=[], flags=["label_is_a_definition"],
+   alt=["'natural language processing' = 'NLP'; a definition in the candidate's own words satisfies the essential concept."],
+   note="'NLP' as a key concept means 'the field of enabling computers to process human language' (definition-level match). Task examples are supporting only."),
+ "smi-0380": dict(E=[], G=[g("a metric for balanced binary classification", ["accuracy", "ROC-AUC", "F1 score", "confusion matrix"], 1), g("a metric suited to imbalance", ["precision and recall", "PR-AUC", "F1 score"], 1),
+   g("a multi-class averaging approach", ["macro F1", "micro F1", "confusion matrix"], 1)], S=[], B=[], flags=[MULTI], note="Three-part question; each part has its own group (groups may overlap)."),
+ "smi-0383": dict(E=[], G=[g("reasons for fewer predictors", ["overfitting", "bias-variance trade-off", "multicollinearity", "interpretability", "curse of dimensionality"], 2)], S=["feature selection", "lasso"], B=[], flags=[LIST]),
+ "smi-0391": dict(E=["donation propensity"], G=[g("a valid modelling safeguard", ["temporal split", "data leakage"], 1)], S=["RFM features", "PR-AUC and lift", "class imbalance"], B=["uplift modelling"], flags=[OPEN],
+   note="Essential idea = framing as a propensity (classification) problem; safeguards are expected in a good answer but any one suffices here."),
+ "smi-0392": dict(E=["demand forecasting", "grid cells"], G=[], S=["Poisson regression", "demand-supply ratio", "smoothing", "time-based backtest", "driver herding"], B=[], flags=[OPEN]),
+ "smi-0397": dict(E=["free-to-paid conversion"], G=[g("e-commerce success metric", ["conversion funnel", "average order value", "customer lifetime value"], 1), g("subscription success metric", ["churn rate", "MRR", "LTV/CAC"], 1)],
+   S=["cohort analysis"], B=[], flags=[MULTI]),
+ "smi-0399": dict(E=[], G=[g("in-app purchase success metrics", ["payer conversion", "ARPU vs ARPPU", "customer lifetime value", "purchase frequency", "retention cohorts"], 2)], S=["refund rate", "revenue concentration"], B=[], flags=[LIST]),
+ "smi-0405": dict(E=["randomised controlled experiment"], G=[g("finding the optimal ad/organic balance", ["ad load response curve", "revenue-engagement trade-off", "holdout group", "guardrail metrics"], 2)],
+   S=["unit of randomisation", "retention and long-term effects", "network interference"], B=[], flags=[MULTI]),
+ "smi-0406": dict(E=["supply-demand balance"], G=[g("how to start investigating", ["price elasticity", "demand forecasts", "randomised price experiments", "switchback experiments"], 2)], S=["fulfilment rate", "marketplace interference"], B=[], flags=[MULTI]),
+ "smi-0407": dict(E=["viewing behaviour"], G=[g("a decision approach", ["subscriber retention", "taste segments", "comparable titles", "portfolio risk"], 2)], S=["confounding", "licensing alternative"], B=[], flags=[OPEN]),
+ "smi-0438": dict(E=["execution plan"], G=[g("a concrete way to speed up the query", ["index design", "sargable predicates", "statistics", "keyset pagination", "N+1 queries", "materialized view"], 2)], S=[], B=[], flags=[LIST],
+   note="Hard SQL question where 'measure first' (execution plan) is the key idea; any two concrete fixes are acceptable."),
+ "smi-0463": dict(E=[], G=[g("a mocking mechanism in pytest", ["unittest.mock.patch", "monkeypatch fixture"], 1)], S=["return_value and side_effect", "autospec", "assert_called_once_with", "patch where it is used", "test isolation"], B=[], flags=[],
+   alt=["The pytest-mock plugin's `mocker` fixture is a valid alternative to unittest.mock.patch."]),
+ "smi-k0001": dict(E=["schema validity vs semantic correctness"], G=[g("an extra verification layer", ["nullable fields", "cross-field invariants", "grounding check", "field-level accuracy", "human review routing"], 2)], S=["constrained decoding"], B=[], flags=[MULTI]),
+ "smi-k0009": dict(E=["idempotency key", "server-side authorisation", "approval thresholds"], G=[], S=["ambiguous timeout", "status check before retry", "propose and commit", "audit log"], B=[], flags=[MULTI],
+   note="Question asks for duplicate prevention, unauthorised-refund prevention and where a human sits; one essential per ask."),
+ "smi-k0016": dict(E=["pointwise vs pairwise judging", "tie handling", "pair-count growth"], G=[], S=["order swap", "position bias", "Bradley-Terry aggregation", "length bias"], B=[], flags=[MULTI],
+   note="Asks: scale choice, ties/inconsistency, cost. Position/length bias are expected evidence for inconsistency but any valid treatment counts."),
+ "smi-k0025": dict(E=["frozen 4-bit base weights", "step-time overhead", "evaluate the deployed artefact"], G=[], S=["dequantise on the fly", "higher-precision adapters", "activation memory", "merging adapters into a different-precision base"], B=[], flags=[MULTI]),
+ "smi-k0026": dict(E=["human-only evaluation set"], G=[g("a risk of training on synthetic data", ["diversity collapse", "error propagation", "model-generated training data"], 1), g("a control", ["near-duplicate filtering", "mixing ratio ablation"], 1)],
+   S=[], B=["data licence and terms review"], flags=[MULTI]),
+ "smi-l0002": dict(E=["silent failure"], G=[g("a reproducibility cause", ["unpinned dependencies", "container image", "data version", "hardware nondeterminism", "run-to-run variance"], 2)], S=[], B=[], flags=[]),
+ "smi-m0022": dict(E=["membership inference", "overfitting gap"], G=[g("a ranked mitigation", ["output rounding", "rate limiting", "differential privacy", "label-only attacks"], 2)], S=["attack AUC measurement"], B=[], flags=[MULTI]),
+ "smi-m0035": dict(E=["proxy metric", "long-term holdback"], G=[g("a plausible mechanism", ["novelty effect", "outcome horizon", "exposure narrowing", "seasonality confound"], 2)], S=["difference-in-differences"], B=[], flags=[MULTI]),
+}

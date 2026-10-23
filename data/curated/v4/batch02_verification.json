@@ -1,0 +1,1360 @@
+[
+ {
+  "id": "smi-h0003",
+  "plan_id": "P2-NLP-03",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "Bucket counts sum to the sample",
+    "method": "derivation",
+    "evidence": "24+21+9+6=60"
+   },
+   {
+    "claim": "21/60 95% interval roughly 24% to 48%",
+    "method": "derivation",
+    "evidence": "Wilson interval computed: 24.2% to 47.6%"
+   },
+   {
+    "claim": "RAGAS context recall is reference-based",
+    "method": "doc",
+    "evidence": "ragas _context_recall.py: LLM classifies each sentence of the 'reference' answer as attributable to retrieved context or not; score = attributed fraction"
+   },
+   {
+    "claim": "RAGAS answer relevancy = generated questions vs original question embedding similarity",
+    "method": "doc",
+    "evidence": "ragas _answer_relevance.py: generates questions from the answer (strictness=3), mean cosine similarity with the user question, times 0 if answer noncommittal"
+   },
+   {
+    "claim": "Reranker over top-50 rescues at most the 15 in top-50",
+    "method": "derivation",
+    "evidence": "upper bound wording present ('at most')"
+   },
+   {
+    "claim": "Mid-context evidence use degrades (Lost in the Middle)",
+    "method": "background_only",
+    "evidence": "already hedged in text as empirical and model-dependent"
+   },
+   {
+    "claim": "Original flags (upper bound, operationalise answer relevance) fixed",
+    "method": "derivation",
+    "evidence": "text now says 'at most those 15' and gives judge-rubric and RAGAS method"
+   }
+  ],
+  "remaining_limitations": [
+   "Lost-in-the-middle and NLI/LLM-judge faithfulness claims rest on background knowledge, hedged in text."
+  ],
+  "fixes": [],
+  "code_patch_applied": false,
+  "code_rerun": {
+   "py3.13": "n/a",
+   "py3.11": "n/a",
+   "py3.10": "n/a"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0004",
+  "plan_id": "P2-NLP-04",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "65,536 params per adapter, 0.39%, 4,194,304 total vs 1,073,741,824",
+    "method": "executed",
+    "evidence": "r*(d_in+d_out)=65536; 64*65536=4194304; 64*16777216=1073741824; ratio 0.00390625 matches example"
+   },
+   {
+    "claim": "Merged = unmerged and rank(delta)<=r",
+    "method": "executed",
+    "evidence": "200 random seeds: rank(Wm-W)==4 each time at tol 1e-9; float32 max diff 3.8e-6; algebra x(W+sBA)^T = xW^T + s(xA^T)B^T derived"
+   },
+   {
+    "claim": "Zero B and zero A/B both give no gradient",
+    "method": "derivation",
+    "evidence": "dL/dB ∝ (..)(A x)^T =0 when A=0 ... with B=0 and A=0 both gradients vanish; with B=0, A!=0 only B gets gradient initially"
+   },
+   {
+    "claim": "alpha/r scaling reduces retuning when varying r",
+    "method": "background_only",
+    "evidence": "LoRA paper (arXiv 2106.09685) could not be opened here (egress blocked); text already hedges 'empirical'"
+   },
+   {
+    "claim": "Flagged issue (no demo code) fixed",
+    "method": "executed",
+    "evidence": "demonstration block present and included verbatim in test; both fenced blocks match tested code"
+   }
+  ],
+  "remaining_limitations": [
+   "alpha/r rationale and 'close to full fine-tuning' claims are background_only, but hedged in the text."
+  ],
+  "fixes": [],
+  "code_patch_applied": false,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0006",
+  "plan_id": "P2-NLP-06",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "best_span correct incl. ties, mask, max length",
+    "method": "executed",
+    "evidence": "300 random brute-force comparisons (integer logits so many ties) identical; example (2,4,5.5) and (2,3) reproduced; max_answer_len=0 and empty mask return None"
+   },
+   {
+    "claim": "Span of length <= overlap+1 lies inside some window",
+    "method": "derivation",
+    "evidence": "largest start s<=a has a-s<=step-1, so window end s+wl-1 >= a+overlap >= b; exhaustively checked for n<40, wl 2..8, all overlaps"
+   },
+   {
+    "claim": "sliding_windows example and edge cases",
+    "method": "executed",
+    "evidence": "(10,4,2)->[(0,4),(2,6),(4,8),(6,10)]; n=0 -> [(0,0)]; n<=window -> single window"
+   },
+   {
+    "claim": "Null decision null_score - best > threshold; min null score across windows is an implementation choice",
+    "method": "background_only",
+    "evidence": "matches HF/SQuAD-v2 convention from memory; text hedges 'differs between implementations'"
+   },
+   {
+    "claim": "Flagged issues (merge_windows null handling, input format)",
+    "method": "derivation",
+    "evidence": "text now states merge_windows merges only real spans and null decision must be applied by caller; format documented in docstring"
+   }
+  ],
+  "remaining_limitations": [
+   "Cross-window logit calibration remark is background knowledge, hedged."
+  ],
+  "fixes": [],
+  "code_patch_applied": false,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0007",
+  "plan_id": "P2-NLP-07",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "fastText defaults bucket=2000000, minn=3, maxn=6",
+    "method": "doc",
+    "evidence": "fastText src/args.cc: bucket=2000000; minn=3; maxn=6 in the constructor, BUT parseArgs for 'supervised' sets minn=0, maxn=0"
+   },
+   {
+    "claim": "Hash is an FNV-1a variant",
+    "method": "doc",
+    "evidence": "dictionary.cc: h=2166136261; h ^= uint32_t(int8_t(c)); h*=16777619 (sign-extended bytes, so non-ASCII ids differ from plain unsigned FNV-1a)"
+   },
+   {
+    "claim": "n-grams by code point, markers, whole marked word",
+    "method": "doc",
+    "evidence": "computeSubwords skips UTF-8 continuation bytes (code-point aware); in-vocab word uses its own row id, not a hash"
+   },
+   {
+    "claim": "fnv1a_32('a')=0xE40C292C, 'foobar'=0xBF9CF968, ''=2166136261",
+    "method": "executed",
+    "evidence": "asserted and re-printed"
+   },
+   {
+    "claim": "Jaccard refund/refundd = 0.5; refund/refnud ~ 0.09",
+    "method": "executed",
+    "evidence": "0.5 and 0.0857"
+   },
+   {
+    "claim": "Flagged: marker wording, defaults hedge, hashed '<word>' unit",
+    "method": "derivation",
+    "evidence": "marker wording fixed; defaults hedged; deviation of always adding hashed whole word only implicit"
+   }
+  ],
+  "remaining_limitations": [
+   "Code deliberately deviates from fastText (always adds hashed '<word>', unsigned-byte FNV); answer says ids will not match pretrained models."
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "fastText's default is, to my knowledge, around two million buckets and n-gram lengths 3 to 6, but check your version;",
+    "problem": "Defaults of 2,000,000 buckets and minn 3 / maxn 6 hold for the general (skipgram/cbow) settings, but fastText's supervised classifier mode, the relevant one for a ticket classifier, sets minn=maxn=0 (no subwords) unless enabled.",
+    "replacement": "fastText's general defaults are 2,000,000 buckets and n-gram lengths 3 to 6 (per its source, args.cc), but its supervised classifier mode sets minn and maxn to 0 (no subwords) unless you pass -minn/-maxn;"
+   },
+   {
+    "severity": "minor",
+    "claim": "so never mix them.",
+    "problem": "Implementation always adds a hashed whole-word unit '<word>' (as the task specifies); real fastText uses the word's own vocabulary row for in-vocabulary words instead. Not stated.",
+    "replacement": "so never mix them. This implementation also always adds the hashed whole marked word as one extra unit, as the task specifies; real fastText uses the word's own vocabulary row for in-vocabulary words instead."
+   }
+  ],
+  "code_patch_applied": false,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0008",
+  "plan_id": "P2-NLP-08",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "Arithmetic: 6% of 500 = 30; 35% majority floor",
+    "method": "derivation",
+    "evidence": "30 one-star in a 10% (500) test split; majority class 35%"
+   },
+   {
+    "claim": "Protocol (dedupe/group, macro-F1, QWK/MAE, bootstrap CI, learning curve, paired seeds) is standard",
+    "method": "background_only",
+    "evidence": "standard evaluation practice; no numeric claim beyond arithmetic"
+   },
+   {
+    "claim": "TF-IDF+LR latency few ms; base encoder marginal on one core",
+    "method": "background_only",
+    "evidence": "hedged in text ('normally', 'confirm with the latency check', 'can be marginal')"
+   },
+   {
+    "claim": "Flagged issues (hedge latency, explicit decision rule)",
+    "method": "derivation",
+    "evidence": "text now ties latency to measurement and states paired comparison with lower CI bound above pre-agreed threshold"
+   }
+  ],
+  "remaining_limitations": [
+   "Latency and 'transformers often help on small sentiment sets' are unmeasured, hedged claims."
+  ],
+  "fixes": [],
+  "code_patch_applied": false,
+  "code_rerun": {
+   "py3.13": "n/a",
+   "py3.11": "n/a",
+   "py3.10": "n/a"
+  },
+  "difficulty_ok": false,
+  "suggested_difficulty": "Hard"
+ },
+ {
+  "id": "smi-h0009",
+  "plan_id": "P2-NLP-09",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Example: dot order [1,0,2]; cosine [2,1,0]; Euclidean [2,0,1]",
+    "method": "executed",
+    "evidence": "dot=[10,19,0.905]; squared L2=[81.81,163.81,0.4525]; cosine verified by topk_cosine"
+   },
+   {
+    "claim": "Identity |a-b|^2=|a|^2+|b|^2-2a.b and equal-norm condition",
+    "method": "derivation",
+    "evidence": "algebra; equal doc norms make all three monotone for a fixed query"
+   },
+   {
+    "claim": "topk_cosine correctness",
+    "method": "executed",
+    "evidence": "200 random integer-matrix trials (heavy ties, zero rows, k>n) match lexsort reference; 1000 identical rows -> [0,1,2]; k=0 returns empty"
+   },
+   {
+    "claim": "Memory 1M x 768 float32 = ~3.07 GB",
+    "method": "derivation",
+    "evidence": "1e6*768*4 = 3.072e9"
+   },
+   {
+    "claim": "Anisotropy / hubness caveats",
+    "method": "background_only",
+    "evidence": "hedged in text as empirical"
+   },
+   {
+    "claim": "Flagged Euclidean claim and sufficiency claim fixed",
+    "method": "executed",
+    "evidence": "text now correctly says Euclidean demotes long vectors but penalises any norm mismatch; equal-norm condition added"
+   }
+  ],
+  "remaining_limitations": [
+   "Reference function copies matrix to float64 per call (~6 GB at 1M x 768, plus normalised copy) -- original minor flag only partly addressed."
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "At 1M x 768 float32 the matrix is about 3.07 GB, so normalise once",
+    "problem": "Code builds a float64 copy plus a normalised float64 copy of the whole matrix on every call (~6 GB each at 1M x 768), fails with IndexError on an empty matrix (n=0), and 'ties by lower index' holds only for bit-identical scores; none is stated, although the answer advises normalising once.",
+    "replacement": "The function above is a reference version: it converts the whole matrix to float64 and normalises it on every call (about 6 GB per copy at 1M x 768), assumes at least one row, and breaks ties by lower index only for bit-identical scores (parallel rows scaled differently can differ by an ulp). At 1M x 768 float32 the matrix is about 3.07 GB, so normalise once"
+   }
+  ],
+  "code_patch_applied": false,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0010",
+  "plan_id": "P2-NLP-10",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "recall@3=1/3, recall@5=2/3, RR=0.5",
+    "method": "executed",
+    "evidence": "reproduced"
+   },
+   {
+    "claim": "nDCG@5 = 0.578 linear, 0.608 exponential",
+    "method": "executed",
+    "evidence": "0.57838, 0.60776"
+   },
+   {
+    "claim": "Duplicate policy (drop repeats, shift up)",
+    "method": "executed",
+    "evidence": "reciprocal_rank(['a','a','b'],{'b'})=0.5; recall@2=1.0, consistent with question wording"
+   },
+   {
+    "claim": "Edge cases",
+    "method": "executed",
+    "evidence": "k=0 -> 0.0; empty/zero gains -> 0.0; fractional gains with exponential OK; empty runs -> 0.0"
+   },
+   {
+    "claim": "nDCG=1 iff gain sequence equals ideal; recall cap when >k relevant; pooling penalises unjudged",
+    "method": "derivation",
+    "evidence": "follows from definitions"
+   },
+   {
+    "claim": "Flagged issues (duplicate wording, MRR wording, nDCG=1 wording)",
+    "method": "derivation",
+    "evidence": "all three rewritten correctly"
+   }
+  ],
+  "remaining_limitations": [],
+  "fixes": [],
+  "code_patch_applied": false,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0011",
+  "plan_id": "P2-NLP-11",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Pad==EOS and loss masking by token id stops EOS learning",
+    "method": "background_only",
+    "evidence": "well-known pitfall (e.g. HF collators set labels=-100 where id==pad_id); stated as a conditional in the text"
+   },
+   {
+    "claim": "Last-token readout with right padding reads a pad position",
+    "method": "derivation",
+    "evidence": "causal attention: real tokens never see later pads, so only the read index is wrong"
+   },
+   {
+    "claim": "Left padding needs mask-derived position ids",
+    "method": "background_only",
+    "evidence": "hedged ('implementation-dependent')"
+   },
+   {
+    "claim": "Flagged issues (context length, tokenizer padding/truncation side) added",
+    "method": "derivation",
+    "evidence": "steps 4 and 6 now include them"
+   },
+   {
+    "claim": "'short examples receive most padding' vs length-sorted batches",
+    "method": "derivation",
+    "evidence": "sorting by length minimises in-batch padding, so this explanation only holds with fixed max_length padding or mixed-length batches; step 1 states it unconditionally"
+   }
+  ],
+  "remaining_limitations": [
+   "Tolerances (1e-4 in fp32) are rule-of-thumb figures, hedged as 'roughly'."
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "This matches the symptom that short examples, which receive the most padding, suffer most.",
+    "problem": "With batches of 32 sorted by length (change 2) in-batch padding is small, so short tickets only receive the most padding when padded to a fixed max_length (such as 1024, change 3) or when batch lengths are mixed; the unconditional statement conflicts with the question's own setup.",
+    "replacement": "This matches the symptom that short examples suffer most, provided they receive the most padding: that happens when batches are padded to a fixed max_length (see step 6) or mix very different lengths, whereas length-sorted batches normally keep padding small, so check which padding strategy is actually used."
+   }
+  ],
+  "code_patch_applied": false,
+  "code_rerun": {
+   "py3.13": "n/a",
+   "py3.11": "n/a",
+   "py3.10": "n/a"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0012",
+  "plan_id": "P2-NLP-12",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "contamination_report spec incl. None for short items, case/punctuation normalisation",
+    "method": "executed",
+    "evidence": "tests pass; 8-token item with n=8 returns 0.0/1.0 only; 'a b ... h' short -> proper; Chinese text -> (None, False)"
+   },
+   {
+    "claim": "GPT-3 paper used 13-gram overlap",
+    "method": "background_only",
+    "evidence": "hedged in text ('often cited'); source not opened"
+   },
+   {
+    "claim": "Flagged: threshold trade-off and non-Latin tokeniser",
+    "method": "derivation",
+    "evidence": "both now present"
+   },
+   {
+    "claim": "'10% overlap on an 8-token question'",
+    "method": "derivation",
+    "evidence": "8-token item with default n=8 has exactly one 8-gram so overlap is 0 or 1; with n=3 it has 6 n-grams (steps of 16.7%); 10% is impossible"
+   }
+  ],
+  "remaining_limitations": [
+   "Accented Latin letters are also split by [a-z0-9]+ (e.g. 'café' -> 'caf'); only non-Latin scripts are mentioned."
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "A full match of a 40-token question is strong evidence of exposure; 10% overlap on an 8-token question is not.",
+    "problem": "An 8-token item has a single 8-gram at the default n=8, so its overlap is only 0 or 1; '10% on an 8-token question' cannot occur and the contrast is misleading.",
+    "replacement": "A full match of a 40-token question (all 33 of its 8-grams) is strong evidence of exposure; one matching 8-gram out of 33 (about 3%) may just be a quoted phrase, and an 8-token item has only a single 8-gram at n=8, so its overlap can only be 0 or 1."
+   }
+  ],
+  "code_patch_applied": false,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0013",
+  "plan_id": "P2-DL-01",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "x*x gives 6.0, x+x gives 2.0; '=' instead of '+=' gives 3.0 for x*x",
+    "method": "derivation",
+    "evidence": "closure assigns other.data*out.grad=3 twice -> 3.0; executed correct code gives 6.0/2.0"
+   },
+   {
+    "claim": "Engine matches central differences on tanh/relu/pow diamond graphs",
+    "method": "executed",
+    "evidence": "5 random points, h=1e-6, |err|<1e-7 for both partials; analytic tanh(x^3-x^2) grad 0.010727605 matches"
+   },
+   {
+    "claim": "Second backward() without zeroing accumulates",
+    "method": "executed",
+    "evidence": "y=x*x; y.backward() twice -> x.grad 12.0"
+   },
+   {
+    "claim": "Recursive DFS hits recursion limit on deep graphs",
+    "method": "executed",
+    "evidence": "chain of 2000 adds -> RecursionError (limit 1000)"
+   },
+   {
+    "claim": "Central difference h~1e-6 agrees to ~1e-8",
+    "method": "derivation",
+    "evidence": "truncation O(h^2 f''')~1e-12, rounding ~eps/h~1e-10"
+   },
+   {
+    "claim": "Original terminology flag (parents/children)",
+    "method": "executed",
+    "evidence": "answer prose now says operands; consistent with code"
+   },
+   {
+    "claim": "Original flag: 2 - x raised TypeError although question says '-' is supported",
+    "method": "executed",
+    "evidence": "still TypeError in the submitted code (no __rsub__)"
+   }
+  ],
+  "remaining_limitations": [
+   "pow with negative base and fractional exponent yields complex data; 0**negative raises ZeroDivisionError (edge, not claimed)",
+   "recursive DFS (disclosed in answer)"
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "    def __sub__(self, other):\n        return self + (-other if isinstance(other, Value) else -other)\n",
+    "problem": "Previously flagged and still unfixed: '2 - x' raises TypeError although the question asks for '-' support.",
+    "replacement": "    def __sub__(self, other):\n        return self + (-other if isinstance(other, Value) else -other)\n\n    def __rsub__(self, other):             # supports 2 - x\n        return (-self) + other\n"
+   }
+  ],
+  "code_patch_applied": true,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0019",
+  "plan_id": "P2-DL-07",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "Linear scaling rule lr = 0.1*k; warmup from 0.1 to kη over 5 epochs",
+    "method": "paper",
+    "evidence": "Goyal et al. 2017 (arXiv 1706.02677): 'When the minibatch size is multiplied by k, multiply the learning rate by k'; 'starts with η = 0.1 and is linearly increased ... over 5 epochs'"
+   },
+   {
+    "claim": "Plain BN uses per-GPU batch statistics",
+    "method": "paper",
+    "evidence": "Goyal: 'the BN statistics should not be computed across all workers'; n=32 per worker kept constant"
+   },
+   {
+    "claim": "1.28M images at batch 2048: 3-5 epochs = ~1,900-3,100 steps",
+    "method": "derivation",
+    "evidence": "1.28e6/2048=625 steps/epoch -> 1875 to 3125"
+   },
+   {
+    "claim": "Executed numbers: shard-mean vs full gradient ~1e-16; ragged-chunk unweighted error ~2e-3 vs gradient magnitude ~5e-2; weighted error ~3e-17; sum = 8x",
+    "method": "executed",
+    "evidence": "max naive err 1.81e-3, max |grad| 4.57e-2; micro=1,7,5000 also match full-batch to 1e-16"
+   },
+   {
+    "claim": "Square-root scaling for Adam-type optimisers is often used",
+    "method": "background_only",
+    "evidence": "Goyal reports sqrt scaling performs worse than linear for SGD at 8k; Adam-sqrt support is from Malladi et al. 2022 (not opened). Text is hedged ('often used', 'tuned value')"
+   },
+   {
+    "claim": "Accumulation vs SyncBN/GroupNorm trade-offs, 2 GPUs x 4 x 256 = 2048",
+    "method": "derivation",
+    "evidence": "arithmetic and standard BN mechanics; hedged"
+   }
+  ],
+  "remaining_limitations": [
+   "With accumulation BN running statistics are updated 8 times per optimiser step instead of once (affects eval-time running stats slightly, not mentioned)",
+   "Sqrt-scaling-for-Adam rests on background knowledge but is hedged"
+  ],
+  "fixes": [],
+  "code_patch_applied": false,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0020",
+  "plan_id": "P2-DL-08",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Wrong-axis softmax with batch 1 gives all ones, argmax 0, loss exactly 0",
+    "method": "executed",
+    "evidence": "test passes on 3.10/3.11/3.13; np.argmax returns first max on ties"
+   },
+   {
+    "claim": "For B>1 wrong-axis loss starts near ln B (4.16 for B=64) and argmax is not always class 0",
+    "method": "executed",
+    "evidence": "B=64 small logits: loss 4.157 vs ln64 4.159; argmax histogram spread over classes"
+   },
+   {
+    "claim": "Original flags (not explaining 2.30; explicit disclaimer)",
+    "method": "executed",
+    "evidence": "answer now states it explicitly"
+   },
+   {
+    "claim": "diagnose() on constant 90/10 case: accuracy 0.9 = baseline, zero logit std",
+    "method": "executed",
+    "evidence": "test passes; also all-one-class and NaN-logit edge cases run"
+   }
+  ],
+  "remaining_limitations": [
+   "Checklist ordering is heuristic (opinion), reasonably hedged by 'cheapest and most likely first'"
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "        \"row_sums_ok\": bool(np.allclose(softmax(logits, axis=1).sum(axis=1), 1.0)),",
+    "problem": "Previously flagged, still unfixed: row_sums_ok recomputes its own softmax over axis 1, so it is always True (False only for NaN) and cannot catch a wrong-axis bug; the key name suggests otherwise.",
+    "replacement": "        \"row_sums_ok\": bool(np.allclose(softmax(logits, axis=1).sum(axis=1), 1.0)),   # recomputes its own softmax: sanity only, cannot catch a wrong-axis bug in the model"
+   }
+  ],
+  "code_patch_applied": true,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0022",
+  "plan_id": "P2-DL-10",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Brute-force match, ln N for identical embeddings, ~0 for orthonormal, naive exp overflow at tau=1e-3",
+    "method": "executed",
+    "evidence": "test passes on all three; typo 'sum' reduction returned a per-sample vector (confirmed)"
+   },
+   {
+    "claim": "Duplicates give loss floor ln 2 (ln 3 for three duplicates)",
+    "method": "derivation",
+    "evidence": "identical logits for duplicate columns -> lse >= logit + ln k; executed: 1.0986 for 3 duplicates"
+   },
+   {
+    "claim": "Small tau concentrates gradient on hardest negatives",
+    "method": "executed",
+    "evidence": "row softmax mass at tau 0.05: 0.90 on one negative; tau 5: ~0.2 each"
+   },
+   {
+    "claim": "Symmetric-loss clause removed; masking keeps positive",
+    "method": "executed",
+    "evidence": "answer text now reads 'mask known same-class pairs (other than the positive itself)'"
+   },
+   {
+    "claim": "0.05-0.5 temperature starting range",
+    "method": "background_only",
+    "evidence": "hedged in text ('common starting points ... tune it')"
+   }
+  ],
+  "remaining_limitations": [
+   "Zero-norm embeddings give NaN (not claimed)"
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "    return per_sample.mean() if reduction == \"mean\" else per_sample",
+    "problem": "Previously flagged, still unfixed: any reduction other than 'mean' (typo, 'sum') silently returns the per-sample vector.",
+    "replacement": "    if reduction == \"mean\":\n        return per_sample.mean()\n    if reduction == \"none\":\n        return per_sample\n    raise ValueError(\"reduction must be 'mean' or 'none'\")"
+   }
+  ],
+  "code_patch_applied": true,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0025",
+  "plan_id": "P2-PY-03",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "Missing re-raise in @contextmanager silently suppresses; RuntimeError only if generator yields again",
+    "method": "executed",
+    "evidence": "bad(): with-block ValueError suppressed silently; yielding twice -> RuntimeError \"generator didn't stop after throw()\" (3.10, 3.11, 3.13)"
+   },
+   {
+    "claim": "Both forms: rollback on body error incl. KeyboardInterrupt/SystemExit, commit failure -> rollback + commit error propagates",
+    "method": "executed",
+    "evidence": "test + extra: events [begin, rollback] / [begin, commit, rollback]"
+   },
+   {
+    "claim": "Rollback failure chains original as __context__",
+    "method": "executed",
+    "evidence": "test asserts __context__ is ValueError; commit+rollback both failing gives RuntimeError with OSError as __context__"
+   },
+   {
+    "claim": "Original RuntimeError-vs-silent flag fixed",
+    "method": "executed",
+    "evidence": "answer now correct"
+   }
+  ],
+  "remaining_limitations": [
+   "If rollback also fails after a failed commit, the rollback error (not the commit error) propagates with the commit error as __context__; answer discloses chaining generally"
+  ],
+  "fixes": [],
+  "code_patch_applied": false,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0026",
+  "plan_id": "P2-PY-04",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "Eager ValueError, laziness (0 pulls before first next), O(n) window, tuple snapshots",
+    "method": "executed",
+    "evidence": "test passes; extras on infinite itertools.count with islice; shorter-than-n input yields nothing"
+   },
+   {
+    "claim": "Matches itertools.batched on 3.13 for ranges/strings/empty",
+    "method": "executed",
+    "evidence": "list equality on range(7),3 / '' / range(4),2; batched also raises ValueError eagerly"
+   },
+   {
+    "claim": "islice(list, n) restarts each time",
+    "method": "derivation",
+    "evidence": "islice calls iter(list) freshly; shared iter() required"
+   },
+   {
+    "claim": "itertools.batched exists from 3.12 and yields tuples",
+    "method": "executed",
+    "evidence": "present and tuple-yielding in 3.13 (3.12 introduction is background_only; docs fetch was blocked)"
+   }
+  ],
+  "remaining_limitations": [
+   "Non-int n such as 2.0 raises ValueError lazily at first next (not required)"
+  ],
+  "fixes": [],
+  "code_patch_applied": false,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0029",
+  "plan_id": "P2-PY-07",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Example [[0,25],[2,13]], matches loop and broadcast, never negative",
+    "method": "executed",
+    "evidence": "tests pass; extra: empty A gives (0,m)"
+   },
+   {
+    "claim": "25.6 GB per (5000,5000,128) float64 array; diff**2 second temporary",
+    "method": "derivation",
+    "evidence": "5000*5000*128*8 = 25.6e9 bytes"
+   },
+   {
+    "claim": "Centering reduces cancellation",
+    "method": "executed",
+    "evidence": "offset 1e8: centered err 2.5e-7, uncentered 167 with 140 negative entries; offset 1e6: 1.7e-9 vs 1.3e-2"
+   },
+   {
+    "claim": "float32 expansion error much larger",
+    "method": "executed",
+    "evidence": "float32 plain expansion max err 7.7e-6 vs float64 1.4e-14"
+   }
+  ],
+  "remaining_limitations": [
+   "Centering reduces but does not eliminate cancellation for close points (answer says 'reduces')"
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "while the expansion needs only the (n, m) output plus small vectors.",
+    "problem": "Imprecise: the expansion also materialises several (n, m) temporaries (A @ B.T, 2.0*product, a2+b2), not only the output.",
+    "replacement": "while the expansion needs a few (n, m) arrays (the product A @ B.T and its temporaries, one of which becomes the output) plus small vectors, with no n x m x d array."
+   }
+  ],
+  "code_patch_applied": false,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0032",
+  "plan_id": "P2-PY-10",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "Quadratic = 19,900 __eq__ calls; hash = 200 __hash__, 0 __eq__ calls",
+    "method": "executed",
+    "evidence": "19900 / 200 / 0 measured; colliding hashes force many eq calls (22355 for 200 all-colliding)"
+   },
+   {
+    "claim": "Sorted version ~n log2 n __lt__ calls",
+    "method": "executed",
+    "evidence": "1273 lt calls on shuffled 200 (bound 1529); test asserts upper bound"
+   },
+   {
+    "claim": "Same nan object: set version True, quadratic and sorted False; distinct nan objects all False",
+    "method": "executed",
+    "evidence": "confirmed on 3.13"
+   },
+   {
+    "claim": "Timsort may use ~n/2 temporary slots",
+    "method": "background_only",
+    "evidence": "CPython listsort.txt (fetch blocked); text hedged with 'up to about n/2' and 'constant factor'"
+   },
+   {
+    "claim": "1 and 1.0 are duplicates under both set and ==",
+    "method": "executed",
+    "evidence": "True for all three functions"
+   },
+   {
+    "claim": "Counting wrapper now present in answer (original major flag)",
+    "method": "executed",
+    "evidence": "fenced Counted class is identical to the one in the test"
+   }
+  ],
+  "remaining_limitations": [
+   "Timsort temp-memory claim is background_only but hedged"
+  ],
+  "fixes": [],
+  "code_patch_applied": false,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0033",
+  "plan_id": "P2-PY-11",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Unicode-digit flag fixed: [0-9] in all patterns",
+    "method": "executed",
+    "evidence": "'k=٣' stays a string; Arabic-Indic timestamp rejected"
+   },
+   {
+    "claim": "All test cases and 20 extra edge lines behave per spec (quote escapes, unterminated quote, junk between pairs, bare followed by quote, repeated keys, blank lines)",
+    "method": "executed",
+    "evidence": "see run; 3.10/3.11/3.13 ok; 20k-pair line parsed in 0.4s"
+   },
+   {
+    "claim": "Original minor flags (\\s, ensure_ascii=False U+2028, unvalidated ranges) still unfixed and undocumented",
+    "method": "executed",
+    "evidence": "NBSP/tab/U+2028 accepted as separators; '2026-13-45T99:99:99Z' accepted; splitlines gives 3 lines vs split('\\n') 1"
+   },
+   {
+    "claim": "New: bare digit string over 4300 digits raises ValueError inside parse_log",
+    "method": "executed",
+    "evidence": "int('9'*5000) ValueError on 3.10.20, 3.11, 3.13, aborting the batch, contradicting 'return a count instead of raising'"
+   }
+  ],
+  "remaining_limitations": [
+   "Timestamps and ranges are shape-checked only",
+   "Quadratic slicing in rest[pos:].strip() is harmless at realistic line lengths"
+  ],
+  "fixes": [
+   {
+    "severity": "major-ish (robustness)",
+    "claim": "            if INT_RE.fullmatch(value):\n                value = int(value)\n",
+    "problem": "A bare token of >4300 digits makes int() raise ValueError (CPython limit), aborting the batch although the design says bad input never raises.",
+    "replacement": "            if INT_RE.fullmatch(value):\n                try:\n                    value = int(value)\n                except ValueError:      # > 4300 digits: CPython's int/str conversion limit; keep the string\n                    pass\n"
+   },
+   {
+    "severity": "minor",
+    "claim": "sort_keys makes output deterministic.",
+    "problem": "Undocumented looseness previously flagged: \\s separators, unvalidated timestamp ranges, ensure_ascii=False plus splitlines.",
+    "replacement": "sort_keys makes output deterministic. Known looseness: \\s accepts tabs and other Unicode whitespace (for example NBSP) as separators although the format says space; timestamps are only shape-checked (month 13 passes); unknown escapes such as \\n are kept literally; and with ensure_ascii=False a raw U+2028 or U+0085 inside a value makes str.splitlines() split a record, so split on '\\n' when reading back (or use the default ensure_ascii=True)."
+   }
+  ],
+  "code_patch_applied": true,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0037",
+  "plan_id": "P2-DA-03",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "chi2 = 2*600^2/50,600 = 14.23, df=1, p=1.6e-4",
+    "method": "executed",
+    "evidence": "srm_check([50000,51200],[1,1]) -> (14.229249, 1, 1.61835e-4, True); scipy 1.18.1 chisquare gives p=1.6183543368e-4"
+   },
+   {
+    "claim": "closed-form survival function for df 2..5 is correct",
+    "method": "executed",
+    "evidence": "Agrees with scipy.stats.chisquare for df=2 (7.68e-15), 3 (0.0185661), 4 (0.228446), 5 (1.37696e-5) to ~1e-15 relative"
+   },
+   {
+    "claim": "50.6% vs 49.4% of total; 2.4% more users than control",
+    "method": "derivation",
+    "evidence": "51200/101200=0.5059; 50000/101200=0.4941; 51200/50000=1.024. Total is 101,200 not '100k' (reworded)"
+   },
+   {
+    "claim": "0.001 is a common SRM alarm threshold (convention)",
+    "method": "background_only",
+    "evidence": "WebFetch of papers was not permitted in this sandbox (permission prompt unanswered); answer already hedges it as 'a convention, not a law'"
+   },
+   {
+    "claim": "Typical causes / do not reweight or drop users to force 50/50",
+    "method": "background_only",
+    "evidence": "Standard A/B-testing practice (Kohavi et al., Fabijan et al. 2019); presented as typical causes/advice, hedged enough"
+   },
+   {
+    "claim": "Originally flagged items ('harmless', '1.2% imbalance')",
+    "method": "executed",
+    "evidence": "Current text contains neither; however the closing sentence was garbled (duplicated clauses 'with very large traffic with very large traffic ... as p., so look at ...') and 'is not small..' - new defects, fixed by replacements"
+   },
+   {
+    "claim": "Code edge cases",
+    "method": "executed",
+    "evidence": "[0,0] -> ZeroDivisionError; [nan,5] -> flag False silently (old); patched version raises ValueError for both, inf, negative; [0,1000] valid -> chi2 1000 True"
+   }
+  ],
+  "remaining_limitations": [
+   "Chi-square approximation assumes adequate expected counts; no exact test for tiny samples",
+   "0.001 threshold and cause list rest on background knowledge (hedged in text)"
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "```python\nimport math\n\ndef srm_check(counts, expected_ratios, alpha=0.001):\n    \"\"\"Chi-square goodness-of-fit for sample ratio mismatch.\n    counts: observed users per arm; expected_ratios: intended allocation (any\n    positive weights). Returns (chi2, df, p_value, mismatch_flag).\"\"\"\n    if len(counts) != len(expected_ratios) or len(counts) < 2:\n        raise ValueError(\"need matching counts and ratios for at least 2 arms\")\n    if any(c < 0 for c in counts) or any(r <= 0 for r in expected_ratios):\n        raise ValueError(\"counts must be >= 0 and ratios > 0\")\n    total = sum(counts)\n    ratio_sum = sum(expected_ratios)\n    expected = [total * r / ratio_sum for r in expected_ratios]\n    chi2 = sum((o - e) ** 2 / e for o, e in zip(counts, expected))\n    df = len(counts) - 1\n    if df == 1:\n        # chi-square(1) survival function: P(Z^2 > x) = erfc(sqrt(x/2))\n        p_value = math.erfc(math.sqrt(chi2 / 2))\n    else:\n        # Even/odd closed forms of the chi-square survival function\n        x = chi2 / 2\n        if df % 2 == 0:\n            p_value = math.exp(-x) * sum(x ** k / math.factorial(k) for k in range(df // 2))\n        else:\n            p_value = math.erfc(math.sqrt(x)) + math.exp(-x) * sum(\n                x ** (k + 0.5) / math.gamma(k + 1.5) for k in range(df // 2))\n    return chi2, df, p_value, p_value < alpha\n```",
+    "problem": "Code let NaN counts through (srm_check([nan,5],[1,1]) -> flag False, p NaN) and an all-zero total raised ZeroDivisionError; patched to validate finite non-negative counts and positive total.",
+    "replacement": "```python\nimport math\n\ndef srm_check(counts, expected_ratios, alpha=0.001):\n    \"\"\"Chi-square goodness-of-fit for sample ratio mismatch.\n    counts: observed users per arm; expected_ratios: intended allocation (any\n    positive weights). Returns (chi2, df, p_value, mismatch_flag).\n    Raises ValueError for mismatched lengths, fewer than two arms, negative,\n    NaN or infinite counts, non-positive ratios, or an all-zero total.\"\"\"\n    if len(counts) != len(expected_ratios) or len(counts) < 2:\n        raise ValueError(\"need matching counts and ratios for at least 2 arms\")\n    if any(not math.isfinite(c) or c < 0 for c in counts) or any(\n            not math.isfinite(r) or r <= 0 for r in expected_ratios):\n        raise ValueError(\"counts must be finite and >= 0, ratios finite and > 0\")\n    total = sum(counts)\n    if total <= 0:\n        raise ValueError(\"need at least one observed user\")\n    ratio_sum = sum(expected_ratios)\n    expected = [total * r / ratio_sum for r in expected_ratios]\n    chi2 = sum((o - e) ** 2 / e for o, e in zip(counts, expected))\n    df = len(counts) - 1\n    if df == 1:\n        # chi-square(1) survival function: P(Z^2 > x) = erfc(sqrt(x/2))\n        p_value = math.erfc(math.sqrt(chi2 / 2))\n    else:\n        # Even/odd closed forms of the chi-square survival function\n        x = chi2 / 2\n        if df % 2 == 0:\n            p_value = math.exp(-x) * sum(x ** k / math.factorial(k) for k in range(df // 2))\n        else:\n            p_value = math.erfc(math.sqrt(x)) + math.exp(-x) * sum(\n                x ** (k + 0.5) / math.gamma(k + 1.5) for k in range(df // 2))\n    return chi2, df, p_value, p_value < alpha\n```"
+   },
+   {
+    "severity": "major",
+    "claim": "If assignment really were 50/50, a gap this large would be rare, and with 100k users, treatment having 2.4% more users than control (50.6% vs 49.4% of the total) is not small.. A very low alarm threshold such as 0.001 is common practice for SRM checks (a convention, not a law), and this still trips it.",
+    "problem": "Garbled sentence ('is not small..') and 'with 100k users' while the table has 101,200.",
+    "replacement": "If assignment really were 50/50, a gap this large would be very unlikely: with 101,200 users, treatment has 2.4% more users than control (50.6% vs 49.4% of the total), far more than chance allows. SRM alarms commonly use a very low threshold such as 0.001 (a convention, not a law), and this still trips it."
+   },
+   {
+    "severity": "minor",
+    "claim": "For df = 1 the chi-square survival function is erfc(sqrt(chi2 / 2)). I added closed forms for other degrees of freedom so it works for multi-arm tests, and checked values against scipy.stats.chisquare in a separate script.",
+    "problem": "NaN counts silently gave flag False; all-zero total raised ZeroDivisionError; preconditions undocumented.",
+    "replacement": "For df = 1 the chi-square survival function is erfc(sqrt(chi2 / 2)). The closed forms for other degrees of freedom make it work for multi-arm tests (values for 1 to 5 degrees of freedom agree with scipy.stats.chisquare). Preconditions, enforced with ValueError: matching counts and ratios for at least two arms, finite non-negative counts with a positive total, and finite positive ratios (a NaN count would otherwise return a False flag silently, and an all-zero total would divide by zero). The chi-square approximation also assumes reasonably large expected counts (a common rule of thumb is at least 5 per arm), which is easily met here."
+   },
+   {
+    "severity": "major",
+    "claim": "and with very large traffic with very large traffic even tiny imbalances become statistically significant; still treat a flagged SRM as a pipeline problem and look at the size of the gap and its cause as well as p., so look at the size of the gap and its cause as well as p.",
+    "problem": "Duplicated/garbled closing sentence left by an earlier edit.",
+    "replacement": "and with very large traffic even a small imbalance becomes statistically significant, so look at the size of the gap and its cause as well as p, but still treat a flagged SRM as a pipeline problem rather than as harmless."
+   }
+  ],
+  "code_patch_applied": true,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0038",
+  "plan_id": "P2-DA-04",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Pooled A 17.5%, B 8.67%; desktop 20% vs 22%; mobile 5% vs 6%",
+    "method": "executed",
+    "evidence": "210/1200=.175; 104/1200=.08667; tests assert segment rates [.2,.22],[.05,.06]"
+   },
+   {
+    "claim": "Standardised A 12.5%, B 14.0% (overall mix 50/50)",
+    "method": "derivation",
+    "evidence": "Users per segment: desktop 1200, mobile 1200 -> .5*.2+.5*.05=.125; .5*.22+.5*.06=.14"
+   },
+   {
+    "claim": "A is 83% desktop, B 83% mobile",
+    "method": "derivation",
+    "evidence": "1000/1200=83.3%; 1000/1200 mobile for B"
+   },
+   {
+    "claim": "Which-to-trust reasoning (randomisation check, pre-treatment confounder, post-treatment segment)",
+    "method": "background_only",
+    "evidence": "Standard causal-inference guidance; answer frames it conditionally ('depends on why the mix differs'), acceptable"
+   },
+   {
+    "claim": "Originally flagged precondition issue",
+    "method": "executed",
+    "evidence": "Old: duplicate rows -> pandas 'duplicate entries' error at unstack; missing cell -> segment silently skipped. Patched code raises ValueError for duplicate, missing cell, 1 variant, missing column, users=0, conversions>users, NaN; new tests fail on old code and pass on new"
+   },
+   {
+    "claim": "Extra edge cases of my own",
+    "method": "executed",
+    "evidence": "3 variants x 3 segments shuffled rows with an extra column: segment_winner B, standardised B=0.12, no reversal"
+   }
+  ],
+  "remaining_limitations": [
+   "Standardised rates use overall user mix as the standard; no confidence intervals/noise assessment in the code",
+   "pooled_winner ties are broken by dict order; segment_winner needs strict wins"
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "```python\nimport pandas as pd\n\ndef simpson_report(df):\n    \"\"\"df columns: variant, segment, users, conversions.\n    Returns dict with pooled rates, per-segment rates, the variant that wins\n    pooled, the variant that wins in every segment (or None), whether the\n    pooled ranking reverses, and mix-standardised rates (each variant\n    re-weighted to the overall segment mix).\"\"\"\n    pooled = df.groupby(\"variant\")[[\"users\", \"conversions\"]].sum()\n    pooled_rate = (pooled[\"conversions\"] / pooled[\"users\"]).to_dict()\n\n    seg = df.set_index([\"segment\", \"variant\"])\n    seg_rate = (seg[\"conversions\"] / seg[\"users\"]).unstack(\"variant\")\n\n    pooled_winner = max(pooled_rate, key=pooled_rate.get)\n    all_win = [v for v in seg_rate.columns\n               if (seg_rate[v] > seg_rate.drop(columns=v).max(axis=1)).all()]\n    segment_winner = all_win[0] if all_win else None\n\n    mix = df.groupby(\"segment\")[\"users\"].sum()\n    mix = mix / mix.sum()\n    standardised = {v: float((seg_rate[v] * mix).sum()) for v in seg_rate.columns}\n\n    return {\n        \"pooled_rate\": pooled_rate,\n        \"segment_rate\": seg_rate,\n        \"pooled_winner\": pooled_winner,\n        \"segment_winner\": segment_winner,\n        \"reversal\": segment_winner is not None and segment_winner != pooled_winner,\n        \"standardised_rate\": standardised,\n    }\n```",
+    "problem": "Duplicate segment/variant rows, a missing cell (segment silently skipped in standardised rate), single variant, zero users, conversions>users and NaN were not validated; patched to raise ValueError.",
+    "replacement": "```python\nimport pandas as pd\n\ndef simpson_report(df):\n    \"\"\"df columns: variant, segment, users, conversions, with exactly ONE row per\n    (segment, variant) pair and every pair present (pre-aggregate first).\n    Returns dict with pooled rates, per-segment rates, the variant that wins\n    pooled, the variant that wins in every segment (or None), whether the\n    pooled ranking reverses, and mix-standardised rates (each variant\n    re-weighted to the overall segment mix).\n    Raises ValueError for missing columns or values, duplicate segment/variant\n    rows, a missing segment-variant cell, fewer than two variants, users <= 0\n    or conversions outside [0, users].\"\"\"\n    cols = [\"variant\", \"segment\", \"users\", \"conversions\"]\n    if not set(cols) <= set(df.columns):\n        raise ValueError(\"df needs columns %s\" % cols)\n    df = df[cols]\n    if df.isna().any().any():\n        raise ValueError(\"missing values in variant, segment, users or conversions\")\n    if df.duplicated([\"segment\", \"variant\"]).any():\n        raise ValueError(\"duplicate segment/variant rows: aggregate to one row per pair first\")\n    n_var, n_seg = df[\"variant\"].nunique(), df[\"segment\"].nunique()\n    if n_var < 2:\n        raise ValueError(\"need at least two variants\")\n    if len(df) != n_var * n_seg:\n        raise ValueError(\"every segment needs a row for every variant (missing cell)\")\n    if (df[\"users\"] <= 0).any() or (df[\"conversions\"] < 0).any() or (\n            df[\"conversions\"] > df[\"users\"]).any():\n        raise ValueError(\"need users > 0 and 0 <= conversions <= users in every row\")\n\n    pooled = df.groupby(\"variant\")[[\"users\", \"conversions\"]].sum()\n    pooled_rate = (pooled[\"conversions\"] / pooled[\"users\"]).to_dict()\n\n    seg = df.set_index([\"segment\", \"variant\"])\n    seg_rate = (seg[\"conversions\"] / seg[\"users\"]).unstack(\"variant\")\n\n    pooled_winner = max(pooled_rate, key=pooled_rate.get)\n    all_win = [v for v in seg_rate.columns\n               if (seg_rate[v] > seg_rate.drop(columns=v).max(axis=1)).all()]\n    segment_winner = all_win[0] if all_win else None\n\n    mix = df.groupby(\"segment\")[\"users\"].sum()\n    mix = mix / mix.sum()\n    standardised = {v: float((seg_rate[v] * mix).sum()) for v in seg_rate.columns}\n\n    return {\n        \"pooled_rate\": pooled_rate,\n        \"segment_rate\": seg_rate,\n        \"pooled_winner\": pooled_winner,\n        \"segment_winner\": segment_winner,\n        \"reversal\": segment_winner is not None and segment_winner != pooled_winner,\n        \"standardised_rate\": standardised,\n    }\n```"
+   },
+   {
+    "severity": "minor",
+    "claim": "On the example data the pooled rates",
+    "problem": "Answer did not state the one-row-per-pair precondition the code relied on.",
+    "replacement": "Precondition: one row per segment-variant pair, with every pair present (aggregate first). The function raises ValueError for duplicate rows, a missing cell (otherwise that segment would silently drop out of the standardised rate), fewer than two variants, missing values, users <= 0, or conversions outside [0, users].\n\nOn the example data the pooled rates"
+   }
+  ],
+  "code_patch_applied": true,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0040",
+  "plan_id": "P2-DA-06",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Sample median 14.5; interval ~ (12, 28) at seed 0",
+    "method": "executed",
+    "evidence": "bootstrap_median_ci(x) -> (12.0, 28.0); same for seeds 1,2; 28 = midpoint of 16 and 40"
+   },
+   {
+    "claim": "Coverage ~0.91-0.94 for n=5..15 in simulation",
+    "method": "executed",
+    "evidence": "My own replication (2000 reps, B=1000, lognormal & exponential): n=5 0.931/0.935, n=10 0.934/0.928, n=15 0.929/0.923 -> consistent with the quoted range; answer calls it illustration"
+   },
+   {
+    "claim": "Bootstrap can be inconsistent for max/min and for the mean under infinite variance",
+    "method": "background_only",
+    "evidence": "Known results (Bickel & Freedman 1981; Athreya 1987); could not open the papers here; stated as 'can be', acceptable"
+   },
+   {
+    "claim": "Interpretation of CI (coverage over repeated samples, not probability for this interval)",
+    "method": "derivation",
+    "evidence": "Standard frequentist definition"
+   },
+   {
+    "claim": "Tiny-sample test: endpoints are data values",
+    "method": "executed",
+    "evidence": "[3,5,9,20,21] -> (3.0, 21.0) for seeds 0-4; true here because odd n gives data-value medians and tail order statistics coincide, but np.quantile can interpolate in general -> hedge added"
+   },
+   {
+    "claim": "Originally flagged endpoint wording",
+    "method": "executed",
+    "evidence": "Current text says 'data points or midpoints, possibly interpolated' - flagged issue is fixed"
+   }
+  ],
+  "remaining_limitations": [
+   "Percentile bootstrap coverage claims for n=5..15 are from an ad hoc simulation (illustration only)",
+   "Inconsistency results for max/min and infinite-variance mean are background knowledge"
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "for a tiny sample the endpoints are values from the data;",
+    "problem": "Unhedged generalisation that contradicts the answer's own 'possibly interpolated' caveat.",
+    "replacement": "for a tiny odd-length sample the endpoints are data values at the fixed seed used here (np.quantile can interpolate between order statistics in general);"
+   }
+  ],
+  "code_patch_applied": false,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0041",
+  "plan_id": "P2-DA-07",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "20 x 0.05 = 1 expected; P(>=1)=1-0.95^20=64.2%",
+    "method": "derivation",
+    "evidence": "1-0.95^20 = 0.64151"
+   },
+   {
+    "claim": "Bonferroni rejects 2; BH rejects 6; rank 4 (.021) misses .020 but ranks 5,6 pass",
+    "method": "executed",
+    "evidence": "Sorted p: .001,.0045,.008,.021,.022,.029 vs .005,.010,.015,.020,.025,.030; tests assert both lists"
+   },
+   {
+    "claim": "BH controls FDR under independence/positive dependence; BY for arbitrary dependence; Holm uniformly more powerful with same FWER",
+    "method": "background_only",
+    "evidence": "Benjamini-Hochberg 1995, Benjamini-Yekutieli 2001, Holm 1979 - textbook theorems; could not open sources (fetch permission unanswered)"
+   },
+   {
+    "claim": "Originally flagged NaN / range issue",
+    "method": "executed",
+    "evidence": "Old benjamini_hochberg([nan,0.001]) -> [True,True]; patched raises ValueError. Extra tests: negative, >1, None, bad alpha/q, boundary p=0 and 1, q=1"
+   }
+  ],
+  "remaining_limitations": [
+   "BH dependence conditions (PRDS, BY) rest on literature not re-opened here",
+   "Non-numeric input raises TypeError rather than ValueError"
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "```python\ndef bonferroni(pvals, alpha=0.05):\n    \"\"\"Reject H_i when p_i <= alpha / m. Controls FWER at alpha.\"\"\"\n    m = len(pvals)\n    return [p <= alpha / m for p in pvals]\n\ndef benjamini_hochberg(pvals, q=0.05):\n    \"\"\"BH step-up. Find the largest rank k (1-based, ascending p) with\n    p_(k) <= q*k/m and reject all hypotheses with rank <= k.\n    Returns booleans in the ORIGINAL order. Controls FDR at q for independent\n    (or positively dependent) tests.\"\"\"\n    m = len(pvals)\n    order = sorted(range(m), key=lambda i: pvals[i])\n    k_max = 0\n    for rank, i in enumerate(order, start=1):\n        if pvals[i] * m <= q * rank:\n            k_max = rank\n    reject = [False] * m\n    for rank, i in enumerate(order, start=1):\n        if rank <= k_max:\n            reject[i] = True\n    return reject\n```",
+    "problem": "NaN p-values were 'rejected' (benjamini_hochberg([nan,0.001]) -> [True,True]) and no range validation; patched to raise ValueError for p outside [0,1] and for alpha/q outside (0,1].",
+    "replacement": "```python\ndef _check_pvals(pvals):\n    \"\"\"p-values must be numbers in [0, 1]; NaN fails this test and is rejected.\"\"\"\n    for p in pvals:\n        if not 0 <= p <= 1:\n            raise ValueError(\"p-values must be numbers in [0, 1] (NaN is not allowed)\")\n\ndef bonferroni(pvals, alpha=0.05):\n    \"\"\"Reject H_i when p_i <= alpha / m. Controls FWER at alpha.\n    Raises ValueError for a p-value outside [0, 1] (including NaN) or alpha outside (0, 1].\"\"\"\n    _check_pvals(pvals)\n    if not 0 < alpha <= 1:\n        raise ValueError(\"alpha must be in (0, 1]\")\n    m = len(pvals)\n    return [bool(p <= alpha / m) for p in pvals]\n\ndef benjamini_hochberg(pvals, q=0.05):\n    \"\"\"BH step-up. Find the largest rank k (1-based, ascending p) with\n    p_(k) <= q*k/m and reject all hypotheses with rank <= k.\n    Returns booleans in the ORIGINAL order. Controls FDR at q for independent\n    (or positively dependent) tests.\n    Raises ValueError for a p-value outside [0, 1] (including NaN) or q outside (0, 1].\"\"\"\n    _check_pvals(pvals)\n    if not 0 < q <= 1:\n        raise ValueError(\"q must be in (0, 1]\")\n    m = len(pvals)\n    order = sorted(range(m), key=lambda i: pvals[i])\n    k_max = 0\n    for rank, i in enumerate(order, start=1):\n        if pvals[i] * m <= q * rank:\n            k_max = rank\n    reject = [False] * m\n    for rank, i in enumerate(order, start=1):\n        if rank <= k_max:\n            reject[i] = True\n    return reject\n```"
+   },
+   {
+    "severity": "minor",
+    "claim": "A common bug is stopping at the first failure.",
+    "problem": "NaN p-values were silently 'rejected' and there was no range validation; precondition not stated.",
+    "replacement": "A common bug is stopping at the first failure. Both functions raise ValueError for a p-value outside [0, 1] (NaN included; otherwise a NaN p-value can be reported as rejected) and for alpha or q outside (0, 1]."
+   }
+  ],
+  "code_patch_applied": true,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0042",
+  "plan_id": "P2-DA-08",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Example rows [1,.667,.333] and [1,0,NaN] at as_of 2024-01-22",
+    "method": "derivation",
+    "evidence": "Hand-derived: cohort1 users 1,2,3 -> week0 3/3, week1 users 1,3, week2 user 3; cohort2 users 4,5,6 -> week0 all, week1 none, week2 incomplete; matches test"
+   },
+   {
+    "claim": "Code honours 'events before signup are ignored'",
+    "method": "executed",
+    "evidence": "FAILED in old code: signup 2024-01-03, event 2024-01-01 -> week-0 retention 1.0. Patched (day-level filter before dedupe); new tests fail on old code, pass on new on 3.13/3.11/3.10"
+   },
+   {
+    "claim": "Flagged as_of items",
+    "method": "executed",
+    "evidence": "Signup after as_of -> row with cohort_size 1 and all NaN (kept, now stated); empty signups now ValueError('no signups'); nested .loc censoring loop is O(cohorts x weeks), harmless"
+   },
+   {
+    "claim": "pandas 2.3.3 and 3.0 pass",
+    "method": "executed",
+    "evidence": "Base tests passed on 3.13/pandas 3.0 and 3.10, 3.11 with pandas 2.3.3; patched version too"
+   },
+   {
+    "claim": "'rolling-unit' wording",
+    "method": "derivation",
+    "evidence": "Definition used is Monday-bracketed calendar weeks, contradicting 'rolling'; reworded"
+   }
+  ],
+  "remaining_limitations": [
+   "Cohort for signups on/after as_of shows cohort_size>0 with all-NaN cells (stated in text)",
+   "Censoring loop is O(cohorts x weeks); tz-aware inputs not tested",
+   "Same-day events before the signup time-of-day cannot be distinguished at date granularity (documented)"
+  ],
+  "fixes": [
+   {
+    "severity": "major",
+    "claim": "```python\nimport numpy as np\nimport pandas as pd\n\ndef _week_start(s):\n    \"\"\"Monday 00:00 of the week containing each timestamp.\"\"\"\n    d = s.dt.normalize()\n    return d - pd.to_timedelta(d.dt.dayofweek, unit=\"D\")\n\ndef weekly_retention(signups, events, as_of, max_week=None):\n    \"\"\"signups: columns user_id, signup_date. events: columns user_id, event_date.\n    Cohort = Monday-based week of signup. Retention at week k = share of the\n    cohort with >= 1 event in week (cohort_week + k). Week 0 is the signup\n    week. Cells whose week has not fully elapsed by `as_of` (a date, exclusive\n    end of observation) are NaN. Returns DataFrame: index cohort_week, column\n    'cohort_size', then integer columns 0..max_week.\"\"\"\n    su = signups.copy()\n    su[\"signup_date\"] = pd.to_datetime(su[\"signup_date\"])\n    su = su.drop_duplicates(\"user_id\")\n    su[\"cohort_week\"] = _week_start(su[\"signup_date\"])\n\n    ev = events.copy()\n    ev[\"event_date\"] = pd.to_datetime(ev[\"event_date\"])\n    ev[\"event_week\"] = _week_start(ev[\"event_date\"])\n    ev = ev.drop_duplicates([\"user_id\", \"event_week\"])      # one row per active user-week\n\n    m = ev.merge(su[[\"user_id\", \"cohort_week\"]], on=\"user_id\", how=\"inner\")\n    m[\"k\"] = (m[\"event_week\"] - m[\"cohort_week\"]).dt.days // 7\n    m = m[m[\"k\"] >= 0]\n\n    as_of = pd.Timestamp(as_of)\n    last_complete_week = _week_start(pd.Series([as_of - pd.Timedelta(days=1)])).iloc[0]\n    if max_week is None:\n        max_week = int((last_complete_week - su[\"cohort_week\"].min()).days // 7)\n    max_week = max(max_week, 0)\n\n    sizes = su.groupby(\"cohort_week\")[\"user_id\"].nunique()\n    active = m.groupby([\"cohort_week\", \"k\"])[\"user_id\"].nunique().unstack(\"k\")\n    active = active.reindex(index=sizes.index, columns=range(max_week + 1))\n    rate = active.fillna(0).div(sizes, axis=0)\n\n    # right-censoring: week k of a cohort counts only if that week is complete\n    for cw in rate.index:\n        for k in rate.columns:\n            if cw + pd.Timedelta(days=7 * (k + 1)) > as_of:\n                rate.loc[cw, k] = np.nan\n    out = rate.copy()\n    out.insert(0, \"cohort_size\", sizes)\n    return out\n```",
+    "problem": "Pre-signup filter was week-level (k>=0): an event earlier in the signup week counted as week-0 retention (signup Wed 2024-01-03, event Mon 2024-01-01 -> 1.0), contradicting 'events before signup are ignored'; also dedup-before-filter order would have lost valid events, duplicate signup rows kept the first row in input order not the earliest, and empty signups gave a cryptic NaN-to-int error. Patched.",
+    "replacement": "```python\nimport numpy as np\nimport pandas as pd\n\ndef _week_start(s):\n    \"\"\"Monday 00:00 of the week containing each timestamp.\"\"\"\n    d = s.dt.normalize()\n    return d - pd.to_timedelta(d.dt.dayofweek, unit=\"D\")\n\ndef weekly_retention(signups, events, as_of, max_week=None):\n    \"\"\"signups: columns user_id, signup_date. events: columns user_id, event_date.\n    Cohort = Monday-based week of signup. Retention at week k = share of the\n    cohort with >= 1 event in week (cohort_week + k). Week 0 is the signup\n    week. Cells whose week has not fully elapsed by `as_of` (a date, exclusive\n    end of observation) are NaN. Events dated before the signup day and events\n    of users without a signup row are ignored (same-day events count); a user\n    with several signup rows is placed in the cohort of the earliest one.\n    Returns DataFrame: index cohort_week, column 'cohort_size', then integer\n    columns 0..max_week. Raises ValueError if there are no signups.\"\"\"\n    su = signups.copy()\n    if su.empty:\n        raise ValueError(\"no signups\")\n    su[\"signup_date\"] = pd.to_datetime(su[\"signup_date\"])\n    su = su.sort_values(\"signup_date\").drop_duplicates(\"user_id\")\n    su[\"cohort_week\"] = _week_start(su[\"signup_date\"])\n\n    ev = events.copy()\n    ev[\"event_date\"] = pd.to_datetime(ev[\"event_date\"])\n    ev[\"event_week\"] = _week_start(ev[\"event_date\"])\n\n    m = ev.merge(su[[\"user_id\", \"signup_date\", \"cohort_week\"]], on=\"user_id\", how=\"inner\")\n    # drop events before the signup day first (a week-level check would keep an\n    # earlier-in-the-week event), then keep one row per active user-week\n    m = m[m[\"event_date\"].dt.normalize() >= m[\"signup_date\"].dt.normalize()]\n    m = m.drop_duplicates([\"user_id\", \"event_week\"])\n    m[\"k\"] = (m[\"event_week\"] - m[\"cohort_week\"]).dt.days // 7\n\n    as_of = pd.Timestamp(as_of)\n    last_complete_week = _week_start(pd.Series([as_of - pd.Timedelta(days=1)])).iloc[0]\n    if max_week is None:\n        max_week = int((last_complete_week - su[\"cohort_week\"].min()).days // 7)\n    max_week = max(max_week, 0)\n\n    sizes = su.groupby(\"cohort_week\")[\"user_id\"].nunique()\n    active = m.groupby([\"cohort_week\", \"k\"])[\"user_id\"].nunique().unstack(\"k\")\n    active = active.reindex(index=sizes.index, columns=range(max_week + 1))\n    rate = active.fillna(0).div(sizes, axis=0)\n\n    # right-censoring: week k of a cohort counts only if that week is complete\n    for cw in rate.index:\n        for k in rate.columns:\n            if cw + pd.Timedelta(days=7 * (k + 1)) > as_of:\n                rate.loc[cw, k] = np.nan\n    out = rate.copy()\n    out.insert(0, \"cohort_size\", sizes)\n    return out\n```"
+   },
+   {
+    "severity": "minor",
+    "claim": "The version below is a rolling-unit \"active in week k\" definition:",
+    "problem": "'rolling-unit' contradicts the Monday-bracketed calendar-week definition used (the answer itself contrasts it with 7-day windows).",
+    "replacement": "The version below is a calendar-week \"active in week k\" definition:"
+   },
+   {
+    "severity": "major",
+    "claim": "3. Use an inner merge with the signup table, then drop k < 0 (activity before signup, for example data from an earlier identity). Users with no events never appear in the merge but stay in the denominator via the signups table, otherwise retention is overstated.",
+    "problem": "Code only dropped events from earlier WEEKS (k < 0); an event earlier in the signup week was counted as week-0 retention, contradicting 'events before signup are ignored'.",
+    "replacement": "3. Use an inner merge with the signup table, then drop events dated before the signup day (for example data from an earlier identity). Compare days, not weeks: a week-level check would count a Monday event as week-0 activity for a Wednesday signup. Same-day events are kept, because a date has no time of day. The code applies this filter before the de-duplication in step 2, otherwise an ignored early event could hide a valid later one in the same week. Users with no events never appear in the merge but stay in the denominator via the signups table, otherwise retention is overstated."
+   },
+   {
+    "severity": "minor",
+    "claim": "The code was checked on a six-user fixture that includes a duplicate same-week event, a non-signup user, a pre-signup event and a user with no events; it passes on pandas 2.3 and 3.0.",
+    "problem": "Fixture description inaccurate (the no-events user is a separate seventh signup) and as_of edge case unstated.",
+    "replacement": "The tests cover a six-user fixture with a duplicate same-week event, a non-signup user and a pre-signup event, plus a seventh signup with no events, an earlier-in-the-same-week pre-signup event, a user with several signup rows (the earliest defines the cohort) and empty signups (ValueError); they pass on pandas 2.3 and 3.0. A cohort that signed up on or after as_of appears with all-NaN cells."
+   }
+  ],
+  "code_patch_applied": true,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0043",
+  "plan_id": "P2-DA-09",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "3.000% -> 2.706%, change -0.294 pts; mix -0.154, rate -0.140",
+    "method": "executed",
+    "evidence": "orders 3000/100000, 2706/100000; test asserts mix sum -0.00154, rate sum -0.00140, total exact to 1e-12"
+   },
+   {
+    "claim": "Midpoint decomposition is exact",
+    "method": "derivation",
+    "evidence": "s1r1-s0r0 = (s1-s0)(r0+r1)/2 + (r1-r0)(s0+s1)/2; subtracting a common avg overall rate adds 0 since sum of share changes is 0; also confirmed on 50 random datasets"
+   },
+   {
+    "claim": "Per-segment rates and shares quoted",
+    "method": "derivation",
+    "evidence": "1482/38000=3.9%; 969/57000=1.7%; 255/5000=5.1%; shares 45->38, 50->57"
+   },
+   {
+    "claim": "z about 3.9",
+    "method": "executed",
+    "evidence": "z = 3.949 (two-proportion, independence assumed); 'about 3.9' acceptable (3.95)"
+   },
+   {
+    "claim": "Originally flagged zero-session NaN",
+    "method": "executed",
+    "evidence": "Old code: NaN rates, sum no longer equals change. Patched to raise ValueError; tests for both periods, duplicate, empty, orders>sessions, NaN, random identity, order invariance"
+   }
+  ],
+  "remaining_limitations": [
+   "Per-segment numbers depend on the decomposition convention (stated in answer)",
+   "New/vanished segments must be merged by the caller"
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "```python\nimport pandas as pd\n\ndef decompose_conversion_change(df):\n    \"\"\"df columns: segment, sessions_0, orders_0, sessions_1, orders_1\n    (period 0 = baseline, period 1 = current). Splits the change in overall\n    conversion into a mix effect and a within-segment rate effect, per segment.\n    Midpoint convention, so mix + rate sums exactly to the total change.\n    mix_effect_i = (share1 - share0) * (avg segment rate - avg overall rate):\n    a shift towards a segment only hurts if that segment converts below average.\"\"\"\n    d = df.set_index(\"segment\")\n    share0 = d[\"sessions_0\"] / d[\"sessions_0\"].sum()\n    share1 = d[\"sessions_1\"] / d[\"sessions_1\"].sum()\n    rate0 = d[\"orders_0\"] / d[\"sessions_0\"]\n    rate1 = d[\"orders_1\"] / d[\"sessions_1\"]\n    overall0 = d[\"orders_0\"].sum() / d[\"sessions_0\"].sum()\n    overall1 = d[\"orders_1\"].sum() / d[\"sessions_1\"].sum()\n    out = pd.DataFrame({\n        \"share_0\": share0, \"share_1\": share1,\n        \"rate_0\": rate0, \"rate_1\": rate1,\n        \"mix_effect\": (share1 - share0) * ((rate0 + rate1) / 2 - (overall0 + overall1) / 2),\n        \"rate_effect\": (rate1 - rate0) * (share0 + share1) / 2,\n    })\n    out[\"total\"] = out[\"mix_effect\"] + out[\"rate_effect\"]\n    return out\n```",
+    "problem": "A zero-session segment gave NaN rates and mix/rate/total silently skipped it (no longer summing to the overall change); duplicates/orders>sessions unchecked. Patched to raise ValueError.",
+    "replacement": "```python\nimport pandas as pd\n\ndef decompose_conversion_change(df):\n    \"\"\"df columns: segment, sessions_0, orders_0, sessions_1, orders_1\n    (period 0 = baseline, period 1 = current), one row per segment. Splits the\n    change in overall conversion into a mix effect and a within-segment rate\n    effect, per segment. Midpoint convention, so mix + rate sums exactly to the\n    total change.\n    mix_effect_i = (share1 - share0) * (avg segment rate - avg overall rate):\n    a shift towards a segment only hurts if that segment converts below average.\n    Precondition: every segment has sessions > 0 in BOTH periods (otherwise its\n    rate is undefined); raises ValueError if not, and for duplicate segments,\n    missing values, or orders outside [0, sessions].\"\"\"\n    need = [\"segment\", \"sessions_0\", \"orders_0\", \"sessions_1\", \"orders_1\"]\n    if not set(need) <= set(df.columns):\n        raise ValueError(\"df needs columns %s\" % need)\n    if df.empty or df[need].isna().any().any():\n        raise ValueError(\"need at least one row and no missing values\")\n    if df[\"segment\"].duplicated().any():\n        raise ValueError(\"duplicate segments: aggregate to one row per segment first\")\n    for t in (\"0\", \"1\"):\n        s, o = df[\"sessions_\" + t], df[\"orders_\" + t]\n        if (s <= 0).any():\n            raise ValueError(\"every segment needs sessions > 0 in both periods; \"\n                             \"merge a new or vanished segment into another one first\")\n        if (o < 0).any() or (o > s).any():\n            raise ValueError(\"orders must be between 0 and sessions\")\n    d = df.set_index(\"segment\")\n    share0 = d[\"sessions_0\"] / d[\"sessions_0\"].sum()\n    share1 = d[\"sessions_1\"] / d[\"sessions_1\"].sum()\n    rate0 = d[\"orders_0\"] / d[\"sessions_0\"]\n    rate1 = d[\"orders_1\"] / d[\"sessions_1\"]\n    overall0 = d[\"orders_0\"].sum() / d[\"sessions_0\"].sum()\n    overall1 = d[\"orders_1\"].sum() / d[\"sessions_1\"].sum()\n    out = pd.DataFrame({\n        \"share_0\": share0, \"share_1\": share1,\n        \"rate_0\": rate0, \"rate_1\": rate1,\n        \"mix_effect\": (share1 - share0) * ((rate0 + rate1) / 2 - (overall0 + overall1) / 2),\n        \"rate_effect\": (rate1 - rate0) * (share0 + share1) / 2,\n    })\n    out[\"total\"] = out[\"mix_effect\"] + out[\"rate_effect\"]\n    return out\n```"
+   },
+   {
+    "severity": "minor",
+    "claim": "split the numbers differently; state the convention you use.",
+    "problem": "Zero-session segment produced NaN and mix/rate effects silently stopped summing to the total change.",
+    "replacement": "split the numbers differently; state the convention you use. Precondition: every segment needs sessions in both periods. A segment with zero sessions in one period has an undefined rate there, so the function raises ValueError (as it does for duplicate segments, missing values or orders above sessions) instead of skipping it, which would break the exact sum. Merge such a segment into another one or treat it separately."
+   }
+  ],
+  "code_patch_applied": true,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0044",
+  "plan_id": "P2-DA-10",
+  "verdict": "fix",
+  "evidence": [
+   {
+    "claim": "Raw mean 4.14; post-stratified 3.54; weights 5, 1, 0.333",
+    "method": "executed",
+    "evidence": "(50*3+150*3.8+300*4.5)/500=4.14; .5*3+.3*3.8+.2*4.5=3.54; .5/.1, .3/.3, .2/.6"
+   },
+   {
+    "claim": "Kish n = (sum w)^2/sum w^2 = 174",
+    "method": "executed",
+    "evidence": "sum w=500, sum w^2=1433.33 -> 174.42; formula is Kish's standard definition (derivation; not re-read from source)"
+   },
+   {
+    "claim": "Originally flagged precondition",
+    "method": "executed",
+    "evidence": "Old: pop {a:.5,b:.3,c:.2} with only a,b -> 2.75 no error. Patched: ValueError for positive-share stratum without respondents; NaN score/label, empty df, negative shares also rejected; zero-share empty stratum allowed; hand check 3 a + 1 b gives mean 3.0, Kish 3.0"
+   },
+   {
+    "claim": "Limits of reweighting (MAR within strata, weight variance, measurement bias)",
+    "method": "background_only",
+    "evidence": "Standard survey-methodology caveats; hedged as conditions"
+   }
+  ],
+  "remaining_limitations": [
+   "Kish n_eff is a rough design-effect approximation; confidence intervals need weighted variance estimators (stated)",
+   "Dropping NaN scores before calling changes sample shares; caller's responsibility"
+  ],
+  "fixes": [
+   {
+    "severity": "minor",
+    "claim": "```python\nimport pandas as pd\n\ndef poststratify(df, stratum_col, value_col, population_share):\n    \"\"\"Post-stratification. population_share: dict stratum -> known population\n    proportion (must sum to 1 and cover every stratum seen in df).\n    Returns dict: raw_mean, weighted_mean, weights (per stratum, scaled so the\n    average respondent weight is 1), kish_n (effective sample size).\"\"\"\n    if abs(sum(population_share.values()) - 1) > 1e-9:\n        raise ValueError(\"population shares must sum to 1\")\n    counts = df[stratum_col].value_counts()\n    missing = set(counts.index) - set(population_share)\n    if missing:\n        raise ValueError(\"strata without a population share: %s\" % sorted(missing))\n    n = len(df)\n    # weight = population share / sample share (strata with no respondents cannot be reweighted)\n    weights = {s: population_share[s] / (counts[s] / n) for s in counts.index}\n    w = df[stratum_col].map(weights)\n    weighted_mean = float((w * df[value_col]).sum() / w.sum())\n    kish_n = float(w.sum() ** 2 / (w ** 2).sum())\n    return {\n        \"raw_mean\": float(df[value_col].mean()),\n        \"weighted_mean\": weighted_mean,\n        \"weights\": weights,\n        \"kish_n\": kish_n,\n    }\n```",
+    "problem": "An empty population stratum was dropped and the rest renormalised (a:.5,b:.3,c:.2 with only a,b -> no error); NaN scores counted in w.sum(). Patched to raise ValueError.",
+    "replacement": "```python\nimport pandas as pd\n\ndef poststratify(df, stratum_col, value_col, population_share):\n    \"\"\"Post-stratification. population_share: dict stratum -> known population\n    proportion (must sum to 1, cover every stratum seen in df, and every\n    stratum with a positive share must have at least one respondent).\n    Returns dict: raw_mean, weighted_mean, weights (per stratum, scaled so the\n    average respondent weight is 1), kish_n (effective sample size).\n    Raises ValueError for an empty df, missing stratum labels or scores (drop or\n    impute them first), invalid shares, an observed stratum with no population\n    share, or a population stratum with no respondents.\"\"\"\n    if len(df) == 0:\n        raise ValueError(\"no respondents\")\n    if df[stratum_col].isna().any() or df[value_col].isna().any():\n        raise ValueError(\"missing stratum labels or scores: drop or impute them first\")\n    if any(not v >= 0 for v in population_share.values()) or abs(sum(population_share.values()) - 1) > 1e-9:\n        raise ValueError(\"population shares must be >= 0 and sum to 1\")\n    counts = df[stratum_col].value_counts()\n    missing = set(counts.index) - set(population_share)\n    if missing:\n        raise ValueError(\"strata without a population share: %s\" % sorted(missing, key=str))\n    empty = [s for s, share in population_share.items() if share > 0 and s not in counts.index]\n    if empty:\n        raise ValueError(\"population strata with no respondents cannot be reweighted: %s\"\n                         % sorted(empty, key=str))\n    n = len(df)\n    # weight = population share / sample share\n    weights = {s: population_share[s] / (counts[s] / n) for s in counts.index}\n    w = df[stratum_col].map(weights)\n    weighted_mean = float((w * df[value_col]).sum() / w.sum())\n    kish_n = float(w.sum() ** 2 / (w ** 2).sum())\n    return {\n        \"raw_mean\": float(df[value_col].mean()),\n        \"weighted_mean\": weighted_mean,\n        \"weights\": weights,\n        \"kish_n\": kish_n,\n    }\n```"
+   },
+   {
+    "severity": "minor",
+    "claim": "(2) You need accurate population totals and every population stratum must have respondents; empty strata cannot be reweighted.",
+    "problem": "Stated requirement was not enforced: an empty stratum was dropped and the rest renormalised; NaN scores still counted in the weight sum.",
+    "replacement": "(2) You need accurate population totals, and every population stratum must have respondents: the function raises ValueError for a stratum with a positive population share and no respondents (silently dropping it and renormalising the rest would change the target population), and also for missing scores or stratum labels, which should be dropped or imputed first. Collapse strata or collect more data instead."
+   }
+  ],
+  "code_patch_applied": true,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ },
+ {
+  "id": "smi-h0046",
+  "plan_id": "P2-DA-12",
+  "verdict": "verified",
+  "evidence": [
+   {
+    "claim": "Naive slope ~0.0046, adjusted ~0.0007, randomised ~0.0004 at seed 0",
+    "method": "executed",
+    "evidence": "(0.004572, 0.000717, 0.000384)"
+   },
+   {
+    "claim": "Naive slope arises purely from tier",
+    "method": "derivation",
+    "evidence": "Cov(img,conv)=(8-3)(.06-.02)(.3)(.7)=.042; Var(img)=4.5+25*.21=9.75 -> 0.0043 theoretical; 30 seeds: naive .0035-.0049, adjusted/randomised within +-0.00125, so test bands (.003-.0065, <.0015) are robust"
+   },
+   {
+    "claim": "Page speed is a mediator, not a confounder",
+    "method": "derivation",
+    "evidence": "Text now says 'Mediators matter too ... do not adjust for page speed' and the pitfall agrees; flagged issue fixed"
+   },
+   {
+    "claim": "Randomise at product level => cluster-robust errors; DiD parallel trends; overlap/no unmeasured confounding",
+    "method": "background_only",
+    "evidence": "Standard causal inference/experimentation guidance; hedged ('only if an experiment is impossible', 'cannot rule out unmeasured confounders')"
+   },
+   {
+    "claim": "n=10 degenerate",
+    "method": "executed",
+    "evidence": "simulate_confounding(n=10) -> (0.0,0.0,0.0) (rank-deficient lstsq); irrelevant at default n, already known"
+   }
+  ],
+  "remaining_limitations": [
+   "simulate_confounding returns zeros for tiny n (rank-deficient design); irrelevant at default n",
+   "Causal-design advice is background knowledge, appropriately hedged"
+  ],
+  "fixes": [],
+  "code_patch_applied": false,
+  "code_rerun": {
+   "py3.13": "ok",
+   "py3.11": "ok",
+   "py3.10": "ok"
+  },
+  "difficulty_ok": true,
+  "suggested_difficulty": null
+ }
+]

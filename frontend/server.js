@@ -24,7 +24,7 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '127.0.0.1', () => {
     console.log(`\n────────────────────────────────────────────────────`);
     console.log(`Frontend server running at http://localhost:${PORT}`);
     console.log(`────────────────────────────────────────────────────\n`);

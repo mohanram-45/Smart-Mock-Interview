@@ -1,0 +1,19 @@
+{% macro interview_rows(ds) %}
+<div class="scroll"><table class="list" aria-label="Interviews">
+  <thead><tr><th class="hide-sm">Started</th><th>Interview</th><th class="num hide-sm">Answered</th><th class="num">Similarity avg</th><th class="num hide-sm">Time</th><th class="hide-sm">Evaluation</th><th><span class="sr">Open</span></th></tr></thead>
+  <tbody>{% for d in ds %}<tr>
+    <td class="hide-sm">{{ short_date(d.created_at) }}</td>
+    <td><a class="row-link" href="{{ url_for('demo.summary_page' if d.status == 'finished' else 'demo.interview_page', sid=d.id) }}">{{ d.role or (d.domains|length ~ ' chosen topics') }}</a><br><span class="muted small">{{ d.asked }} technical questions <span class="show-sm">· {{ short_date(d.created_at) }}</span></span></td>
+    <td class="num hide-sm">{{ d.answered }}{% if d.skipped %}<span class="muted small"> +{{ d.skipped }} skipped</span>{% endif %}<span class="muted small"> / {{ d.asked }}</span></td>
+    <td class="num">{% if d.legacy_average is not none %}{{ d.legacy_average|sim }}{% else %}<span class="muted">—</span>{% endif %}</td>
+    <td class="num hide-sm">{{ clock(d.seconds) }}</td>
+    <td class="hide-sm">{% if d.modular_mode != 'off' %}<span class="tag exp">experimental: {{ d.modular_mode }}</span> {% endif %}{% if d.code_eval %}<span class="tag exp">code check</span> {% endif %}{% if d.modular_mode == 'off' and not d.code_eval %}<span class="tag on">interview report</span>{% endif %}</td>
+    <td>{% if d.status == 'finished' %}<a href="{{ url_for('demo.summary_page', sid=d.id) }}">Review</a>{% else %}<a href="{{ url_for('demo.interview_page', sid=d.id) }}">Continue</a>{% endif %}</td>
+  </tr>{% endfor %}</tbody></table></div>
+{% endmacro %}
+
+{% macro segs(d) %}<span class="segs" role="img" aria-label="{{ d.answered }} answered, {{ d.skipped }} skipped, {{ d.unanswered }} not reached of {{ d.asked }}">{% for _ in range(d.answered) %}<i class="d"></i>{% endfor %}{% for _ in range(d.skipped) %}<i class="s"></i>{% endfor %}{% for _ in range(d.unanswered) %}<i></i>{% endfor %}</span>{% endmacro %}
+
+{% macro history_off() %}
+<div class="empty"><strong>History is not shown to this client</strong>The list of saved interviews is only served to the computer the app runs on. Open the app at <code>http://127.0.0.1:5000/demo/</code> on that computer, or start it with <code>SMART_DEMO_HISTORY=1</code>. A finished interview can still be opened from its own link.</div>
+{% endmacro %}

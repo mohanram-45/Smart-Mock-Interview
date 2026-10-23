@@ -1,0 +1,312 @@
+[
+ {
+  "id": "smi-g0027",
+  "verdict": "pass",
+  "reasons": [
+   "Self-contained, specific, deterministic expected output; answer correct and complete.",
+   "No 3.37.2 vs 3.45.1 difference."
+  ],
+  "parts_answered": {
+   "query with rn/rnk/drnk, top 3 levels, ordered": true,
+   "explain RANK/ROW_NUMBER/DENSE_RANK differences using output": true,
+   "which function for top-3 people vs top-3 levels": true
+  },
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Short window-function query plus comparison of three ranking functions on tie data; mechanism and application, no multi-step design.",
+  "key_concepts_findings": "All seven concepts are discussed in the answer.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0431",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran setup+solution+test from scratch on python sqlite3 linked to SQLite 3.45.1 AND to a real SQLite 3.37.2 (Ubuntu jammy libsqlite3 3.37.2-2ubuntu0.8 loaded via LD_LIBRARY_PATH): test passes on both. Extra cases (both versions): empty table -> []; dept where all 4 people tie (Z:1,1,1,1) -> all four returned with rn 1-4, rnk=drnk=1; dept with 4 distinct levels (Q) -> top 3 only; single-person dept returned. Window-in-WHERE raises OperationalError on both. Output identical across versions. Nearest: smi-0431 (ROW_NUMBER vs RANK, pure concept recall) and smi-g0035 (second-highest salary); intent differs.",
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/windowfunctions.html",
+    "status": "supported",
+    "evidence": "\"Window functions may only appear in the result set and in the ORDER BY clause of a SELECT statement.\" (WHERE exclusion follows; page does not name WHERE.)"
+   }
+  ]
+ },
+ {
+  "id": "smi-g0029",
+  "verdict": "pass",
+  "reasons": [
+   "Both averages, running total, difference explanation and default-frame explanation all present and verified.",
+   "RANGE-on-text claim verified empirically on both engine versions."
+  ],
+  "parts_answered": {
+   "query with 3 requested columns+averages": true,
+   "why last two columns differ": true,
+   "what default frame does with only ORDER BY": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "If two rows shared the same day, both would show the same running total",
+    "problem": "day is the PRIMARY KEY in this table, so the case cannot occur in this schema; it is a hypothetical (fine, but unflagged).",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Needs RANGE-with-offset vs ROWS semantics, the requirement of a single numeric ORDER BY (julianday trick), peers in the default frame and gap handling.",
+  "key_concepts_findings": "All seven concepts covered.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0039",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran setup+solution+test from scratch on python sqlite3 linked to SQLite 3.45.1 AND to a real SQLite 3.37.2 (Ubuntu jammy libsqlite3 3.37.2-2ubuntu0.8 loaded via LD_LIBRARY_PATH): test passes on both with identical rows. Extra cases: empty table -> []; Feb28/Mar1/Mar2 -> avg_last_3_days 10,15,25 (correct, 3-day window spans only 2 rows at 03-02? 20,30 plus 02-28 is 3 days back -> excluded) ; text ORDER BY with RANGE 2 PRECEDING returns each row's own revenue (frame collapses to peers) on both versions, no error, exactly as the answer states; two ORDER BY terms -> 'RANGE with offset PRECEDING/FOLLOWING requires one ORDER BY expression'; -1 PRECEDING -> 'frame starting offset must be a non-negative number'; 2.5 PRECEDING accepted. RANGE offsets need SQLite >= 3.28, so 3.37.2 is fine. Nearest existing: smi-g0039 (month-over-month with generated calendar, uses LAG) and smi-g0033; intent differs.",
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/windowfunctions.html",
+    "status": "supported",
+    "evidence": "Default frame \"RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW EXCLUDE NO OTHERS ... up to and including the current row and its peers\"; \"The RANGE frame type requires that the ORDER BY clause of the window has exactly one term\"; \"<expr> must be a non-negative constant numeric expression\"; \"If either Xi or Xc are non-numeric, then the boundary is the first row for which 'Xi IS Xc' is true\" (matches the collapse-to-peers claim)."
+   }
+  ]
+ },
+ {
+  "id": "smi-g0030",
+  "verdict": "pass",
+  "reasons": [
+   "Correct gaps-and-islands solution, expected output verified, tiebreak and dedupe handled and explained.",
+   "No version dependence."
+  ],
+  "parts_answered": {
+   "query returns user_id,streak_len,streak_start,streak_end with earliest tie": true,
+   "ordered by user_id": true,
+   "explain date-minus-row-number trick": true
+  },
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-step: dedupe, per-user numbering, island label via date arithmetic, group, rank with tiebreak; plus explanation of the invariant.",
+  "key_concepts_findings": "All seven concepts discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0035",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran setup+solution+test from scratch on python sqlite3 linked to SQLite 3.45.1 AND to a real SQLite 3.37.2 (Ubuntu jammy libsqlite3 3.37.2-2ubuntu0.8 loaded via LD_LIBRARY_PATH): test passes on both. Extra cases (both versions, identical): empty table -> []; year boundary 2023-12-30..2024-01-01 -> len 3; leap day 02-28,02-29,03-01 (with a duplicate) -> len 3; single-login user -> len 1; non-consecutive 01,03,05 -> earliest streak of 1; 5001 consecutive days -> 5001 (large date modifiers fine). If login_date held a time part the DISTINCT would not collapse same-day rows (question guarantees ISO date). Nothing in the nearest existing questions overlaps (closest generic: smi-g0035/g0039 are other query patterns).",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0031",
+  "verdict": "pass",
+  "reasons": [
+   "Three-valued-logic derivation is correct and complete; both fixes verified; recommendation given.",
+   "Only a key_concepts nit."
+  ],
+  "parts_answered": {
+   "explain exactly why zero rows (3VL)": true,
+   "correct query returning Aviator, Round, Shield": true,
+   "which fix chosen": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "correlated subquery",
+    "problem": "Listed as a key concept but the answer never names or explains correlation (it only uses NOT EXISTS).",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Classic NULL/NOT IN trap requiring a stepwise 3VL explanation and a fix comparison; mechanism, not multi-step design.",
+  "key_concepts_findings": "Weak: 'correlated subquery' is not discussed; 'UNKNOWN' and 'anti-join' are covered.",
+  "suggested_key_concepts": [
+   "NOT IN",
+   "NULL",
+   "three-valued logic",
+   "UNKNOWN",
+   "NOT EXISTS",
+   "anti-join",
+   "IS NOT NULL / NOT NULL constraint"
+  ],
+  "nearest_existing": {
+   "id": "smi-g0032",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran setup+solution+test from scratch on python sqlite3 linked to SQLite 3.45.1 AND to a real SQLite 3.37.2 (Ubuntu jammy libsqlite3 3.37.2-2ubuntu0.8 loaded via LD_LIBRARY_PATH): test passes on both. Extra cases: remove the NULL row -> buggy NOT IN would work and NOT EXISTS gives same 3 rows; empty discontinued -> all 5 products; duplicate discontinued row for id 2 -> still 1,3,5. Buggy query returns [] on both versions. Nearest: smi-g0032 (customers with no 2024 orders, LEFT JOIN-IS NULL vs NOT EXISTS, WHERE-vs-ON pitfall); overlap is only the NOT EXISTS technique, intent differs (that one is about filter placement, this one NULL poisoning of NOT IN).",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0034",
+  "verdict": "pass",
+  "reasons": [
+   "Result numbers (66.7%, 50.0%, cohort 06-03 excluded) verified; censoring explained and assumptions stated.",
+   "Minor: question does not state that the last date is a complete day."
+  ],
+  "parts_answered": {
+   "query with 4 columns for fully-observed cohorts": true,
+   "calendar-day (not 24h) definition honoured (u2)": true,
+   "state what excluded and why": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "for every cohort whose day-after date is fully observed in the data",
+    "problem": "The question never says the last date in the data (06-03) is a complete day, so 'fully observed' is only decidable under the assumption the answer adds afterwards ('assumes ... the max date is a full day'). Not wrong, but the exercise would be tighter if the premise were in the question.",
+    "replacement": null
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Needs dedupe of user-days, first-activity cohort, LEFT JOIN on day+1 with COUNT of nullable column, and recognition of right-censoring; several steps with a subtle definition.",
+  "key_concepts_findings": "All seven concepts covered (censoring discussed as 'unobserved').",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0039",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran setup+solution+test from scratch on python sqlite3 linked to SQLite 3.45.1 AND to a real SQLite 3.37.2 (Ubuntu jammy libsqlite3 3.37.2-2ubuntu0.8 loaded via LD_LIBRARY_PATH): test passes on both with identical output. Extra cases (both versions): empty -> []; single-day data -> [] (no cohort observable); cohorts across the May/June boundary work (date() handles it); ISO 'T' separator timestamps work with date(); a user whose events are 00:00:00 and next-day 00:00:00 counts as retained (calendar day), 23:59:59 then next 00:00:01 also retained, matching the stated definition. Result rows only include cohorts with day+1 <= max_day, as intended.",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0036",
+  "verdict": "pass",
+  "reasons": [
+   "Cycle guard works, output verified, 16-row claim for the unguarded depth-12 run verified by hand (1+2+1+1+1+1+2+1+1+1+1+2+1).",
+   "UNION/LIMIT statements match SQLite docs."
+  ],
+  "parts_answered": {
+   "recursive CTE with id,name,depth,name_path excluding Dana": true,
+   "orders by depth,name": true,
+   "terminates despite cycle - how": true,
+   "what happens without a guard": true
+  },
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Recursive CTE with path accumulation, delimiter-safe cycle guard, and reasoning about UNION vs UNION ALL under cycles.",
+  "key_concepts_findings": "All seven concepts discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0421",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran setup+solution+test from scratch on python sqlite3 linked to SQLite 3.45.1 AND to a real SQLite 3.37.2 (Ubuntu jammy libsqlite3 3.37.2-2ubuntu0.8 loaded via LD_LIBRARY_PATH): test passes on both. Extra cases (identical on both): self-loop Dana->Dana still terminates with the same 5 rows; Dana as root (manager NULL) same rows; leaf anchor (id 9) -> []; ids 12/13 added -> no false match of '/1/' inside '/12/' (delimiters work); two siblings with equal names both returned. Unguarded variant with depth<12 yields (16,12) as claimed. Recursive CTEs predate 3.37. Nearest: smi-0421 (What is a CTE?, definition) - different intent.",
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/lang_with.html",
+    "status": "supported",
+    "evidence": "\"If the operator is UNION ALL, then all rows ... are always added to the queue even if they are repeats\"; UNION discards repeated rows; \"The LIMIT clause ... Once the limit is reached, the recursion stops\"; page itself says UNION prevents infinite loops in cyclic graphs, consistent with the answer's caveat that it only helps for identical rows."
+   }
+  ]
+ },
+ {
+  "id": "smi-g0038",
+  "verdict": "pass",
+  "reasons": [
+   "All arithmetic verified (360/320, 230/210, fan-out 2x2); corrected query verified.",
+   "Nothing version dependent."
+  ],
+  "parts_answered": {
+   "work out what original returns for Asha": true,
+   "why wrong": true,
+   "corrected query with 0 for unpaid, ordered": true
+  },
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Identify multiplicative fan-out of two one-to-many joins and fix by pre-aggregation; single well-known pattern with computation.",
+  "key_concepts_findings": "All seven concepts covered.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0032",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran setup+solution+test from scratch on python sqlite3 linked to SQLite 3.45.1 AND to a real SQLite 3.37.2 (Ubuntu jammy libsqlite3 3.37.2-2ubuntu0.8 loaded via LD_LIBRARY_PATH): test passes on both (including the bug reproduction [('Asha',360,320),('Bruno',60,60),('Chloe',40,None)]). Extra cases: customer with no orders -> 0,0; order with a payment but no items -> items unchanged, paid 220; second item with an equal line total (3*20) on Bruno's order -> 120 (SUM(DISTINCT) would have wrongly given 60, supporting the answer's claim). Identical on both engines.",
+  "sources_findings": []
+ },
+ {
+  "id": "smi-g0040",
+  "verdict": "correct",
+  "reasons": [
+   "Schema, constraints and tests all verified, including the ten rejection cases and the FK pragma claim.",
+   "Answer text leaks a meta-reference to 'the record's setup' and presents the query before the schema; the reporting query silently drops zero-order customers."
+  ],
+  "parts_answered": {
+   "CREATE TABLE/INDEX with PK/FK/NOT NULL/UNIQUE/CHECK": true,
+   "integer pence and price snapshot on order line": true,
+   "query: email, non-cancelled order count, total spend ordered by email": true,
+   "explain indexes added and why": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "(The full setup with sample rows is in the record's setup; it is the same schema plus the INSERT statements.)",
+    "problem": "Refers to an internal data field the learner cannot see; the answer should stand alone.",
+    "replacement": "(The sample rows used to check it: two customers, two products, three orders - one of them pending - and four order lines.)"
+   },
+   {
+    "severity": "minor",
+    "claim": "The query above runs against this schema and sample data (setup, executed with foreign keys on):",
+    "problem": "Awkward ordering (query before the CREATE TABLE statements the question asked for first) and refers to 'setup'.",
+    "replacement": "The query above runs against the schema below (foreign keys switched on for the connection):"
+   },
+   {
+    "severity": "minor",
+    "claim": "Every extra index costs write time and space, so add them for real query patterns, not by default.",
+    "problem": "The report query uses inner joins, so a customer with no non-cancelled order (or an order with no lines) is omitted; 'each customer' is ambiguous and the answer does not say which it chose. Verified on 3.37.2/3.45.1: the LEFT JOIN variant below returns cara 0/0 and dev 1/0 for such cases.",
+    "replacement": "Every extra index costs write time and space, so add them for real query patterns, not by default. Note that the report uses inner joins, so customers with no non-cancelled orders are not listed; to list them with 0, use LEFT JOIN orders o ON o.customer_id = c.id AND o.status <> 'cancelled' LEFT JOIN order_items oi ON oi.order_id = o.id and wrap the sum in COALESCE(..., 0). Also, UNIQUE on email is case-sensitive, so 'ASHA@example.com' and 'asha@example.com' are both accepted; add COLLATE NOCASE if that matters."
+   }
+  ],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open design with several constraints, FK enforcement subtleties, price snapshotting, index trade-offs and a fan-out-safe report query.",
+  "key_concepts_findings": "All eight concepts are discussed.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0422",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran setup+solution+test from scratch on python sqlite3 linked to SQLite 3.45.1 AND to a real SQLite 3.37.2 (Ubuntu jammy libsqlite3 3.37.2-2ubuntu0.8 loaded via LD_LIBRARY_PATH): test passes on both (report rows, ten IntegrityError cases, cascade delete, no-pragma orphan accepted). Extra: customer with only a cancelled order is omitted by the inner-join query; customer with an order but no lines omitted; LEFT JOIN variant returns [(asha,2,40000),(bruno,1,12000),(cara,0,0),(dev,1,0)] on both versions; case-variant duplicate email is accepted by UNIQUE. Note PRAGMA foreign_keys inside executescript works because no transaction is open. Nearest: smi-0422/0412 are one-line definition questions.",
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/foreignkeys.html",
+    "status": "supported",
+    "evidence": "\"Foreign key constraints are disabled by default ... so must be enabled separately for each database connection.\"; \"Indices are not required for child key columns but they are almost always beneficial.\"; \"If an action is not explicitly specified, it defaults to NO ACTION\"; ON DELETE CASCADE documented. (Page recommends indexing child keys; 'does not automatically index' is implied, true in practice.)"
+   }
+  ]
+ },
+ {
+  "id": "smi-g0041",
+  "verdict": "correct",
+  "reasons": [
+   "Explanation, rewrite, alternatives, and BETWEEN pitfall all verified.",
+   "The 'show how you would verify with EXPLAIN QUERY PLAN' part reports plan output but never shows the command."
+  ],
+  "parts_answered": {
+   "why index not used": true,
+   "sargable rewrite": true,
+   "show how to verify with EXPLAIN QUERY PLAN": "partial",
+   "alternative keeping original predicate": true,
+   "mistake with timestamp range": true
+  },
+  "issues": [
+   {
+    "severity": "minor",
+    "claim": "I checked the plans on 1000 rows:",
+    "problem": "The question asks to show how to verify with EXPLAIN QUERY PLAN; the answer gives results but never writes the statement.",
+    "replacement": "To verify, prefix each query with EXPLAIN QUERY PLAN (e.g. EXPLAIN QUERY PLAN SELECT id, created_at FROM orders WHERE created_at >= '2024-01-05' AND created_at < '2024-01-06' ORDER BY id;) and look at the detail column. I checked the plans on 1000 rows:"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Single mechanism (sargability) with rewrite, plan verification and one pitfall; no multi-step design.",
+  "key_concepts_findings": "All seven concepts covered.",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0438",
+   "same_intent": false
+  },
+  "code_findings": "Re-ran setup+solution+test from scratch on python sqlite3 linked to SQLite 3.45.1 AND to a real SQLite 3.37.2 (Ubuntu jammy libsqlite3 3.37.2-2ubuntu0.8 loaded via LD_LIBRARY_PATH): test passes on both; plan strings are IDENTICAL on 3.45.1 and 3.37.2: original ['SCAN orders'], rewrite ['SEARCH orders USING COVERING INDEX idx_orders_created_at (created_at>? AND created_at<?)','USE TEMP B-TREE FOR ORDER BY'], expression index -> 'SEARCH orders USING INDEX e (<expr>=?)'. (Before 3.36 SQLite printed 'SCAN TABLE'/'SEARCH TABLE', so the answer's advice to match substrings is sound; 3.37.2 is already the new wording.) With SELECT * the rewrite uses non-covering 'USING INDEX'. BETWEEN '...05' AND '...05 23:59:59' returned 4 vs 5 correct rows once a '23:59:59.500' row existed; date() = and the range agree for 'T' separator and bare-date values. No version difference found in any of the 9 exercises.",
+  "sources_findings": [
+   {
+    "url": "https://www.sqlite.org/optoverview.html",
+    "status": "supported",
+    "evidence": "Usable terms listed as 'column = expression', 'column >= expression', 'column < expression' etc.; for expression indexes \"whenever the word 'column' is used ... one can substitute 'indexed expression' (a copy of the expression that appears in the CREATE INDEX statement)\"."
+   },
+   {
+    "url": "https://www.sqlite.org/expridx.html",
+    "status": "supported",
+    "evidence": "\"only to functions whose output is always determined completely by its input parameters (deterministic)\"; planner uses the index when the expression appears \"exactly as it is written in the CREATE INDEX statement. The query planner does not do algebra.\""
+   }
+  ]
+ }
+]

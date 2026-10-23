@@ -1,0 +1,631 @@
+[
+ {
+  "id": "P3-SQL-01",
+  "domain": "SQL",
+  "question_type": "concept",
+  "question": "Two tables hold sign-up emails: web_signups(email) with rows 'a@x.com', 'b@x.com', 'b@x.com', NULL, and newsletter(email) with rows 'b@x.com', 'c@x.com', NULL. A teammate combines them with UNION and is surprised the result has 4 rows, not 7. Explain the difference between UNION and UNION ALL, say what each costs, and state the rules a compound SELECT imposes on its column lists and on ORDER BY. Then write one query that returns the row count of the UNION result and of the UNION ALL result as two rows (columns op, n_rows), ordered by n_rows.",
+  "answer": "UNION returns the rows of both queries and then removes duplicate rows from the combined result; UNION ALL simply concatenates them and keeps every row. Here UNION ALL gives 4 + 3 = 7 rows and UNION gives 4: 'a@x.com', 'b@x.com', 'c@x.com' and one NULL. For duplicate removal, NULLs count as equal to each other (unlike in a = comparison), so the two NULL rows collapse into one.\n\n```sql\nSELECT 'union' AS op, COUNT(*) AS n_rows\nFROM (SELECT email FROM web_signups UNION SELECT email FROM newsletter)\nUNION ALL\nSELECT 'union_all', COUNT(*)\nFROM (SELECT email FROM web_signups UNION ALL SELECT email FROM newsletter)\nORDER BY n_rows;\n```\n\nCost: UNION has to detect duplicates, which typically means a sort or a hash/temporary index over the whole result, so it does extra work and cannot stream rows out immediately; UNION ALL needs no such step. Use UNION ALL when duplicates are impossible or wanted (for example, the two inputs are disjoint partitions), and UNION only when you actually need distinct rows. Using UNION \"just to be safe\" can also hide data problems.\n\nRules: every SELECT in the compound must return the same number of columns (otherwise SQLite raises an error); columns are matched by position, not by name, and the output column names come from the first SELECT. Column types should be compatible; SQLite does not enforce this, but stricter databases do. ORDER BY (and LIMIT) may appear only once, at the very end, and it applies to the whole combined result, not to the last SELECT alone; its terms are resolved against the output columns. Three or more operands group left to right.",
+  "key_concepts": [
+   "UNION",
+   "UNION ALL",
+   "duplicate elimination",
+   "NULL equality in set operations",
+   "compound SELECT",
+   "ORDER BY on compound select",
+   "column count and position matching"
+  ],
+  "common_mistakes": [
+   "Believing UNION ALL also removes duplicates, or that UNION only dedupes against the second table rather than the whole combined result.",
+   "Putting ORDER BY inside the first SELECT of the compound, or assuming the order of the inputs is preserved after UNION.",
+   "Using UNION by habit when the inputs are known to be disjoint, paying for an unnecessary distinct step."
+  ],
+  "interview_style_note": "Strong candidates state both semantics precisely, mention NULL-equals-NULL in duplicate removal, give the performance reason to prefer UNION ALL, and know ORDER BY is global to the compound.",
+  "sources": [
+   {
+    "title": "SQLite: SELECT statement (compound select operators)",
+    "url": "https://www.sqlite.org/lang_select.html",
+    "supports": "UNION removes duplicate rows while UNION ALL does not; all SELECTs in a compound must have the same number of columns; ORDER BY may only be at the end and applies to the whole compound; NULLs are considered equal when determining duplicates in compound selects."
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE web_signups(email TEXT);\nCREATE TABLE newsletter(email TEXT);\nINSERT INTO web_signups VALUES ('a@x.com'), ('b@x.com'), ('b@x.com'), (NULL);\nINSERT INTO newsletter VALUES ('b@x.com'), ('c@x.com'), (NULL);",
+   "solution": "SELECT 'union' AS op, COUNT(*) AS n_rows\nFROM (SELECT email FROM web_signups UNION SELECT email FROM newsletter)\nUNION ALL\nSELECT 'union_all', COUNT(*)\nFROM (SELECT email FROM web_signups UNION ALL SELECT email FROM newsletter)\nORDER BY n_rows;",
+   "test": "",
+   "expected": [
+    [
+     "union",
+     4
+    ],
+    [
+     "union_all",
+     7
+    ]
+   ]
+  }
+ },
+ {
+  "id": "P3-SQL-02",
+  "domain": "SQL",
+  "question_type": "sql_exercise",
+  "question": "purchases(id INTEGER PRIMARY KEY, customer_id INTEGER NOT NULL, product TEXT NOT NULL) has one row per item bought. Rows (customer_id, product): 1 Aviator; 1 Aviator; 2 Aviator; 2 Wayfarer; 3 Wayfarer; 4 Aviator; 4 Round; 5 Aviator; 5 Wayfarer; 5 Aviator. Return the customers who bought 'Aviator' but never bought 'Wayfarer' (expected 1 and 4), one row per customer, column customer_id, ordered by customer_id. Write it with EXCEPT, then compare it with the NOT EXISTS version: what does each return for customer 1, and when would you prefer which?",
+  "answer": "Use EXCEPT: it returns the distinct rows of the left query that do not appear in the right query, so each customer appears once even if they bought the Aviator twice.\n\n```sql\nSELECT customer_id FROM purchases WHERE product = 'Aviator'\nEXCEPT\nSELECT customer_id FROM purchases WHERE product = 'Wayfarer'\nORDER BY customer_id;\n```\n\nResult: customers 1 and 4. Customer 2 and 5 are removed because they bought a Wayfarer; customer 3 never bought an Aviator.\n\nThe NOT EXISTS version is: SELECT p.customer_id FROM purchases p WHERE p.product = 'Aviator' AND NOT EXISTS (SELECT 1 FROM purchases q WHERE q.customer_id = p.customer_id AND q.product = 'Wayfarer'). Run on this data it returns customer 1 twice (and 4 once), because it filters rows and customer 1 has two Aviator rows; it needs SELECT DISTINCT to match EXCEPT. With DISTINCT, both give 1 and 4.\n\nTrade-offs: EXCEPT is compact and reads like the business question, and compares whole rows with NULLs treated as equal. But it can only compare the columns it selects, so if you also want other columns (name, first purchase date) you must join back or use NOT EXISTS. NOT EXISTS is the more flexible form and is not thrown off by NULLs in the subquery; NOT IN is (a NULL in the subquery makes it return no rows). Check the query plan if performance matters; do not assume either is faster on a given engine.",
+  "key_concepts": [
+   "EXCEPT",
+   "NOT EXISTS",
+   "anti-join",
+   "duplicate elimination",
+   "NOT IN NULL trap",
+   "set difference"
+  ],
+  "common_mistakes": [
+   "Writing the NOT EXISTS/anti-join version without DISTINCT and returning customer 1 twice.",
+   "Using NOT IN on a nullable column, which returns no rows if the subquery yields a NULL.",
+   "Filtering product = 'Aviator' AND product <> 'Wayfarer' in a single WHERE, which tests one row at a time and excludes nobody."
+  ],
+  "interview_style_note": "Strong candidates recognise this as set difference across rows of the same table, notice that EXCEPT dedupes while a row-filtering anti-join does not, and can say when each form is preferable.",
+  "sources": [
+   {
+    "title": "SQLite: SELECT statement (compound select operators)",
+    "url": "https://www.sqlite.org/lang_select.html",
+    "supports": "EXCEPT returns the rows of the left SELECT not returned by the right SELECT, and duplicate rows are removed from the results of INTERSECT and EXCEPT."
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE purchases(id INTEGER PRIMARY KEY, customer_id INTEGER NOT NULL, product TEXT NOT NULL);\nINSERT INTO purchases(customer_id, product) VALUES\n (1,'Aviator'),(1,'Aviator'),\n (2,'Aviator'),(2,'Wayfarer'),\n (3,'Wayfarer'),\n (4,'Aviator'),(4,'Round'),\n (5,'Aviator'),(5,'Wayfarer'),(5,'Aviator');",
+   "solution": "SELECT customer_id FROM purchases WHERE product = 'Aviator'\nEXCEPT\nSELECT customer_id FROM purchases WHERE product = 'Wayfarer'\nORDER BY customer_id;",
+   "test": "",
+   "expected": [
+    [
+     1
+    ],
+    [
+     4
+    ]
+   ]
+  }
+ },
+ {
+  "id": "P3-SQL-03",
+  "domain": "SQL",
+  "question_type": "sql_exercise",
+  "question": "Two nightly snapshots of the same contact list should match. crm_contacts(id, email, phone) has rows (1,'a@x.com','111'), (2,'b@x.com',NULL), (3,'c@x.com','333'), (4,'d@x.com',NULL); billing_contacts(id, email, phone) has rows (1,'a@x.com','111'), (2,'b@x.com',NULL), (3,'c@x.com','999'), (5,'e@x.com',NULL). List every row that is present in only one snapshot, with columns side ('crm_only' or 'billing_only'), id, email, phone, ordered by id then side. Row 2 is identical in both (phone is NULL in both) and must not be reported. Explain why a join on phone = phone gets row 2 wrong and why EXCEPT does not.",
+  "answer": "Take the difference in both directions with EXCEPT and stack the two results with UNION ALL, tagging each with its side. Wrapping each EXCEPT in a subquery lets the final ORDER BY apply to the whole stacked result.\n\n```sql\nSELECT 'crm_only' AS side, id, email, phone\nFROM (SELECT id, email, phone FROM crm_contacts\n      EXCEPT\n      SELECT id, email, phone FROM billing_contacts)\nUNION ALL\nSELECT 'billing_only', id, email, phone\nFROM (SELECT id, email, phone FROM billing_contacts\n      EXCEPT\n      SELECT id, email, phone FROM crm_contacts)\nORDER BY id, side;\n```\n\nResult: (billing_only, 3, c@x.com, 999), (crm_only, 3, c@x.com, 333), (crm_only, 4, d@x.com, NULL), (billing_only, 5, e@x.com, NULL). Id 3 shows up on both sides because the phone differs, which is how a changed value appears in a row-set comparison; ids 4 and 5 are genuinely one-sided; row 2 is correctly absent.\n\nWhy it works: set operators compare whole rows and treat NULL as equal to NULL when finding duplicates. An equality comparison does not: NULL = NULL is unknown, so a NOT EXISTS (or LEFT JOIN ... IS NULL) anti-join with b.phone = c.phone treats row 2 as unmatched and falsely reports it as crm_only (I ran this: it returns ids 2, 3 and 4). To get the same effect with joins, compare with the NULL-safe operator (IS in SQLite, IS NOT DISTINCT FROM in standard SQL/PostgreSQL).\n\nLimits: EXCEPT is set-based, so it cannot see a row that is duplicated a different number of times in each table; compare GROUP BY counts if multiplicity matters. It also cannot tell you which column changed. Pick UNION ALL, not UNION, for stacking, so nothing is dropped.",
+  "key_concepts": [
+   "EXCEPT",
+   "UNION ALL",
+   "NULL-safe comparison",
+   "three-valued logic",
+   "table reconciliation",
+   "symmetric difference"
+  ],
+  "common_mistakes": [
+   "Using = on nullable columns in a NOT EXISTS/LEFT JOIN comparison, which reports identical NULL-containing rows as differences.",
+   "Running EXCEPT in only one direction, so rows that exist only in the second table are missed.",
+   "Using UNION instead of UNION ALL and relying on EXCEPT for multiplicity, forgetting both are set-based and ignore duplicate counts."
+  ],
+  "interview_style_note": "Strong candidates build the symmetric difference, explain the NULL asymmetry between set operators and =, and name the limitation that EXCEPT ignores row multiplicity.",
+  "sources": [
+   {
+    "title": "SQLite: SELECT statement (compound select operators)",
+    "url": "https://www.sqlite.org/lang_select.html",
+    "supports": "For duplicate determination in compound SELECTs, NULL values are considered equal to other NULL values; EXCEPT returns left rows not in the right result."
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE crm_contacts(id INTEGER, email TEXT, phone TEXT);\nCREATE TABLE billing_contacts(id INTEGER, email TEXT, phone TEXT);\nINSERT INTO crm_contacts VALUES (1,'a@x.com','111'),(2,'b@x.com',NULL),(3,'c@x.com','333'),(4,'d@x.com',NULL);\nINSERT INTO billing_contacts VALUES (1,'a@x.com','111'),(2,'b@x.com',NULL),(3,'c@x.com','999'),(5,'e@x.com',NULL);",
+   "solution": "SELECT 'crm_only' AS side, id, email, phone\nFROM (SELECT id, email, phone FROM crm_contacts\n      EXCEPT\n      SELECT id, email, phone FROM billing_contacts)\nUNION ALL\nSELECT 'billing_only', id, email, phone\nFROM (SELECT id, email, phone FROM billing_contacts\n      EXCEPT\n      SELECT id, email, phone FROM crm_contacts)\nORDER BY id, side;",
+   "test": "",
+   "expected": [
+    [
+     "billing_only",
+     3,
+     "c@x.com",
+     "999"
+    ],
+    [
+     "crm_only",
+     3,
+     "c@x.com",
+     "333"
+    ],
+    [
+     "crm_only",
+     4,
+     "d@x.com",
+     null
+    ],
+    [
+     "billing_only",
+     5,
+     "e@x.com",
+     null
+    ]
+   ]
+  }
+ },
+ {
+  "id": "P3-SQL-04",
+  "domain": "SQL",
+  "question_type": "sql_exercise",
+  "question": "logins(user_id INTEGER NOT NULL, login_date TEXT NOT NULL) holds ISO dates, several rows per user possible. Rows (user_id: dates): 1: 2024-09-03, 09-17, 10-02, 10-05, 10-09; 2: 09-12, 09-12; 3: 10-01, 10-31; 4: 09-30, 10-01; 5: 09-05, 09-06, 10-20 (all 2024). Return the users who logged in during September 2024 and also during October 2024, one row per user, column user_id, ordered by user_id (expected 1, 4, 5). Use INTERSECT, then compare with the equivalent self-join and IN versions: what does the plain join return for this data and why?",
+  "answer": "Use INTERSECT on the two monthly user lists; it returns only rows in both and removes duplicates.\n\n```sql\nSELECT user_id FROM logins WHERE login_date >= '2024-09-01' AND login_date < '2024-10-01'\nINTERSECT\nSELECT user_id FROM logins WHERE login_date >= '2024-10-01' AND login_date < '2024-11-01'\nORDER BY user_id;\n```\n\nResult: users 1, 4 and 5. User 2 was only active in September, user 3 only in October. Note the half-open date ranges (>= first day, < first day of next month), which stay correct for timestamps and avoid hand-typing the month's last day.\n\nEquivalents: (a) a self-join on user_id with one month filter on each side, and (b) WHERE login_date in September AND user_id IN (subquery for October). Both are correct only with DISTINCT. The plain join returns nine rows on this data: user 1 has 2 September logins x 3 October logins = 6 rows, user 4 has 1 x 1, and user 5 has 2 x 1 = 2 rows. The join pairs every September row with every October row per user, so the row count multiplies instead of counting users. IN with SELECT DISTINCT returns 1, 4, 5.\n\nChoice: INTERSECT is the shortest and expresses the intent; it compares whole rows, so it only works cleanly when you select the key alone, and it is harder to extend if you need extra columns (such as first login date), where the join/EXISTS form is better. Chaining a third month with another INTERSECT is easy, and it groups left to right. Performance depends on the engine and indexes, so check the plan rather than assuming.",
+  "key_concepts": [
+   "INTERSECT",
+   "duplicate elimination",
+   "self-join row multiplication",
+   "IN subquery",
+   "half-open date range",
+   "set intersection"
+  ],
+  "common_mistakes": [
+   "Writing the self-join without DISTINCT and getting multiple rows per user (nine here instead of three).",
+   "Filtering login_date in September AND in October in the same WHERE on a single row, which can never be true.",
+   "Using BETWEEN '2024-10-01' AND '2024-10-31' on timestamps and missing activity on the last day after midnight."
+  ],
+  "interview_style_note": "Strong candidates know INTERSECT dedupes, can explain why a join multiplies rows, and use correct half-open date ranges.",
+  "sources": [
+   {
+    "title": "SQLite: SELECT statement (compound select operators)",
+    "url": "https://www.sqlite.org/lang_select.html",
+    "supports": "INTERSECT returns the intersection of the left and right SELECT results, and duplicate rows are removed from INTERSECT results."
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE logins(user_id INTEGER NOT NULL, login_date TEXT NOT NULL);\nINSERT INTO logins VALUES\n (1,'2024-09-03'),(1,'2024-09-17'),(1,'2024-10-02'),(1,'2024-10-05'),(1,'2024-10-09'),\n (2,'2024-09-12'),(2,'2024-09-12'),\n (3,'2024-10-01'),(3,'2024-10-31'),\n (4,'2024-09-30'),(4,'2024-10-01'),\n (5,'2024-09-05'),(5,'2024-09-06'),(5,'2024-10-20');",
+   "solution": "SELECT user_id FROM logins WHERE login_date >= '2024-09-01' AND login_date < '2024-10-01'\nINTERSECT\nSELECT user_id FROM logins WHERE login_date >= '2024-10-01' AND login_date < '2024-11-01'\nORDER BY user_id;",
+   "test": "",
+   "expected": [
+    [
+     1
+    ],
+    [
+     4
+    ],
+    [
+     5
+    ]
+   ]
+  }
+ },
+ {
+  "id": "P3-SQL-05",
+  "domain": "SQL",
+  "question_type": "sql_exercise",
+  "question": "employees(id INTEGER PRIMARY KEY, name TEXT, dept TEXT, salary INTEGER) has rows (name, dept, salary): Ana Eng 150, Ben Eng 140, Cy Eng 140, Dee Eng 130, Eli Eng 120; Fay Sales 100, Gus Sales 90, Hal Sales 90, Ivy Sales 60; Jo HR 80, Kim HR 70; Lou Ops 50, Max Ops 70, Ned Ops NULL (not yet set), Oda Ops 60. SQLite has no MEDIAN function. Write one query returning dept and median_salary (the middle value, or the mean of the two middle values when the count is even), ignoring NULL salaries, ordered by dept. Explain how you handle odd and even counts and what goes wrong if the NULL row is not excluded.",
+  "answer": "Number the non-NULL salaries inside each department and keep the middle one or two rows, then average them.\n\n```sql\nWITH ranked AS (\n  SELECT dept, salary,\n         ROW_NUMBER() OVER (PARTITION BY dept ORDER BY salary) AS rn,\n         COUNT(*)     OVER (PARTITION BY dept)                 AS cnt\n  FROM employees\n  WHERE salary IS NOT NULL\n)\nSELECT dept, AVG(salary) AS median_salary\nFROM ranked\nWHERE rn IN ((cnt + 1) / 2, (cnt + 2) / 2)\nGROUP BY dept\nORDER BY dept;\n```\n\nResult (Eng 140, HR 75, Ops 60, Sales 90; AVG returns a real number, so SQLite shows 140.0 etc.). Mechanism: ROW_NUMBER orders each department's salaries, COUNT(*) OVER gives the group size cnt. With integer division, (cnt+1)/2 and (cnt+2)/2 are the same row for odd cnt (cnt=5 gives row 3 twice) and the two middle rows for even cnt (cnt=4 gives rows 2 and 3). IN matches either one, and AVG over the one or two matching rows gives the median. Ties are harmless: Sales has 100, 90, 90, 60, and the middle rows are both 90.\n\nThe NULL row: salaries must be filtered before numbering, otherwise ROW_NUMBER and COUNT include the NULL row. In SQLite NULL sorts first in ascending order, so Ops would have 4 rows and the middle rows would be 50 and 60, giving 55 instead of the correct 60 (the middle of the three known values). Filtering in the CTE gives the correct median 60. A department whose salaries are all NULL disappears from the result; use a LEFT JOIN from a department table if you need it shown as NULL.\n\nAlternatives: a self-join counting rows below and above each value, or LIMIT/OFFSET in a correlated subquery per department; the window version is the clearest. Window functions require SQLite 3.25 or newer.",
+  "key_concepts": [
+   "median",
+   "ROW_NUMBER",
+   "COUNT window function",
+   "PARTITION BY",
+   "integer division",
+   "NULL handling",
+   "even and odd row counts"
+  ],
+  "common_mistakes": [
+   "Using AVG(salary) and calling it the median.",
+   "Not excluding NULLs before ROW_NUMBER/COUNT, which shifts the middle position.",
+   "Using cnt/2 only, which returns the wrong row for odd counts, or averaging DISTINCT salaries so repeated values are collapsed."
+  ],
+  "interview_style_note": "Strong candidates derive the middle-row positions with integer arithmetic for both parities and filter NULLs before counting.",
+  "sources": [
+   {
+    "title": "SQLite: Window Functions",
+    "url": "https://www.sqlite.org/windowfunctions.html",
+    "supports": "Window functions were added in SQLite 3.25.0, and row_number() numbers rows within the partition in the order given by the window ORDER BY."
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE employees(id INTEGER PRIMARY KEY, name TEXT, dept TEXT, salary INTEGER);\nINSERT INTO employees(name, dept, salary) VALUES\n ('Ana','Eng',150),('Ben','Eng',140),('Cy','Eng',140),('Dee','Eng',130),('Eli','Eng',120),\n ('Fay','Sales',100),('Gus','Sales',90),('Hal','Sales',90),('Ivy','Sales',60),\n ('Jo','HR',80),('Kim','HR',70),\n ('Lou','Ops',50),('Max','Ops',70),('Ned','Ops',NULL),('Oda','Ops',60);",
+   "solution": "WITH ranked AS (\n  SELECT dept, salary,\n         ROW_NUMBER() OVER (PARTITION BY dept ORDER BY salary) AS rn,\n         COUNT(*)     OVER (PARTITION BY dept)                 AS cnt\n  FROM employees\n  WHERE salary IS NOT NULL\n)\nSELECT dept, AVG(salary) AS median_salary\nFROM ranked\nWHERE rn IN ((cnt + 1) / 2, (cnt + 2) / 2)\nGROUP BY dept\nORDER BY dept;",
+   "test": "",
+   "expected": [
+    [
+     "Eng",
+     140.0
+    ],
+    [
+     "HR",
+     75.0
+    ],
+    [
+     "Ops",
+     60.0
+    ],
+    [
+     "Sales",
+     90.0
+    ]
+   ]
+  }
+ },
+ {
+  "id": "P3-SQL-06",
+  "domain": "SQL",
+  "question_type": "sql_exercise",
+  "question": "sales(id INTEGER PRIMARY KEY, category TEXT, product TEXT, amount INTEGER) has one row per order line. Rows (category, product, amount): Sunglasses: Aviator 200, Aviator 100, Wayfarer 250, Round 150, Round 100, Shield 100; Frames: Slim 400, Bold 250, Bold 150, Retro 100; Lenses: A 90, B 80, C 50, C 30, D 80; Accessories: Case 50, Cloth 20. The homepage has exactly two featured slots per category, filled by the top two products by total revenue. Return category, product, revenue, rn, rnk and cutoff_tie for the products that fill the slots, where rn is ROW_NUMBER (ties broken by product name), rnk is RANK, and cutoff_tie is 1 when the product's revenue is shared with a product that missed the cut. Order by category, rn. Explain what each ranking function would do with the ties, and the business consequence.",
+  "answer": "Aggregate to product revenue first (a product has several rows), then rank within each category. ROW_NUMBER picks exactly two products; RANK is used only to detect ties across the cutoff.\n\n```sql\nWITH rev AS (\n  SELECT category, product, SUM(amount) AS revenue\n  FROM sales\n  GROUP BY category, product\n),\nr AS (\n  SELECT category, product, revenue,\n         ROW_NUMBER() OVER (PARTITION BY category ORDER BY revenue DESC, product) AS rn,\n         RANK()       OVER (PARTITION BY category ORDER BY revenue DESC)          AS rnk,\n         COUNT(*)     OVER (PARTITION BY category, revenue)                       AS n_same\n  FROM rev\n)\nSELECT category, product, revenue, rn, rnk,\n       CASE WHEN rnk + n_same - 1 > 2 THEN 1 ELSE 0 END AS cutoff_tie\nFROM r\nWHERE rn <= 2\nORDER BY category, rn;\n```\n\nResult: Accessories Case and Cloth; Frames Bold and Slim (both 400, no problem: they tie each other but both fit); Lenses A and B (B has 80, same as C and D, so cutoff_tie = 1); Sunglasses Aviator and Round (Round and Wayfarer both have 250, cutoff_tie = 1).\n\nHow the functions treat ties: ROW_NUMBER always gives distinct numbers, so exactly two rows per category, but which tied product wins is decided by the secondary sort, here the name. If you leave the tie-break out, the choice is arbitrary and can change between runs. RANK gives tied rows the same number and skips afterwards, so rnk <= 2 returns four Lenses products (A plus B, C and D, all rank 2) and three Sunglasses products (Aviator plus the tied Round and Wayfarer): the slot count is not guaranteed. DENSE_RANK has no gaps, so dense_rank <= 2 returns every product in the top two revenue levels; in Frames (400, 400, 100) it would add Retro, which RANK (1, 1, 3) leaves out.\n\nConsequence: for a fixed number of slots, use ROW_NUMBER with an explicit, business-approved tie-break (for example margin or most recent sale) and flag cutoff ties for review; use RANK when the rule is to include everyone tied for a place, and be ready for variable-length output. The flag condition is rnk + (size of the tie group) - 1 > 2, meaning the tie group extends past position 2. Window functions need SQLite 3.25+.",
+  "key_concepts": [
+   "ROW_NUMBER",
+   "RANK",
+   "DENSE_RANK",
+   "top-N per group",
+   "tie-breaking",
+   "aggregate before ranking",
+   "window functions"
+  ],
+  "common_mistakes": [
+   "Ranking order lines instead of aggregating to product revenue first.",
+   "Using ROW_NUMBER without a tie-break, so which tied product gets the slot is arbitrary.",
+   "Using RANK <= 2 and assuming it returns exactly two rows per category."
+  ],
+  "interview_style_note": "Strong candidates aggregate before ranking, choose the ranking function from the business rule, and detect ties at the cutoff instead of hiding them.",
+  "sources": [
+   {
+    "title": "SQLite: Window Functions",
+    "url": "https://www.sqlite.org/windowfunctions.html",
+    "supports": "row_number() numbers rows in window order, rank() gives peers the row_number of the first peer (with gaps), and dense_rank() numbers peer groups without gaps."
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE sales(id INTEGER PRIMARY KEY, category TEXT, product TEXT, amount INTEGER);\nINSERT INTO sales(category, product, amount) VALUES\n ('Sunglasses','Aviator',200),('Sunglasses','Aviator',100),('Sunglasses','Wayfarer',250),\n ('Sunglasses','Round',150),('Sunglasses','Round',100),('Sunglasses','Shield',100),\n ('Frames','Slim',400),('Frames','Bold',250),('Frames','Bold',150),('Frames','Retro',100),\n ('Lenses','A',90),('Lenses','B',80),('Lenses','C',50),('Lenses','C',30),('Lenses','D',80),\n ('Accessories','Case',50),('Accessories','Cloth',20);",
+   "solution": "WITH rev AS (\n  SELECT category, product, SUM(amount) AS revenue\n  FROM sales\n  GROUP BY category, product\n),\nr AS (\n  SELECT category, product, revenue,\n         ROW_NUMBER() OVER (PARTITION BY category ORDER BY revenue DESC, product) AS rn,\n         RANK()       OVER (PARTITION BY category ORDER BY revenue DESC)          AS rnk,\n         COUNT(*)     OVER (PARTITION BY category, revenue)                       AS n_same\n  FROM rev\n)\nSELECT category, product, revenue, rn, rnk,\n       CASE WHEN rnk + n_same - 1 > 2 THEN 1 ELSE 0 END AS cutoff_tie\nFROM r\nWHERE rn <= 2\nORDER BY category, rn;",
+   "test": "",
+   "expected": [
+    [
+     "Accessories",
+     "Case",
+     50,
+     1,
+     1,
+     0
+    ],
+    [
+     "Accessories",
+     "Cloth",
+     20,
+     2,
+     2,
+     0
+    ],
+    [
+     "Frames",
+     "Bold",
+     400,
+     1,
+     1,
+     0
+    ],
+    [
+     "Frames",
+     "Slim",
+     400,
+     2,
+     1,
+     0
+    ],
+    [
+     "Lenses",
+     "A",
+     90,
+     1,
+     1,
+     0
+    ],
+    [
+     "Lenses",
+     "B",
+     80,
+     2,
+     2,
+     1
+    ],
+    [
+     "Sunglasses",
+     "Aviator",
+     300,
+     1,
+     1,
+     0
+    ],
+    [
+     "Sunglasses",
+     "Round",
+     250,
+     2,
+     2,
+     1
+    ]
+   ]
+  }
+ },
+ {
+  "id": "P3-SQL-07",
+  "domain": "SQL",
+  "question_type": "sql_exercise",
+  "question": "events(user_id INTEGER NOT NULL, event_ts TEXT NOT NULL, event_name TEXT) stores 'YYYY-MM-DD HH:MM:SS' timestamps in one time zone. Rows (user_id, event_ts): user 1: 2024-06-01 09:00:00, 09:10:00, 09:40:00, 10:11:00, 10:12:00; user 2: 2024-06-01 23:50:00, 2024-06-02 00:10:00, 2024-06-02 00:10:00 (two events at the same second), 2024-06-02 12:00:00; user 3: 2024-06-01 08:00:00. A new session starts at a user's first event, and whenever the gap to that user's previous event is strictly more than 30 minutes (a gap of exactly 30:00 stays in the session). Return user_id, session_id (1, 2, ... per user), session_start, session_end and n_events, ordered by user_id, session_id, using LAG and a running SUM. Explain why the running SUM works and which edge cases matter.",
+  "answer": "Mark session starts with LAG, then turn the flags into session numbers with a running SUM per user.\n\n```sql\nWITH lagged AS (\n  SELECT user_id, event_ts,\n         LAG(event_ts) OVER (PARTITION BY user_id ORDER BY event_ts) AS prev_ts\n  FROM events\n),\nflagged AS (\n  SELECT user_id, event_ts,\n         CASE WHEN prev_ts IS NULL\n                OR CAST(strftime('%s', event_ts) AS INTEGER)\n                 - CAST(strftime('%s', prev_ts)  AS INTEGER) > 1800\n              THEN 1 ELSE 0 END AS is_new\n  FROM lagged\n),\nnumbered AS (\n  SELECT user_id, event_ts,\n         SUM(is_new) OVER (PARTITION BY user_id ORDER BY event_ts\n                           ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS session_id\n  FROM flagged\n)\nSELECT user_id, session_id,\n       MIN(event_ts) AS session_start,\n       MAX(event_ts) AS session_end,\n       COUNT(*)      AS n_events\nFROM numbered\nGROUP BY user_id, session_id\nORDER BY user_id, session_id;\n```\n\nResult: user 1 has session 1 (09:00 to 09:40, 3 events) and session 2 (10:11 to 10:12, 2 events); user 2 has session 1 (23:50 to 00:10, 3 events) and session 2 (12:00, 1 event); user 3 has one session.\n\nWhy it works: is_new is 1 on each first event and after each big gap, and 0 otherwise. The running sum of those flags in time order increases by one exactly at a session boundary, so every event of a session carries the same value, which then serves as a group key. The sum has to be an explicit running one (ROWS frame); the default RANGE frame would also work here but treats equal timestamps as peers, so be explicit.\n\nEdge cases from the data: the gap from 09:10 to 09:40 is exactly 1800 seconds and stays in the session because the test is > 1800; 09:40 to 10:11 is 31 minutes and splits; user 2 crosses midnight but is one session because the comparison uses full timestamps, not dates; duplicate timestamps give a zero gap, so their LAG order does not change the sessions. I compare epoch seconds with strftime('%s'), which gives exact integers; fractional julianday differences can misjudge the exact-30-minute boundary. Session ids are per user; combine user_id and session_id for a global key. Sessionisation needs the events ordered, so with millions of rows add a (user_id, event_ts) index. Window functions need SQLite 3.25+.",
+  "key_concepts": [
+   "sessionization",
+   "LAG",
+   "running SUM",
+   "window frame",
+   "gap threshold",
+   "strftime epoch seconds",
+   "boundary conditions"
+  ],
+  "common_mistakes": [
+   "Grouping by date instead of using time gaps, which splits sessions at midnight.",
+   "Using > 30 minutes computed with floating-point julianday differences, or >= instead of >, so boundary cases flip.",
+   "Forgetting PARTITION BY user_id, so one user's last event is compared with another user's first."
+  ],
+  "interview_style_note": "Strong candidates explain the flag-then-cumulative-sum pattern, partition by user, and test the exact-threshold and midnight cases.",
+  "sources": [
+   {
+    "title": "SQLite: Window Functions",
+    "url": "https://www.sqlite.org/windowfunctions.html",
+    "supports": "lag() returns the value from the previous row in the partition, or NULL when there is no previous row."
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE events(user_id INTEGER NOT NULL, event_ts TEXT NOT NULL, event_name TEXT);\nINSERT INTO events VALUES\n (1,'2024-06-01 09:00:00','view'),(1,'2024-06-01 09:10:00','click'),(1,'2024-06-01 09:40:00','click'),\n (1,'2024-06-01 10:11:00','view'),(1,'2024-06-01 10:12:00','click'),\n (2,'2024-06-01 23:50:00','view'),(2,'2024-06-02 00:10:00','click'),(2,'2024-06-02 00:10:00','click'),\n (2,'2024-06-02 12:00:00','view'),\n (3,'2024-06-01 08:00:00','view');",
+   "solution": "WITH lagged AS (\n  SELECT user_id, event_ts,\n         LAG(event_ts) OVER (PARTITION BY user_id ORDER BY event_ts) AS prev_ts\n  FROM events\n),\nflagged AS (\n  SELECT user_id, event_ts,\n         CASE WHEN prev_ts IS NULL\n                OR CAST(strftime('%s', event_ts) AS INTEGER)\n                 - CAST(strftime('%s', prev_ts)  AS INTEGER) > 1800\n              THEN 1 ELSE 0 END AS is_new\n  FROM lagged\n),\nnumbered AS (\n  SELECT user_id, event_ts,\n         SUM(is_new) OVER (PARTITION BY user_id ORDER BY event_ts\n                           ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS session_id\n  FROM flagged\n)\nSELECT user_id, session_id,\n       MIN(event_ts) AS session_start,\n       MAX(event_ts) AS session_end,\n       COUNT(*)      AS n_events\nFROM numbered\nGROUP BY user_id, session_id\nORDER BY user_id, session_id;",
+   "test": "",
+   "expected": [
+    [
+     1,
+     1,
+     "2024-06-01 09:00:00",
+     "2024-06-01 09:40:00",
+     3
+    ],
+    [
+     1,
+     2,
+     "2024-06-01 10:11:00",
+     "2024-06-01 10:12:00",
+     2
+    ],
+    [
+     2,
+     1,
+     "2024-06-01 23:50:00",
+     "2024-06-02 00:10:00",
+     3
+    ],
+    [
+     2,
+     2,
+     "2024-06-02 12:00:00",
+     "2024-06-02 12:00:00",
+     1
+    ],
+    [
+     3,
+     1,
+     "2024-06-01 08:00:00",
+     "2024-06-01 08:00:00",
+     1
+    ]
+   ]
+  }
+ },
+ {
+  "id": "P3-SQL-08",
+  "domain": "SQL",
+  "question_type": "sql_exercise",
+  "question": "events(user_id INTEGER NOT NULL, event_name TEXT NOT NULL, event_ts TEXT NOT NULL) logs a shop funnel with event_name in 'view', 'add_to_cart', 'purchase'. Rows (user_id: event@ts, all 2024-05): 1: view 05-01 10:00, view 10:05, add_to_cart 10:06, purchase 10:20; 2: view 05-01 11:00, add_to_cart 11:02; 3: view 05-02 09:00; 4: view 05-02 12:00, view 12:30, view 05-03 08:00; 5: view 05-03 14:00, add_to_cart 14:01, add_to_cart 14:02, purchase 14:10; 6: purchase 05-04 09:00 only; 7: add_to_cart 05-04 10:00, then view 10:05; 8: view 05-04 15:00, add_to_cart 15:03, purchase 15:30. Count USERS (not events) at each step, where a user reaches add_to_cart only if their first cart event is at or after their first view, and reaches purchase only if their first purchase is at or after their first cart event. Return one row: viewed, carted, purchased, view_to_cart_pct, cart_to_purchase_pct, overall_pct (1 decimal). Explain the design choices.",
+  "answer": "Reduce to one row per user with the first time of each step using conditional aggregation, enforce the order of the steps, then count how many users have a value at each step.\n\n```sql\nWITH u AS (\n  SELECT user_id,\n         MIN(CASE WHEN event_name = 'view'        THEN event_ts END) AS t_view,\n         MIN(CASE WHEN event_name = 'add_to_cart' THEN event_ts END) AS t_cart,\n         MIN(CASE WHEN event_name = 'purchase'    THEN event_ts END) AS t_buy\n  FROM events\n  GROUP BY user_id\n),\ns2 AS (\n  SELECT user_id, t_view,\n         CASE WHEN t_cart >= t_view THEN t_cart END AS t_cart, t_buy\n  FROM u\n  WHERE t_view IS NOT NULL\n),\ns3 AS (\n  SELECT user_id, t_view, t_cart,\n         CASE WHEN t_buy >= t_cart THEN t_buy END AS t_buy\n  FROM s2\n)\nSELECT COUNT(t_view) AS viewed,\n       COUNT(t_cart) AS carted,\n       COUNT(t_buy)  AS purchased,\n       ROUND(100.0 * COUNT(t_cart) / NULLIF(COUNT(t_view), 0), 1) AS view_to_cart_pct,\n       ROUND(100.0 * COUNT(t_buy)  / NULLIF(COUNT(t_cart), 0), 1) AS cart_to_purchase_pct,\n       ROUND(100.0 * COUNT(t_buy)  / NULLIF(COUNT(t_view), 0), 1) AS overall_pct\nFROM s3;\n```\n\nResult: viewed 7, carted 4, purchased 3, view_to_cart 57.1%, cart_to_purchase 75.0%, overall 42.9%. Counting events would give 10 view events for 7 viewers (users 1 and 4 viewed several times), and a naive count of purchase events would include user 6, who purchased without any prior view in the log, and ignore the rule that the steps must happen in order.\n\nDesign choices: MIN(CASE WHEN ...) gives each user's first event of each type, so repeated events cannot inflate counts. COUNT(column) counts only non-NULL values, which is why a user who fails a step is simply dropped from that and later steps (their value becomes NULL). User 7 added to cart before viewing, so counts as viewed only; user 6 is excluded from the funnel entirely (they are worth investigating as a tracking gap or a buy-now path). The rate denominators are the previous step, and NULLIF avoids division by zero (SQLite would return NULL, other databases error). Use 100.0 to avoid integer division.\n\nLimits: this is a first-touch funnel, with no time window or session boundary and no product dimension; add a window such as purchase within 24 hours of the first view if the business defines conversion that way, and decide up front whether ties on timestamps count as ordered (here >= does).",
+  "key_concepts": [
+   "conditional aggregation",
+   "funnel analysis",
+   "COUNT DISTINCT users vs events",
+   "NULLIF division guard",
+   "step ordering",
+   "conversion rate"
+  ],
+  "common_mistakes": [
+   "Counting events (COUNT(*)) instead of users, so repeat viewers inflate each step.",
+   "Counting purchasers who never viewed or added to cart, so later steps exceed earlier ones and rates can exceed 100%.",
+   "Dividing integers (COUNT/COUNT) and getting 0 instead of a percentage, or dividing by a zero step count."
+  ],
+  "interview_style_note": "Strong candidates count users, take each user's first event per step, enforce step order, and call out data oddities such as a purchase with no earlier steps.",
+  "sources": [
+   {
+    "title": "SQLite: Built-in Aggregate Functions",
+    "url": "https://www.sqlite.org/lang_aggfunc.html",
+    "supports": "count(X) counts the number of times X is not NULL in a group, while count(*) counts all rows in the group."
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE events(user_id INTEGER NOT NULL, event_name TEXT NOT NULL, event_ts TEXT NOT NULL);\nINSERT INTO events VALUES\n (1,'view','2024-05-01 10:00:00'),(1,'view','2024-05-01 10:05:00'),(1,'add_to_cart','2024-05-01 10:06:00'),(1,'purchase','2024-05-01 10:20:00'),\n (2,'view','2024-05-01 11:00:00'),(2,'add_to_cart','2024-05-01 11:02:00'),\n (3,'view','2024-05-02 09:00:00'),\n (4,'view','2024-05-02 12:00:00'),(4,'view','2024-05-02 12:30:00'),(4,'view','2024-05-03 08:00:00'),\n (5,'view','2024-05-03 14:00:00'),(5,'add_to_cart','2024-05-03 14:01:00'),(5,'add_to_cart','2024-05-03 14:02:00'),(5,'purchase','2024-05-03 14:10:00'),\n (6,'purchase','2024-05-04 09:00:00'),\n (7,'add_to_cart','2024-05-04 10:00:00'),(7,'view','2024-05-04 10:05:00'),\n (8,'view','2024-05-04 15:00:00'),(8,'add_to_cart','2024-05-04 15:03:00'),(8,'purchase','2024-05-04 15:30:00');",
+   "solution": "WITH u AS (\n  SELECT user_id,\n         MIN(CASE WHEN event_name = 'view'        THEN event_ts END) AS t_view,\n         MIN(CASE WHEN event_name = 'add_to_cart' THEN event_ts END) AS t_cart,\n         MIN(CASE WHEN event_name = 'purchase'    THEN event_ts END) AS t_buy\n  FROM events\n  GROUP BY user_id\n),\ns2 AS (\n  SELECT user_id, t_view,\n         CASE WHEN t_cart >= t_view THEN t_cart END AS t_cart, t_buy\n  FROM u\n  WHERE t_view IS NOT NULL\n),\ns3 AS (\n  SELECT user_id, t_view, t_cart,\n         CASE WHEN t_buy >= t_cart THEN t_buy END AS t_buy\n  FROM s2\n)\nSELECT COUNT(t_view) AS viewed,\n       COUNT(t_cart) AS carted,\n       COUNT(t_buy)  AS purchased,\n       ROUND(100.0 * COUNT(t_cart) / NULLIF(COUNT(t_view), 0), 1) AS view_to_cart_pct,\n       ROUND(100.0 * COUNT(t_buy)  / NULLIF(COUNT(t_cart), 0), 1) AS cart_to_purchase_pct,\n       ROUND(100.0 * COUNT(t_buy)  / NULLIF(COUNT(t_view), 0), 1) AS overall_pct\nFROM s3;",
+   "test": "",
+   "expected": [
+    [
+     7,
+     4,
+     3,
+     57.1,
+     75.0,
+     42.9
+    ]
+   ]
+  }
+ },
+ {
+  "id": "P3-SQL-09",
+  "domain": "SQL",
+  "question_type": "sql_exercise",
+  "question": "revenue(region TEXT NOT NULL, year INTEGER NOT NULL, amount INTEGER NOT NULL) has rows (region, year, amount): North 2021 400, North 2022 500, North 2023 450; South 2021 300, South 2022 0, South 2023 250; East 2021 300, East 2023 300 (East has no 2022 row). Return region, year, revenue, share_pct (the region's percentage of that year's total revenue, 1 decimal), prev_revenue (the same region's revenue in year-1) and yoy_pct (year-over-year % change, 1 decimal), ordered by year, region. prev_revenue and yoy_pct must be NULL for a region's first year, when the previous calendar year has no row, and yoy_pct must also be NULL when the previous year's revenue is 0. Explain the traps.",
+  "answer": "Aggregate to region-year, compute the share with a window SUM over the year, and fetch the previous row with LAG, checking that it really is the previous calendar year.\n\n```sql\nWITH r AS (\n  SELECT region, year, SUM(amount) AS rev\n  FROM revenue\n  GROUP BY region, year\n),\nx AS (\n  SELECT region, year, rev,\n         100.0 * rev / NULLIF(SUM(rev) OVER (PARTITION BY year), 0) AS share_raw,\n         LAG(year) OVER (PARTITION BY region ORDER BY year) AS prev_year,\n         LAG(rev)  OVER (PARTITION BY region ORDER BY year) AS prev_rev\n  FROM r\n)\nSELECT region, year, rev AS revenue,\n       ROUND(share_raw, 1) AS share_pct,\n       CASE WHEN prev_year = year - 1 THEN prev_rev END AS prev_revenue,\n       CASE WHEN prev_year = year - 1 AND prev_rev <> 0\n            THEN ROUND(100.0 * (rev - prev_rev) / prev_rev, 1) END AS yoy_pct\nFROM x\nORDER BY year, region;\n```\n\nResult highlights: in 2021 East 30.0%, North 40.0%, South 30.0% of the total; North 2022 is 100.0% of that year's total because South is 0 and East has no row, with yoy +25.0%; South 2022 is -100.0%; South 2023 has prev_revenue 0 so yoy_pct is NULL; East 2023 has prev_revenue NULL and yoy NULL, because there is no 2022 row.\n\nTraps: (1) LAG returns the previous row in the partition, not the previous year. For East, LAG on 2023 would return the 2021 value and give a bogus 0.0% change; comparing LAG(year) with year - 1 prevents this. If gaps should count as zero revenue instead, generate the full region x year grid first (a CROSS JOIN of distinct regions and years) and LEFT JOIN the data. (2) Zero previous value: dividing by it is undefined, so return NULL; SQLite returns NULL for division by zero anyway, but PostgreSQL and others raise an error, so guard with CASE or NULLIF explicitly. (3) Percent of total uses SUM() OVER (PARTITION BY year), a window total that keeps the individual rows; the shares sum to 100 only up to rounding. (4) Use 100.0 to force decimal arithmetic. Window functions need SQLite 3.25+.",
+  "key_concepts": [
+   "LAG",
+   "percent of total",
+   "year-over-year change",
+   "window SUM",
+   "division by zero guard",
+   "missing period gap",
+   "NULLIF"
+  ],
+  "common_mistakes": [
+   "Assuming LAG gives the previous year when a year is missing, which compares non-adjacent years.",
+   "Dividing by a zero previous value, giving an error in many databases or a misleading infinite percentage.",
+   "Using integer division so every share or change rounds to 0."
+  ],
+  "interview_style_note": "Strong candidates use a window total for shares, verify the lag row is year-1, and make the NULL/zero rules explicit.",
+  "sources": [
+   {
+    "title": "SQLite: Window Functions",
+    "url": "https://www.sqlite.org/windowfunctions.html",
+    "supports": "lag() returns the value from the previous row in the partition, or NULL for the first row; window functions can appear in the SELECT result set."
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE revenue(region TEXT NOT NULL, year INTEGER NOT NULL, amount INTEGER NOT NULL);\nINSERT INTO revenue VALUES\n ('North',2021,400),('North',2022,500),('North',2023,450),\n ('South',2021,300),('South',2022,0),('South',2023,250),\n ('East',2021,300),('East',2023,300);",
+   "solution": "WITH r AS (\n  SELECT region, year, SUM(amount) AS rev\n  FROM revenue\n  GROUP BY region, year\n),\nx AS (\n  SELECT region, year, rev,\n         100.0 * rev / NULLIF(SUM(rev) OVER (PARTITION BY year), 0) AS share_raw,\n         LAG(year) OVER (PARTITION BY region ORDER BY year) AS prev_year,\n         LAG(rev)  OVER (PARTITION BY region ORDER BY year) AS prev_rev\n  FROM r\n)\nSELECT region, year, rev AS revenue,\n       ROUND(share_raw, 1) AS share_pct,\n       CASE WHEN prev_year = year - 1 THEN prev_rev END AS prev_revenue,\n       CASE WHEN prev_year = year - 1 AND prev_rev <> 0\n            THEN ROUND(100.0 * (rev - prev_rev) / prev_rev, 1) END AS yoy_pct\nFROM x\nORDER BY year, region;",
+   "test": "",
+   "expected": [
+    [
+     "East",
+     2021,
+     300,
+     30.0,
+     null,
+     null
+    ],
+    [
+     "North",
+     2021,
+     400,
+     40.0,
+     null,
+     null
+    ],
+    [
+     "South",
+     2021,
+     300,
+     30.0,
+     null,
+     null
+    ],
+    [
+     "North",
+     2022,
+     500,
+     100.0,
+     400,
+     25.0
+    ],
+    [
+     "South",
+     2022,
+     0,
+     0.0,
+     300,
+     -100.0
+    ],
+    [
+     "East",
+     2023,
+     300,
+     30.0,
+     null,
+     null
+    ],
+    [
+     "North",
+     2023,
+     450,
+     45.0,
+     500,
+     -10.0
+    ],
+    [
+     "South",
+     2023,
+     250,
+     25.0,
+     0,
+     null
+    ]
+   ]
+  }
+ },
+ {
+  "id": "P3-SQL-10",
+  "domain": "SQL",
+  "question_type": "sql_exercise",
+  "question": "user_plans(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, plan TEXT NOT NULL, updated_at TEXT) is an append-style history. Rows (id, user_id, plan, updated_at): (1,1,free,'2024-01-10 09:00:00'), (2,1,pro,'2024-03-02 12:00:00'), (3,1,team,'2024-02-01 08:30:00'), (4,2,free,'2024-02-14 10:00:00'), (5,2,pro,'2024-02-20 17:45:00'), (6,2,team,'2024-02-20 17:45:00'), (7,3,free,'2024-01-05 00:00:00'), (8,4,free,NULL), (9,4,pro,'2024-03-01 00:00:00'). Return exactly one current row per user (id, user_id, plan, updated_at), the one with the latest updated_at, ordered by user_id. For the tie of users 2's rows 5 and 6, the higher id wins. Show the ROW_NUMBER version, then compare it with the correlated-subquery and the GROUP BY ... MAX() versions: what does each do with ties and the NULL?",
+  "answer": "Number each user's rows from newest to oldest and keep number 1. The tie-break is part of the ORDER BY.\n\n```sql\nSELECT id, user_id, plan, updated_at\nFROM (\n  SELECT id, user_id, plan, updated_at,\n         ROW_NUMBER() OVER (PARTITION BY user_id\n                            ORDER BY updated_at DESC, id DESC) AS rn\n  FROM user_plans\n)\nWHERE rn = 1\nORDER BY user_id;\n```\n\nResult: ids 2, 6, 7 and 9. User 2's tie goes to id 6 because of the id DESC tie-break. User 4's NULL timestamp row (id 8) is not chosen because SQLite sorts NULL as the smallest value, so it comes last in a DESC ordering; in PostgreSQL, NULLs sort first in DESC order by default, so you would add NULLS LAST there or filter them out.\n\nAlternative 1, correlated subquery: WHERE updated_at = (SELECT MAX(updated_at) FROM user_plans x WHERE x.user_id = u.user_id). It is simple and works on old engines, but returns both ids 5 and 6 for user 2 (two rows per user on ties), and it needs a covering index on (user_id, updated_at) to avoid a scan per row. MAX ignores NULLs, so user 4 gets id 9.\n\nAlternative 2, SELECT id, user_id, plan, MAX(updated_at) ... GROUP BY user_id: returns one row per user, and SQLite documents that with exactly one MAX() the bare columns come from a row holding the maximum. But on ties the row is arbitrary (here it returned id 5, not 6), and the behaviour is SQLite-specific: most other databases reject the query or do not guarantee it. Do not use it where the tie matters or the code must be portable.\n\nPick the ROW_NUMBER form when you need exactly one row with a deterministic rule; use the correlated or join-to-MAX form only if duplicates are acceptable or the pair (user_id, updated_at) is unique by constraint. Window functions need SQLite 3.25+.",
+  "key_concepts": [
+   "ROW_NUMBER",
+   "latest row per group",
+   "deterministic tie-break",
+   "correlated subquery",
+   "bare columns with MAX",
+   "NULL ordering",
+   "deduplication"
+  ],
+  "common_mistakes": [
+   "Using the correlated MAX subquery and silently returning two rows for a tied timestamp.",
+   "Relying on SQLite's bare-column MAX behaviour with ties or in code that must run elsewhere.",
+   "Ordering by updated_at DESC without a tie-break, so the surviving row changes between runs; or forgetting that NULL timestamps sort differently across databases."
+  ],
+  "interview_style_note": "Strong candidates choose ROW_NUMBER with an explicit tie-break, can predict what the other two forms return on ties, and know the NULL ordering rule of their database.",
+  "sources": [
+   {
+    "title": "SQLite: SELECT statement (compound select operators)",
+    "url": "https://www.sqlite.org/lang_select.html",
+    "supports": "With exactly one min() or max() aggregate, bare columns take values from a row containing the min/max, but on ties the row is arbitrary; NULLs are smaller than any value in sorting, so they come last in DESC order."
+   },
+   {
+    "title": "SQLite: Built-in Aggregate Functions",
+    "url": "https://www.sqlite.org/lang_aggfunc.html",
+    "supports": "max() returns NULL only when the group has no non-NULL values (NULLs are ignored)."
+   }
+  ],
+  "code": {
+   "language": "sql",
+   "setup": "CREATE TABLE user_plans(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, plan TEXT NOT NULL, updated_at TEXT);\nINSERT INTO user_plans(id, user_id, plan, updated_at) VALUES\n (1,1,'free','2024-01-10 09:00:00'),\n (2,1,'pro','2024-03-02 12:00:00'),\n (3,1,'team','2024-02-01 08:30:00'),\n (4,2,'free','2024-02-14 10:00:00'),\n (5,2,'pro','2024-02-20 17:45:00'),\n (6,2,'team','2024-02-20 17:45:00'),\n (7,3,'free','2024-01-05 00:00:00'),\n (8,4,'free',NULL),\n (9,4,'pro','2024-03-01 00:00:00');",
+   "solution": "SELECT id, user_id, plan, updated_at\nFROM (\n  SELECT id, user_id, plan, updated_at,\n         ROW_NUMBER() OVER (PARTITION BY user_id\n                            ORDER BY updated_at DESC, id DESC) AS rn\n  FROM user_plans\n)\nWHERE rn = 1\nORDER BY user_id;",
+   "test": "",
+   "expected": [
+    [
+     2,
+     1,
+     "pro",
+     "2024-03-02 12:00:00"
+    ],
+    [
+     6,
+     2,
+     "team",
+     "2024-02-20 17:45:00"
+    ],
+    [
+     7,
+     3,
+     "free",
+     "2024-01-05 00:00:00"
+    ],
+    [
+     9,
+     4,
+     "pro",
+     "2024-03-01 00:00:00"
+    ]
+   ]
+  }
+ }
+]

@@ -1,0 +1,541 @@
+[
+ {
+  "plan_id": "B3-MLO-01-2",
+  "verdict": "pass",
+  "reasons": [
+   "Applied fix ('many of' for 'most of') is correct and removes an unquantified overstatement; answer is internally consistent, ~236 words, single answer appropriate for a concept question."
+  ],
+  "parts_answered": {
+   "why ML 'works on my machine' is worse": true,
+   "silent failure vs crash": true,
+   "sources of difference": true,
+   "remedies": true
+  },
+  "evidence": [
+   {
+    "claim": "Unpinned deps/hardware/data/randomness/hidden state can change a metric without crashing",
+    "method": "background_only",
+    "evidence": "Standard reproducibility folklore, qualitatively stated, no numeric claims"
+   },
+   {
+    "claim": "Pin container by digest rather than moving tag",
+    "method": "background_only",
+    "evidence": "Common container practice; digest is immutable, tags are movable"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Easy",
+  "difficulty_rationale": "Single-concept explanation with a list of causes.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer, sufficient"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "ok, all discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-0335",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "General reproducibility causes (background knowledge, uncontroversial)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-01-3",
+  "verdict": "pass",
+  "reasons": [
+   "Both applied corrections verified: 0.013/0.005=2.6; 0.005*sqrt(2)=0.00707, 0.013/0.00707=1.84 (about 1.8); SE of difference of two 5-seed means 0.005*sqrt(2/5)=0.00316; 0.011/0.00316=3.48 (about 3.5). Table, prose and decision rule are consistent (A 0.841 reproduces 0.842, B no change, C -0.011, D = C)."
+  ],
+  "parts_answered": {
+   "ordered checklist": true,
+   "how to decide if real regression": true
+  },
+  "evidence": [
+   {
+    "claim": "0.013 gap = 2.6 seed SDs / 1.8 SDs if both single runs",
+    "method": "executed",
+    "evidence": "numpy: 0.013/0.005=2.6; 0.013/(0.005*sqrt2)=1.84"
+   },
+   {
+    "claim": "0.011 drop = 3.5 SE of 5-seed mean difference",
+    "method": "executed",
+    "evidence": "0.005*sqrt(2/5)=0.003162; 0.011/0.003162=3.48"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Multi-factor debugging plus noise-floor reasoning and a decision rule.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "checklist + decision rule"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "worked bisection table with numbers not in the detailed answer"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok, all discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0002",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Debugging order is practitioner judgement, hypothetical numbers labelled as such"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-01-4",
+  "verdict": "pass",
+  "reasons": [
+   "PYTHONHASHSEED correction is right (dict order is insertion-ordered; only str/bytes hashing is randomised). All source-backed claims verified on the live pages. Concise answer 59 words, distinct from detailed; fenced code identical to tested solution."
+  ],
+  "parts_answered": {
+   "why seed not sufficient": true,
+   "what to control": true,
+   "what to accept": true
+  },
+  "evidence": [
+   {
+    "claim": "Completely reproducible results not guaranteed across releases, commits, platforms; CPU vs GPU may differ with identical seeds",
+    "method": "doc",
+    "evidence": "PyTorch randomness notes: 'Completely reproducible results are not guaranteed across PyTorch releases, individual commits, or different platforms.' / 'results may not be reproducible between CPU and GPU executions, even when using identical seeds.'"
+   },
+   {
+    "claim": "cudnn.benchmark may pick different algorithms; disabling gives deterministic selection, maybe slower",
+    "method": "doc",
+    "evidence": "'the benchmark may select different algorithms on subsequent runs, even on the same machine.' / 'causes cuDNN to deterministically select an algorithm, possibly at the cost of reduced performance.'"
+   },
+   {
+    "claim": "worker_init_fn + generator",
+    "method": "doc",
+    "evidence": "'Use worker_init_fn() and generator to preserve reproducibility'"
+   },
+   {
+    "claim": "root_seed+worker_id overlaps -> bias",
+    "method": "doc",
+    "evidence": "NumPy parallel page: 'multiple invocations ... will get overlapping sets of worker seeds ... causing a bias in the overall ensemble of results.'"
+   },
+   {
+    "claim": "order_demo -> (0.0, 1.0); spawn streams independent of worker count",
+    "method": "executed",
+    "evidence": "Passes on 3.13, 3.10, 3.11"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism explanation plus small demos.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "59-word interview answer"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "mechanisms with doc support"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "runnable demos, not in detailed"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "ok, all discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0009",
+   "same_intent": false
+  },
+  "code_findings": "Fenced block == code.solution (checked). Test passes on 3.13/3.10/3.11 with identical output. Extra edge cases: worker_draws(42,0)==[], worker_draws(7,3) reproducible and differs from worker_draws(8,3) (covered by existing asserts d1!=worker_draws(43,4)). stdlib+numpy only, no 3.11+ features.",
+  "sources_findings": [
+   {
+    "url": "https://docs.pytorch.org/docs/stable/notes/randomness.html",
+    "status": "supported",
+    "evidence": "Redirects to docs/2.14; all quoted behaviours present incl. use_deterministic_algorithms raising for ops without deterministic implementation"
+   },
+   {
+    "url": "https://numpy.org/doc/stable/reference/random/parallel.html",
+    "status": "supported",
+    "evidence": "spawn() gives independent (very high probability) streams; root_seed+worker_id warned against"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'Differences ... can compound over many training steps' (hedged with 'can')"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-01-5",
+  "verdict": "pass",
+  "reasons": [
+   "Hedge added to the file-bucket sentence is accurate (object lock/versioning exist). Concise answer 78 words (within 80) and consistent with detailed. Lineage chain complete."
+  ],
+  "parts_answered": {
+   "why not one tool": true,
+   "what belongs in tracker": true,
+   "what belongs in registry": true,
+   "serving-time lineage chain": true
+  },
+  "evidence": [
+   {
+    "claim": "MLflow tracking logs params, code versions, metrics, output files; run records metadata + artifacts",
+    "method": "doc",
+    "evidence": "'an API and UI for logging parameters, code versions, metrics, and output files'; 'Each run records metadata ... artifacts'"
+   },
+   {
+    "claim": "Registry aliases mutable, lineage to run",
+    "method": "doc",
+    "evidence": "'assign a mutable, named reference to a particular version'; 'lineage (i.e., which MLflow experiment and run produced the model)'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Comparison of two systems plus a lineage chain.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Tracker vs registry roles",
+    "tradeoff": "exploration volume vs governed releases"
+   },
+   {
+    "decision": "Immutable versions + movable alias",
+    "tradeoff": "process overhead vs auditability/rollback"
+   },
+   {
+    "decision": "Carry run id/commit/data hash to registry and version+checksum to serving logs",
+    "tradeoff": "logging cost vs broken lineage"
+   },
+   {
+    "decision": "Register full bundle",
+    "tradeoff": "size vs servability"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "78 words, interview-ready"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "adds pitfalls, bucket contrast, chain"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed",
+  "key_concepts_findings": "ok, all discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0009",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://mlflow.org/docs/latest/ml/tracking/",
+    "status": "supported",
+    "evidence": "quotes found"
+   },
+   {
+    "url": "https://mlflow.org/docs/latest/ml/model-registry/",
+    "status": "supported",
+    "evidence": "alias and lineage sentences found; page does not state versions are immutable or that stages are deprecated"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "'immutable' registry versions is a design recommendation, not stated on the MLflow page",
+   "Rubric item on retention/GC is not discussed in the answer text (minor)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-01-6",
+  "verdict": "pass",
+  "reasons": [
+   "Both corrections verified: .dir manifest wording matches DVC internal-files page; 52x400=20.8 TB, +400 GB = 21.2 TB; 400+52x8=816 GB; ratios 25.5x (vs 20.8 TB) and 26x (vs 21.2 TB), 'roughly 25 times' fine."
+  ],
+  "parts_answered": {
+   "compare weekly copies vs content-hash": true,
+   "what a run records": true,
+   "what can go wrong": true,
+   "arithmetic": true
+  },
+  "evidence": [
+   {
+    "claim": "Storage arithmetic",
+    "method": "executed",
+    "evidence": "20800 GB, 21200 GB, 816 GB, ratio 25.5/26"
+   },
+   {
+    "claim": ".dvc file in Git with MD5, git checkout then dvc checkout",
+    "method": "doc",
+    "evidence": "'a placeholder for the original data for the purpose of Git tracking'; git checkout then dvc checkout"
+   },
+   {
+    "claim": ".dir mapping files to hashes",
+    "method": "doc",
+    "evidence": "'It contains the mapping of files inside (as a JSON array), identified by their hash values'"
+   },
+   {
+    "claim": "gc removes unreferenced cache objects by scope",
+    "method": "doc",
+    "evidence": "'doesn't do anything unless one or a combination of scope options are provided'; --all-commits preserves entire history"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Trade-off comparison with simple arithmetic.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "mechanism and failure modes"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "arithmetic and pointer-file sketch"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok, all discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0021",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://doc.dvc.org/start/data-management/data-versioning",
+    "status": "supported",
+    "evidence": "as above"
+   },
+   {
+    "url": "https://doc.dvc.org/command-reference/gc",
+    "status": "supported",
+    "evidence": "scope options and --all-commits found (the attached quote string itself was not verbatim on the page, claim is)"
+   },
+   {
+    "url": "https://doc.dvc.org/user-guide/project-structure/internal-files",
+    "status": "supported",
+    "evidence": ".dir entry quote verbatim"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Many-small-files slowness and legal deletion remarks are general engineering judgement"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-01-7",
+  "verdict": "pass",
+  "reasons": [
+   "Recomputed: A mean 0.9118 sd 0.00507, B 0.9156 sd 0.00518, diff 0.0038, independent SE 0.00324 (1.17 SE), paired SE 0.000374 (10.2 SE), sign test 2*(1/2)^5=0.0625. Applied interval text verified: paired 95% t-interval [0.00276, 0.00484] so lower end about 0.0028; Welch interval lower end 0.0038-2.306*0.00324=-0.0037 (about -0.004)."
+  ],
+  "parts_answered": {
+   "fair comparison": true,
+   "paired vs independent": true,
+   "strength of evidence": true
+  },
+  "evidence": [
+   {
+    "claim": "All statistics",
+    "method": "executed",
+    "evidence": "numpy computation above; t(4)=2.776, t(8)=2.306"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Paired vs unpaired reasoning with caveats on n, split noise, selection.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "analysis"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "decision procedure with threshold and intervals"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok, all discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0002",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Statistics are derivation/executed; no sources needed"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-02-2",
+  "verdict": "pass",
+  "reasons": [
+   "Code change ('v != v' null test, '(n - len)/n' null rate) is correct and fenced code equals tested solution. Behaviour matches detailed claims and the worked example (2 range, 1 unseen country, 6/100 nulls -> warn). No major defects."
+  ],
+  "parts_answered": {
+   "function with all listed checks": true,
+   "deterministic order": true,
+   "has_errors": true,
+   "pipeline wiring": true
+  },
+  "evidence": [
+   {
+    "claim": "Solution + test pass",
+    "method": "executed",
+    "evidence": "prints ok on 3.13, 3.10, 3.11"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Non-trivial implementation with several edge-case interactions (bool, NaN, missing key, check short-circuits).",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "design decisions and limitations"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "code, wiring, output example"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok, all discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-k0002",
+   "same_intent": false
+  },
+  "code_findings": "Fenced == solution. Test passes on all three interpreters. My extra cases (identical output on all three): inf without bounds -> [] (documented limitation), inf with max -> range; True in float column -> type; True in untyped range column -> range; empty schema -> []; 3 in float OK, 3.0 in int -> type error; unknown type with a non-null value raises ValueError; severity 'warn' keeps range warn but type stays error; output ordered by sorted column. Minor gaps, not worth changing: unhashable value in a column with 'allowed' and no 'type' raises TypeError; unknown type with only nulls does not raise; non-sortable mixed-type column names raise TypeError; numpy ints would fail type 'int' (stdlib-only scope).",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "Paper contains 'Feature expectations are captured in a schema' (Data 1), 'Data invariants hold for inputs' (Monitor 2), slices, canary, rollback; only the schema and invariants items are relevant here, rest of listed tests is padding but accurate"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Pipeline wiring advice is practitioner judgement"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B3-MLO-02-3",
+  "verdict": "pass",
+  "reasons": [
+   "Applied edits are accurate: interval hypothetical stated as such, AUC-not-weighted-average caveat is true. Numbers consistent: 6% of 80,000 = 4,800; drop 0.03 matches 0.790->0.760; ECE +0.025 > 0.01 fails; +0.005 >= 0.003 gain rule. Source claims verified (Rules of ML #9; ML Test Score slices and simple-baseline tests)."
+  ],
+  "parts_answered": {
+   "extra checks": true,
+   "order": true,
+   "example of hidden regression": true
+  },
+  "evidence": [
+   {
+    "claim": "Rules of ML rule 9: sanity checks right before export",
+    "method": "doc",
+    "evidence": "'Do sanity checks right before you export the model.'"
+   },
+   {
+    "claim": "ML Test Score lists slices and simple baseline tests",
+    "method": "paper",
+    "evidence": "Model 6 'Model quality is sufficient on all important data slices'; Model 5 'A simpler model is not better'"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Application of a multi-gate checklist with a worked example.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "ordered checks"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "gate report table not in detailed"
+   }
+  ],
+  "suggested_answer_set": "detailed+practical",
+  "key_concepts_findings": "ok, all discussed",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-i0002",
+   "same_intent": false
+  },
+  "code_findings": "n/a (no code)",
+  "sources_findings": [
+   {
+    "url": "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/aad9f93b86b7addfea4c419b9100c6cdd26cacea.pdf",
+    "status": "supported",
+    "evidence": "slices and simple-baseline tests present"
+   },
+   {
+    "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+    "status": "supported",
+    "evidence": "Rule 5, 8, 9, 29 titles/sentences present; only rule 9 is used in the answer"
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "The hidden-slice example is hypothetical; whether overall AUC rises while a 6% slice falls 0.03 requires gains in cross-slice ranking (answer now says so)"
+  ],
+  "code_patch": null
+ }
+]

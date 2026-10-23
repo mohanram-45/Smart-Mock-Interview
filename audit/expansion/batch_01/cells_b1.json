@@ -1,0 +1,51 @@
+[
+ {
+  "cell_id": "GEN-01",
+  "topic": "Embeddings and similarity search (metrics, normalisation, ANN: HNSW/IVF/PQ)",
+  "count": 7,
+  "type_hint": "concept;coding;scenario",
+  "guidance": "Angles that are NOT already in v5: choosing and configuring an ANN index (HNSW vs IVF vs PQ: recall, latency, memory, build cost, update behaviour); measuring ANN recall against exact search; inner-product vs cosine index configuration pitfalls with unnormalised vectors; mixing embeddings from two model versions in one index; distance concentration in high dimensions; embedding dimension/memory arithmetic. v5 already has 'cosine vs dot product' (NLP) - do not repeat it."
+ },
+ {
+  "cell_id": "GEN-02",
+  "topic": "Chunking and document ingestion",
+  "count": 6,
+  "type_hint": "concept;scenario;debugging",
+  "guidance": "Chunk size/overlap trade-offs measured by retrieval behaviour, structure-aware splitting (headings, tables, code), PDF/HTML extraction artefacts, metadata to keep per chunk, stale or duplicated chunks after re-ingestion, parent-child (small-to-big) retrieval. v5 already has one 'chunking/hybrid/freshness trade-offs' record (smi-g0010)."
+ },
+ {
+  "cell_id": "GEN-03",
+  "topic": "Retrieval strategies (dense, BM25, hybrid, RRF, query rewriting, MMR)",
+  "count": 8,
+  "type_hint": "concept;coding;scenario",
+  "guidance": "Dense vs sparse failure modes (exact identifiers, rare terms, paraphrase), hybrid score fusion (why raw scores can't be added; reciprocal rank fusion with a tested implementation), BM25 mechanics (tf saturation, length normalisation, tested implementation), MMR for diversity (tested), query rewriting/HyDE/multi-query trade-offs, metadata pre- vs post-filtering."
+ },
+ {
+  "cell_id": "GEN-04",
+  "topic": "Reranking and context assembly",
+  "count": 6,
+  "type_hint": "concept;scenario",
+  "guidance": "Bi-encoder vs cross-encoder trade-offs, how many candidates to rerank (latency/recall), context ordering and lost-in-the-middle (hedge: empirical, model-dependent), deduplicating and compressing retrieved context, citation/attribution handling, token budgeting of the prompt."
+ },
+ {
+  "cell_id": "GEN-05",
+  "topic": "RAG evaluation (recall@k, MRR, nDCG, faithfulness, golden sets, LLM judges)",
+  "count": 8,
+  "type_hint": "evaluation;coding;concept",
+  "guidance": "Retrieval metrics with tested implementations (recall@k, MRR, nDCG with a worked example), building a golden set and its biases, separating retrieval failure from generation failure, faithfulness vs answer relevance vs correctness, LLM-as-judge biases and calibration against humans (hedge), statistical noise with small eval sets. v5 already has a RAG-evaluation/retrieval-metrics question (smi-h0003 family) - go beyond it."
+ },
+ {
+  "cell_id": "GEN-06",
+  "topic": "Vector databases and index operations (filters, freshness, updates, cost)",
+  "count": 6,
+  "type_hint": "scenario;concept",
+  "guidance": "Metadata filtering vs ANN recall, deletes/updates and index rebuilds, freshness of newly ingested documents, sharding/replication and memory cost arithmetic (computed), multi-tenancy isolation, hybrid support. Avoid naming product limits, prices or quotas (time-sensitive); discuss mechanisms."
+ },
+ {
+  "cell_id": "GEN-07",
+  "topic": "RAG failure diagnosis",
+  "count": 5,
+  "type_hint": "debugging;scenario",
+  "guidance": "Given symptoms (right document retrieved but answer wrong; answer fluent but unsupported; good offline metrics but bad user feedback; quality drop after re-indexing; wrong answers for acronyms/IDs), diagnose with a step-by-step triage and the measurements that separate causes. v5 has one 'RAG hallucination triage' record (smi-g0010 / NLP) - use different symptoms and decision logic."
+ }
+]

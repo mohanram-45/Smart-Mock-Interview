@@ -1,0 +1,499 @@
+[
+ {
+  "plan_id": "B2-GEN-13-5",
+  "verdict": "pass",
+  "reasons": [
+   "Applied fp16-retention parenthetical is correct and consistent; all arithmetic re-run: 26 GB, 6.5 GB raw, 4.125 bits, 6.70 GB, 3.88x."
+  ],
+  "parts_answered": {
+   "a": true,
+   "b": true,
+   "c": true
+  },
+  "evidence": [
+   {
+    "claim": "26 GB fp16 -> ~6.7 GB at 4.125 bits/weight (3.88x)",
+    "method": "executed",
+    "evidence": "13e9*4.125/8=6.703e9; 26/6.7=3.88"
+   },
+   {
+    "claim": "group scale overhead 16/128=0.125 bit",
+    "method": "derivation",
+    "evidence": "16 bits per 128 weights"
+   },
+   {
+    "claim": "activations harder to quantise than weights (outliers)",
+    "method": "paper",
+    "evidence": "SmoothQuant abstract"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Arithmetic plus memory-bound vs compute-bound mechanism and test design; no subtle debugging.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer; no padding fields"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "3-8, specific, each discussed; none weak",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-g0026",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2211.10438",
+    "status": "supported",
+    "evidence": "Abstract: 'weights are easy to quantize while activations are not'; 'smooths the activation outliers'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "weight-only schemes mainly help memory-bound decode (hedged in text as model/kernel/hardware dependent)",
+   "embeddings/output layer often left in fp16 (hedged with 'often')"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-13-6",
+  "verdict": "pass",
+  "reasons": [
+   "Applied conservative-normalisation qualifier is correct and does not conflict with partition-first design.",
+   "Wilson 95% for 10/500 = 1.09%-3.64% -> 3,270-10,926/day, matches stated 3,300-10,900."
+  ],
+  "parts_answered": {
+   "a": true,
+   "b": true,
+   "c": true
+  },
+  "evidence": [
+   {
+    "claim": "Wilson interval 1.1%-3.6%, 3,300-10,900 wrong/day",
+    "method": "executed",
+    "evidence": "computed 0.01090-0.03642 x 300,000"
+   },
+   {
+    "claim": "300,000 x 2% = 6,000",
+    "method": "derivation",
+    "evidence": "30% of 1e6"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Hard",
+  "difficulty_rationale": "Open-ended design with statistics, multi-tenant correctness and invalidation trade-offs.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": [
+   {
+    "decision": "Partition by tenant/locale/permission before similarity search",
+    "tradeoff": "Prevents leakage; lowers hit rate"
+   },
+   {
+    "decision": "Version key/entry by template, model, document versions plus TTL",
+    "tradeoff": "Prevents staleness; more misses after changes"
+   },
+   {
+    "decision": "Do not cache personalised/live/tool answers",
+    "tradeoff": "Safety vs hit rate"
+   },
+   {
+    "decision": "Pre-serve guard or exact-match tier first",
+    "tradeoff": "Fewer near-miss errors; latency and lost hits"
+   },
+   {
+    "decision": "Shadow mode and monitored wrong-hit rate with intervals",
+    "tradeoff": "Evidence before exposure vs delayed savings"
+   },
+   {
+    "decision": "Skip caching in high-stakes/low-hit-rate cases",
+    "tradeoff": "Risk avoided vs forgone saving"
+   }
+  ],
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer; no padding fields"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "3-8, specific, each discussed; none weak",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-h0017",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "Wilson assumes the 500 reviewed hits are a simple random sample with accurate labels (stated as random in question)"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-14-1",
+  "verdict": "correct",
+  "reasons": [
+   "Applied replacement removed an overstated claim and is accurate, but its grammar is now clumsy ('..., only an imperfect, uneven signal').",
+   " Source abstract and Sec 1.1/3.1/3.3.1 text verified."
+  ],
+  "parts_answered": {
+   "pretraining objective": true,
+   "scoring incentives": true,
+   "rare facts": true,
+   "retrieval can/cannot": true,
+   "colleague's IDK puzzle": true
+  },
+  "evidence": [
+   {
+    "claim": "hallucinations originate as errors in binary classification; benchmarks reward guessing; propose changing scoring of existing benchmarks",
+    "method": "paper",
+    "evidence": "arXiv 2509.04664 abstract"
+   },
+   {
+    "claim": "hallucination rate at least fraction of training facts seen once",
+    "method": "paper",
+    "evidence": "Sec 1.1 / 3.3.1"
+   },
+   {
+    "claim": "base models often calibrated",
+    "method": "paper",
+    "evidence": "Sec 3.1"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "shaped to refuse, only an imperfect, uneven signal of what it knows",
+    "problem": "Grammar after the applied edit: dangling appositive; reads as if abstention itself is the signal.",
+    "replacement": "shaped to refuse, and it is only an imperfect, uneven signal of what the model knows"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Mechanism explanation across objective, scoring incentives and retrieval limits.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer; no padding fields"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "3-8, specific, each discussed; none weak",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0027",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2509.04664",
+    "status": "supported",
+    "evidence": "'originate simply as errors in binary classification'; 'optimized to be good test-takers, and guessing when uncertain improves test performance'; 'modifying the scoring of existing benchmarks'."
+   },
+   {
+    "url": "https://arxiv.org/pdf/2509.04664",
+    "status": "supported",
+    "evidence": "'hallucination rate, after pretraining, should be at least the fraction of training facts that appear once'; 'base models are often found to be calibrated, in contrast to post-trained models'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-14-3",
+  "verdict": "pass",
+  "reasons": [
+   "Applied GPU-seconds addition verified: 1.5e6 s = 17.4 GPUs; 3e4 s = 0.347 GPU.",
+   "All other numbers re-run: 30 s, 0.6 s, 1.5e10 vs 3e8 (50x), 36.6 GiB (=39.3 GB), 19.7 ms/token."
+  ],
+  "parts_answered": {
+   "latency": true,
+   "compute": true,
+   "memory": true,
+   "freshness": true,
+   "access control": true,
+   "when long context wins": true
+  },
+  "evidence": [
+   {
+    "claim": "17 GPUs vs 0.35 GPU",
+    "method": "executed",
+    "evidence": "1.5e10/1e4/86400=17.36; 3e8/1e4/86400=0.347"
+   },
+   {
+    "claim": "36.6 GiB, ~39 GB, ~20 ms at 2 TB/s",
+    "method": "executed",
+    "evidence": "3e5*131072 B"
+   },
+   {
+    "claim": "long-context use is position dependent",
+    "method": "paper",
+    "evidence": "Lost in the Middle abstract"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Multi-factor comparison with straightforward arithmetic; hybrid conclusion.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer; no padding fields"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "3-8, specific, each discussed; none weak",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0024",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2307.03172",
+    "status": "supported",
+    "evidence": "'significantly degrades when models must access relevant information in the middle of long contexts'; models do not robustly use information in long inputs."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "attention cost per token grows with context (standard transformer property, hedged as 'likely')"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-14-4",
+  "verdict": "correct",
+  "reasons": [
+   "Applied 26% figure verified: 1-P(Bin(5,0.8)>=4)=0.2627 (assumes independent samples and scattered wrong answers).",
+   "One attribution nit: the 'less reliably on new tasks' caveat in the abstract is about P(IK) calibration, not P(True)."
+  ],
+  "parts_answered": {
+   "token prob where informative/fails": true,
+   "self-consistency where informative/fails": true,
+   "deployment decision": true
+  },
+  "evidence": [
+   {
+    "claim": "about 26% of questions flagged if p=0.8",
+    "method": "executed",
+    "evidence": "1-(0.8^5+5*0.8^4*0.2)=0.2627"
+   },
+   {
+    "claim": "larger models well-calibrated on MC and T/F; P(True) works well",
+    "method": "paper",
+    "evidence": "Kadavath abstract"
+   },
+   {
+    "claim": "sampled responses similar if LLM knows, diverge if hallucinated",
+    "method": "paper",
+    "evidence": "SelfCheckGPT abstract"
+   },
+   {
+    "claim": "base models often calibrated vs post-trained",
+    "method": "paper",
+    "evidence": "Kalai Sec 3.1"
+   }
+  ],
+  "issues": [
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "though less reliably on new kinds of tasks",
+    "problem": "Kadavath abstract states the new-task calibration struggle for the trained P(IK) predictor, not for P(True); as worded it is over-attributed.",
+    "replacement": "though models trained to predict whether they know an answer struggled with calibration on new tasks"
+   },
+   {
+    "severity": "minor",
+    "field": "answer",
+    "claim": "(latency can be hidden by sampling in parallel)",
+    "problem": "Slightly strong; parallel sampling reduces but does not remove latency/throughput cost.",
+    "replacement": "(latency can be largely hidden by sampling in parallel)"
+   }
+  ],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Two uncertainty signals with limits plus evaluation design; no code.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer; no padding fields"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "3-8, specific, each discussed; none weak",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [
+   {
+    "url": "https://arxiv.org/abs/2207.05221",
+    "status": "partially",
+    "evidence": "Abstract: 'larger models are well-calibrated on diverse multiple choice and true/false questions'; P(True) shows 'encouraging performance'; new-task struggle is stated for P(IK). The 'improves with many own samples' sentence in supports could not be re-quoted (session limit reached before fetching the PDF)."
+   },
+   {
+    "url": "https://arxiv.org/abs/2303.08896",
+    "status": "supported",
+    "evidence": "'sampled responses are likely to be similar and contain consistent facts'; hallucinated facts 'likely to diverge and contradict one another'."
+   },
+   {
+    "url": "https://arxiv.org/pdf/2509.04664",
+    "status": "supported",
+    "evidence": "'base models are often found to be calibrated, in contrast to post-trained models'."
+   }
+  ],
+  "added_sources": [],
+  "unsourced_claims": [
+   "preference-tuned models having peaked distributions beyond the Kalai calibration statement (hedged with 'often ... in many setups')"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-14-5",
+  "verdict": "pass",
+  "reasons": [
+   "Applied FPC parenthetical correct: 384/(1+383/725)=251.",
+   "Re-run: 240/725=33.1%, 60 missed, 485 FP, 240/337=71.2% at 1% FPR; concise (65 words) consistent with detailed and practical."
+  ],
+  "parts_answered": {
+   "a": true,
+   "b": true,
+   "c": true
+  },
+  "evidence": [
+   {
+    "claim": "precision 33.1%",
+    "method": "executed",
+    "evidence": "240/725"
+   },
+   {
+    "claim": "sample size 384, ~251 with FPC",
+    "method": "executed",
+    "evidence": "1.96^2*.25/.05^2; n0/(1+(n0-1)/725)"
+   },
+   {
+    "claim": "NLI input-granularity mismatch with long premises, fix by segmenting and aggregating",
+    "method": "paper",
+    "evidence": "SummaC abstract"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "Bayes calculation plus failure modes and validation design.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "concise_answer",
+    "adds_distinct_value": true,
+    "note": "65 words, interview-ready"
+   },
+   {
+    "field": "detailed_answer",
+    "adds_distinct_value": true,
+    "note": "adds 1% FPR contrast, failure-mode detail"
+   },
+   {
+    "field": "practical_answer",
+    "adds_distinct_value": true,
+    "note": "labelling and sample-size procedure not in detailed"
+   }
+  ],
+  "suggested_answer_set": "concise+detailed+practical",
+  "key_concepts_findings": "3-8, specific, each discussed; none weak",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0002",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [],
+  "added_sources": [
+   {
+    "title": "SummaC: Re-Visiting NLI-based Models for Inconsistency Detection in Summarization",
+    "url": "https://arxiv.org/abs/2111.09525",
+    "supports": "Sentence-level NLI models suffer an input-granularity mismatch with long source documents; segmenting into sentence units and aggregating pairwise scores helps.",
+    "quote": "past work suffered from a mismatch in input granularity between NLI datasets (sentence-level)",
+    "type": "paper"
+   }
+  ],
+  "unsourced_claims": [
+   "entailment models often weak on numbers, dates, negation, quantifiers (hedged with 'often')"
+  ],
+  "code_patch": null
+ },
+ {
+  "plan_id": "B2-GEN-14-6",
+  "verdict": "pass",
+  "reasons": [
+   "Applied randomised-experiment wording is correct and consistent.",
+   "70/500=14%, 45=9%, 25=5% verified."
+  ],
+  "parts_answered": {
+   "what is wrong": true,
+   "UI/wording changes": true,
+   "test": true
+  },
+  "evidence": [
+   {
+    "claim": "70 of 500 = 14% (9% partial + 5% unsupported)",
+    "method": "executed",
+    "evidence": "45+25=70"
+   }
+  ],
+  "issues": [],
+  "difficulty_blind": "Medium",
+  "difficulty_rationale": "UI/measurement reasoning with simple arithmetic; open-ended but scenario type is acceptable.",
+  "type_ok": true,
+  "suggested_type": null,
+  "rubric_points": null,
+  "answer_set_findings": [
+   {
+    "field": "answer",
+    "adds_distinct_value": true,
+    "note": "single answer; no padding fields"
+   }
+  ],
+  "suggested_answer_set": "single",
+  "key_concepts_findings": "3-8, specific, each discussed; none weak",
+  "suggested_key_concepts": null,
+  "nearest_existing": {
+   "id": "smi-j0026",
+   "same_intent": false
+  },
+  "code_findings": "no code",
+  "sources_findings": [],
+  "added_sources": [],
+  "unsourced_claims": [
+   "automation bias plausible (explicitly hedged as worth measuring)"
+  ],
+  "code_patch": null
+ }
+]

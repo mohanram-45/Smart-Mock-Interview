@@ -1,0 +1,862 @@
+[
+ {
+  "plan_id": "B3-MLO-03-1",
+  "cell_id": "MLO-03",
+  "topic": "Model registry and packaging (containers, ONNX, signatures, dependency pinning)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "concept",
+  "difficulty": "Easy",
+  "question": "A teammate argues: 'We already save every trained model into a versioned folder in object storage, so a model registry is redundant.' What does a registry add beyond that folder, and in what situation would the folder genuinely be enough?",
+  "answer_set": "single",
+  "answer": "A registry turns 'a file somewhere' into a managed, addressable model with history. The folder gives you bytes with a naming convention; a registry typically adds:\n\n1. Version identity. Each registration under a model name gets a new, immutable version number (MLflow's registry documents this behaviour), so 'model X v12' means one specific artifact.\n2. Lineage. Each version links back to what produced it: the training run, code commit, data snapshot and config, so you can answer 'how was the model in production built?'\n3. Metadata. Tags, descriptions, evaluation results and the input/output signature travel with the version, so a consumer can validate requests without opening the artifact.\n4. Named pointers. Consumers ask for 'production' (an alias or stage) instead of a path. Promotion and rollback become re-pointing that name, and the registry keeps a record of who moved it and when. MLflow documents aliases as mutable named references to a version.\n5. Governance. Access control, approvals and an audit trail around who may promote.\n\nThe folder is genuinely enough when there is one model, one author and one consumer, nothing is promoted through environments, and nobody will ever ask for provenance. Even then, the convention you invent (latest, final, v2) tends to be a hand-built registry with fewer guarantees.\n\nPitfall: a registry does not create reproducibility on its own. If the training job does not log the data version, seeds and environment, the lineage field is empty or misleading.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "model registry",
+   "model version",
+   "alias",
+   "lineage",
+   "signature",
+   "metadata and tags",
+   "approval and audit trail"
+  ],
+  "common_mistakes": [
+   "Describing a registry as storage with a nicer UI, missing that the value is versioned identity, pointers and lineage",
+   "Assuming that registering a model by itself makes it reproducible; lineage is only as good as what the training job logs",
+   "Treating folder-naming conventions such as v3_final_FINAL as versioning"
+  ],
+  "interview_style_note": "Separates artifact storage from model management (identity, pointers, provenance, governance) and can say when the extra machinery is not worth it.",
+  "code": null,
+  "sources": [
+   {
+    "title": "MLflow Model Registry",
+    "url": "https://mlflow.org/docs/latest/ml/model-registry/",
+    "supports": "Registry is a centralized model store with versioning (each registration increments the version), lineage to the producing run, tags and annotations; aliases are mutable named references to a model version."
+   }
+  ],
+  "tags": [
+   "model-registry",
+   "versioning",
+   "lineage",
+   "aliases"
+  ],
+  "time_sensitive": true,
+  "change_notes": "Introductory registry question about what is added over plain artifact storage; no existing question covers registries (nearest MLOps-adjacent items are smi-i0009 on skew and smi-k-series on LLM serving).",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-03-2",
+  "cell_id": "MLO-03",
+  "topic": "Model registry and packaging (containers, ONNX, signatures, dependency pinning)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "Your team stores scikit-learn pipelines as joblib files in a shared bucket that several teams, and one external partner, can write to. The serving image loads whichever file is newest at startup. After a base-image refresh the service starts logging version warnings and a handful of predictions change; separately, the security team flags the loading step. Explain both problems and what you would change in the loading path.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Two different problems share one loading step.\n\nCompatibility. A pickle records instance state plus references to classes by import path; it does not embed the class code (the Python docs say only instance data is pickled). Loading therefore needs a compatible version of the library that defined the classes. scikit-learn's persistence guide says loading a model trained with a different scikit-learn version is not supported, may emit an inconsistent-version warning, and can give different results or crash. A base-image refresh that bumped a library is the classic trigger: the file loads, so nothing fails loudly, but internals have changed. Small output changes are consistent with changed internals, but only a replay against the old environment would prove the cause.\n\nSecurity. Unpickling calls whatever callables the byte stream names, so crafted data can execute arbitrary code during loading (Python's pickle documentation carries an explicit warning). scikit-learn states that joblib is pickle-based and shares the risk. Because several teams and an outside partner can write to the bucket, anyone with write access can run code inside the serving process with its credentials. 'Newest file wins' makes it worse: an overwritten or planted file is promoted automatically.\n\nChanges: (1) serve only artifacts that a registry has promoted, referenced by explicit version, never 'latest'; (2) restrict who can write promoted artifacts; (3) verify integrity against a digest or signature recorded where the artifact writers cannot edit it (the Python docs suggest signing pickled data with HMAC); (4) record training-time library versions with the model and refuse to load on mismatch, instead of warning; (5) build the serving image from the same lockfile as training; (6) where feasible, move to a format that does not execute code on load, accepting its limits (an exchange format may not cover every estimator or custom step).",
+  "practical_answer": "Loader contract to implement at container start-up (hypothetical numbers):\n\n1. Config names one registry version, for example 'fraud-model version 41', not an alias resolved at runtime and not a path.\n2. The loader fetches the registry record: artifact URI, sha256 digest, and metadata {python: '3.11', scikit-learn: '1.5', numpy: '2.1'} (illustrative values).\n3. It downloads the artifact and computes its sha256. If the digest differs from the registry's record, exit non-zero before any deserialization.\n4. It compares installed library versions to the recorded ones. Any difference in the framework or numpy major/minor version: exit non-zero (fail fast, container never becomes ready, previous replicas keep serving).\n5. Only then deserialize. Run the container as a non-root user with no write access to the model directory, and with the narrowest credentials the service needs.\n6. Smoke test: score a fixed set of 50 stored input rows and compare with stored expected scores (tolerance, for example 1e-6 absolute). Fail readiness if any exceeds it.\n\nTest the guard by uploading a corrupted copy of the file and by building an image with a deliberately different library version; both must fail before the pod is marked ready.",
+  "key_concepts": [
+   "pickle deserialization",
+   "arbitrary code execution on load",
+   "library version coupling",
+   "joblib",
+   "artifact integrity (hash/signature)",
+   "environment pinning",
+   "fail-fast version check"
+  ],
+  "common_mistakes": [
+   "Believing joblib or a custom file extension is safer than pickle; it is pickle-based, so loading untrusted files can run code",
+   "Fixing only the version problem (pinning) while leaving write access and the 'newest file' rule in place",
+   "Storing the integrity hash next to the artifact in the same writable location, so an attacker simply replaces both"
+  ],
+  "interview_style_note": "Identifies two separate failure modes (compatibility and code execution), ties them to how pickle works, and fixes the process (promotion, integrity, fail-fast) rather than only the library.",
+  "code": null,
+  "sources": [
+   {
+    "title": "pickle - Python object serialization (Python documentation)",
+    "url": "https://docs.python.org/3/library/pickle.html",
+    "supports": "Warning that the pickle module is not secure and malicious pickle data can execute arbitrary code during unpickling; only instance data is pickled, not class code; suggests signing data with hmac; protocol versions."
+   },
+   {
+    "title": "Model persistence (scikit-learn user guide)",
+    "url": "https://scikit-learn.org/stable/model_persistence.html",
+    "supports": "pickle/joblib are not safe for untrusted sources; loading across scikit-learn versions is unsupported and raises InconsistentVersionWarning; persisted models need the training environment; ONNX does not need a Python environment but not all estimators are supported and arbitrary computation can be represented (sandbox recommended)."
+   }
+  ],
+  "tags": [
+   "pickle",
+   "joblib",
+   "security",
+   "supply-chain",
+   "packaging"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Distinct from smi-i0009 (training-serving skew) and every serving item: this is about serialization safety and version coupling of the artifact format.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-03-3",
+  "cell_id": "MLO-03",
+  "topic": "Model registry and packaging (containers, ONNX, signatures, dependency pinning)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "evaluation",
+  "difficulty": "Medium",
+  "question": "A fraud model (a scikit-learn pipeline: one-hot encoding, scaling, then gradient-boosted trees) is exported to ONNX so it can be served without a Python environment. In a shadow comparison, 0.8% of rows get a different predicted class from the original pipeline, and the ops lead asks whether ONNX 'guarantees identical behaviour'. What does an exchange format like this actually fix, what can still make outputs differ, and how would you test the export before it ships?",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "What it fixes. ONNX specifies a portable, serialized computation graph plus named operator sets (the IR specification). The serving side needs a runtime that implements those operators, not the training Python environment, and loading a model does not unpickle Python objects. scikit-learn's guide lists these as advantages and also notes that arbitrary computation can be expressed in ONNX, so untrusted models should still run in a sandbox.\n\nWhat it does not guarantee:\n1. Semantics come from the converter. Not every estimator is supported, and custom transformers need custom conversion work; the original Python object is lost.\n2. Operator sets. A model must name the operator sets it needs, and a runtime must support them all or reject the model. A runtime that is too old fails loudly; custom operators from non-default domains require the runtime to have them.\n3. Anything outside the graph. Pandas feature engineering, text cleaning or tokenization done before the pipeline is not exported unless you convert it too. Re-implementing it in the service creates exactly the skew you wanted to avoid.\n4. Numerics. Exported graphs often compute in float32 where training used float64. Tree models compare a feature to a threshold, so a value very close to a split can go to the other branch; summed leaf scores then shift slightly, and a row sitting near the decision threshold flips class. A 0.8% label difference is plausible from this alone, but it is a hypothesis to check, not a conclusion.\n\nTest: run both models on a large representative sample, compare probabilities (not just labels), and check whether every flipped row has a score within the numeric tolerance of the decision threshold.",
+  "practical_answer": "Parity test, worked with hypothetical numbers on 200,000 held-out rows:\n\n1. Score all rows with the original pipeline (float64) and the exported model in the target runtime, using the exact serving preprocessing.\n2. Compute |p_orig - p_onnx| per row. Acceptance: maximum below 1e-4, and 99.9% of rows below 1e-6 (pick tolerances from the precision of the export, then justify them).\n3. For flipped labels, compute |p_orig - threshold|. Suppose 1,600 rows flip (0.8%). If all 1,600 have |p - threshold| < 1e-4, the flips are numeric ties at the threshold and acceptable; report the effect on precision and recall at the operating point. If even 20 flips have margin above 1e-3, there is a real discrepancy: bisect by comparing intermediate outputs (the encoded feature matrix first, then leaf scores).\n4. Add adversarial rows: NaN and missing values, unseen categories, extreme magnitudes, values exactly on known split thresholds.\n5. Pin the converter and runtime versions in the lockfile and re-run the parity test in CI whenever either changes.",
+  "key_concepts": [
+   "ONNX computation graph",
+   "operator set (opset)",
+   "custom operators",
+   "preprocessing outside the graph",
+   "float32 vs float64 precision",
+   "decision threshold flips",
+   "parity testing"
+  ],
+  "common_mistakes": [
+   "Saying ONNX guarantees bit-identical outputs because it is a standard",
+   "Forgetting that hand-written preprocessing (pandas code, custom transformers) is usually not in the exported graph",
+   "Comparing only predicted labels, which hides whether the flips are just rows sitting at the decision threshold"
+  ],
+  "interview_style_note": "Distinguishes what a portable format removes (Python/pickle coupling, code execution on load) from what remains (converter coverage, preprocessing, numerics, runtime/opset support) and proposes a parity test with a principled tolerance.",
+  "code": null,
+  "sources": [
+   {
+    "title": "ONNX Intermediate Representation specification",
+    "url": "https://github.com/onnx/onnx/blob/main/docs/IR.md",
+    "supports": "ONNX specifies a portable serialized format of a computation graph; a model must name the operator sets it relies on and an implementation must support all operators in the set or reject the model; non-default operator sets must specify a domain."
+   },
+   {
+    "title": "Model persistence (scikit-learn user guide)",
+    "url": "https://scikit-learn.org/stable/model_persistence.html",
+    "supports": "pickle/joblib are not safe for untrusted sources; loading across scikit-learn versions is unsupported and raises InconsistentVersionWarning; persisted models need the training environment; ONNX does not need a Python environment but not all estimators are supported and arbitrary computation can be represented (sandbox recommended)."
+   }
+  ],
+  "tags": [
+   "onnx",
+   "model-export",
+   "parity-testing",
+   "preprocessing",
+   "packaging"
+  ],
+  "time_sensitive": false,
+  "change_notes": "New topic in the batch; related only loosely to smi-i0009 (skew) because here the divergence comes from the export step, not data differences.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B3-MLO-03-4",
+  "cell_id": "MLO-03",
+  "topic": "Model registry and packaging (containers, ONNX, signatures, dependency pinning)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "A registered model has an input signature of {age: double, plan_id: string, days_active: long}. Three clients misbehave: one sends age as the string '34'; one sends days_active as 3.7; a third sends perfectly typed rows but days_active measured in hours instead of days. Which of these can a signature-based schema check catch, which can it not, and what would you add around it?",
+  "answer_set": "single",
+  "answer": "A signature is a declared contract on input and output names, types and (for tensors) shapes that travels with the model version. MLflow's documentation describes it this way and notes it can be generated automatically when you log an input example, which is convenient but means the signature only reflects that one example: a column that happens to hold whole numbers in the example becomes an integer type even if the model should accept doubles. Review inferred signatures.\n\nWhat it can catch:\n- The string '34' for a double column: a type mismatch. A strict check rejects it with a clear client error; a lenient one coerces it. Decide which behaviour you want and test it, because coercion rules differ between serving layers.\n- days_active = 3.7 for a long column: this is a lossy conversion (3.7 to 3). A good check rejects it rather than truncating, because truncation hides a client bug.\n- Missing columns, extra columns, wrong shapes.\n\nWhat it cannot catch: the third client. 'Hours instead of days' is type-correct but semantically wrong, and every type check passes while predictions degrade silently. Neither can it catch out-of-range values (age = -4 or 900), new categories in plan_id, an unusual null rate, or a shifted distribution.\n\nComplement it with:\n1. Constraint checks derived from training data: ranges, allowed categories, maximum null rate, applied at the endpoint (reject or flag) and in the pipeline.\n2. Unit conventions in the field names or schema documentation (days_active_days), and contract tests that replay each client's sample payloads against the endpoint in CI.\n3. Logging of rejected and clamped requests per client, so a unit mix-up shows up as a changed distribution for one client.\n4. Versioning of the signature with the model so a schema change is a deliberate, reviewed event.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "model signature",
+   "input schema validation",
+   "type coercion",
+   "range and unit validation",
+   "contract test",
+   "signature inference from an example"
+  ],
+  "common_mistakes": [
+   "Assuming schema validation also catches wrong units or out-of-range values",
+   "Trusting a signature inferred from one example without reviewing it (an integer-looking column in the example becomes an integer type)",
+   "Silently coercing 3.7 to 3 to keep the request alive, which hides a client bug"
+  ],
+  "interview_style_note": "Knows a signature is a type/shape contract, not a semantic one, and layers range, unit and categorical checks plus contract tests on top.",
+  "code": null,
+  "sources": [
+   {
+    "title": "MLflow Model Signatures",
+    "url": "https://mlflow.org/docs/latest/ml/model/signatures/",
+    "supports": "A signature specifies the expected format of inputs, outputs and parameters; it can be inferred automatically when an input_example is provided; helps deployment tools validate requests."
+   }
+  ],
+  "tags": [
+   "model-signature",
+   "schema-validation",
+   "input-validation",
+   "contract-testing"
+  ],
+  "time_sensitive": true,
+  "change_notes": "Registry/packaging angle on input contracts; the data-validation cell MLO-02 covers pipeline checks, this asks what the packaged signature does and does not catch.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B3-MLO-03-5",
+  "cell_id": "MLO-03",
+  "topic": "Model registry and packaging (containers, ONNX, signatures, dependency pinning)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Hard",
+  "question": "Auditors ask you to bring back, with behaviour equivalent to the original, the model that served customers 14 months ago, and to show how it was built. Design what each registry version must record and how the model is packaged, then describe how promotion and rollback should work using aliases, including what is and is not atomic.",
+  "answer_set": "concise+detailed+practical",
+  "answer": null,
+  "concise_answer": "Each registry version is immutable and records the artifact checksum, lineage (commit, data snapshot, config, run), signature, evaluation and required preprocessing. The image is built from a lockfile on a digest-pinned base, and the deployment records version plus image digest. Promotion moves an alias: atomic in the registry, but replicas change only when redeployed. Rollback re-points the alias and redeploys the retained previous version and image.",
+  "detailed_answer": "Record per version (immutable once registered):\n- Artifact in the chosen format with a content digest, plus the preprocessing it depends on, packaged inside it or versioned and referenced explicitly.\n- Lineage: training run, code commit, data snapshot identifier or hash, configuration, seeds, and the feature definitions' version. MLflow's registry documents linking a version to the run that produced it, which is the pattern to copy.\n- Signature, evaluation results against the baseline, who approved the promotion.\n- Environment: dependency lockfile with hashes, base image referenced by digest (tags are mutable), hardware class.\n\nEquivalent behaviour needs more than the weights: if the feature pipeline or an encoder lives outside the artifact, the old version of that code must also be recoverable. Exact bit-for-bit equality can be unrealistic across hardware, so define 'equivalent' as agreement within a stated tolerance on a replay set.\n\nAliases. Versions never change; aliases (for example 'production') are mutable named pointers, which MLflow documents. Promotion moves the alias from v39 to v41. The pointer update is atomic in the registry, but running replicas do not notice unless they re-resolve it. A safe pattern is to resolve the alias to an explicit version when you create the deployment, and record that version, not the alias, in the deployment record. Rollback is then the same operation in reverse (alias back to v39, redeploy v39), which only works if v39's artifact and image are still retained. Retention policy is therefore part of the design: cleanup jobs that delete 'old' images silently destroy your ability to roll back or to answer an audit.",
+  "practical_answer": "Worked scenario (hypothetical identifiers).\n\nDeployment record written at release time:\n- model: fraud-score, version 41, artifact sha256 recorded\n- training run id, git commit, data snapshot id, feature-definition version 7\n- image digest recorded (not a tag), built from a hashed lockfile\n- alias 'production' moved from v39 to v41 at 10:42 by the release job; approver recorded\n\nFourteen months later:\n1. Look up the deployment record for the audit date, take model v39 and its image digest.\n2. Check the digest still resolves in the image store; if retention removed it, rebuild from the git commit plus lockfile (this is why the lockfile and commit are recorded as a fallback).\n3. Restore feature definition version 7 and the data snapshot for the replay.\n4. Replay a stored sample of 1,000 logged requests (with their logged predictions) through the restored container. Pass if at least 99.9% of scores match within 1e-6 and every class decision matches; investigate any gap by diffing library versions and preprocessing.\n5. Produce the lineage report from the version record: data snapshot, code, config, evaluation, approver.\n\nRollback drill (run quarterly): move the alias back to the previous version in staging, redeploy, confirm the replay set passes, and time the procedure.",
+  "key_concepts": [
+   "immutable model version",
+   "alias promotion",
+   "lineage (code, data, config)",
+   "lockfile and base-image digest",
+   "packaged preprocessing",
+   "deployment record",
+   "replay test"
+  ],
+  "common_mistakes": [
+   "Pinning the base image by tag rather than digest, or letting the registry or image store garbage-collect old images",
+   "Believing that moving an alias updates running servers instantly; consumers see the change only when they re-resolve it",
+   "Recording the model artifact but not the feature definitions, preprocessing code or data snapshot it depended on"
+  ],
+  "interview_style_note": "Designs for reproducing and auditing a past deployment end to end, and understands that registry operations are atomic while rollout to running replicas is not.",
+  "code": null,
+  "sources": [
+   {
+    "title": "MLflow Model Registry",
+    "url": "https://mlflow.org/docs/latest/ml/model-registry/",
+    "supports": "Registry is a centralized model store with versioning (each registration increments the version), lineage to the producing run, tags and annotations; aliases are mutable named references to a model version."
+   }
+  ],
+  "tags": [
+   "model-registry",
+   "reproducibility",
+   "rollback",
+   "aliases",
+   "containers",
+   "lineage"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Synthesis question combining registry, packaging and pinning; closest are MLO-03-1 (what a registry adds) and MLO-03-2 (loading safety), but this one is about end-to-end reproducibility and promotion mechanics.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B3-MLO-04-1",
+  "cell_id": "MLO-04",
+  "topic": "Serving patterns (batch, online, streaming, REST/gRPC, autoscaling, batching) - includes monitoring fundamentals for serving",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Medium",
+  "question": "Choose batch, online (request/response) or streaming inference for each case and justify it on latency, freshness, cost and failure handling: (a) re-ranking 3 million product pages once a week for a newsletter; (b) a card-payment risk score that must return in about 100 ms at checkout and should reflect the cardholder's last 10 minutes of activity; (c) 50,000 sensor readings per second where an alert must fire within a few seconds of a pattern. Where would a hybrid beat a pure choice?",
+  "answer_set": "single",
+  "answer": "(a) Batch. Nobody waits on an individual prediction, the entity set is known in advance, and staleness of a week is acceptable. Run it as a scheduled job that is partitioned and retried per partition, with idempotent writes (overwrite by partition or upsert by key) so a rerun cannot duplicate. Cost is paid only while the job runs, and if a run fails the previous week's output simply stays in place.\n\n(b) Online, with a hybrid feature path. The score is on the checkout critical path, so it needs a synchronous endpoint with a latency budget (for example 100 ms end to end, meaning only a few tens of ms for the model). Slow-moving features are precomputed in batch and read from a key-value store; the 'last 10 minutes' aggregates are maintained by a streaming job into the same store. Capacity must cover peak traffic, so cost is higher than batch. Failure handling is a business decision made in advance: on timeout, return a rules-based or default decision (for example allow with step-up verification) and flag it, rather than blocking checkout.\n\n(c) Streaming. Events arrive continuously and the answer is needed within seconds, so a stateful stream processor keeps windows per sensor and applies a small model per event or window. Design for event time versus arrival time, late and out-of-order events, checkpointing, and at-least-once delivery, which means alerts must be deduplicated or idempotent. Apply backpressure rather than dropping data silently.\n\nHybrid beats pure modes when the expensive part is stable: precompute embeddings or heavy scores in batch, then run a light model online on top of fresh signals. Also, if the set of entities is finite, an 'online' product can often be a lookup of batch-precomputed predictions, which removes inference from the request path entirely.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "batch inference",
+   "online inference",
+   "streaming inference",
+   "feature freshness",
+   "latency budget",
+   "idempotent writes",
+   "fallback decision"
+  ],
+  "common_mistakes": [
+   "Choosing online serving for everything because it feels more modern, paying for peak capacity when the predictions could be precomputed",
+   "Assuming 'real time' means one mode: the 10-minute feature in (b) still needs a streaming feature pipeline even though the model call is request/response",
+   "Ignoring duplicates and late events in streaming, which makes alerts non-idempotent"
+  ],
+  "interview_style_note": "Maps requirements (who waits, how fresh, what happens on failure) to a serving mode and recognises hybrids such as precompute plus a light online step.",
+  "code": null,
+  "sources": [],
+  "tags": [
+   "serving-patterns",
+   "batch-inference",
+   "online-inference",
+   "streaming",
+   "architecture"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Mode-selection question with three described workloads; existing serving items (smi-k0033..k0039) are LLM capacity questions and do not cover batch/online/stream choice.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-04-2",
+  "cell_id": "MLO-04",
+  "topic": "Serving patterns (batch, online, streaming, REST/gRPC, autoscaling, batching) - includes monitoring fundamentals for serving",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Medium",
+  "question": "An image-embedding model sits behind an endpoint called by other backend services at about 300 requests/s with a 150 ms client budget. Each request currently carries a decoded 224x224x3 float32 tensor (150,528 values) as JSON over REST. A browser dashboard also calls a separate, low-volume prediction route. Would you move the main route to gRPC with protobuf, and what would you check before and after the move?",
+  "answer_set": "concise+detailed",
+  "answer": null,
+  "concise_answer": "Probably yes for the service-to-service route, but first fix the payload. In a local test, 150,528 random float values serialised as JSON text came to about 3.05 MB versus 0.60 MB as raw float32 (roughly 5x). At 300 requests/s that is about 0.9 GB/s of JSON against 0.18 GB/s binary. Sending the compressed image and decoding server side is smaller still. Use gRPC internally with explicit deadlines; keep REST for browsers.",
+  "detailed_answer": "Start with the arithmetic, because it may make the protocol question secondary. 150,528 float32 values are 602,112 bytes raw. Serialised as JSON text at full precision (random values in a local test with Python's json module) the same tensor was about 3.05 MB, roughly five times larger; rounding to four decimals brought it to about 1.19 MB. At 300 requests/s the JSON route moves on the order of 0.9 GB/s, which is about 7 Gbit/s before overhead, so the network and the JSON encode/decode cost may already eat the 150 ms budget. Raw binary is 0.18 GB/s. Sending the encoded image (typically a small fraction of the raw tensor size) and preprocessing on the server is usually the bigger win, and keeps preprocessing in one place.\n\ngRPC advantages for the internal route: a binary protobuf encoding, a .proto contract with generated clients that catches schema drift at build time, HTTP/2 multiplexing and streaming. Its docs recommend always setting an explicit, realistic deadline and note that gRPC sets none by default, so a client could wait indefinitely; deadlines can be propagated to downstream calls. Decide them from your measured latency plus margin.\n\nCosts and checks: (1) load balancing, since many requests share one long-lived HTTP/2 connection, a connection-level balancer can leave some replicas idle; verify per-request balancing; (2) browsers cannot call native gRPC directly, so the dashboard keeps REST or uses a gateway; (3) debugging is harder than curl, so keep a REST health and admin path; (4) benchmark both under your real payload, not assumptions.\n\nAfter the move, compare p50/p95/p99 and CPU per request for old and new routes, and keep both routes for a deprecation period.",
+  "practical_answer": null,
+  "key_concepts": [
+   "REST/JSON vs gRPC/protobuf",
+   "payload size and serialization cost",
+   "HTTP/2 multiplexing and load balancing",
+   "deadlines",
+   "schema contract (.proto)",
+   "browser clients",
+   "sending compressed image bytes"
+  ],
+  "common_mistakes": [
+   "Switching protocols without questioning the payload: sending encoded image bytes and preprocessing server side may reduce traffic far more than any protocol change",
+   "Assuming gRPC load-balances well behind a connection-level load balancer; long-lived multiplexed connections can pin traffic to a few backends",
+   "Forgetting that browsers and curl-style debugging need extra tooling or a gateway for gRPC"
+  ],
+  "interview_style_note": "Weighs protocol trade-offs with numbers, spots that payload design dominates, and mentions deadlines, load balancing and client constraints.",
+  "code": null,
+  "sources": [
+   {
+    "title": "gRPC Deadlines",
+    "url": "https://grpc.io/docs/guides/deadlines/",
+    "supports": "A deadline is a point in time past which a client is unwilling to wait; gRPC sets no deadline by default and the docs advise always setting a realistic one; deadlines can be propagated to downstream calls."
+   }
+  ],
+  "tags": [
+   "rest",
+   "grpc",
+   "protobuf",
+   "serving",
+   "payload-size"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Protocol-choice question with a size calculation; no existing question compares REST and gRPC for model endpoints.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B3-MLO-04-3",
+  "cell_id": "MLO-04",
+  "topic": "Serving patterns (batch, online, streaming, REST/gRPC, autoscaling, batching) - includes monitoring fundamentals for serving",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "coding",
+  "difficulty": "Hard",
+  "question": "Implement a deterministic simulator for dynamic request batching on a single worker, plus a percentile helper.\n\nsimulate_microbatch(arrivals, max_batch, max_wait, overhead, per_item) -> (latencies, batch_sizes)\n\narrivals is a sorted list of arrival times in ms (ValueError if unsorted; ValueError if max_batch < 1 or max_wait < 0). Requests are served FIFO. A batch is dispatched at the first moment the worker is free AND (max_batch requests are waiting OR the oldest waiting request has waited max_wait ms). It contains the waiting requests up to max_batch. Service time is overhead + per_item * batch_size, and the worker is busy for that time. Latency of a request is its finish time minus its arrival time. Also write percentile(values, p) using the nearest-rank definition. Then use it to explain, with an arrival every 1 ms (1000 requests/s) and every 20 ms, why max_batch and max_wait must be chosen from the load, using overhead=10 ms and per_item=0.5 ms.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Why batching exists. Many accelerators and runtimes pay a mostly fixed cost per call (launching kernels, moving data, framework overhead) and a smaller marginal cost per item, so a batch of n costs overhead + per_item * n. Throughput per worker is then n / (overhead + per_item * n), which rises with n and approaches 1/per_item. Batching trades latency for throughput: the first request in a batch waits for others to arrive (bounded by max_wait), and a larger batch also takes longer to compute.\n\nThe dispatch rule has two cases. If the worker is idle, the batch goes at min(time the max_batch-th request arrives, oldest arrival + max_wait). If the worker is busy, requests accumulate and the batch goes as soon as the worker frees if the full or timeout condition already held by then. Both cases are captured by max(free_time, min(full_time, oldest_arrival + max_wait)). Under heavy load the worker is always busy, so the wait window barely matters and batches fill toward max_batch; under light load the window is pure added delay.\n\nEdge cases to test: a single request with a timer-based dispatch; max_wait = 0 (no batching); a request that arrives just inside versus just outside the window; unsorted input.\n\nInterpretation of the experiment: with one request per ms and no batching, service takes 10.5 ms per request but only 1 ms passes between arrivals, so the queue grows without bound; with max_batch 32 the worker handles 32 requests per 26 ms, which exceeds the arrival rate, and latency stays bounded. At one request per 20 ms the opposite holds: batching only adds waiting.",
+  "practical_answer": "Reference implementation (standard library only):\n\n```python\nimport math\n\n\ndef percentile(values, p):\n    \"\"\"Nearest-rank percentile, p in (0, 100].\"\"\"\n    if not values:\n        raise ValueError(\"empty\")\n    s = sorted(values)\n    k = max(1, math.ceil(p / 100.0 * len(s)))\n    return s[k - 1]\n\n\ndef simulate_microbatch(arrivals, max_batch, max_wait, overhead, per_item):\n    \"\"\"Single worker, FIFO, dynamic batching. Times in ms.\n\n    A batch is dispatched at the first moment the worker is free AND either\n    max_batch requests are queued or the oldest queued request has waited\n    max_wait. Batch service time = overhead + per_item * size.\n    Returns (latencies in input order, batch sizes).\n    \"\"\"\n    n = len(arrivals)\n    if any(arrivals[i] > arrivals[i + 1] for i in range(n - 1)):\n        raise ValueError(\"arrivals must be sorted\")\n    if max_batch < 1 or max_wait < 0:\n        raise ValueError(\"bad parameters\")\n    latencies = [0.0] * n\n    sizes = []\n    free_t = 0.0\n    i = 0\n    while i < n:\n        a0 = arrivals[i]\n        full_idx = i + max_batch - 1\n        a_full = arrivals[full_idx] if full_idx < n else math.inf\n        dispatch = max(free_t, min(a_full, a0 + max_wait))\n        j = i\n        while j < n and j - i < max_batch and arrivals[j] <= dispatch:\n            j += 1\n        size = j - i\n        finish = dispatch + overhead + per_item * size\n        for k in range(i, j):\n            latencies[k] = finish - arrivals[k]\n        sizes.append(size)\n        free_t = finish\n        i = j\n    return latencies, sizes\n```\n\nThe accompanying tests check hand-computed cases: arrivals [0, 1, 2, 3] with max_batch 2, max_wait 5, overhead 10, per_item 2 give latencies [15, 14, 27, 26]; a lone request waits out max_wait (latency 17); max_wait=0 gives unbatched latencies; unsorted input raises ValueError. They pass on Python 3.10, 3.11 and 3.13.\n\nObserved results from running the solution (deterministic, times in ms; overhead 10, per_item 0.5):\n\n- 2,000 arrivals, one per ms: max_batch=1, max_wait=0 gives p95 latency 18,051 (the first request takes 10.5, the last 19,001, so the queue grows without bound). max_batch=16, max_wait=4 gives p95 260.5. max_batch=32, max_wait=8 gives p95 38 with a mean batch size of about 19.6.\n- 500 arrivals, one per 20 ms: max_batch=1, max_wait=0 gives 10.5 for every request; max_batch=8, max_wait=5 gives 15.5 (every batch is one request, so the wait is pure cost).\n\nPractical rule: choose max_batch so that the worker's capacity at that batch size, max_batch / (overhead + per_item * max_batch), comfortably exceeds peak arrival rate, and set max_wait to a small fraction of the latency budget.",
+  "key_concepts": [
+   "dynamic batching",
+   "max batch size and max wait",
+   "fixed overhead vs per-item cost",
+   "queueing delay",
+   "throughput capacity",
+   "p95 latency",
+   "head-of-line wait"
+  ],
+  "common_mistakes": [
+   "Setting a long max_wait 'to get bigger batches' without checking that it adds directly to latency at low load",
+   "Deciding on average latency only; the tail is what saturates first",
+   "Forgetting that a batch cannot dispatch while the worker is busy, so under load the wait window is irrelevant and batches fill to max_batch"
+  ],
+  "interview_style_note": "Implements the dispatch rule precisely (worker free AND full or timed out), validates edge cases, and interprets load-dependent behaviour.",
+  "code": {
+   "language": "python",
+   "setup": "",
+   "solution": "import math\n\n\ndef percentile(values, p):\n    \"\"\"Nearest-rank percentile, p in (0, 100].\"\"\"\n    if not values:\n        raise ValueError(\"empty\")\n    s = sorted(values)\n    k = max(1, math.ceil(p / 100.0 * len(s)))\n    return s[k - 1]\n\n\ndef simulate_microbatch(arrivals, max_batch, max_wait, overhead, per_item):\n    \"\"\"Single worker, FIFO, dynamic batching. Times in ms.\n\n    A batch is dispatched at the first moment the worker is free AND either\n    max_batch requests are queued or the oldest queued request has waited\n    max_wait. Batch service time = overhead + per_item * size.\n    Returns (latencies in input order, batch sizes).\n    \"\"\"\n    n = len(arrivals)\n    if any(arrivals[i] > arrivals[i + 1] for i in range(n - 1)):\n        raise ValueError(\"arrivals must be sorted\")\n    if max_batch < 1 or max_wait < 0:\n        raise ValueError(\"bad parameters\")\n    latencies = [0.0] * n\n    sizes = []\n    free_t = 0.0\n    i = 0\n    while i < n:\n        a0 = arrivals[i]\n        full_idx = i + max_batch - 1\n        a_full = arrivals[full_idx] if full_idx < n else math.inf\n        dispatch = max(free_t, min(a_full, a0 + max_wait))\n        j = i\n        while j < n and j - i < max_batch and arrivals[j] <= dispatch:\n            j += 1\n        size = j - i\n        finish = dispatch + overhead + per_item * size\n        for k in range(i, j):\n            latencies[k] = finish - arrivals[k]\n        sizes.append(size)\n        free_t = finish\n        i = j\n    return latencies, sizes\n",
+   "test": "lat, sizes = simulate_microbatch([0, 1, 2, 3], 2, 5, 10, 2)\nassert lat == [15, 14, 27, 26] and sizes == [2, 2], (lat, sizes)\nlat, sizes = simulate_microbatch([0], 4, 5, 10, 2)\nassert lat == [17] and sizes == [1]\nlat, sizes = simulate_microbatch([0, 100], 8, 0, 10, 2)\nassert lat == [12, 12] and sizes == [1, 1]\n# wait-window closes: second request arrives inside the window, third outside\nlat, sizes = simulate_microbatch([0, 4, 6], 8, 5, 10, 2)\nassert sizes == [2, 1], sizes\nassert lat == [19, 15, 25], lat\nassert percentile([5, 1, 3, 2, 4], 50) == 3\nassert percentile(list(range(1, 101)), 95) == 95\nassert percentile([7], 99) == 7\ntry:\n    simulate_microbatch([2, 1], 2, 1, 1, 1)\n    raise SystemExit(\"should fail\")\nexcept ValueError:\n    pass\n",
+   "expected": null
+  },
+  "sources": [],
+  "tags": [
+   "dynamic-batching",
+   "simulation",
+   "latency",
+   "throughput",
+   "python"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Original coding task on the serving-side throughput/latency trade-off; smi-k0035 simulates static vs continuous batching of LLM decode steps, which is a different mechanism and question.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-04-4",
+  "cell_id": "MLO-04",
+  "topic": "Serving patterns (batch, online, streaming, REST/gRPC, autoscaling, batching) - includes monitoring fundamentals for serving",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Hard",
+  "question": "A model endpoint scales out when average CPU passes 70%. Each replica serves about 4 requests at a time at roughly 120 ms each and takes about 90 s to become useful (image pull, model load, warm-up). Normally 3 replicas handle 50 requests/s. At 09:00 traffic ramps to 200 requests/s within two minutes. p99 goes to timeouts for several minutes even though CPU graphs look unremarkable (the work happens on an accelerator). Diagnose the failure and redesign the scaling policy.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Diagnosis. Capacity per replica is about 4 in flight / 0.12 s = 33 requests/s. Three replicas give about 100 requests/s, which is fine for 50 requests/s (50% busy) but not for 200. The excess is about 100 requests/s. Even if scaling reacted instantly at 09:00, new replicas are only useful after about 90 s, plus the metric scrape and decision delay, so at least roughly 9,000 requests arrive faster than they can be served. With an unbounded queue they wait until clients time out, and retries add load. CPU never signalled because the work runs on an accelerator, so the chosen signal does not measure saturation (one of the four golden signals in Google's SRE book: how full the service is).\n\nRedesign.\n1. Scale on a signal that tracks saturation: in-flight requests (concurrency) per replica, or queue depth or queue wait, optionally together with accelerator utilisation. Little's law gives the target: required in-flight = rate x latency = 200 x 0.12 = 24, so at least 6 replicas at 100% utilisation.\n2. Keep headroom: target about 60% of per-replica concurrency (2.4 in flight), so 24 / 2.4 = 10 replicas at the new peak, and about 3 at 50 requests/s (6 in flight / 2.4 = 2.5, rounded up).\n3. Respect the lag: pre-scale on a schedule or forecast for known 09:00 ramps; keep a minimum replica count; scale up aggressively and down slowly with a stabilisation window.\n4. Make readiness mean 'model loaded and warmed up' (run a few dummy requests so the first real request does not pay for lazy initialisation), so the balancer never sends traffic to a cold replica.\n5. Bound the queue and shed load early (fast 429/503 or a cheaper fallback) so overload degrades part of the traffic instead of all of it.",
+  "practical_answer": "Policy sketch with hypothetical numbers.\n\n- Scaling metric: in-flight requests per replica, target 2.4 (60% of the measured limit of 4). Re-measure the limit with a load test; it is model- and hardware-specific.\n- Bounds: minimum 4 replicas on weekdays from 08:45 (scheduled), maximum 14 (above the 10 needed at peak, to absorb error).\n- Scale up: add up to 100% of current replicas per minute when the metric exceeds target for 30 s. Scale down: remove at most 1 replica per 5 minutes after the metric stays under 50% of target for 10 minutes.\n- Per-replica queue limit: 8 waiting requests (two rounds of 4 requests, roughly 240 ms of wait). Beyond that, reject immediately with a retry-after hint or answer from a cheaper fallback.\n- Readiness: pass only after model load plus 20 warm-up requests.\n\nVerify with a replay of the 09:00 ramp in staging: p99 stays under the SLO, rejected-request fraction is under 1%, and the replica count follows the curve without oscillating.",
+  "key_concepts": [
+   "autoscaling signal",
+   "Little's law (concurrency = rate x latency)",
+   "saturation",
+   "cold start and warm-up",
+   "readiness gating",
+   "scale-up lag",
+   "bounded queue and load shedding"
+  ],
+  "common_mistakes": [
+   "Scaling on CPU for an accelerator-bound or I/O-bound service, so the metric never moves",
+   "Ignoring startup time: reactive scaling cannot help during the 90 s plus metric and decision delay",
+   "Leaving the request queue unbounded, which turns overload into timeouts for everyone"
+  ],
+  "interview_style_note": "Uses concurrency arithmetic to size capacity, chooses a saturation signal, and combines headroom, pre-scaling and load shedding because scale-out is slow.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Monitoring Distributed Systems (Google SRE Book)",
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "supports": "Four golden signals (latency, traffic, errors, saturation); distinguish latency of successful and failed requests; measure distributions/percentiles rather than only averages."
+   }
+  ],
+  "tags": [
+   "autoscaling",
+   "little's-law",
+   "saturation",
+   "cold-start",
+   "capacity-planning"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Capacity/autoscaling scenario with arithmetic; no existing item covers autoscaling signals (the smi-k003x items are LLM memory/throughput).",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-04-5",
+  "cell_id": "MLO-04",
+  "topic": "Serving patterns (batch, online, streaming, REST/gRPC, autoscaling, batching) - includes monitoring fundamentals for serving",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "debugging",
+  "difficulty": "Medium",
+  "question": "During a deploy, a prediction service's p99 rises from 200 ms to 1.5 s. Its callers use a 1 s timeout and retry up to 3 times immediately. Within minutes the service, which normally runs at about 80% of capacity, is completely down. Explain the mechanism and describe the client and server changes (timeouts, retries, idempotency, fallbacks) that would have contained it.",
+  "answer_set": "single",
+  "answer": "Mechanism. The slow deploy pushes some requests past the 1 s client timeout. Each timeout triggers an immediate retry, so offered load grows. If a fraction f of attempts fail, a client with up to 3 retries sends about 1 + f + f^2 + f^3 attempts per original request; at f = 0.5 that is 1.875x. A service at 80% of capacity has only 25% headroom, so 1.875x load takes it to about 150% of capacity, which makes more requests time out, which raises f: positive feedback. A second effect makes it worse: when a client times out, the server often keeps processing the abandoned request, so capacity is spent on answers nobody is waiting for.\n\nClient changes.\n- Set explicit deadlines, derived from the end-to-end budget, and pass the remaining deadline downstream (gRPC documents propagating deadlines, and notes it sets none by default).\n- Retry only on retryable errors, with a retry budget (for example retries limited to about 10% of recent request volume), exponential backoff with jitter, and a low attempt cap.\n- Add a circuit breaker so a failing dependency is skipped for a short period.\n- Define a fallback: a cached score, a simpler model or rule, or a safe default, marked as fallback in the response.\n\nServer changes.\n- Reject or skip work whose deadline has already passed; cancel in-flight inference when the client disconnects where the stack allows.\n- Bound queues and shed load quickly (fast 503/429) instead of queueing past the point where answers are useful.\n- Make deploys gradual with readiness gates so a slow version never takes full traffic.\n\nIdempotency. Pure scoring is safe to retry, but if the endpoint also writes a decision, charges, or sends a notification, a retry can repeat the side effect. Use a client-generated request id as an idempotency key so repeats return the stored result. Monitor retry rate, fallback rate and the latency of failed requests separately from successful ones, as the SRE book recommends.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "retry storm",
+   "timeouts and deadlines",
+   "retry budget",
+   "exponential backoff with jitter",
+   "idempotency",
+   "load shedding",
+   "fallback prediction",
+   "circuit breaker"
+  ],
+  "common_mistakes": [
+   "Believing retries are always safe for prediction endpoints; the call may have side effects such as logging a decision or triggering an action",
+   "Raising the timeout instead of limiting retries, which keeps more work in flight",
+   "Retrying immediately without backoff or jitter, synchronising clients"
+  ],
+  "interview_style_note": "Quantifies retry amplification and proposes layered protection: deadlines, retry budgets, backoff with jitter, shedding and a defined fallback.",
+  "code": null,
+  "sources": [
+   {
+    "title": "gRPC Deadlines",
+    "url": "https://grpc.io/docs/guides/deadlines/",
+    "supports": "A deadline is a point in time past which a client is unwilling to wait; gRPC sets no deadline by default and the docs advise always setting a realistic one; deadlines can be propagated to downstream calls."
+   },
+   {
+    "title": "Monitoring Distributed Systems (Google SRE Book)",
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "supports": "Four golden signals (latency, traffic, errors, saturation); distinguish latency of successful and failed requests; measure distributions/percentiles rather than only averages."
+   }
+  ],
+  "tags": [
+   "retries",
+   "timeouts",
+   "idempotency",
+   "load-shedding",
+   "resilience",
+   "fallback"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Failure-mode scenario around client/server timeout behaviour; distinct from MLO-04-4 (autoscaling); no existing item covers timeouts, retries or idempotency.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-04-6",
+  "cell_id": "MLO-04",
+  "topic": "Serving patterns (batch, online, streaming, REST/gRPC, autoscaling, batching) - includes monitoring fundamentals for serving",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Medium",
+  "question": "You are about to put a recommendation-scoring endpoint (about 500 requests/s) into production. Define what you log for every prediction, which dashboard panels and alerts you build from the four golden signals (and which latency statistic you alert on), and what you deliberately do not page on. Mention the cost and privacy side of logging at this volume.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Log per prediction (structured, one record per request): request id or trace id; timestamp; model version and the version of preprocessing/feature definitions; a pseudonymised entity id; the model's output (score, chosen items) and any threshold applied; fallback flag and reason; status code; latency broken into queue wait, preprocessing and inference; and either a hash of the input features or, for a small sample, the features themselves. Request id plus model version lets you join later outcomes (clicks, labels) back to the exact prediction.\n\nGolden signals (Google SRE book): latency, traffic, errors, saturation.\n- Latency: p50, p95 and p99 per model version, not the mean (averages hide the tail), and track failed requests separately from successful ones, since fast failures can make averages look good.\n- Traffic: requests per second, split by route, client and model version.\n- Errors: explicit (5xx, timeouts) and implicit ones such as malformed outputs, NaN scores, or responses served by the fallback.\n- Saturation: concurrency or queue depth against the measured limit, accelerator and memory utilisation.\n\nAlert on symptoms users feel: error ratio and latency SLO burn (for example, page when the share of requests slower than the latency objective burns the budget quickly). Do not page on drift statistics, offline accuracy, or a single noisy metric; send them to dashboards and tickets because they need labels, windows or judgment.\n\nVolume: 500 requests/s is 43.2 million requests a day; at about 1 KB per record that is roughly 43 GB/day. Keep a compact record for every request and the full feature payload for a sample (say 1%), set retention periods, restrict access, and avoid raw identifiers or free text where a hash is enough.",
+  "practical_answer": "Example record (illustrative values):\n\n{ \"request_id\": \"9f2c-...\", \"ts\": \"2026-03-04T09:12:44.381Z\", \"route\": \"/score\", \"model_version\": 41, \"feature_set_version\": 7, \"entity\": \"u_8a1f (hashed)\", \"features_hash\": \"b7e1...\", \"score\": 0.731, \"threshold\": 0.6, \"decision\": \"show\", \"fallback\": false, \"status\": 200, \"latency_ms\": {\"queue\": 4, \"preprocess\": 6, \"inference\": 31, \"total\": 43} }\n\nStarter alert set:\n- Page: bad-request ratio (5xx, timeouts, or slower than 300 ms) above an SLO burn threshold over a long and a short window (see MLO-04-7).\n- Page: saturation signal (queue depth) above its limit for 5 minutes while traffic is below the tested maximum.\n- Ticket: fallback rate above 2% for 30 minutes; share of NaN or out-of-range scores above 0 in any hour; traffic for one model version drops to zero unexpectedly.\n- Dashboard only: score distribution per version, feature null rates, outcomes joined by request id when labels arrive.",
+  "key_concepts": [
+   "per-prediction log record",
+   "model version tag",
+   "four golden signals",
+   "percentile latency",
+   "symptom-based alerting",
+   "fallback rate",
+   "log sampling and privacy"
+  ],
+  "common_mistakes": [
+   "Alerting on average latency, which hides tail problems",
+   "Paging on data drift or on accuracy, which need labels or statistical windows and belong in dashboards and tickets",
+   "Logging raw personal data for every request without sampling, retention or access limits"
+  ],
+  "interview_style_note": "Chooses a minimal but sufficient log schema, maps it to golden signals with percentiles, and separates paging alerts from slower model-quality monitoring.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Monitoring Distributed Systems (Google SRE Book)",
+    "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+    "supports": "Four golden signals (latency, traffic, errors, saturation); distinguish latency of successful and failed requests; measure distributions/percentiles rather than only averages."
+   }
+  ],
+  "tags": [
+   "monitoring",
+   "golden-signals",
+   "logging",
+   "slo",
+   "observability"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Serving-layer monitoring design; drift monitoring is deliberately excluded here (later batch) and no existing question covers the logging schema or golden signals.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-04-7",
+  "cell_id": "MLO-04",
+  "topic": "Serving patterns (batch, online, streaming, REST/gRPC, autoscaling, batching) - includes monitoring fundamentals for serving",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "evaluation",
+  "difficulty": "Medium",
+  "question": "Your scoring API has a 99.9% SLO over 30 days, where a request is 'good' only if it returns a valid score within 300 ms. In the last hour 1.5% of requests were bad; in the last 5 minutes 0.4% were bad. How fast is the error budget burning, how much of the monthly budget did that hour use (assume uniform traffic), would a multiwindow policy that pages at a 14.4x burn rate over 1 hour and 5 minutes fire, and how should responses served by a fallback model be counted?",
+  "answer_set": "single",
+  "answer": "The error budget is the allowed bad fraction: 100% - 99.9% = 0.1%. Burn rate is observed bad ratio divided by that: over the last hour 1.5% / 0.1% = 15x; over the last 5 minutes 0.4% / 0.1% = 4x. Google's SRE workbook defines burn rate as how fast the service consumes error budget relative to the SLO.\n\nBudget used by the hour: the hour is 1/720 of a 30-day window (720 hours), so at 15x it consumed 15 / 720 = 2.08% of the monthly budget (assuming uniform traffic). At a sustained 15x the whole budget would be gone in 30 / 15 = 2 days. As a sanity check, the monthly budget corresponds to 0.1% of 43,200 minutes = 43.2 minutes of total outage, and a 15x burn for an hour spends 15 x 60 x 0.001 = 0.9 minutes' worth of that.\n\nWould it page? The rule needs both windows above 14.4x. The 1-hour window is at 15x (above), the 5-minute window is at 4x (below), so it would not fire. That is the point of the short window: the long window alone would keep alerting for up to an hour after a problem ended, while the short window shows the problem is already receding. The SRE workbook's suggested starting parameters for a 99.9% SLO page at 14.4x over 1 hour with a 5-minute short window, corresponding to 2% of the budget. You would still want a lower-severity alert such as a 6x burn over 6 hours, and a ticket-level alert for slow burns.\n\nFallbacks. Define 'good' by what the user receives. A valid, in-time response from the fallback is good for the availability SLO, but a fallback model is usually lower quality, so track the fallback rate as its own SLI with its own objective (and alert), otherwise a long fallback period looks perfectly healthy.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "error budget",
+   "burn rate",
+   "multiwindow alert",
+   "SLI definition (valid and within 300 ms)",
+   "fallback accounting",
+   "long and short window"
+  ],
+  "common_mistakes": [
+   "Computing burn rate against the 99.9% target instead of the 0.1% allowed error ratio",
+   "Paging on a long window alone, which keeps firing after the incident has already recovered",
+   "Counting fallback responses as plain successes and hiding quality degradation"
+  ],
+  "interview_style_note": "Computes burn rate and budget consumption correctly, reads a multiwindow rule, and handles the ML-specific question of fallback accounting.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Alerting on SLOs (Google SRE Workbook)",
+    "url": "https://sre.google/workbook/alerting-on-slos/",
+    "supports": "Burn rate is how fast the service consumes the error budget relative to the SLO; recommended multiwindow multi-burn-rate starting parameters (e.g. 14.4x burn over 1 hour and 5 minutes, 2% of budget consumed, for a 99.9% SLO)."
+   }
+  ],
+  "tags": [
+   "slo",
+   "burn-rate",
+   "alerting",
+   "error-budget"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Numeric SLO-alerting evaluation; no existing item covers SLOs or burn rates.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-05-1",
+  "cell_id": "MLO-05",
+  "topic": "Deployment strategies (shadow, canary, A/B, blue-green, rollback)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "concept",
+  "difficulty": "Easy",
+  "question": "How does a canary release of a new model differ from a blue-green deployment, and what does each one cost you?",
+  "answer_set": "concise+detailed",
+  "answer": null,
+  "concise_answer": "A canary sends a small share of live traffic to the new model while the old one keeps serving the rest as a control, then widens exposure if metrics hold; it limits the blast radius but needs traffic splitting and metric comparison. Blue-green runs two full environments and flips all traffic at once, keeping the old one idle for instant rollback; it needs duplicate capacity and exposes everyone at the flip.",
+  "detailed_answer": "Canary. Google's SRE workbook defines canarying as a partial, time-limited deployment of a change and its evaluation, with the rest of the service acting as control. For a model: route, say, 5% of requests to the new version, compare error rate, latency and behavioural metrics against the concurrent baseline, and increase the share in stages. Benefits: small blast radius, real-traffic evidence, gradual capacity growth. Costs: you need weighted routing and a way to compare the two groups; the canary must be large and long enough to be representative (the workbook says so), and a small slice can be too small to detect rare or slow-to-appear problems.\n\nBlue-green. You keep the current ('blue') environment and bring up the new model fully in a separate ('green') one, warm it up and test it, then switch the router. Benefits: the cutover is a single routing change, and if something is wrong, switching back is just as fast because blue is still running. Costs: duplicate capacity for the overlap (significant for GPU-backed services), and everyone is exposed at the moment of the flip, so a defect that only appears under real traffic hits 100% of users until you notice.\n\nThey combine well: build green as a separate environment, shift traffic to it in canary steps, and keep blue until the new model has proven itself. Neither helps if both versions share state that has changed incompatibly, such as a feature table or schema; that needs compatible, staged data changes.",
+  "practical_answer": null,
+  "key_concepts": [
+   "canary release",
+   "blue-green deployment",
+   "traffic shifting",
+   "control group",
+   "instant rollback",
+   "duplicate capacity",
+   "blast radius"
+  ],
+  "common_mistakes": [
+   "Treating the two as synonyms: blue-green switches all traffic at once, a canary exposes a small slice first",
+   "Forgetting that blue-green needs a full second environment (expensive for accelerator-backed models)",
+   "Assuming either strategy protects you from changes in shared state such as a feature store or database"
+  ],
+  "interview_style_note": "Gives the core contrast (gradual exposure with a control vs full switch with instant fallback), costs of each, and notes they combine.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Canarying Releases (Google SRE Workbook)",
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "supports": "Canarying is a partial, time-limited deployment of a change with evaluation, the rest of the service acting as control; canary should be large and long enough to be representative; a handful of queries gives no useful signal; response to a bad canary is to pause/roll back; keep the set of canary metrics small."
+   }
+  ],
+  "tags": [
+   "canary",
+   "blue-green",
+   "deployment-strategies",
+   "rollback"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Introductory contrast question; smi-i0030/smi-h0025 are unrelated and no existing item covers deployment strategies.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-05-2",
+  "cell_id": "MLO-05",
+  "topic": "Deployment strategies (shadow, canary, A/B, blue-green, rollback)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "A team replacing a ranking model proposes: 'We will shadow the new model for two weeks. If its offline metrics on the logged shadow outputs and its latency look good, we go straight to 100%.' What can shadow deployment tell you, what can it not, and how would you sequence shadow, canary and A/B testing instead?",
+  "answer_set": "single",
+  "answer": "Shadow deployment sends copies of live requests to the new model while only the old model's output is used. What it can tell you: whether the new model runs reliably on real inputs (errors, malformed outputs), how latency and resource use behave under real traffic, how its output distribution compares with the old model's, and how often the two agree. If you log the shadow outputs you can also compute offline metrics once outcomes arrive, with care.\n\nWhat it cannot tell you:\n1. User response. Shadow outputs are never shown, so clicks, purchases or complaints about them never happen. Anything that depends on how users react to the new ranking is invisible.\n2. Feedback effects. A different ranking changes what users see, which changes what data you collect and how the system evolves. Shadow runs in a world still shaped by the old model.\n3. Unbiased labels. In ranking, outcomes usually exist only for items the old model displayed. Scoring the shadow model on those is biased toward the old model's choices, and it cannot reward items the old model never showed.\n4. Side-effect paths. If the model call has side effects (writes, cache fills), shadowing must be isolated; also shadow adds compute cost and may perturb latency if it shares resources.\n\nSo 'looks good in shadow, go to 100%' is unsafe. A sound sequence is: shadow for crash, latency and distribution sanity; a small canary (a few percent) with guardrail metrics and automatic rollback to prove safety on real user-facing traffic; then a properly sized randomized A/B test on the business metric to measure impact, including feedback effects; then a staged ramp. The canary is usually too small and short to estimate business impact, and the A/B test is the step that does.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "shadow deployment",
+   "canary release",
+   "A/B test",
+   "feedback effects",
+   "selection bias in logged data",
+   "guardrail metrics",
+   "staged rollout"
+  ],
+  "common_mistakes": [
+   "Believing shadow results predict the business effect; users never see the shadow outputs, so their reactions cannot be observed",
+   "Evaluating shadow outputs against labels that exist only for items the old model chose to show",
+   "Using the canary for impact estimation instead of safety, when it is usually too small to measure business metrics"
+  ],
+  "interview_style_note": "Matches each strategy to the question it can answer (safety, behaviour, causal impact) and sequences them.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Canarying Releases (Google SRE Workbook)",
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "supports": "Canarying is a partial, time-limited deployment of a change with evaluation, the rest of the service acting as control; canary should be large and long enough to be representative; a handful of queries gives no useful signal; response to a bad canary is to pause/roll back; keep the set of canary metrics small."
+   }
+  ],
+  "tags": [
+   "shadow-deployment",
+   "canary",
+   "ab-testing",
+   "ranking",
+   "deployment-strategies"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Strategy-selection question on what each method can reveal; smi-0172 only defines A/B testing and smi-i0009 is about training-serving skew, not rollout design.",
+  "confidence": "high"
+ },
+ {
+  "plan_id": "B3-MLO-05-3",
+  "cell_id": "MLO-05",
+  "topic": "Deployment strategies (shadow, canary, A/B, blue-green, rollback)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "evaluation",
+  "difficulty": "Medium",
+  "question": "Your service handles 2 million requests per day. A new model is canaried at 1% of traffic for one day. The guardrail is the complaint rate, baseline 0.20%, and you do not want it to rise by more than 30% relative (to 0.26%). At the end of the day the canary shows 50 complaints in 20,000 requests (0.25%). One colleague says 'not statistically significant, so it is safe'; another says 'close enough to the limit, ship'. Evaluate both, and say how you would design the check. Complaints are only reliably known after a week.",
+  "answer_set": "single",
+  "answer": "Neither colleague is right. Expected complaints at baseline in 20,000 requests are 0.20% x 20,000 = 40, so 50 observed is within ordinary noise of 40 (Poisson standard deviation about 6.3). The canary rate is 0.25% against a control of about 0.20%; with the large control group, the standard error of the difference is about 0.035 percentage points. The difference of 0.05 points gives z of about 1.4 (two-sided p about 0.16), so it is not significant. That is not evidence of safety: a one-sided 95% upper bound on the canary rate is roughly 0.31%, about 54% above baseline, well past the 30% margin. The data are consistent with both 'no change' and 'unacceptable'.\n\nPower. Using a normal approximation for two proportions with a large control, detecting a rise from 0.20% to 0.26% with 80% power needs about 58,000 canary requests. One day at 1% (20,000) gives only about 38% power; it takes about 3 days at 1%, or under a day at 5% (100,000 requests/day). So size the canary by required events (here, about 116 complaints expected at baseline across 58,000 requests), not by a fixed share or day count. The guardrail should be framed as non-inferiority: promote only if the upper confidence bound of the increase stays under the 30% margin.\n\nPractical design. (1) Use fast, high-volume metrics for the automatic gate: errors, timeouts, latency percentiles, fallback rate, score distribution, decision or flag rate, support-contact rate. They are well powered even at 1% because they are common. (2) Treat the week-delayed complaint rate as a delayed guardrail: hold at a modest share long enough to accumulate the needed events, then ramp only once enough matured outcomes are in. (3) Outcomes cluster by user, so effective sample size is smaller than the request count; assign by user. Also, one day can miss weekly seasonality, so the canary window should span a representative period.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "canary statistical power",
+   "non-inferiority margin",
+   "confidence bound",
+   "event counts",
+   "delayed labels",
+   "proxy metrics",
+   "traffic share vs duration"
+  ],
+  "common_mistakes": [
+   "Reading 'not significant' as 'no harm'; with few events the confidence interval is wide and includes harmful values",
+   "Sizing the canary by traffic share or days instead of the number of events needed for the margin",
+   "Waiting for delayed outcomes before any decision instead of gating on faster proxy metrics"
+  ],
+  "interview_style_note": "Reasons from event counts and interval width, links power to share and duration, and proposes proxies for delayed outcomes.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Canarying Releases (Google SRE Workbook)",
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "supports": "Canarying is a partial, time-limited deployment of a change with evaluation, the rest of the service acting as control; canary should be large and long enough to be representative; a handful of queries gives no useful signal; response to a bad canary is to pause/roll back; keep the set of canary metrics small."
+   }
+  ],
+  "tags": [
+   "canary",
+   "power",
+   "guardrail",
+   "delayed-labels",
+   "proxy-metrics"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Quantitative canary-power question with delayed outcomes; nearest are smi-h0035 (sample size for a conversion A/B test) and smi-i0036 (reading a CI), but this is about guardrail non-inferiority on a small deployment slice.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B3-MLO-05-4",
+  "cell_id": "MLO-05",
+  "topic": "Deployment strategies (shadow, canary, A/B, blue-green, rollback)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "design",
+  "difficulty": "Hard",
+  "question": "Design the automatic promote/rollback policy for a canary that ramps a new fraud-scoring model through 5%, 25% and 100% of traffic (150 requests/s overall). Chargeback labels arrive up to 45 days late. Specify the comparison baseline, the guardrail metrics, minimum samples before each decision, example thresholds, and what stays manual. Explain why 'roll back if the canary's error rate is ever higher than control's' is a poor rule.",
+  "answer_set": "detailed+practical",
+  "answer": null,
+  "concise_answer": null,
+  "detailed_answer": "Baseline. Compare the canary with a concurrent control receiving the old model, as Google's SRE workbook frames canarying (the rest of the service is the control). This removes time-of-day and traffic-mix effects that a comparison with yesterday would mix in. Keep assignment sticky by user or account so the two groups are comparable and customers do not flip between models.\n\nTiered metrics.\n1. Operational guardrails (auto-rollback): 5xx and timeout rate, p99 latency, saturation, fallback rate, invalid or NaN scores. These are frequent, so a few thousand requests give a usable signal.\n2. Behavioural proxies (banded checks): approval/decline/flag rate, manual-review queue rate, score quantiles versus control. A shift beyond a band blocks promotion and goes to a human, because it may be an intended change in strictness or a defect.\n3. Outcomes (chargebacks, 45-day delay): cannot gate a stage lasting hours. Limit exposure while they mature, and verify later with a matured-label comparison or an A/B analysis.\n\nMinimum samples. At 150 requests/s, a 5% canary sees 7.5 requests/s, so 27,000 per hour and 4,500 per 10 minutes. With a 0.5% baseline error rate, the standard error of an observed 4,500-request rate is about 0.1 percentage points (sqrt(0.005 x 0.995 / 4500)), so thresholds must sit well outside that noise.\n\nWhy the naive rule fails. With small samples the canary's rate will exceed control's by chance about half the time, causing spurious rollbacks; it ignores effect size; and checking repeatedly multiplies false alarms. The SRE workbook warns that a handful of queries gives no useful signal. Require a minimum count, a margin, and persistence (consecutive windows).",
+  "practical_answer": "Hypothetical policy table (tune with load tests):\n\nStage 1: 5% for at least 60 minutes AND at least 20,000 canary requests.\n- Auto-rollback if, in two consecutive 10-minute windows (4,500 requests each): error+timeout rate exceeds control by more than 0.5 percentage points (about 5 standard errors at a 0.5% baseline), OR p99 latency exceeds 1.5x control p99, OR fallback rate exceeds 2%, OR any NaN score appears.\n- Promotion held for human review if decline rate differs from control by more than 10% relative or review-queue rate by more than 15% relative over the stage.\n\nStage 2: 25% for at least 4 hours (22,500 requests per 10-minute window): same rules with tighter margins (0.3 points, since SE shrinks to about 0.05 points).\n\nStage 3: 100%, with the previous model kept deployed and warm for 7 days; the rollback is a traffic switch.\n\nOutcome check: 14 days after Stage 3 starts, compare matured chargeback and false-positive rates for the cohorts scored by old and new models, using the sticky assignment log. Any breach triggers a review and, if needed, rollback.\n\nAutomation boundary: rollbacks are automatic; promotions to the next stage are automatic only when all gates pass; any behavioural-band breach pages a human.",
+  "key_concepts": [
+   "concurrent control comparison",
+   "guardrail metrics",
+   "minimum sample size",
+   "rollback threshold",
+   "consecutive-window rule",
+   "delayed labels",
+   "proxy metrics",
+   "human sign-off"
+  ],
+  "common_mistakes": [
+   "Comparing the canary with yesterday's numbers instead of a concurrent control, mixing in time-of-day and traffic-mix effects",
+   "Deciding after a handful of requests, or rolling back on a single noisy window",
+   "Making delayed chargebacks a gating metric for a short canary stage instead of using proxies and verifying outcomes later"
+  ],
+  "interview_style_note": "Builds a tiered policy: fast auto-rollback on operational metrics, banded checks on behavioural proxies, and slow outcome verification, with sample sizes derived from traffic.",
+  "code": null,
+  "sources": [
+   {
+    "title": "Canarying Releases (Google SRE Workbook)",
+    "url": "https://sre.google/workbook/canarying-releases/",
+    "supports": "Canarying is a partial, time-limited deployment of a change with evaluation, the rest of the service acting as control; canary should be large and long enough to be representative; a handful of queries gives no useful signal; response to a bad canary is to pause/roll back; keep the set of canary metrics small."
+   }
+  ],
+  "tags": [
+   "canary",
+   "rollback",
+   "guardrails",
+   "fraud",
+   "delayed-labels",
+   "deployment-strategies"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Policy-design question with traffic arithmetic; related to MLO-05-3 (power of a small canary) but this asks for an operational decision policy with thresholds and tiers.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B3-MLO-05-5",
+  "cell_id": "MLO-05",
+  "topic": "Deployment strategies (shadow, canary, A/B, blue-green, rollback)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "debugging",
+  "difficulty": "Hard",
+  "question": "Model v7 was released together with a feature pipeline change: the feature merchant_category moved from 12 integer codes to 40 string categories and the old column was dropped from the online store. Two hours in, v7 regresses, so you roll back to v6, and v6's predictions collapse to near the default value. Explain why rollback failed, and how to structure the release so that rolling back a model is safe even when its inputs change.",
+  "answer_set": "concise+detailed+practical",
+  "answer": null,
+  "concise_answer": "Rollback reverted the model but not the data contract. v6 expects the 12 integer codes, which are no longer served, so its input is missing or unseen and it falls back to default handling. Use expand-contract: add the new versioned feature alongside the old one, run both while either model may be live, release the model, and remove the old column only after v6 is retired and the rollback window has passed.",
+  "detailed_answer": "Why it failed. A model is deployed together with the feature definitions it was trained on: a model plus a schema and encoding contract. Rolling back v7 to v6 restores the model weights, but the feature pipeline kept running the new definition, and the old column is gone. v6 now receives missing or unrecognised values for merchant_category and falls into its default branch (null handling, unseen-category handling). The predictions look 'valid' to the endpoint, so nothing errors, but quality collapses. The release combined two changes that were not independently reversible.\n\nExpand-contract (parallel change). Make the data change in backward-compatible steps:\n1. Expand: add merchant_category_v2 (the new 40-string encoding) next to the old column and keep populating both, online and offline, including a backfill for training history. Existing models are unaffected.\n2. Migrate: train and release v7 reading only the new feature. v6 still reads the old one, so both models run correctly against the live data.\n3. Observe: canary v7; rolling back is just switching the model.\n4. Contract: only after v7 is stable, v6 is retired and the rollback window (for example, a few weeks of retained v6 artifacts) has passed, stop writing and then delete the old column.\n\nSupporting controls. Version feature definitions rather than editing them in place and record the feature-set version in the model's registry entry. Add a pre-deploy compatibility check: every feature that a model version declares (name, type, version) must exist in the serving store; run it both on release and on rollback. Package fitted encoders with the model. Replay logged requests from before the change through the older model against the new pipeline in CI. Cost: dual-write storage and compute for the window, which is the price of a safe rollback.",
+  "practical_answer": "Release timeline (hypothetical), with the rollback state at each step.\n\nDay 0: Deploy pipeline change that writes merchant_category_v2 as well as merchant_category; backfill v2 for the last 180 days. Rollback of the pipeline: safe, old column untouched. Models: v6 only.\nDay 2: Compatibility check passes for v6 (needs old column: present). Train v7 on v2. Registry entry for v7 declares feature_set merchant_category_v2.\nDay 3: Canary v7 at 5%. Rollback to v6: safe, since the old column is still written.\nDay 5: v7 at 100%, v6 retained and warm. Rollback to v6: safe.\nDay 26: v6 retired (21 days with no rollback). Stop writing the old column.\nDay 33: Delete the old column and its backfill after a final check that no registered model version declares it.\n\nPre-deploy gate (runs at every deploy and every rollback): for model version M, assert declared features and types are a subset of the features currently served; if not, block the deploy and print the missing features. Had this existed, the original rollback attempt would have been blocked with a clear message instead of silently degrading.",
+  "key_concepts": [
+   "expand-contract (parallel change)",
+   "rollback compatibility",
+   "feature versioning",
+   "feature store / schema coupling",
+   "backward-compatible schema change",
+   "deployment contract test",
+   "retention window before removal"
+  ],
+  "common_mistakes": [
+   "Assuming rolling back the model rolls back the data pipeline; data already written and removed columns stay changed",
+   "Redefining a feature in place under the same name instead of adding a new versioned feature",
+   "Dropping the old column in the same release, leaving no compatibility window"
+  ],
+  "interview_style_note": "Recognises model and data contract as coupled deployments and applies expand-contract so every released model can still run against the live feature data.",
+  "code": null,
+  "sources": [],
+  "tags": [
+   "rollback",
+   "expand-contract",
+   "feature-store",
+   "schema-evolution",
+   "deployment-strategies"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Rollback with changed inputs; smi-i0009 lists skew causes but not release sequencing, and MLO-07 will cover feature stores themselves.",
+  "confidence": "medium"
+ },
+ {
+  "plan_id": "B3-MLO-05-6",
+  "cell_id": "MLO-05",
+  "topic": "Deployment strategies (shadow, canary, A/B, blue-green, rollback)",
+  "domain": "MLOps & Model Deployment",
+  "status": "ok",
+  "question_type": "scenario",
+  "difficulty": "Medium",
+  "question": "A marketplace tests a new ranking model with a 50/50 split. One engineer wants to randomise each request; another wants to hash the user ID. The 'recommended for you' carousel shows a +6% click lift in week 1 that decays to +1.5% by week 3. Compare the two ways of splitting traffic for consistency and interference, explain the decay, and say what you would put in place.",
+  "answer_set": "single",
+  "answer": "Per-request randomisation gives many independent assignments and the highest statistical power for request-level outcomes (for example, 'was this impression clicked'), but each user sees both models. The experience is inconsistent, and outcomes that accumulate over a user (retention, repeat purchase, trust) are blended across arms, so they cannot be attributed to either model. It suits stateless, memoryless situations such as a latency or error comparison.\n\nHashing the user ID (with an experiment-specific salt, so assignments are not correlated with other concurrent tests) gives sticky assignment: a user always sees the same model, user-level metrics are interpretable, and the same user cannot learn from one arm and act in the other. Cost: fewer independent units, and analysis must treat users, not requests, as the unit. Verify the split is balanced with a sample-ratio check; a deviation from 50/50 beyond chance indicates an assignment or logging bug.\n\nNeither method fixes interference. In a marketplace, arms compete for shared inventory, shared caches or a model that retrains on logged feedback from both arms, so one arm's gains can come at the other's expense and the measured difference is not what a full rollout would give. Where interference is likely, consider randomising by cluster (market, region, seller group) or alternating whole-system time blocks (switchback), and watch for effects on shared resources.\n\nThe decay from +6% to +1.5% is consistent with a novelty effect: users click on something that looks different, then adapt. Other explanations exist (a differing mix of new and returning users, seasonality, or a feedback loop), so I would: run long enough for the effect to stabilise; report the metric by week and by new versus returning users; use holdout users who keep the old model for the longer term; decide on the stabilised effect; and avoid shipping on early lift.",
+  "concise_answer": null,
+  "detailed_answer": null,
+  "practical_answer": null,
+  "key_concepts": [
+   "split unit (request vs user)",
+   "sticky assignment by hashing",
+   "experiment-specific salt",
+   "interference between arms",
+   "novelty effect",
+   "switchback test",
+   "sample ratio check"
+  ],
+  "common_mistakes": [
+   "Randomising per request even though outcomes accumulate per user, so each user mixes both models and user-level metrics are muddied",
+   "Reusing the same hash for all experiments so assignments are correlated across tests",
+   "Declaring victory from week-1 lift without checking whether it decays or differs between new and returning users"
+  ],
+  "interview_style_note": "Chooses the randomisation unit to match the outcome's unit and the interference structure, and treats novelty decay as a design issue, not a surprise.",
+  "code": null,
+  "sources": [],
+  "tags": [
+   "traffic-splitting",
+   "experimentation",
+   "interference",
+   "novelty-effect",
+   "deployment-strategies"
+  ],
+  "time_sensitive": false,
+  "change_notes": "Traffic-splitting design question; statistical analysis of A/B results stays in Data Analysis, and smi-0172 only defines A/B testing.",
+  "confidence": "medium"
+ }
+]

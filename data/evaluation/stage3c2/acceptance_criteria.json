@@ -1,0 +1,35 @@
+{
+  "version": "3c2.criteria.1",
+  "frozen_before_any_real_model_run": true,
+  "note": "Thresholds are set BEFORE any real-model result exists and must not be changed afterwards. n is small (20 answers, 8 questions): results are exploratory, never general grading accuracy.",
+  "mechanical": {
+    "_scope": "computable without human labels; evaluated by audit/evaluation/stage3c2_analyze.py",
+    "valid_output_rate_min": 0.90,
+    "provider_errors_max": 0,
+    "gate_downgrade_rate_max": 0.25,
+    "unsupported_completeness_penalties_max": 0,
+    "scored_results_without_derivation_max": 0,
+    "evidence_claim_ids_not_in_answer_max": 0,
+    "injection_flagged_claims_used_as_evidence_max": 0,
+    "abstentions_without_recorded_reason_max": 0,
+    "abstain_rate_max": 0.40,
+    "median_answer_latency_s_max": 60,
+    "max_answer_latency_s_max": 180,
+    "repeat_member_state_agreement_min": 0.85,
+    "repeat_score_delta_max_points": 10
+  },
+  "needs_human_labels": {
+    "_scope": "cannot be evaluated until a person has completed the blind review sheet; until then these are reported as PENDING_HUMAN and no accuracy is claimed",
+    "false_credit_rate_max": 0.10,
+    "false_error_rate_max": 0.05,
+    "credit_rate_on_human_correct_concise_or_alternative_answers_min": 0.70,
+    "essential_missing_penalties_contradicted_by_human_max": 0,
+    "modular_unsupported_penalties_not_more_than_legacy": true
+  },
+  "decision_rule": {
+    "all_mechanical_pass_and_human_labels_available_and_pass": "ADVANCE: a larger human-labelled study of the modular verifier on the 16 eligible questions may be planned. Still no shadow mode or live scoring without a further explicit approval.",
+    "all_mechanical_pass_but_no_human_labels": "EXPLORATORY ONLY: behavioural readiness can be reported; quality readiness cannot. Obtain human labels before any further step.",
+    "any_mechanical_fail": "DO NOT ADVANCE: report which criterion failed and why. Do not tune the prompt, gate or rubric on these 20 answers and re-score them; any change requires a new sample.",
+    "any_human_criterion_fail": "DO NOT ADVANCE: investigate failures; same no-retuning rule."
+  }
+}

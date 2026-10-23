@@ -1,0 +1,608 @@
+{
+ "design_checks": {
+  "n_docs_per_mode": {
+   "q": 666,
+   "qk": 666,
+   "qka": 666
+  },
+  "unique_doc_ids_per_mode": {
+   "q": 666,
+   "qk": 666,
+   "qka": 666
+  },
+  "doc_keys": [
+   "doc_id",
+   "metadata",
+   "text"
+  ],
+  "searchable_text_equals_search_text_fn_for_every_doc": true,
+  "doc_ids_equal_corpus_ids_in_order": true,
+  "eval_query_text_found_verbatim_in_any_doc": 0,
+  "eval_query_ids_or_labels_in_docs": 0,
+  "records_with_non_reference_origin": [],
+  "eval_set_label_fields_in_docs": "none: documents are built from corpus records only; eval files are never read by build_documents",
+  "doc_fields_used": "topic + question (q); + key_concepts (qk); + canonical_answer (qka). alternatives, common_mistakes, tags, sources, verification are metadata only",
+  "alt_answer_text_in_qka_docs": 0,
+  "duplicate_doc_texts_qka": 0,
+  "max_jaccard_query_vs_any_stored_question": {
+   "median": 0.128,
+   "p95": 0.276,
+   "max": 0.5
+  },
+  "qka_docs_likely_truncated_at_256_wordpieces_(est)": 0.599,
+  "qka_doc_words": {
+   "median": 252.0,
+   "p90": 489
+  }
+ },
+ "answer_text_effect_rank1": {
+  "bm25": {
+   "q_ok_qka_wrong@1": {
+    "n": 8,
+    "ids": [
+     "Q035",
+     "Q058",
+     "Q061",
+     "Q096",
+     "Q098",
+     "Q107",
+     "Q123",
+     "Q125"
+    ]
+   },
+   "q_wrong_qka_ok@1": {
+    "n": 30,
+    "ids": [
+     "Q001",
+     "Q004",
+     "Q007",
+     "Q012",
+     "Q013",
+     "Q015",
+     "Q016",
+     "Q020",
+     "Q022",
+     "Q025",
+     "Q028",
+     "Q037",
+     "Q039",
+     "Q042",
+     "Q046",
+     "Q051",
+     "Q064",
+     "Q077",
+     "Q079",
+     "Q080",
+     "Q084",
+     "Q088",
+     "Q104",
+     "Q110",
+     "Q112",
+     "Q119",
+     "Q121",
+     "Q127",
+     "Q128",
+     "Q138"
+    ]
+   }
+  },
+  "minilm": {
+   "q_ok_qka_wrong@1": {
+    "n": 11,
+    "ids": [
+     "Q014",
+     "Q034",
+     "Q053",
+     "Q058",
+     "Q065",
+     "Q069",
+     "Q075",
+     "Q103",
+     "Q105",
+     "Q134",
+     "Q138"
+    ]
+   },
+   "q_wrong_qka_ok@1": {
+    "n": 17,
+    "ids": [
+     "Q002",
+     "Q006",
+     "Q010",
+     "Q019",
+     "Q021",
+     "Q042",
+     "Q046",
+     "Q051",
+     "Q056",
+     "Q076",
+     "Q079",
+     "Q088",
+     "Q089",
+     "Q118",
+     "Q119",
+     "Q130",
+     "Q143"
+    ]
+   }
+  },
+  "hybrid_minilm": {
+   "q_ok_qka_wrong@1": {
+    "n": 6,
+    "ids": [
+     "Q014",
+     "Q058",
+     "Q065",
+     "Q105",
+     "Q123",
+     "Q134"
+    ]
+   },
+   "q_wrong_qka_ok@1": {
+    "n": 31,
+    "ids": [
+     "Q002",
+     "Q004",
+     "Q006",
+     "Q010",
+     "Q012",
+     "Q013",
+     "Q016",
+     "Q020",
+     "Q021",
+     "Q022",
+     "Q028",
+     "Q042",
+     "Q046",
+     "Q054",
+     "Q056",
+     "Q064",
+     "Q072",
+     "Q077",
+     "Q079",
+     "Q080",
+     "Q084",
+     "Q085",
+     "Q088",
+     "Q095",
+     "Q099",
+     "Q104",
+     "Q110",
+     "Q112",
+     "Q114",
+     "Q119",
+     "Q143"
+    ]
+   }
+  }
+ },
+ "no_answer_operating_points": {
+  "bm25_qka": {
+   "operating_points (illustrative; thresholds chosen on these same queries -> optimistic)": [
+    {
+     "threshold": 5,
+     "no_answer_rejected": 0.0,
+     "answerable_wrongly_rejected": 0.0
+    },
+    {
+     "threshold": 10,
+     "no_answer_rejected": 0.3,
+     "answerable_wrongly_rejected": 0.007
+    },
+    {
+     "threshold": 15,
+     "no_answer_rejected": 0.85,
+     "answerable_wrongly_rejected": 0.027
+    },
+    {
+     "threshold": 20,
+     "no_answer_rejected": 1.0,
+     "answerable_wrongly_rejected": 0.096
+    },
+    {
+     "threshold": 25,
+     "no_answer_rejected": 1.0,
+     "answerable_wrongly_rejected": 0.253
+    },
+    {
+     "threshold": 30,
+     "no_answer_rejected": 1.0,
+     "answerable_wrongly_rejected": 0.479
+    },
+    {
+     "threshold": 35,
+     "no_answer_rejected": 1.0,
+     "answerable_wrongly_rejected": 0.658
+    },
+    {
+     "threshold": 40,
+     "no_answer_rejected": 1.0,
+     "answerable_wrongly_rejected": 0.788
+    }
+   ],
+   "highest_scoring_no_answer_queries": [
+    [
+     19.201,
+     "Q149",
+     "Explain Hamiltonian Monte Carlo and the NUTS sampler"
+    ],
+    [
+     18.413,
+     "Q155",
+     "How do you evaluate an automatic speech recognition system? WER vs CER"
+    ],
+    [
+     17.396,
+     "Q164",
+     "What is quantum machine learning and could a variational quantum circuit beat a classical "
+    ],
+    [
+     14.042,
+     "Q153",
+     "How do I build an Alteryx workflow with a batch macro for iterative file processing?"
+    ],
+    [
+     13.904,
+     "Q154",
+     "How do I negotiate salary when I already have a competing offer?"
+    ]
+   ]
+  },
+  "minilm_qka": {
+   "operating_points (illustrative; thresholds chosen on these same queries -> optimistic)": [
+    {
+     "threshold": 0.3,
+     "no_answer_rejected": 0.5,
+     "answerable_wrongly_rejected": 0.0
+    },
+    {
+     "threshold": 0.35,
+     "no_answer_rejected": 0.65,
+     "answerable_wrongly_rejected": 0.021
+    },
+    {
+     "threshold": 0.4,
+     "no_answer_rejected": 0.9,
+     "answerable_wrongly_rejected": 0.027
+    },
+    {
+     "threshold": 0.45,
+     "no_answer_rejected": 1.0,
+     "answerable_wrongly_rejected": 0.096
+    },
+    {
+     "threshold": 0.5,
+     "no_answer_rejected": 1.0,
+     "answerable_wrongly_rejected": 0.205
+    },
+    {
+     "threshold": 0.55,
+     "no_answer_rejected": 1.0,
+     "answerable_wrongly_rejected": 0.404
+    },
+    {
+     "threshold": 0.6,
+     "no_answer_rejected": 1.0,
+     "answerable_wrongly_rejected": 0.596
+    },
+    {
+     "threshold": 0.65,
+     "no_answer_rejected": 1.0,
+     "answerable_wrongly_rejected": 0.699
+    },
+    {
+     "threshold": 0.7,
+     "no_answer_rejected": 1.0,
+     "answerable_wrongly_rejected": 0.836
+    },
+    {
+     "threshold": 0.75,
+     "no_answer_rejected": 1.0,
+     "answerable_wrongly_rejected": 0.959
+    }
+   ],
+   "highest_scoring_no_answer_queries": [
+    [
+     0.413,
+     "Q155",
+     "How do you evaluate an automatic speech recognition system? WER vs CER"
+    ],
+    [
+     0.406,
+     "Q156",
+     "How does JVM garbage collection work? G1 vs ZGC tuning"
+    ],
+    [
+     0.397,
+     "Q164",
+     "What is quantum machine learning and could a variational quantum circuit beat a classical "
+    ],
+    [
+     0.387,
+     "Q145",
+     "3D object detection from LiDAR point clouds, how does PointNet work?"
+    ],
+    [
+     0.358,
+     "Q146",
+     "Azure Data Factory mapping data flow vs copy activity performance"
+    ]
+   ]
+  }
+ },
+ "hard_cases_top5_misses": {
+  "bm25_qka": {
+   "miss_top5": [
+    "Q047",
+    "Q053",
+    "Q060",
+    "Q083",
+    "Q098",
+    "Q118",
+    "Q120",
+    "Q123",
+    "Q139"
+   ],
+   "n": 9
+  },
+  "minilm_qka": {
+   "miss_top5": [
+    "Q003",
+    "Q040",
+    "Q043",
+    "Q097",
+    "Q098",
+    "Q110",
+    "Q131"
+   ],
+   "n": 7
+  },
+  "hybrid_minilm_qka": {
+   "miss_top5": [
+    "Q003",
+    "Q040",
+    "Q043",
+    "Q060",
+    "Q098",
+    "Q118"
+   ],
+   "n": 6
+  },
+  "missed_by_all_three": [
+   "Q098"
+  ],
+  "missed_by_hybrid_only": []
+ },
+ "hard_case_detail": [
+  {
+   "query_id": "Q003",
+   "category": "multi_concept",
+   "query": "We compute features once for both training and batch scoring via a shared store with point-in-time joins; how would I then pick the latest row per customer in SQL when timestamps tie, using ranking functions?",
+   "grade2": {
+    "smi-i0020": "user_plans(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, plan TEXT NOT NULL, updated_at TEXT) is"
+   },
+   "bm25_qka_rank_of_first_grade2": 4,
+   "bm25_qka_top1": "A three-person team has one churn model. Features come from a data warehouse, the model scores 200,0",
+   "minilm_qka_rank_of_first_grade2": null,
+   "minilm_qka_top1": "You are building training data for a churn model. Feature rows are (entity, feature_ts, value) and l",
+   "hybrid_minilm_qka_rank_of_first_grade2": 6,
+   "hybrid_minilm_qka_top1": "You are building training data for a churn model. Feature rows are (entity, feature_ts, value) and l"
+  },
+  {
+   "query_id": "Q040",
+   "category": "multi_concept",
+   "query": "Two checks before shipping: how do I stop future information sneaking into my training features, and how do I safely overwrite a saved model file so a crash never leaves it half-written?",
+   "grade2": {
+    "smi-i0023": "A service rewrites its config file with `open(path, 'w').write(json.dumps(cfg))`. After a kill -9 du"
+   },
+   "bm25_qka_rank_of_first_grade2": 3,
+   "bm25_qka_top1": "A nightly ML pipeline runs five steps as containerised jobs: extract, build_features, train, evaluat",
+   "minilm_qka_rank_of_first_grade2": null,
+   "minilm_qka_top1": "A teammate hands you a notebook that reported 0.87 F1 on the validation set and says 'just rerun it ",
+   "hybrid_minilm_qka_rank_of_first_grade2": null,
+   "hybrid_minilm_qka_top1": "Where in an ML pipeline would you put data validation, and which kinds of failures would you block t"
+  },
+  {
+   "query_id": "Q043",
+   "category": "multi_concept",
+   "query": "Our relational database is outgrowing one server and we are considering splitting rows by a key across nodes; separately, how do we keep our RAG golden test set representative as real user queries change over time?",
+   "grade2": {
+    "smi-0437": "What is sharding?"
+   },
+   "bm25_qka_rank_of_first_grade2": 3,
+   "bm25_qka_top1": "What is SQL?",
+   "minilm_qka_rank_of_first_grade2": null,
+   "minilm_qka_top1": "A marketplace tests a new ranking model with a 50/50 split. One engineer wants to randomise each req",
+   "hybrid_minilm_qka_rank_of_first_grade2": 6,
+   "hybrid_minilm_qka_top1": "After a weekend re-index in which you also switched to a newer embedding model and changed chunk siz"
+  },
+  {
+   "query_id": "Q047",
+   "category": "paraphrase",
+   "query": "Why does Naive Bayes get called naive, and how does it use Bayes' rule to classify examples?",
+   "grade2": {
+    "smi-0141": "What is Naive Bayes?"
+   },
+   "bm25_qka_rank_of_first_grade2": 8,
+   "bm25_qka_top1": "What's the difference between a generative and discriminative model?",
+   "minilm_qka_rank_of_first_grade2": 1,
+   "minilm_qka_top1": "What is Naive Bayes?",
+   "hybrid_minilm_qka_rank_of_first_grade2": 1,
+   "hybrid_minilm_qka_top1": "What is Naive Bayes?"
+  },
+  {
+   "query_id": "Q053",
+   "category": "paraphrase",
+   "query": "How do you design and sanity-check an online split test, so you don't ship something on a noisy or tiny win?",
+   "grade2": {
+    "smi-m0037": "An A/B test of a new ranking model (planned 50/50 by user hash) reports +3.1% conversion for treatme",
+    "smi-l0033": "A marketplace tests a new ranking model with a 50/50 split. One engineer wants to randomise each req",
+    "smi-i0034": "Product wants to test a redesigned checkout button on a site with about 40,000 eligible visitors per"
+   },
+   "bm25_qka_rank_of_first_grade2": null,
+   "bm25_qka_top1": "You train an image classifier on 15,000 labelled images and see three different runs. Run A: trainin",
+   "minilm_qka_rank_of_first_grade2": 2,
+   "minilm_qka_top1": "A support-ticket router (TF-IDF + logistic regression over 12 queues) scored 0.96 macro-F1 in offlin",
+   "hybrid_minilm_qka_rank_of_first_grade2": 4,
+   "hybrid_minilm_qka_top1": "A pull-request check trains a small model on a 200-row fixture and asserts validation accuracy >= 0."
+  },
+  {
+   "query_id": "Q060",
+   "category": "paraphrase",
+   "query": "What does it mean to label each word in a sentence as a noun, verb, adjective and so on, and why is that useful in NLP?",
+   "grade2": {
+    "smi-0374": "What is POS tagging?"
+   },
+   "bm25_qka_rank_of_first_grade2": null,
+   "bm25_qka_top1": "What is Parsing in the context of NLP?",
+   "minilm_qka_rank_of_first_grade2": 2,
+   "minilm_qka_top1": "What is Parsing in the context of NLP?",
+   "hybrid_minilm_qka_rank_of_first_grade2": null,
+   "hybrid_minilm_qka_top1": "What is Parsing in the context of NLP?"
+  },
+  {
+   "query_id": "Q083",
+   "category": "paraphrase",
+   "query": "How do I write a SQL query that shows what share of each signup-week group came back on day 1, 7 and 30, without miscounting recent groups that haven't had time to reach those days?",
+   "grade2": {
+    "smi-g0034": "events(user_id INTEGER, event_ts TEXT, event_name TEXT) holds app events with 'YYYY-MM-DD HH:MM:SS' "
+   },
+   "bm25_qka_rank_of_first_grade2": null,
+   "bm25_qka_top1": "You have two tables: signups(user_id, signup_date) and events(user_id, event_date), one row per user",
+   "minilm_qka_rank_of_first_grade2": 4,
+   "minilm_qka_top1": "logins(user_id INTEGER NOT NULL, login_date TEXT NOT NULL) holds ISO dates, several rows per user po",
+   "hybrid_minilm_qka_rank_of_first_grade2": 5,
+   "hybrid_minilm_qka_top1": "You have two tables: signups(user_id, signup_date) and events(user_id, event_date), one row per user"
+  },
+  {
+   "query_id": "Q097",
+   "category": "paraphrase",
+   "query": "Why does randomly switching off neurons during training help prevent overfitting?",
+   "grade2": {
+    "smi-0055": "What do you mean by Dropout?"
+   },
+   "bm25_qka_rank_of_first_grade2": 2,
+   "bm25_qka_top1": "Is dropout used on the test set?",
+   "minilm_qka_rank_of_first_grade2": null,
+   "minilm_qka_top1": "What are overfitting and underfitting? Why does the decision tree algorithm often suffer from overfi",
+   "hybrid_minilm_qka_rank_of_first_grade2": 5,
+   "hybrid_minilm_qka_top1": "Is dropout used on the test set?"
+  },
+  {
+   "query_id": "Q098",
+   "category": "paraphrase",
+   "query": "Why do LLMs sometimes ignore relevant passages placed in the middle of a long prompt, and how would you test and mitigate that in a RAG pipeline?",
+   "grade2": {
+    "smi-j0024": "You assemble 10 retrieved chunks into a prompt. The best evidence is usually chunk 1, but you notice"
+   },
+   "bm25_qka_rank_of_first_grade2": 9,
+   "bm25_qka_top1": "A company wants a QA assistant answering from internal policy documents (about 20,000 pages, changin",
+   "minilm_qka_rank_of_first_grade2": null,
+   "minilm_qka_top1": "A team ran full-parameter supervised fine-tuning for 3 epochs on 6,000 internal ticket-classificatio",
+   "hybrid_minilm_qka_rank_of_first_grade2": 9,
+   "hybrid_minilm_qka_top1": "A company wants a QA assistant answering from internal policy documents (about 20,000 pages, changin"
+  },
+  {
+   "query_id": "Q110",
+   "category": "paraphrase",
+   "query": "What are the main components you look for when analysing data ordered by time, and what are such analyses used for?",
+   "grade2": {
+    "smi-0319": "What is Time series?"
+   },
+   "bm25_qka_rank_of_first_grade2": 1,
+   "bm25_qka_top1": "What is Time series?",
+   "minilm_qka_rank_of_first_grade2": 8,
+   "minilm_qka_top1": "What is bubble sort and what is its time complexity?",
+   "hybrid_minilm_qka_rank_of_first_grade2": 1,
+   "hybrid_minilm_qka_top1": "What is Time series?"
+  },
+  {
+   "query_id": "Q118",
+   "category": "similar_distinct",
+   "query": "What does it mean to estimate parameters by choosing the values that make the observed data most probable, in general and not specifically for logistic regression?",
+   "grade2": {
+    "smi-0138": "What is maximum likelihood estimation?"
+   },
+   "bm25_qka_rank_of_first_grade2": null,
+   "bm25_qka_top1": "A customer survey has 30 percent of income answers missing. Explain how you would decide whether the",
+   "minilm_qka_rank_of_first_grade2": 1,
+   "minilm_qka_top1": "What is maximum likelihood estimation?",
+   "hybrid_minilm_qka_rank_of_first_grade2": null,
+   "hybrid_minilm_qka_top1": "What is log likelihood in logistic regression?"
+  },
+  {
+   "query_id": "Q120",
+   "category": "paraphrase",
+   "query": "A user invokes their right to be forgotten; how do we find where their data fed into models, and what are our options for removing its influence?",
+   "grade2": {
+    "smi-m0020": "A customer asks for their personal data to be deleted. Their records were in the warehouse, the onli"
+   },
+   "bm25_qka_rank_of_first_grade2": null,
+   "bm25_qka_top1": "How we can incorporate implicit feedback (clicks, etc) into our recommender systems?",
+   "minilm_qka_rank_of_first_grade2": 1,
+   "minilm_qka_top1": "A customer asks for their personal data to be deleted. Their records were in the warehouse, the onli",
+   "hybrid_minilm_qka_rank_of_first_grade2": 4,
+   "hybrid_minilm_qka_top1": "A teammate hands you a notebook that reported 0.87 F1 on the validation set and says 'just rerun it "
+  },
+  {
+   "query_id": "Q123",
+   "category": "multi_concept",
+   "query": "How do ensembles that average predicted probabilities from several models compare with simply fixing a single neural net's overfitting through early stopping and augmentation?",
+   "grade2": {
+    "smi-0014": "What is the main idea behind ensemble learning? If I had many different models that predicted the sa"
+   },
+   "bm25_qka_rank_of_first_grade2": 10,
+   "bm25_qka_top1": "What is Model Capacity?",
+   "minilm_qka_rank_of_first_grade2": 1,
+   "minilm_qka_top1": "What is the main idea behind ensemble learning? If I had many different models that predicted the sa",
+   "hybrid_minilm_qka_rank_of_first_grade2": 3,
+   "hybrid_minilm_qka_top1": "What is a voting model?"
+  },
+  {
+   "query_id": "Q131",
+   "category": "multi_concept",
+   "query": "If a feature's units silently changed upstream and my nearest-neighbour model starts misbehaving, how would I catch it with monitoring, and why are distance-based lazy learners so sensitive to that?",
+   "grade2": {
+    "smi-m0002": "On Monday 06:10 the drift job pages you: txn_amount has PSI 8.3 against the training reference, and ",
+    "smi-l0040": "What is training-serving skew, and how is it different from data drift? Use a small concrete example"
+   },
+   "bm25_qka_rank_of_first_grade2": 4,
+   "bm25_qka_top1": "What is K-Nearest Neighbors?",
+   "minilm_qka_rank_of_first_grade2": 7,
+   "minilm_qka_top1": "After a marketing campaign, the drift dashboard shows PSI above 0.25 on 14 of a fraud model's 120 fe",
+   "hybrid_minilm_qka_rank_of_first_grade2": 2,
+   "hybrid_minilm_qka_top1": "What is K-Nearest Neighbors?"
+  },
+  {
+   "query_id": "Q139",
+   "category": "domain_confusing",
+   "query": "In a neural net, how does gradient descent adjust each layer's weights and biases starting from the input layer's data?",
+   "grade2": {
+    "smi-0031": "What is Backpropagation?"
+   },
+   "bm25_qka_rank_of_first_grade2": null,
+   "bm25_qka_top1": "What are the steps to be followed to use the gradient descent algorithm?",
+   "minilm_qka_rank_of_first_grade2": 4,
+   "minilm_qka_top1": "What are the steps to be followed to use the gradient descent algorithm?",
+   "hybrid_minilm_qka_rank_of_first_grade2": 5,
+   "hybrid_minilm_qka_top1": "What are the steps to be followed to use the gradient descent algorithm?"
+  }
+ ],
+ "top1_domain_mismatch": {
+  "bm25_qka": {
+   "n": 144,
+   "top1_in_other_domain": 26,
+   "rate": 0.181
+  },
+  "minilm_qka": {
+   "n": 144,
+   "top1_in_other_domain": 21,
+   "rate": 0.146
+  },
+  "hybrid_minilm_qka": {
+   "n": 144,
+   "top1_in_other_domain": 18,
+   "rate": 0.125
+  }
+ }
+}
