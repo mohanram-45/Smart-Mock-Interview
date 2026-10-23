@@ -23,8 +23,8 @@ A local, single-user mock-interview application. `/demo` is the product; the ori
 | Automated tests, lint, integrity, version checks | pass (Linux sandbox; CI on GitHub reported green for the Stage 13 commit) |
 | Full /demo journey (setup, answer, skip, resume, history, export, PDF) | tested with a stand-in scorer and in a real Chromium run |
 | Dependency audit of the three hashed/pinned locks (`pip-audit`, 23 Oct 2026) | no known vulnerabilities |
-| ML Docker image builds and scores with real Sentence-BERT | **not yet run**: `heavy.yml` (GitHub, manual) or `verify_docker_ml.bat` (Docker Desktop) |
-| Correctness check with the real local model | **failed once (0/3, 23 Oct 2026); corrected in code, re-run not yet done**: `verify_ollama_stage12.bat` (9 answers). **NOT READY to be enabled by default; stays opt-in and labelled advisory** |
+| ML Docker image builds and scores with real Sentence-BERT | **PASSED locally, 23 Oct 2026**: `verify_docker_ml.bat`, six real Sentence-BERT checks and application readiness; semantic retrieval fell back to BM25 due to a read-only FAISS cache path |
+| Correctness check with the real local model | **two live runs (23 Oct 2026): initial 0/3 matches; corrected 1/3 matches, one Uncertain and one wrong; six independent cases not run**: `verify_ollama_stage12.bat` (9 answers). **NOT READY to be enabled by default; stays opt-in and labelled advisory** |
 | Accuracy of any verdict or similarity against human judgement | **never measured** |
 
 ## Known limitations

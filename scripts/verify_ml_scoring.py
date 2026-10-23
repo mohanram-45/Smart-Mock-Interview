@@ -53,7 +53,7 @@ def drive_app(corpus_all) -> list:
         for k in (2, 3):
             s = get_engine().get(sid)
             q = s["questions"][k - 1]
-            ref = (by_id.get(q.get("question_id")) or {}).get("reference_answer")
+            ref = (get_engine().record(q.get("question_id")) or {}).get("canonical_answer")
             text = ref if (k == 2 and ref) else UNRELATED
             r = c.post(f"/demo/api/sessions/{sid}/answer", json={"n": k, "answer": text})
             leg = get_engine().get(sid)["answers"][k - 1]["legacy"]
