@@ -23,6 +23,7 @@ from question_provider import QuestionSourceUnavailable
 from src.retrieval.flask_api import init_retrieval, make_provider, question_meta, resolve_source
 from src.demo.routes import init_demo
 from src.mlops.obs import init_observability
+from src.security.local_guard import cors_origins
 from src.mlops.metrics import inc as _metric
 
 logging.basicConfig(
@@ -37,9 +38,9 @@ app.register_blueprint(delivery_blueprint)
 
 CORS(app, resources={
     r"/api/*": {
-        "origins": "*",
+        "origins": cors_origins(),      # Stage 13: local pages only (was "*"); extra origins via SMART_ALLOWED_ORIGINS
         "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type"]
+        "allow_headers": ["Content-Type", "X-Report-Token"]
     }
 })
 

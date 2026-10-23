@@ -21,6 +21,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src" / "model"))
+sys.path.insert(0, str(Path(__file__).parent.parent))   # project root, for src.security
+from src.security.local_guard import cors_origins  # noqa: E402
 from model_registry import get_scorer, list_models, is_valid_model, DEFAULT_MODEL, MODEL_CHOICES  # noqa: E402
 
 TOPIC_QUESTION_COUNT = 5
@@ -39,7 +41,7 @@ logger.info(f"Loaded {len(ALL_QUESTIONS)} questions for the similarity checker")
 app = Flask(__name__)
 CORS(app, resources={
     r"/api/*": {
-        "origins": "*",
+        "origins": cors_origins(),          # Stage 13: local pages only (was "*")
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type"]
     }
@@ -101,7 +103,7 @@ def api_score():
         similarity_percent = round(max(0.0, min(1.0, similarity)) * 100, 2)
     except Exception as e:
         logger.error(f"Scoring failed: {e}")
-        return jsonify({"error": f"Scoring failed: {e}"}), 500
+        return jsonify({"error": "Scoring failed."}), 500
 
     return jsonify({
         "model_key": model_key,
@@ -171,7 +173,17 @@ def api_topic_score():
     }), 200
 
 
+def run_config(environ=None):
+    """Stage 13: (host, port, debug). Local-only by default and the Werkzeug debugger (remote code execution from the browser) is OFF unless SMART_DEBUG is set.
+    Override with SMART_COMPARE_HOST / SMART_COMPARE_PORT / SMART_DEBUG=1."""
+    import os
+    env = os.environ if environ is None else environ
+    return (env.get("SMART_COMPARE_HOST", "127.0.0.1"), int(env.get("SMART_COMPARE_PORT", "5050")),
+            env.get("SMART_DEBUG", "").strip().lower() in ("1", "true", "yes", "on"))
+
+
 if __name__ == "__main__":
     # reloader disabled: it watches every imported module including
     # transformers/sentence-transformers and restarts mid-request
-    app.run(host="0.0.0.0", port=5050, debug=True, use_reloader=False)
+    _host, _port, _debug = run_config()
+    app.run(host=_host, port=_port, debug=_debug, use_reloader=False)
