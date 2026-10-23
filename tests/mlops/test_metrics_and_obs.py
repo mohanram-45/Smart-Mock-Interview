@@ -125,7 +125,7 @@ def _new(c, **o):
 def test_interview_lifecycle_counters(app_c):
     sid = _new(app_c)
     assert _total("smart_interviews_started_total", surface="demo") == 1
-    for n in range(1, 7):                                                  # the introduction + five technical questions
+    for n in range(1, 7):  # the introduction + five technical questions
         assert app_c.post(f"/demo/api/sessions/{sid}/answer", json={"n": n, "answer": "a reasonable answer about the topic"}).status_code == 200
     assert _total("smart_answers_submitted_total", surface="demo") == 6
     assert _total("smart_interviews_completed_total", surface="demo") == 1  # exactly once, not once per call
@@ -157,7 +157,7 @@ def test_scorer_failure_is_counted_and_interview_continues(tmp_path, monkeypatch
     try:
         with mod.app.test_client() as c:
             sid = _new(c)
-            assert c.post(f"/demo/api/sessions/{sid}/answer", json={"n": 1, "answer": "hello"}).status_code == 200      # the introduction is never scored
+            assert c.post(f"/demo/api/sessions/{sid}/answer", json={"n": 1, "answer": "hello"}).status_code == 200  # the introduction is never scored
             r = c.post(f"/demo/api/sessions/{sid}/answer", json={"n": 2, "answer": "anything"})
             assert r.status_code == 200  # the interview continues; the score is simply unavailable
             assert _total("smart_scorer_failures_total", stage="score") == 1

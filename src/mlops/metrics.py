@@ -34,16 +34,31 @@ KNOWN: Dict[str, Tuple[str, str]] = {
     "smart_followups_total": ("counter", "Follow-up proposals by mode (deterministic|mock|live) and outcome (llm|mock|skip|fallback); never their text"),
     "smart_memory_items_total": ("counter", "Interview-memory items by outcome (added|merged|conflicts|rejected); never their text"),
     "smart_memory_references_total": ("counter", "Interviewer questions that referred back to a stored candidate statement, by kind"),
-    "smart_policy_decisions_total": ("counter", "Adaptive-policy decisions by code (deeper|clarify|explore_related|revisit|new_competency|practical|wrapup|continue)"),
+    "smart_policy_decisions_total": (
+        "counter",
+        "Adaptive-policy decisions by code (deeper|clarify|explore_related|revisit|new_competency|practical|wrapup|continue)",
+    ),
     "smart_behavioural_probes_total": ("counter", "Behavioural follow-up probes by kind (action|result|measure|reflection|situation|clarification)"),
-    "smart_embedding_model_loads_total": ("counter", "Embedding-model loads by component and outcome (loaded|cache_hit|failed); a rising 'loaded' count means unnecessary re-initialisation"),
-    "smart_followup_opportunities_total": ("counter", "Live follow-up opportunities by class: gap_open (a curated concept looks open), covered (all look covered), related_unknown"),
+    "smart_embedding_model_loads_total": (
+        "counter",
+        "Embedding-model loads by component and outcome (loaded|cache_hit|failed); a rising 'loaded' count means unnecessary re-initialisation",
+    ),
+    "smart_followup_opportunities_total": (
+        "counter",
+        "Live follow-up opportunities by class: gap_open (a curated concept looks open), covered (all look covered), related_unknown",
+    ),
     "smart_followup_skips_total": ("counter", "Follow-up skips by reason code (covered|off_topic|nothing_to_add) and who decided (rules|model)"),
     "smart_followup_repairs_total": ("counter", "One-shot repair attempts after a fixable wording rejection, by outcome (ok|failed); never text"),
     "smart_followup_rejections_total": ("counter", "Validator rejections by first reason code (no text)"),
-    "smart_followup_memory_stage_total": ("counter", "Memory use in a live follow-up by stage: none_offered|offered_no_usable_lead|used|declined|not_connected|not_used|rejected|citation_invalid|not_reached|not_applicable (codes only)"),
+    "smart_followup_memory_stage_total": (
+        "counter",
+        "Memory use in a live follow-up by stage: none_offered|offered_no_usable_lead|used|declined|not_connected|not_used|rejected|citation_invalid|not_reached|not_applicable (codes only)",
+    ),
     "smart_followup_memory_citations_total": ("counter", "Model memory citations by validity (valid|dropped|rejected)"),
-    "smart_followup_latency_seconds": ("summary", "Live follow-up call latency by model and phase (first_call|later_call; the one-off model load is measured separately by the warm-up)"),
+    "smart_followup_latency_seconds": (
+        "summary",
+        "Live follow-up call latency by model and phase (first_call|later_call; the one-off model load is measured separately by the warm-up)",
+    ),
     "smart_model_available": ("gauge", "1 if a scorer/provider was ready at the last probe, else 0 (label: model)"),
     "smart_build_info": ("gauge", "Always 1; labels identify the running code/experiment version"),
 }

@@ -54,7 +54,8 @@ def test_runtime_mlops_modules_never_execute_code_or_spawn_processes(name):
 
 def test_no_workflow_or_script_enables_docker_execution_automatically():
     for f in [*ROOT.glob(".github/workflows/*.yml"), ROOT / "docker-compose.yml", ROOT / "Dockerfile", ROOT / ".env.example", ROOT / "scripts/verify_mlops.py"]:
-        text = f.read_text(encoding="utf-8")
+        # commented-out lines (the opt-in hints in .env.example) do not enable anything; only live settings count
+        text = "\n".join(ln for ln in f.read_text(encoding="utf-8").splitlines() if not ln.lstrip().startswith("#"))
         assert "SMART_CODEEVAL_EXEC=docker" not in text and 'SMART_CODEEVAL_EXEC: "docker"' not in text, f"{f.name} enables Docker code execution"
 
 

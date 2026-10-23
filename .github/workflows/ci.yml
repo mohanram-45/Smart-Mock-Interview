@@ -198,7 +198,8 @@ jobs:
       - name: Container runs as a non-root user and carries no secrets
         run: |
           test "$(docker exec smart-ci id -u)" != "0"
-          ! docker exec smart-ci env | grep -i -E "key|token|secret|password"
+          # Names only - values are never printed. GPG_KEY is the public key id that python base images set, not an application credential.
+          docker exec smart-ci python -c "import os,re,sys; bad=sorted(k for k in os.environ if re.search('key|token|secret|password', k, re.I) and k != 'GPG_KEY'); print('credential-like variable names:', bad); sys.exit(1 if bad else 0)"
       - if: always()
         run: docker logs smart-ci | tail -30
 
