@@ -5,6 +5,7 @@ from __future__ import annotations
 import ipaddress
 import logging
 import os
+import re
 import threading
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -319,6 +320,29 @@ def export_json(sid):
         out["answers"].append(item)
     resp = make_response(jsonify(out), 200)
     resp.headers["Content-Disposition"] = f'attachment; filename="{s["id"]}.json"'
+    return resp
+
+
+@demo_blueprint.route("/s/<sid>/report.pdf", methods=["GET"])
+def report_pdf(sid):
+    """Stage 14: the finished interview as a PDF (the existing report generator), including the Stage 12 correctness feedback. Similarity appears only as a labelled 0-1 figure."""
+    from . import pdf_report
+    eng = get_engine()
+    try:
+        s = eng.get(sid)
+    except DemoError as e:
+        return _json_error(e)
+    if s["status"] != "finished":
+        return jsonify({"error": "Finish the interview first; the report is built from the finished interview."}), 409
+    if not pdf_report.is_available():
+        return jsonify({"error": "PDF reports need the reportlab package, which is not installed."}), 503
+    from report_delivery.pdf_generator import build_pdf
+    pdf = build_pdf(pdf_report.build(s, eng.summary(s)))
+    name = re.sub(r"[^A-Za-z0-9_-]+", "_", str((s.get("config") or {}).get("role") or "Interview"))
+    resp = make_response(pdf, 200)
+    resp.headers["Content-Type"] = "application/pdf"
+    resp.headers["Content-Disposition"] = f'attachment; filename="SMART_{name}_Interview_Report.pdf"'
+    resp.headers["Cache-Control"] = "no-store"
     return resp
 
 

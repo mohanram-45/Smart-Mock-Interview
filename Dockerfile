@@ -16,6 +16,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     SMART_GIT_COMMIT=${SMART_GIT_COMMIT} \
     SMART_HOST=0.0.0.0 \
+    SMART_TRUST_DOCKER_GATEWAY=1 \
     SMART_PORT=5000 \
     SMART_FORBID_MODEL_TRAINING=1 \
     SMART_DEMO_DATA_DIR=/app/results/demo_sessions \
@@ -37,7 +38,7 @@ COPY main/ ./main/
 COPY src/ ./src/
 COPY report_delivery/ ./report_delivery/
 COPY data/ ./data/
-COPY scripts/healthcheck.py ./scripts/healthcheck.py
+COPY scripts/healthcheck.py scripts/verify_ml_scoring.py ./scripts/
 
 # 3. the only writable location: session files, generated reports (mount a volume here to keep them)
 # (/hf-cache is where an INSTALL_ML=1 build looks for the embedding model; mount a volume there. Nothing is downloaded into the image.)

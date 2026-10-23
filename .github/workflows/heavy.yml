@@ -52,3 +52,20 @@ jobs:
           persist-credentials: false
       - name: Build the image with the optional ML extras
         run: docker build --build-arg INSTALL_ML=1 -t smart-mock-interview:ml .
+      - name: Fill the model cache once (downloads the public all-MiniLM-L6-v2, about 90 MB; no private data, no credentials)
+        timeout-minutes: 10
+        run: |
+          docker volume create smart-hf
+          docker run --rm -v smart-hf:/hf-cache -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 smart-mock-interview:ml python -c "from sentence_transformers import SentenceTransformer as S; S('sentence-transformers/all-MiniLM-L6-v2'); print('model cached')"
+      - name: Real Sentence-BERT scoring inside the ML container (no network, read-only filesystem; not just /healthz)
+        timeout-minutes: 10
+        run: |
+          docker run --rm --network none -v smart-hf:/hf-cache --read-only --tmpfs /tmp --tmpfs /app/results:uid=10001,gid=10001 --cap-drop ALL --security-opt no-new-privileges -e HF_HUB_OFFLINE=1 -e TRANSFORMERS_OFFLINE=1 -e SMART_DEMO_RETENTION_DAYS=1 smart-mock-interview:ml python scripts/verify_ml_scoring.py
+      - name: The ML image starts, is healthy and reports ready
+        timeout-minutes: 5
+        run: |
+          docker run -d --name smart-ml -p 127.0.0.1:5000:5000 -v smart-hf:/hf-cache --read-only --tmpfs /tmp --tmpfs /app/results:uid=10001,gid=10001 --cap-drop ALL --security-opt no-new-privileges -e HF_HUB_OFFLINE=1 -e TRANSFORMERS_OFFLINE=1 smart-mock-interview:ml
+          for i in $(seq 1 40); do python scripts/healthcheck.py --ready && break; sleep 3; done
+          python scripts/healthcheck.py --ready
+      - if: always()
+        run: docker logs smart-ml 2>&1 | tail -30 || true

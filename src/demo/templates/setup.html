@@ -31,7 +31,15 @@
   </fieldset>
 
   <fieldset>
-    <legend><span class="step">3</span> Job description <span class="opt">optional</span></legend>
+    <legend><span class="step">3</span> How long should it take?</legend>
+    <div class="types four" role="radiogroup" aria-label="Interview length" id="length-choices">
+      {% for m, t in ((15, 'Short: a quick round, fewer follow-ups'), (30, 'Standard: a focused session'), (45, 'Full: the default, room for follow-ups and a practical exercise'), (60, 'Extended: more time to think and elaborate')) %}<label class="type-opt"><input type="radio" name="time_budget_min" value="{{ m }}"{{ ' checked' if m == 45 }}><span><strong>About {{ m }} minutes</strong><span class="t">{{ t }}</span></span></label>{% endfor %}
+    </div>
+    <p class="muted small tight-top">This is a time budget, not a hard timer: once it is used up the interviewer wraps up instead of starting new follow-ups.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend><span class="step">4</span> Job description <span class="opt">optional</span></legend>
     <label class="field" for="jd">Paste the job description to guide the topics</label>
     <textarea id="jd" name="job_description" rows="6" maxlength="{{ catalog.jd_max_chars }}" placeholder="Responsibilities and requirements, as plain text." aria-describedby="jd-help"></textarea>
     <div class="row between tight-top"><span class="muted small" id="jd-help">Only used to pick topics from this role's questions. It is read on this computer, is not saved with your interview, and contact details are ignored. Instructions inside it are never followed.</span><span class="muted small" id="jd-count">0 / {{ catalog.jd_max_chars }}</span></div>

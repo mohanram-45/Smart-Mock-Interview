@@ -1,16 +1,16 @@
 # SMART Mock Interview
 
-A local practice tool for **technical interviews** (machine learning, deep learning, NLP, Python, SQL, data analysis) and a research prototype for evaluating free-text and code answers. You pick a role, difficulty and length, answer questions one at a time, and get per-question feedback and a session summary. Everything runs on your own computer.
+A local practice tool for **technical interviews** (machine learning, deep learning, NLP, Python, SQL, data analysis) and a research prototype for evaluating free-text and code answers. You pick a role, interview type and length, answer questions one at a time, and get a separate similarity value and correctness check per answer, a session summary, a JSON export and a PDF report. Everything runs on your own computer.
 
-![Interview setup](docs/screenshots/01_landing_setup.png)
+![Interview setup](docs/screenshots/v1_01_setup.png)
 
-> **Honest status.** This is a working demonstration, not a validated assessment tool. No score or finding in it has been checked against human marking. The default score measures **similarity to a reference answer**, not correctness. The experimental evaluators are opt-in, labelled, and never influence which question you get next. See [What is and is not established](#what-is-and-is-not-established).
+> **Honest status.** This is a working demonstration, not a validated assessment tool. No score or finding in it has been checked against human marking. The similarity value (Sentence-BERT, shown 0-1) measures resemblance to a reference answer, **not correctness**. The correctness check (Correct / Partially correct / Incorrect / Uncertain) is a separate, **opt-in** feature that needs a local Ollama model, and is **off by default**; without it every answer shows *Not assessed*. Its model-backed accuracy has not been measured yet. See [What is and is not established](#what-is-and-is-not-established) and [Results and limitations](#results-and-limitations-at-a-glance).
 
 ## What is implemented
 
 | Area | What exists | Where |
 |---|---|---|
-| Interview app (`/demo`) | A structured text interview: pick a role (optionally paste a job description), then introduction, five curated technical questions, up to two follow-ups, one practical exercise and a wrap-up; feedback report, JSON export, resume after refresh/restart, delete-my-data, About and label guide pages | `src/demo/` |
+| Interview app (`/demo`) | A structured text interview: pick a role (optionally paste a job description), then introduction, five curated technical questions, up to two follow-ups, one practical exercise and a wrap-up; interview length (15/30/45/60 min budget), a correctness check kept apart from similarity, a PDF report and JSON export, resume after refresh/restart, delete-my-data, About and label guide pages | `src/demo/` |
 | Question bank | 666 curated records (487 frozen v5 + 179 approved expansion), each with a reference answer and key concepts; authored and source-checked with AI assistance (see `audit/`), **not human-reviewed**; loaded read-only with fingerprint checks | `src/retrieval/`, `data/` |
 | Similarity scoring | Sentence-BERT (`all-MiniLM-L6-v2`) is the only scorer used for new interviews. The Siamese Bi-LSTM and TF-IDF scorers remain in `src/model/` as frozen research code and are not reachable from the interview | `src/model/` |
 | Retrieval layer (the retrieval half of a RAG design) | Corpus loader, `all-MiniLM-L6-v2` (SentenceTransformer) embeddings, FAISS index, BM25 baseline and fallback, evaluation harness. Opt-in `/api/retrieval/*` routes, including (Stage 8B) `/api/retrieval/diagnostics`: scores, an uncalibrated evidence band, per-hit provenance and index/model fingerprints, never reference answers. **The interview app does not use vector search to choose questions, and nothing in the scoring path retrieves context at answer time: there is no retrieval-augmented grading yet.** | `src/retrieval/` |
@@ -33,15 +33,40 @@ A local practice tool for **technical interviews** (machine learning, deep learn
 | Sandboxed behaviour tests | yes (off by default) | by construction + unit tests; **not run against a real Docker daemon** | no: a container is not a hardened sandbox |
 | MLflow tracking, historical import | yes | yes: 30 runs / 642 metrics reproduced exactly (Linux) | local only |
 | DVC `build_index` | yes | yes with the offline stand-in embedder; not with the real MiniLM model | no remote configured |
-| Docker / Compose | yes | built and run on Linux with a substitute Python base | no: no public deployment |
-| GitHub Actions CI | yes | simulated locally from the hash locks; **never executed on GitHub** | no |
+| Docker / Compose (lean image) | yes | built, started and health-checked by CI on GitHub; non-root, read-only | no: no public deployment |
+| Docker image with ML extras (`INSTALL_ML=1`) | yes | **not yet verified**: `heavy.yml` (manual) builds it and runs `scripts/verify_ml_scoring.py` for real Sentence-BERT scoring; no run recorded yet | no |
+| Correctness check (Stage 12) and PDF report (Stage 14) | yes | deterministic tests with scripted evaluator replies; **no live-model run yet** (`verify_ollama_stage12.bat`) | no |
+| GitHub Actions CI | yes | runs on the `Update` branch (lint, security audit, integrity, tests on Python 3.12 and 3.13, MLflow, Windows smoke, Docker build and health); the latest run is reported green by the maintainer | no |
 | Windows scripts | yes | run on Linux (PowerShell 7) only; **not run on Windows** | no |
 
-Three kinds of result are always kept apart on screen: **similarity score** (default), **modular evaluation** (opt-in) and **code check** (opt-in). Nothing experimental controls adaptive difficulty. The demo itself does not adapt at all: Mixed goes Easy, Medium, Hard in a fixed pattern.
+Three kinds of result are always kept apart on screen: **similarity score** (default), **modular evaluation** (opt-in) and **code check** (opt-in). Nothing experimental controls adaptive difficulty. The interview plan adapts to the time budget, the answers and follow-up rules; none of the experimental checks influence it.
+
+## Screenshots
+
+Taken from the running app. The correctness verdicts shown are **illustrative**: they come from scripted evaluator replies written for the test suite, not from a live model.
+
+| Setup (with interview length) | Correctness check and similarity, kept apart |
+|---|---|
+| ![Setup](docs/screenshots/v1_01_setup.png) | ![Correctness check](docs/screenshots/v1_02_correctness_check.png) |
+| **Summary with the PDF button** | **PDF report (page 1)** |
+| ![Summary](docs/screenshots/v1_03_summary_top.png) | ![PDF report](docs/screenshots/v1_05_pdf_report.png) |
+
+## Results and limitations at a glance
+
+| What | Number | Kind of evidence |
+|---|---|---|
+| Automated tests (`tests/`) | 1,801 passed, 9 skipped, 0 failed (one unexplained single failure seen once in four runs, not reproduced) (Linux, Python 3.12) | real test runs; CI also runs Python 3.13 and a Windows smoke job |
+| Retrieval success@1 on answerable queries | 0.71 dev, 0.63 frozen challenge (stored MiniLM rankings) | AI-pooled labels, not human ground truth |
+| Modular concept evaluator abstain rate | 0.45 against a limit of 0.40: **failed its frozen gate** | recorded real run, 20 answers |
+| Follow-up questions, automatic acceptance (Stage 11U baseline, 22 Oct real run) | 17/23 accepted; technical 11/12; grounded memory 2/7; no detected fabricated references | automatic rules, **not human-rated** |
+| Same rules after the final repair, replayed without a model | 14 of 25 model-called rows accepted, below the 80 % target | replay of recorded text, not a score |
+| Correctness check, 10 representative answers | 9/10 matched the author's expected verdict | **scripted evaluator replies**, not a model; live run pending |
+
+Limitations: the question bank and every rubric are AI-written and not human-reviewed; no score or verdict has been validated against human markers; the correctness check is off by default and depends on a small local model that abstains often (expect many *Uncertain*); a correct paraphrase that avoids a concept's own wording is usually *Uncertain*, not *Correct*; the experimental code check reads code and never runs it unless you set up Docker sandboxing yourself; this is a local single-user tool, not a hardened public service (no accounts, no TLS).
 
 ## Windows quick start
 
-Prerequisites: Windows 10/11, **Python 3.10-3.12** (3.13 may lack wheels for some packages), Git. Docker Desktop and Ollama are optional.
+Prerequisites: Windows 10/11, **Python 3.12 or 3.13** (CI runs both), Git. Docker Desktop and Ollama are optional.
 
 ```bat
 git clone <your repository URL> SMART-MOCK-INTERVIEW
@@ -58,7 +83,7 @@ Then either double-click **`run_demo.bat`**, or:
 .bot\Scripts\python.exe main\app.py
 ```
 
-and open **http://127.0.0.1:5000/demo/** (the dashboard). The app binds to `127.0.0.1` only (this computer) and the Werkzeug debugger is off. What each screen does: [docs/FRONTEND.md](docs/FRONTEND.md).
+and open **http://127.0.0.1:5000/** (a browser is sent to **/demo/**, the dashboard; API clients still get the legacy JSON description, and the legacy `/api/*` routes are unchanged). The app binds to `127.0.0.1` only (this computer) and the Werkzeug debugger is off. What each screen does: [docs/FRONTEND.md](docs/FRONTEND.md).
 
 Check your machine at any time (never trains, downloads or runs candidate code):
 
@@ -98,6 +123,8 @@ copy .env.example .env
 docker compose up --build                  :: app only, http://127.0.0.1:5000/demo/ (bound to this machine only)
 docker compose --profile ollama up         :: + optional local Ollama service
 python scripts\healthcheck.py --ready      :: health + readiness of a running instance
+verify_ollama_stage12.bat                  :: bounded live check of the correctness feedback with local Ollama (3 answers, about 10 minutes)
+verify_docker_ml.bat                       :: ML image (INSTALL_ML=1) + a real Sentence-BERT scoring check inside the container; health alone does not prove scoring
 pip install -r requirements-mlops.txt
 python scripts\mlflow_import_history.py    :: import existing results into local MLflow and verify them against the source files
 mlflow ui --backend-store-uri sqlite:///mlflow/mlflow.db
@@ -125,6 +152,7 @@ Imported MLflow runs are labelled as historical imports and carry no accuracy cl
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): components, data flow, the three result layers, retrieval, persistence
 - [docs/CONFIGURATION.md](docs/CONFIGURATION.md): every environment variable and feature flag
 - [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md): a guided demonstration with screenshots
+- [docs/RELEASE_NOTES_v1.0.md](docs/RELEASE_NOTES_v1.0.md) and [docs/RELEASE_CHECKLIST_v1.0.md](docs/RELEASE_CHECKLIST_v1.0.md): what v1.0 contains and the exact verification steps
 - [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md): symptoms and fixes
 - [docs/MLOPS.md](docs/MLOPS.md): MLflow tracking, CI, Docker, monitoring, local deployment, production limitations
 - [docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md): integrity controls, line endings, locks, DVC scope, rebuilding the retrieval pipeline
@@ -137,7 +165,7 @@ Imported MLflow runs are labelled as historical imports and carry no accuracy cl
 ## Tests
 
 ```bat
-.bot\Scripts\python.exe -m pytest tests\evaluation tests\retrieval tests\app tests\codeeval tests\mlops -q
+.bot\Scripts\python.exe -m pytest tests -q
 .bot\Scripts\python.exe scripts\check_integrity.py      :: dataset and frozen-experiment integrity (no drift expected)
 ```
 
@@ -157,7 +185,7 @@ python scripts\stage6a_browser_journey.py --base http://127.0.0.1:5058
 **Also established (Stage 6B, Linux sandbox):** privacy-safe metrics and logs, `/healthz` `/readyz` `/metrics`, MLflow import reproducing 642 historical metrics exactly, the Docker image running non-root on a read-only filesystem with persistent sessions, a DVC stage that rebuilt the index with the offline dev-LSA stand-in embedder and restored it byte-identical (not run with the real MiniLM model).
 
 **Not established:**
-- That the GitHub workflows run green (never executed on GitHub; locally they were simulated on Python 3.12 from the hash-locked requirements), that `validate_windows.ps1` and the Windows launchers pass on a real Windows machine (they were only run on Linux), that the exact `python:3.13-slim` base builds (Docker Hub was unreachable in the sandbox; a substitute Python 3.13 base was used), or anything on Docker Desktop for Windows.
+- That the Windows launchers and `validate_windows.ps1` pass on a real Windows machine beyond the CI smoke job, that the ML-enabled Docker image scores correctly (not yet run: see `heavy.yml` / `verify_docker_ml.bat`), and that the Stage 12 correctness check is accurate with the real local model (not yet run: `verify_ollama_stage12.bat`).
 - That any score matches human judgement. The default scorers compare text with a reference answer; a correct answer in different words can score low, and for code the comparison is of text, not behaviour. The comment shown with a score depends only on the score band.
 - That the modular evaluator is usable: the recorded 20-answer run had an abstain rate of 0.45 against a limit of 0.40.
 - That code behaviour tests are safe against hostile code. A container shares the host's kernel; see the security document. The sandboxed path is checked by construction and unit tests only (it has not been run against a real Docker daemon by the author of this change); `verify_windows.bat --docker-sample` checks it on your machine. It has not had a security review.
@@ -166,7 +194,7 @@ python scripts\stage6a_browser_journey.py --base http://127.0.0.1:5058
 
 ## Legacy application
 
-The original adaptive interview system (three scorers, adaptive Easy/Medium/Hard rounds, PDF and e-mail reports) lives in `main/` and `frontend/`; `run_all.bat` starts it together with Ollama and the comparison tool. It reads the 4,085-question processed knowledge base (Machine Learning 851, Deep Learning 710, NLP 649, Python 628, SQL 642, Data Analysis 605). The demo above uses the smaller curated corpus instead.
+The original adaptive interview system (three scorers, adaptive Easy/Medium/Hard rounds, PDF and e-mail reports) lives in `main/` and `frontend/`; `run_all.bat` starts it together with Ollama and the comparison tool. It reads the 4,085-question processed knowledge base (Machine Learning 851, Deep Learning 710, NLP 649, Python 628, SQL 642, Data Analysis 605). The demo above uses the smaller curated corpus instead. Since Stage 13 the legacy API, the comparison tool and the front-end server listen on this computer only, CORS is limited to local pages, and the report download/e-mail endpoints refuse other origins and other machines.
 
 ## Stage 11 follow-up engine (experimental, off by default)
 

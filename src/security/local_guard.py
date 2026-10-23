@@ -34,11 +34,50 @@ def cors_origins() -> List[str]:
     return base + extra_origins()
 
 
-def is_loopback(addr: Optional[str]) -> bool:
+def _gateway_from_route(text: str) -> Optional[str]:
+    """The default gateway in the text of /proc/net/route (hex, little-endian), or None."""
+    for line in (text or "").splitlines()[1:]:
+        f = line.split()
+        if len(f) >= 3 and f[1] == "00000000" and re.fullmatch(r"[0-9A-Fa-f]{8}", f[2]):
+            return str(ipaddress.ip_address(int(f[2], 16).to_bytes(4, "little")))
+    return None
+
+
+def docker_gateway() -> Optional[str]:
     try:
-        return ipaddress.ip_address((addr or "").split("%")[0]).is_loopback
+        with open("/proc/net/route", encoding="ascii") as fh:
+            return _gateway_from_route(fh.read())
+    except OSError:
+        return None
+
+
+def trusted_peers(route_text: Optional[str] = None) -> set:
+    """Peers treated like this computer, by EXACT address only (never a network range):
+      * SMART_TRUSTED_PEERS - comma-separated single IP addresses, set deliberately by the operator;
+      * the container's default gateway when SMART_TRUST_DOCKER_GATEWAY=1 (set only in the Docker image). With the port published to the host's 127.0.0.1 (docker-compose.yml)
+        the host's browser reaches the app through that one address. Other containers on the compose network and every other private address stay untrusted.
+    If the port is ever published beyond loopback, set SMART_REPORT_TOKEN as well: a published port can make remote clients appear as the gateway."""
+    out = set()
+    for item in os.environ.get("SMART_TRUSTED_PEERS", "").split(","):
+        try:
+            out.add(str(ipaddress.ip_address(item.strip())))
+        except ValueError:
+            pass
+    if os.environ.get("SMART_TRUST_DOCKER_GATEWAY") == "1":
+        gw = _gateway_from_route(route_text) if route_text is not None else docker_gateway()
+        if gw:
+            out.add(gw)
+    out.discard("0.0.0.0")
+    return out
+
+
+def is_loopback(addr: Optional[str]) -> bool:
+    """True for this computer, or for an explicitly trusted peer (see trusted_peers)."""
+    try:
+        ip = ipaddress.ip_address((addr or "").split("%")[0])
     except ValueError:
         return False
+    return ip.is_loopback or str(ip) in trusted_peers()
 
 
 def origin_allowed(origin: str, own_origin: str = "") -> bool:

@@ -1,0 +1,2 @@
+`v1_*.png` are the current screenshots used by the README and docs/WALKTHROUGH.md (taken in Stage 15 from the running app; the correctness verdicts in them come from scripted evaluator replies and are illustrative).
+Files numbered `01`-`15` are earlier screenshots from before Stage 12. They show a similarity percentage and an automatic band comment that the app no longer displays. They are kept for history and are not referenced.

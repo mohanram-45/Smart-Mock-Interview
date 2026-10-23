@@ -3,7 +3,7 @@ import logging
 import json
 import threading
 import uuid
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify, redirect, request
 from flask_cors import CORS
 from datetime import datetime, timezone
 from pathlib import Path
@@ -492,7 +492,9 @@ def health():
 
 @app.route('/', methods=['GET'])
 def index():
-    """API info."""
+    """Browsers go to the interview app (/demo/); API clients (no text/html in Accept) still get the legacy JSON description of /api."""
+    if "text/html" in (request.headers.get("Accept") or ""):
+        return redirect("/demo/", code=302)
     return jsonify({
         "name": "SMART Mock Interview - Adaptive System",
         "version": "2.0.0",

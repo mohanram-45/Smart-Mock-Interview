@@ -90,12 +90,24 @@ def build_pdf(report: Dict[str, Any], output_path: Path | None = None) -> bytes:
         Spacer(1, 7 * mm),
     ]
 
-    stats = [
-        [Paragraph(f"<b>{score:.1f}%</b><br/><font size='8' color='#667870'>Overall score</font>", centered),
-         Paragraph(f"<b>{report.get('questions_answered', 0)}</b><br/><font size='8' color='#667870'>Answered</font>", centered),
-         Paragraph(f"<b>{report.get('questions_skipped', 0)}</b><br/><font size='8' color='#667870'>Skipped</font>", centered),
-         Paragraph(f"<b>{_text(report.get('scoring_model', 'AI'))}</b><br/><font size='8' color='#667870'>Scoring model</font>", centered)]
-    ]
+    correctness = report.get("correctness")
+    if correctness:
+        # Stage 14 (/demo reports): no similarity percentage is ever shown as a score. Counts come from the Stage 12 correctness check.
+        counts = correctness.get("counts") or {}
+        sim_avg = correctness.get("similarity_average")
+        stats = [
+            [Paragraph(f"<b>{report.get('questions_answered', 0)}</b><br/><font size='8' color='#667870'>Answered</font>", centered),
+             Paragraph(f"<b>{report.get('questions_skipped', 0)}</b><br/><font size='8' color='#667870'>Skipped</font>", centered),
+             Paragraph(f"<b>{counts.get('correct', 0)} / {correctness.get('assessed', 0)}</b><br/><font size='8' color='#667870'>Judged correct</font>", centered),
+             Paragraph(f"<b>{_text(sim_avg) if sim_avg else '-'}</b><br/><font size='8' color='#667870'>Avg similarity (0-1)</font>", centered)]
+        ]
+    else:
+        stats = [
+            [Paragraph(f"<b>{score:.1f}%</b><br/><font size='8' color='#667870'>Overall score</font>", centered),
+             Paragraph(f"<b>{report.get('questions_answered', 0)}</b><br/><font size='8' color='#667870'>Answered</font>", centered),
+             Paragraph(f"<b>{report.get('questions_skipped', 0)}</b><br/><font size='8' color='#667870'>Skipped</font>", centered),
+             Paragraph(f"<b>{_text(report.get('scoring_model', 'AI'))}</b><br/><font size='8' color='#667870'>Scoring model</font>", centered)]
+        ]
     stat_table = Table(stats, colWidths=[42.5 * mm] * 4, rowHeights=[21 * mm])
     stat_table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), PALE), ("BOX", (0, 0), (-1, -1), 0.7, BORDER),
@@ -103,6 +115,30 @@ def build_pdf(report: Dict[str, Any], output_path: Path | None = None) -> bytes:
         ("LEFTPADDING", (0, 0), (-1, -1), 5), ("RIGHTPADDING", (0, 0), (-1, -1), 5),
     ]))
     story.append(stat_table)
+
+    if correctness:
+        story.append(Paragraph("CORRECTNESS FEEDBACK", section))
+        story.append(Paragraph(_text(correctness.get("note")), small))
+        story.append(Spacer(1, 3 * mm))
+        for item in correctness.get("items") or []:
+            sim = f"Similarity to the reference answer: {_text(item.get('similarity'))} (0-1; closeness of wording, not correctness)" if item.get("similarity") else "Similarity: not available"
+            content = [Paragraph(f"Q{item.get('n')}. {_text(item.get('topic'))}: {_text(item.get('label'))}", card_title), Paragraph(sim, small), Spacer(1, 2 * mm)]
+            if item.get("correct"):
+                content.append(Paragraph(f"<b>Demonstrated:</b> {_text(', '.join(item['correct']))}", body))
+            if item.get("missing"):
+                content.append(Paragraph(f"<b>Missing:</b> {_text(', '.join(item['missing']))}", body))
+            for m in item.get("misconceptions") or []:
+                ref = f" The reference says: &quot;{_text(m.get('reference_says'))}&quot;" if m.get("reference_says") else ""
+                content.append(Paragraph(f'<font color="#C74B53"><b>Check this statement:</b></font> &quot;{_text(str(m.get("claim") or "").rstrip(" ."))}&quot;.{ref}', body))
+            for line in item.get("feedback") or []:
+                content.append(Paragraph(f"- {_text(line)}", body))
+            card = Table([[content]], colWidths=[164 * mm])
+            card.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), PALE), ("BOX", (0, 0), (-1, -1), 0.7, BORDER),
+                ("LEFTPADDING", (0, 0), (-1, -1), 10), ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ]))
+            story += [KeepTogether(card), Spacer(1, 3 * mm)]
 
     demonstrated = ((analysis.get("strengths") or {}).get("demonstrated_topics") or [])
     if demonstrated:
@@ -140,7 +176,8 @@ def build_pdf(report: Dict[str, Any], output_path: Path | None = None) -> bytes:
             ]))
             story += [KeepTogether(card), Spacer(1, 3 * mm)]
 
-    story.append(Paragraph("PERSONALIZED LEARNING PLAN", section))
+    if analysis.get("learning_plan"):
+        story.append(Paragraph("PERSONALIZED LEARNING PLAN", section))
     for phase in analysis.get("learning_plan") or []:
         phase_content = [
             Paragraph(_text(phase.get("phase")), card_title),
@@ -149,7 +186,8 @@ def build_pdf(report: Dict[str, Any], output_path: Path | None = None) -> bytes:
         ]
         story += [KeepTogether(phase_content), Spacer(1, 3 * mm)]
 
-    story.append(Paragraph("RECOMMENDATIONS", section))
+    if analysis.get("recommendations") or not correctness:
+        story.append(Paragraph("RECOMMENDATIONS", section))
     story += _items(analysis.get("recommendations") or [], body)
     if analysis.get("next_assessment_date"):
         story += [Spacer(1, 3 * mm), Paragraph(f"<b>Suggested next assessment:</b> {_text(analysis['next_assessment_date'])}", body)]

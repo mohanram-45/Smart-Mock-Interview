@@ -19,6 +19,7 @@ services:
     ports:
       - "127.0.0.1:${SMART_PUBLISH_PORT:-5000}:5000"   # loopback only. Do not change to 0.0.0.0 without adding authentication and TLS first
     environment:
+      SMART_TRUST_DOCKER_GATEWAY: "1"                  # trust ONLY the container default gateway (the host path of the published port); see src/security/local_guard.py
       SMART_HOST: "0.0.0.0"                            # inside the container only; exposure is controlled by the port mapping above
       SMART_FORBID_MODEL_TRAINING: "1"                 # a request can never start a training run
       SMART_DEMO_DATA_DIR: /app/results/demo_sessions

@@ -44,6 +44,7 @@
       var body = { role: c.getAttribute("data-role") };
       if (jd && jd.value.trim()) body.job_description = jd.value;
       var ty = document.querySelector("input[name=interview_type]:checked"); if (ty && ty.value !== "technical") body.interview_type = ty.value;
+      var tb = document.querySelector("input[name=time_budget_min]:checked"); if (tb) body.time_budget_min = parseInt(tb.value, 10);
       var mm = prefs().modular; if (mm && mm !== "off") body.modular_mode = mm;
       var fm = prefs().followup; if (fm && fm !== "deterministic") body.followup_mode = fm;
       btn.disabled = true; note.innerHTML = '<span class="spinner" aria-hidden="true"></span>Planning your interview… (the first start after launching the server loads the models and can take a little while)';
