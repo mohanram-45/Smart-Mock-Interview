@@ -108,7 +108,7 @@
     var tabmode = $("#tabmode"), escaped = false, IND = "    ";
     function setMode(code) {
       isCode = code; root.setAttribute("data-code", code ? "1" : "0"); $("#composer").classList.toggle("is-code", code);
-      ta.setAttribute("data-code", code ? "1" : "0"); ta.classList.toggle("codearea", code); ta.rows = code ? 14 : 7;
+      ta.setAttribute("data-code", code ? "1" : "0"); ta.classList.toggle("codearea", code); ta.rows = code ? 14 : 6; var eb = $(".ed-bar"); if (eb) eb.hidden = !code;
       ta.setAttribute("spellcheck", code ? "false" : "true"); ta.setAttribute("autocapitalize", code ? "off" : "sentences");
       if (code) ta.setAttribute("wrap", "off"); else ta.removeAttribute("wrap");
       ta.placeholder = code ? "Write your Python here" : "Reply in your own words. Short, specific answers are fine.";

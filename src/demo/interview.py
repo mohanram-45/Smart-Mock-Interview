@@ -202,6 +202,37 @@ def concept_found(concept: str, answer: str, answer_tokens: Optional[set] = None
     return False
 
 
+_CONNECT = frozenset("vs versus and or the a an of in to for with between using use on by as at from it its".split())
+_OPS = re.compile(r"==|!=|<=|>=|->|\*\*|//")
+_WORD = re.compile(r"[a-z0-9_]+")
+
+
+def _stem(w: str) -> str:
+    w = w[:-1] if len(w) > 4 and w.endswith("s") and not w.endswith("ss") else w
+    return w[:6]
+
+
+def concept_covered_loosely(concept: str, answer: str) -> bool:
+    """Does the answer already DISCUSS this curated key concept, even if it never writes the concept's exact phrase? Lenient on purpose (at least 60 % of the concept's significant words, matched by stem,
+    and its code operators such as '==')  because it is only used to AVOID a redundant follow-up and to avoid calling an idea 'missing' in the feedback. A concept with
+    nothing significant to match counts as covered: with no evidence either way the interview moves on. 'Covered' never means correct."""
+    low = (answer or "").lower()
+    have = {_stem(w) for w in _WORD.findall(low)}
+    alts = [a.strip() for a in re.split(r"\s*/\s*|\s+or\s+", str(concept).lower()) if a.strip()] or [str(concept).lower()]
+    for alt in alts:
+        if len(alt) > 3 and alt in low:
+            return True
+        words = [w for w in _WORD.findall(alt) if w not in _CONNECT and (len(w) > 1 or w.isdigit())]
+        ops = _OPS.findall(alt)
+        total = len(words) + len(ops)
+        if total == 0:
+            return True
+        present = sum(_stem(w) in have for w in words) + sum(o in low for o in ops)
+        if present * 5 >= total * 3:
+            return True
+    return False
+
+
 def term_check(record: Optional[Dict[str, Any]], answer: str) -> Dict[str, Any]:
     """{'found': [...], 'missing': [...]} over the record's curated key concepts. Empty lists when the record has none."""
     concepts = [str(c) for c in ((record or {}).get("key_concepts") or [])]
@@ -367,7 +398,17 @@ def wrapup_text(answered: int, asked: int, ended_early: bool = False) -> str:
             "Similarity numbers are available as optional technical details; they are not a grade.")
 
 
-_CORE_LEADS = ("Next, a question on {t}.", "Let us move on to {t}.", "Switching topics: {t}.", "Now a question about {t}.", "Moving on to {t}.")
+_CORE_LEADS = ("Next, a question on {t}.", "Now a question about {t}.", "Let us turn to {t}.", "The next question is about {t}.", "Let us look at {t} now.")
+
+
+def topic_phrase(topic: str) -> str:
+    """A bank topic label ('Core language', 'NLP fundamentals') as a noun phrase inside a sentence: the first word is lower-cased unless it is an acronym or a proper name."""
+    t = " ".join(str(topic or "").split()).strip(" .:")
+    if not t:
+        return "the next area"
+    first = t.split(" ")[0]
+    keep = len(first) > 1 and (first.isupper() or any(ch.isupper() for ch in first[1:]))
+    return t if keep else t[0].lower() + t[1:]
 
 
 def lead_in(q: Dict[str, Any], index: int, first_core: bool = False) -> str:
@@ -381,7 +422,7 @@ def lead_in(q: Dict[str, Any], index: int, first_core: bool = False) -> str:
         return "Now for a practical exercise. Take your time."
     if st == BEHAVIOURAL:
         return q.get("lead") or ""
-    t = (q.get("topic") or q.get("domain") or "the next area").lower()
+    t = topic_phrase(q.get("topic") or q.get("domain") or "")
     if first_core:
         return f"Thanks, that is helpful context. Now the technical part, starting with {t}."
     return _CORE_LEADS[index % len(_CORE_LEADS)].format(t=t)
@@ -409,7 +450,15 @@ def followup_item(parent_n: int, parent: Dict[str, Any], record: Optional[Dict[s
         return {**base, "question": _EXPAND_VARIANTS[parent_n % len(_EXPAND_VARIANTS)], "followup_kind": "expand_short",
                 "provenance": {"record_id": parent["question_id"], "source": "fixed prompt", "method": "deterministic: the answer had fewer than "
                                f"{SHORT_ANSWER_WORDS} words", "llm": False}}
-    missing = [c for c in term_check(record, answer)["missing"] if 1 <= len(_toks(c)) <= 5 and len(c) <= 48]
+    concepts = [str(c) for c in ((record or {}).get("key_concepts") or [])]
+    # Conservative (final polish): a concept the answer already discusses in other words is not "missing", and an answer that covers most of the question's ideas gets no follow-up.
+    # When relevance is uncertain the interview moves to the next planned question.
+    wc = word_count(answer)
+    if concepts and wc >= 25:
+        share = sum(concept_covered_loosely(c, answer) for c in concepts) / len(concepts)
+        if share >= (0.34 if wc >= 40 else 0.6):                    # a long answer that already touches a third of the ideas has said enough; word matching cannot see paraphrase
+            return None
+    missing = [c for c in term_check(record, answer)["missing"] if 1 <= len(_toks(c)) <= 5 and len(c) <= 48 and not concept_covered_loosely(c, answer)]
     if not missing:
         return None
     c = missing[0]

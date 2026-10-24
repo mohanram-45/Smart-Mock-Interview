@@ -55,6 +55,52 @@ def _page(canvas, doc):
     canvas.restoreState()
 
 
+def _build_overview(doc, story, report, ov, st, buffer, output_path):
+    """Compact, two-page-at-most report for an interview whose correctness check did not run. Nothing here is a verdict."""
+    section, body, small, card_title, centered = st["section"], st["body"], st["small"], st["card_title"], st["centered"]
+    cells = [[Paragraph(f"<b>{_text(v)}</b><br/><font size='8' color='#667870'>{_text(k)}</font>", centered) for k, v in ov["stats"]]]
+    stat_table = Table(cells, colWidths=[42.5 * mm] * len(ov["stats"]), rowHeights=[17 * mm])
+    stat_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), PALE), ("BOX", (0, 0), (-1, -1), 0.7, BORDER), ("INNERGRID", (0, 0), (-1, -1), 0.5, BORDER),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 5), ("RIGHTPADDING", (0, 0), (-1, -1), 5)]))
+    story.append(stat_table)
+    story.append(Spacer(1, 3 * mm))
+    notice = Table([[Paragraph(f"<b>Correctness not assessed.</b> {_text(ov['notice'].replace('Correctness was not assessed. ', ''))}", body)]], colWidths=[164 * mm])
+    notice.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.7, BORDER), ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F7FAF9")),
+                                ("LEFTPADDING", (0, 0), (-1, -1), 9), ("RIGHTPADDING", (0, 0), (-1, -1), 9), ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6)]))
+    story.append(notice)
+    if ov.get("similarity"):
+        sim = ov["similarity"]
+        story += [Spacer(1, 2 * mm), Paragraph(f"<b>Similarity: {_text(sim['average'])}</b> across {sim['n']} answer{'s' if sim['n'] != 1 else ''}. {_text(sim['note'])}", small)]
+    if ov.get("followups"):
+        story.append(Paragraph(f"Follow-up questions answered: {ov['followups']}.", small))
+
+    if ov.get("topics"):
+        story.append(Paragraph("TOPICS COVERED", section))
+        rows = [[Paragraph(f"<b>{_text(t['topic'])}</b>", body), Paragraph(_text(t["domain"]), small), Paragraph(_text(t["status"]), small)] for t in ov["topics"]]
+        table = Table(rows, colWidths=[86 * mm, 38 * mm, 40 * mm])
+        table.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, -1), 0.4, BORDER), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 2),
+                                   ("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2)]))
+        story.append(table)
+    if ov.get("observations"):
+        story.append(Paragraph("WHAT WE NOTICED IN YOUR ANSWERS", section))
+        story += _items([f"Q{o['n']} {o['topic']}: {o['text']}" for o in ov["observations"]], body)
+        story.append(Paragraph("Plain facts about what you wrote. They do not judge whether an answer was correct.", small))
+    if ov.get("practice"):
+        story.append(Paragraph("NEXT PRACTICE PROMPTS", section))
+        story += _items([f"Q{p['n']} {p['topic']}: {p['text']}" for p in ov["practice"]], body)
+    if ov.get("skipped"):
+        story.append(Paragraph("SKIPPED OR NOT REACHED (NOT COUNTED AS WEAKNESSES)", section))
+        story += _items([f"Q{x['n']} {x['topic']} ({x['state']})" for x in ov["skipped"]], body, "#667870")
+    # No sign-off line: the page footer already carries the product name, and a trailing paragraph could spill onto an otherwise empty second page.
+    doc.build(story)
+    pdf_bytes = buffer.getvalue()
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(pdf_bytes)
+    return pdf_bytes
+
+
 def build_pdf(report: Dict[str, Any], output_path: Path | None = None) -> bytes:
     """Build the report and optionally save the exact bytes to output_path."""
     buffer = BytesIO()
@@ -84,11 +130,15 @@ def build_pdf(report: Dict[str, Any], output_path: Path | None = None) -> bytes:
     role = report.get("interview_role") or "Technical Interview"
 
     story = [
-        Paragraph("INTERVIEW PERFORMANCE REPORT", ParagraphStyle("Kicker", parent=small, fontName="Helvetica-Bold", textColor=GREEN, tracking=1.2)),
+        Paragraph("INTERVIEW REPORT" if report.get("overview") else "INTERVIEW PERFORMANCE REPORT", ParagraphStyle("Kicker", parent=small, fontName="Helvetica-Bold", textColor=GREEN, tracking=1.2)),
         Paragraph(_text(role), title),
         Paragraph(_text(rating), role_style),
         Spacer(1, 7 * mm),
     ]
+
+    overview = report.get("overview")
+    if overview:
+        return _build_overview(doc, story, report, overview, dict(section=section, body=body, small=small, card_title=card_title, centered=centered), buffer, output_path)
 
     correctness = report.get("correctness")
     if correctness:
@@ -120,7 +170,9 @@ def build_pdf(report: Dict[str, Any], output_path: Path | None = None) -> bytes:
         story.append(Paragraph("CORRECTNESS FEEDBACK", section))
         story.append(Paragraph(_text(correctness.get("note")), small))
         story.append(Spacer(1, 3 * mm))
-        for item in correctness.get("items") or []:
+        judged = ("correct", "partially_correct", "incorrect", "uncertain")
+        unjudged = [i for i in (correctness.get("items") or []) if i.get("verdict") not in judged]
+        for item in [i for i in (correctness.get("items") or []) if i.get("verdict") in judged]:
             sim = f"Similarity to the reference answer: {_text(item.get('similarity'))} (0-1; closeness of wording, not correctness)" if item.get("similarity") else "Similarity: not available"
             content = [Paragraph(f"Q{item.get('n')}. {_text(item.get('topic'))}: {_text(item.get('label'))}", card_title), Paragraph(sim, small), Spacer(1, 2 * mm)]
             if item.get("correct"):
@@ -139,6 +191,8 @@ def build_pdf(report: Dict[str, Any], output_path: Path | None = None) -> bytes:
                 ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
             ]))
             story += [KeepTogether(card), Spacer(1, 3 * mm)]
+        if unjudged:
+            story.append(Paragraph("<b>No correctness verdict:</b> " + _text("; ".join(f"Q{i.get('n')} {i.get('topic')}" for i in unjudged)) + ". These were skipped, not reached, or the check did not return a result; nothing was assumed.", small))
 
     demonstrated = ((analysis.get("strengths") or {}).get("demonstrated_topics") or [])
     if demonstrated:
@@ -148,14 +202,17 @@ def build_pdf(report: Dict[str, Any], output_path: Path | None = None) -> bytes:
             body,
         )
 
-    story.append(Paragraph("AREAS FOR IMPROVEMENT", section))
-
-    weak_lines = []
-    for item in weaknesses.get("weak_questions") or []:
-        weak_lines.append(item.get("question"))
-    for item in weaknesses.get("skipped_questions") or []:
-        weak_lines.append(f"Skipped: {item.get('question')}")
-    story += _items(weak_lines or ["No significant weak areas identified."], body, "#C74B53")
+    weak_lines = [item.get("question") for item in weaknesses.get("weak_questions") or []]
+    skipped_lines = [str(item.get("question")) for item in weaknesses.get("skipped_questions") or []]
+    if correctness:
+        story.append(Paragraph("AREAS FOR IMPROVEMENT", section))
+        story += _items(weak_lines or ["None flagged by the automatic check (it is experimental and not human-validated)."], body, "#C74B53")
+        if skipped_lines:
+            story.append(Paragraph("SKIPPED (NOT COUNTED AS WEAKNESSES)", section))
+            story += _items(skipped_lines, body, "#667870")
+    else:
+        story.append(Paragraph("AREAS FOR IMPROVEMENT", section))
+        story += _items(weak_lines + [f"Skipped: {line}" for line in skipped_lines] or ["No significant weak areas identified."], body, "#C74B53")
 
     technical_focus = analysis.get("technical_focus") or []
     if technical_focus:

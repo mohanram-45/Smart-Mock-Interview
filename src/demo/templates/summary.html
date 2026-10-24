@@ -45,13 +45,15 @@
   <div class="section-title"><h2>What I noticed in your answers</h2><span class="muted">Read from your own words</span></div>
   {% if observations %}
   <div class="obs">{% for o in observations %}<p><a href="#q{{ o.n }}" class="obs-n">{{ o.n }}</a><span><b>{{ o.topic }}.</b> {{ o.text }}</span></p>{% endfor %}</div>
-  <p class="muted small">These are plain facts about what you wrote (length, and exact key terms from the curated answer notes). A term not found may still be covered in other words, and a term found does not prove understanding. Nothing here is a judgement of correctness.</p>
+  <p class="muted small">These are plain facts about what you wrote: its length, whether it had an example, and curated key terms you wrote out. Nothing here is a judgement of correctness, and a different wording of the same idea is just as good.</p>
   {% else %}<div class="empty"><strong>Nothing to report yet</strong>There were no technical answers to read. This is not a statement about your skills.</div>{% endif %}
 
   <div class="section-title"><h2>Areas for future practice</h2><span class="muted">From this interview only</span></div>
   {% if areas %}<div class="areas">{% for ar in areas %}<section class="area {{ ar.source }}"><h3>{{ ar.title }}{% if ar.source in ('experimental', 'code') %} <span class="tag exp">experimental</span>{% endif %}</h3><p>{{ ar.note }}</p>
     <ul>{% for it in ar['items'] %}<li><b>{{ it.n }}.</b> <a href="#q{{ it.n }}">{{ it.text }}</a> <span class="d">{{ it.detail }}</span></li>{% endfor %}</ul></section>{% endfor %}</div>
-  {% else %}<div class="empty"><strong>Nothing to flag</strong>There were too few answers to compare and no skipped questions. This is not a statement that every answer was right.</div>{% endif %}
+  {% else %}<div class="empty"><strong>No practice prompts</strong>Your answers were reasonably detailed and included examples, so there is nothing to suggest from their length. This is not a statement that every answer was right.</div>{% endif %}
+  {% if skipped_list %}<section class="area session"><h3>Skipped or not reached</h3><p>No answer was recorded for these, so nothing can be said about them. They are not counted as weaknesses; come back to them when you like.</p>
+    <ul>{% for it in skipped_list %}<li><b>{{ it.n }}.</b> <a href="#q{{ it.n }}">{{ it.text }}</a> <span class="d">{{ it.detail }}</span></li>{% endfor %}</ul></section>{% endif %}
 
   {% endif %}
 
@@ -83,7 +85,10 @@
       <p class="muted">Skipped.</p>
     {% else %}
       <h4>Your answer</h4>{{ answer_view(a.answer) }}
-      {% if a.terms and (a.terms.found or a.terms.missing) %}<div class="terms"><span class="tl">Key terms (exact words)</span>{% for t in a.terms.found %}<span class="tm yes" title="found in your answer">✓ {{ t }}</span>{% endfor %}{% for t in a.terms.missing %}<span class="tm no" title="not found as written">○ {{ t }}</span>{% endfor %}</div>{% endif %}
+      {% set td = term_diag.get(it.n) %}{% if td %}<details class="tech terms-detail"><summary>Optional: exact key-term check</summary>
+        <p class="muted small">A word-matching check against the curated notes for this question. It cannot tell whether you explained an idea in other words, so a term listed as not written out is not a mistake.</p>
+        <div class="terms">{% for t in td.written %}<span class="tm yes" title="written out in your answer">✓ {{ t }}</span>{% endfor %}{% for t in td.other_words %}<span class="tm maybe" title="the same idea seems to be discussed in other words">≈ {{ t }}</span>{% endfor %}{% for t in td.no_sign %}<span class="tm no" title="no sign of these words">○ {{ t }}</span>{% endfor %}</div>
+        <p class="muted small">✓ written out · ≈ seems to be covered in other words · ○ no matching words found</p></details>{% endif %}
       {% if q.stage in ('core', 'practical') or (a.code and a.code.requested) %}<details class="tech"><summary>Technical details for this answer</summary>
         {% set compact = true %}<div class="eval-slot" data-n="{{ a.n }}">{% include "_answer_eval.html" %}</div></details>{% endif %}
     {% endif %}

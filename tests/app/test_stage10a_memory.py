@@ -183,8 +183,21 @@ def test_intro_project_is_recalled_several_turns_later(eng):
     assert "achieved" not in said.replace("you said you achieved", "") or "you said" in said
 
 
+def _two_sentence_answerer(eng, intro):
+    """The first two sentences of the reference: a plain, partial explanation (the candidate does not recite the whole reference)."""
+    def ans(n, q, s):
+        if I.stage_of(q) == I.INTRO:
+            return intro
+        rec = eng.record(q["question_id"]) if q.get("question_id") else None
+        return " ".join(re.split(r"(?<=[.!?])\s+", rec["canonical_answer"])[:2]) if rec else "I would explain it step by step with an example."
+    return ans
+
+
 def test_an_earlier_explanation_shapes_a_later_question(eng):
-    s, t = sim.run(eng, {"role": "Python Developer", "practical": False, "size": 5}, canonical_answerer(eng, "I work as a backend developer."))
+    # Final-polish note: this test used to be driven by the FULL reference answer for Python Developer, where the old deterministic follow-up asked about a concept the answer already
+    # discussed ("Where does 'unit test' fit into your answer?") and the memory lead hung off that redundant turn. That follow-up is now suppressed on purpose, so the same mechanic
+    # (an explanation given earlier is acknowledged by a later question) is exercised with a partial explanation. The assertions below are unchanged.
+    s, t = sim.run(eng, {"role": "Data Scientist", "practical": False, "size": 5}, _two_sentence_answerer(eng, "I work as a backend developer."))
     leads = [r for r in t if "Earlier you explained" in r["lead"]]
     assert leads, "a later question on the same topic acknowledges the earlier explanation"
     r = leads[0]
