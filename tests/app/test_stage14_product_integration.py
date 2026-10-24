@@ -96,8 +96,9 @@ def test_journey_setup_to_pdf_with_skip_history_export_and_resume(env, monkeypat
     r = c.get(f"/demo/s/{sid}/report.pdf")
     assert r.status_code == 200 and r.mimetype == "application/pdf" and r.data.startswith(b"%PDF") and "attachment" in r.headers["Content-Disposition"]
     assert "Interview_Report.pdf" in r.headers["Content-Disposition"]
-    assert b"CORRECTNESS FEEDBACK" in r.data and b"Not assessed" in r.data                   # concept check was off: honest, not invented
-    assert b"Correctness was not checked" in r.data and b"not a grade" in r.data
+    # Final polish: with the correctness check OFF the PDF carries ONE concise notice instead of a "Not assessed" card per answer, and never "0/0 judged correct".
+    assert b"Correctness not assessed" in r.data and b"not a grade" in r.data
+    assert b"CORRECTNESS FEEDBACK" not in r.data and b"Not assessed" not in r.data and b"judged correct" not in r.data and b"0 / 0" not in r.data and b"0/0" not in r.data
     assert not re.search(rb"\d+\.\d%", r.data) and b"Overall score" not in r.data              # no similarity percentage presented as a score
     assert sid in c.get("/demo/history").data.decode()
     exp = c.get(f"/demo/s/{sid}/export.json").json

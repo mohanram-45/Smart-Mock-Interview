@@ -7,10 +7,34 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from . import assessment as AS
+from . import insights as INS
 from . import interview as I
 
 NOTE = ("Correctness is judged by an automatic check of your answer against the question's key concepts (a local model, not human-validated). "
         "'Not assessed' means the check was off or unavailable - nothing was assumed. Similarity is a separate figure and is not a grade.")
+
+
+OFF_NOTICE = ("Correctness was not assessed. The optional correctness check was off for this interview, so this report describes what you did and wrote, not whether your answers were right. "
+              "Similarity, where shown, is closeness to a reference answer and is not a grade.")
+SIMILARITY_NOTE = "Average similarity to the reference answers (0-1). It compares wording and meaning, is not a grade, and has not been validated against human markers."
+
+
+def _overview(s: Dict[str, Any], summary: Dict[str, Any], ov: Dict[str, Any]) -> Dict[str, Any]:
+    """The compact report used when the correctness check did not run: statistics, topics, factual observations, practice prompts and skipped questions. No verdicts, no per-answer cards."""
+    dg = INS.digest(s)
+    sims = [row["assessment"]["similarity"]["value"] for row in ov["rows"] if row["assessment"]["similarity"].get("available")]
+    cov = I.coverage(s.get("questions") or [], s.get("answers") or [])
+    return {"notice": OFF_NOTICE,
+            "stats": [("Answered", str(summary.get("answered", 0))), ("Skipped or not reached", str(summary.get("skipped", 0) + summary.get("unanswered", 0))),
+                      ("Topics covered", str(len(cov))), ("Time spent", INS.clock(dg.get("seconds")))],
+            "followups": summary.get("followups", 0),
+            "similarity": {"average": f"{sum(sims) / len(sims):.2f}", "n": len(sims), "note": SIMILARITY_NOTE} if sims else None,
+            "topics": [{"topic": c["topic"], "domain": c["domain"],
+                        "status": ", ".join(x for x in (f"{c['answered']} answered" if c["answered"] else "", f"{c['skipped']} skipped" if c["skipped"] else "",
+                                                          f"{c['not_reached']} not reached" if c["not_reached"] else "") if x)} for c in cov],
+            "observations": [{"n": o["n"], "topic": o["topic"], "text": o["text"]} for o in INS.observations(s) if o["kind"] == "answer"],
+            "practice": [{"n": p["n"], "topic": p["text"], "text": p["detail"]} for p in INS.practice_prompts(s)],
+            "skipped": [{"n": x["n"], "topic": x["text"], "state": x["detail"]} for x in INS.skipped_questions(s)]}
 
 
 def build(s: Dict[str, Any], summary: Dict[str, Any]) -> Dict[str, Any]:
@@ -36,6 +60,10 @@ def build(s: Dict[str, Any], summary: Dict[str, Any]) -> Dict[str, Any]:
             for line in i["feedback"][:2]:
                 if line not in recs:
                     recs.append(line)
+    if not ov["assessed"]:                                                       # correctness check off / unavailable for every answer: one notice, no empty "Not assessed" cards, no 0/0
+        return {"interview_role": (s.get("config") or {}).get("role") or "Interview", "questions_answered": summary.get("answered", 0),
+                "questions_skipped": summary.get("skipped", 0) + summary.get("unanswered", 0), "average_score": 0, "scoring_model": "Sentence-BERT similarity (0-1)",
+                "analysis": {"performance_label": "Interview summary"}, "overview": _overview(s, summary, ov)}
     return {
         "interview_role": (s.get("config") or {}).get("role") or "Interview",
         "questions_answered": summary.get("answered", 0), "questions_skipped": summary.get("skipped", 0) + summary.get("unanswered", 0),

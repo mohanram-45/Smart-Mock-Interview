@@ -32,13 +32,13 @@
       <div class="composer{{ ' is-code' if codeq }}" id="composer">
         <form id="answer-form" novalidate>
           <label class="field" for="answer" id="answer-label">{{ 'Your code' if codeq else 'Your answer' }}</label>
-          <div class="ed-bar"><b id="ed-name">{{ 'answer.py' if codeq else 'answer.txt' }}</b><span id="ed-lang">{% if codeq %}<span class="lang">Python</span>{% else %}Plain text{% endif %}</span></div>
+          <div class="ed-bar"{% if not codeq %} hidden{% endif %}><b id="ed-name">{{ 'answer.py' if codeq else 'answer.txt' }}</b><span id="ed-lang">{% if codeq %}<span class="lang">Python</span>{% else %}Plain text{% endif %}</span></div>
           <div class="editor">
             <pre class="gutter" id="gutter" aria-hidden="true"{% if not codeq %} hidden{% endif %}>1</pre>
-            <textarea id="answer" name="answer" rows="{{ 14 if codeq else 7 }}" maxlength="8000" spellcheck="{{ 'false' if codeq else 'true' }}" autocapitalize="{{ 'off' if codeq else 'sentences' }}" {{ 'wrap="off"'|safe if codeq }} class="{{ 'codearea' if codeq }}" data-code="{{ '1' if codeq else '0' }}" aria-describedby="answer-help" placeholder="{{ 'Write your Python here' if codeq else 'Reply in your own words. Short, specific answers are fine.' }}" required></textarea>
+            <textarea id="answer" name="answer" rows="{{ 14 if codeq else 6 }}" maxlength="8000" spellcheck="{{ 'false' if codeq else 'true' }}" autocapitalize="{{ 'off' if codeq else 'sentences' }}" {{ 'wrap="off"'|safe if codeq }} class="{{ 'codearea' if codeq }}" data-code="{{ '1' if codeq else '0' }}" aria-describedby="answer-help" placeholder="{{ 'Write your Python here' if codeq else 'Reply in your own words. Short, specific answers are fine.' }}" required></textarea>
           </div>
           <div class="row between tight-top"><span class="muted small" id="counter">0 / 8000</span><span class="draft-note" id="draft-note" role="status"></span></div>
-          <div class="keys" id="answer-help"><span><kbd>Ctrl</kbd> + <kbd>Enter</kbd> send</span><span class="only-code"{% if not codeq %} hidden{% endif %}><kbd>Tab</kbd> indents, <kbd>Esc</kbd> then <kbd>Tab</kbd> leaves the box</span></div>
+          <div class="keys" id="answer-help"><span><kbd>Ctrl</kbd> + <kbd>Enter</kbd> to send</span><span class="only-code"{% if not codeq %} hidden{% endif %}><kbd>Tab</kbd> indents, <kbd>Esc</kbd> then <kbd>Tab</kbd> leaves the box</span></div>
           <label class="check small only-code"{% if not codeq %} hidden{% endif %}><input type="checkbox" id="tabmode" {{ 'checked' if codeq }}> Tab key indents (4 spaces)</label>
           <div id="answer-error" class="banner banner-bad hidden" role="alert"></div>
           <div class="actions">

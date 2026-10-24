@@ -8,6 +8,7 @@ Rules (each is tested):
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, Iterable, List, Optional
 
 from . import interview as I
@@ -106,26 +107,54 @@ def concept_findings(view: Optional[Dict[str, Any]]) -> Optional[Dict[str, List[
     return out
 
 
-def improvement_areas(session: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """What to look at again, derived only from what was recorded in this interview. Each entry names its source so experimental items stay separate."""
+_EXAMPLE_RX = re.compile(r"\b(?:for example|for instance|e\.g\.|such as|say you|imagine|suppose|in practice)\b|`|\w+\(\)", re.I)
+PRACTICE_MIN_WORDS = 30          # an answer shorter than this gets a "say a little more" prompt; it is a fact about length, not a judgement
+
+
+def answer_facts(a: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Plain facts about one recorded answer: its length, whether it contains an example, and the curated key terms it wrote out as written. Nothing about correctness."""
+    text = (a or {}).get("answer", "") or ""
+    t = (a or {}).get("terms") or {}
+    return {"words": I.word_count(text), "has_example": bool(_EXAMPLE_RX.search(text)), "terms_used": list(t.get("found") or [])}
+
+
+def practice_prompts(session: Dict[str, Any], limit: int = 5) -> List[Dict[str, Any]]:
+    """Next-practice prompts tied to the questions that were actually asked. They are driven by two recorded facts only (a short answer, or an answer without an example), never by a
+    judgement of what was right or wrong and never by missing exact terms."""
     qs, ans = session.get("questions") or [], session.get("answers") or []
-    scored = [(a["legacy"]["score"], i) for i, (q, a) in enumerate(zip(qs, ans)) if a and not a.get("skipped") and (a.get("legacy") or {}).get("status") == "scored"]
     out: List[Dict[str, Any]] = []
-    terms = term_gaps(session)
-    if terms:
-        out.append({"source": "terms", "title": "Key terms from the question bank that your answer did not use",
-                    "note": "An exact-words check against the curated key concepts of each question. A missing term may still be covered in other words; it is a prompt to re-read, not a mistake.",
-                    "items": terms[:6]})
-    if len(scored) >= 2:
-        low = sorted(scored)[:3]
-        out.append({"source": "legacy", "title": "Lowest similarity to the reference answer",
-                    "note": "Similarity is closeness of wording and meaning, not correctness. Re-read these against your own answer.",
-                    "items": [{"n": i + 1, "text": qs[i]["topic"] or qs[i]["domain"], "detail": f"similarity {s / 100:.2f}"} for s, i in low]})
-    skipped = [i for i, a in enumerate(ans) if a and a.get("skipped") and I.is_question(qs[i])]
-    unreached = [i for i, a in enumerate(ans) if a is None and I.is_question(qs[i])]
-    if skipped or unreached:
-        out.append({"source": "session", "title": "Skipped or not reached", "note": "No answer was recorded for these.",
-                    "items": [{"n": i + 1, "text": qs[i]["topic"] or qs[i]["domain"], "detail": "skipped" if i in skipped else "not reached"} for i in skipped + unreached]})
+    for i, (q, a) in enumerate(zip(qs, ans)):
+        if not a or a.get("skipped") or not I.is_question(q):
+            continue
+        f = answer_facts(a)
+        if f["words"] < PRACTICE_MIN_WORDS:
+            why = f"your answer was {f['words']} word{'s' if f['words'] != 1 else ''}"
+        elif not f["has_example"]:
+            why = "your answer did not include a concrete example"
+        else:
+            continue
+        topic = q.get("topic") or q.get("domain") or "this topic"
+        out.append({"n": i + 1, "text": topic, "detail": f"Try explaining it again in your own words with one concrete example ({why}).", "question": q.get("question")})
+    return out[:limit]
+
+
+def skipped_questions(session: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Technical questions with no recorded answer. Not weaknesses: nothing was said, so nothing can be read."""
+    qs, ans = session.get("questions") or [], session.get("answers") or []
+    return [{"n": i + 1, "text": q.get("topic") or q.get("domain"), "detail": "skipped" if a else "not reached"}
+            for i, (q, a) in enumerate(zip(qs, ans)) if I.is_question(q) and (a is None or a.get("skipped"))]
+
+
+def improvement_areas(session: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """What to practise next, derived only from what was recorded in this interview. Each entry names its source so experimental items stay separate.
+    Final polish: exact-term gaps and 'lowest similarity' are NOT listed here (they read as verdicts); they stay available as optional technical details. Skipped questions are
+    returned by `skipped_questions` and shown apart from practice prompts."""
+    qs, ans = session.get("questions") or [], session.get("answers") or []
+    out: List[Dict[str, Any]] = []
+    prompts = practice_prompts(session)
+    if prompts:
+        out.append({"source": "practice", "title": "Prompts for your next practice session",
+                    "note": "Based on what you wrote (its length and whether it had an example). They do not say that an answer was right or wrong.", "items": prompts})
     miss: List[Dict[str, Any]] = []
     for i, a in enumerate(ans):
         if not a or a.get("skipped"):
@@ -150,8 +179,23 @@ def improvement_areas(session: Dict[str, Any]) -> List[Dict[str, Any]]:
     return out
 
 
+def term_diagnostics(session: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """OPTIONAL technical detail: the exact-words check against the curated key terms, per answered question. A term 'not written out' is split into 'the same idea seems to be discussed
+    in other words' and 'no sign of it', both guesses by word matching, neither a verdict."""
+    out: List[Dict[str, Any]] = []
+    for i, (q, a) in enumerate(zip(session.get("questions") or [], session.get("answers") or [])):
+        t = (a or {}).get("terms")
+        if not t or a.get("skipped") or not I.is_question(q) or not (t.get("found") or t.get("missing")):
+            continue
+        text = a.get("answer", "")
+        missing = list(t.get("missing") or [])
+        other = [c for c in missing if I.concept_covered_loosely(c, text)]
+        out.append({"n": i + 1, "topic": q.get("topic") or q.get("domain"), "written": list(t.get("found") or []), "other_words": other, "no_sign": [c for c in missing if c not in other]})
+    return out
+
+
 def term_gaps(session: Dict[str, Any], min_missing: int = 2) -> List[Dict[str, Any]]:
-    """Answered technical questions where at least `min_missing` curated key terms (and at least half of them) were not found as written."""
+    """Answered technical questions where at least `min_missing` curated key terms (and at least half of them) were not found as written. Technical diagnostics only."""
     out: List[Dict[str, Any]] = []
     for i, (q, a) in enumerate(zip(session.get("questions") or [], session.get("answers") or [])):
         t = (a or {}).get("terms")
@@ -164,23 +208,17 @@ def term_gaps(session: Dict[str, Any], min_missing: int = 2) -> List[Dict[str, A
 
 
 def observations(session: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Facts about what was said, one row per answered technical question, each tied to the answer it comes from. Nothing here judges correctness. [{n, topic, text}]"""
+    """Facts about what was said, one row per answered technical question, each tied to the answer it comes from. Nothing here judges correctness and no missing term is listed. [{n, topic, text}]"""
     out: List[Dict[str, Any]] = []
     qs, ans = session.get("questions") or [], session.get("answers") or []
     for i, (q, a) in enumerate(zip(qs, ans)):
         if not a or a.get("skipped") or not I.is_question(q):
             continue
-        words = I.word_count(a.get("answer", ""))
-        t = a.get("terms") or {}
-        parts = []
-        if words < 12:
-            parts.append(f"Your answer was brief ({words} words), which leaves little to review.")
-        if t.get("found"):
-            parts.append("Key terms you used: " + ", ".join(t["found"][:6]) + ".")
-        if t.get("missing") and words >= 12:
-            parts.append("Key terms not found as written: " + ", ".join(t["missing"][:5]) + ".")
-        if parts:
-            out.append({"n": i + 1, "topic": q.get("topic"), "kind": "answer", "text": " ".join(parts)})
+        f = answer_facts(a)
+        parts = [f"You wrote {f['words']} word{'s' if f['words'] != 1 else ''}" + (" and included an example." if f["has_example"] else ".")]
+        if f["terms_used"]:
+            parts.append("Key terms you wrote out: " + ", ".join(f["terms_used"][:6]) + ".")
+        out.append({"n": i + 1, "topic": q.get("topic"), "kind": "answer", "text": " ".join(parts)})
     for i, (q, a) in enumerate(zip(qs, ans)):
         if I.stage_of(q) == I.FOLLOW_UP and a and not a.get("skipped"):
             out.append({"n": i + 1, "topic": q.get("topic"), "kind": "follow_up",

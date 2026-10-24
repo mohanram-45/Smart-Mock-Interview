@@ -281,7 +281,7 @@ def summary_page(sid):
     digest = INS.digest(s)
     assessments = AS.session_overview(s)
     return render_template("summary.html", s=s, summary=eng.summary(s), items=items, in_progress=False, expose_reference=eng.expose_reference(),
-                           digest=digest, rows=INS.per_question(s), areas=INS.improvement_areas(s), coverage=I.coverage(s["questions"], s["answers"]),
+                           digest=digest, rows=INS.per_question(s), areas=INS.improvement_areas(s), skipped_list=INS.skipped_questions(s), term_diag={t["n"]: t for t in INS.term_diagnostics(s)}, coverage=I.coverage(s["questions"], s["answers"]),
                            observations=INS.observations(s), tech=[it for it in items if I.is_question(it["q"])],
                            beh=(B.feedback(s) if (s.get("plan") or {}).get("type") in ("behavioural", "mixed") else None), assessments=assessments)
 

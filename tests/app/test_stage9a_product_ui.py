@@ -122,14 +122,18 @@ def test_concept_findings_only_when_the_evaluator_produced_verdicts():
 
 
 def test_improvement_areas_are_derived_and_experimental_stays_separate():
+    """Final polish: areas are practice prompts (from answer length / missing example), not 'lowest similarity' or missing-term lists; skipped questions are returned apart."""
     s = _session([30.0, 90.0, 60.0, None])
     kinds = [a["source"] for a in INS.improvement_areas(s)]
-    assert kinds == ["legacy", "session"]                                  # no experimental/code entries without experimental data
+    assert kinds == ["practice"]                                           # no experimental/code entries without experimental data; no similarity ranking, no skipped entry
+    assert [(x["n"], x["detail"]) for x in INS.skipped_questions(s)] == [(4, "not reached")]
     s["answers"][0]["modular"] = {"status": "done", "view": {"verdicts": [{"member": "Big-O", "final_state": "not_stated"}]}}
     areas = INS.improvement_areas(s)
     exp = [a for a in areas if a["source"] == "experimental"]
     assert exp and "Big-O" in exp[0]["items"][0]["detail"]
-    assert INS.improvement_areas(_session([55.0])) == []                    # one scored answer, nothing skipped: nothing to say
+    full = _session([55.0])
+    full["answers"][0]["answer"] = "Idempotent means repeating the call has the same effect as calling it once, for example PUT /users/3 with the same body twice leaves one user. " * 2
+    assert INS.improvement_areas(full) == []                               # a detailed answer with an example: nothing to suggest
 
 
 # ---------------------------------------------------------------------------------------------------------------- engine timing

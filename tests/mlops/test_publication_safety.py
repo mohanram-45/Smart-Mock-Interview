@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 # directories that are git-ignored (and docker-ignored) on purpose: never part of a clone, so never inspected here
 _PRUNE = {
+    ".claude",
     ".git",
     "node_modules",
     ".venv",
