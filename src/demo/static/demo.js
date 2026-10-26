@@ -227,6 +227,7 @@
   }
 
   function initSettings() {
+    $("#prefs-form").addEventListener("submit", function (ev) { ev.preventDefault(); });
     var p = prefs();
     var pm = $("#pref-modular"); if (pm && p.modular && $$("option", pm).some(function (o) { return o.value === p.modular; })) pm.value = p.modular;
     var pf = $("#pref-followup"); if (pf && p.followup && $$("option", pf).some(function (o) { return o.value === p.followup; })) pf.value = p.followup;

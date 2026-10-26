@@ -21,6 +21,7 @@ class OverlapScorer:
 def main(port: int, data_dir: str) -> None:
     import os
     os.environ["SMART_DEMO_DATA_DIR"] = data_dir
+    os.environ["SMART_RETRIEVAL_BACKEND"] = "dev-lsa"
     import model_registry
     model_registry.MODEL_CHOICES["bert"] = {**model_registry.MODEL_CHOICES["bert"], "label": "Sentence-BERT (test stand-in: word overlap, not the real model)"}
     spec = importlib.util.spec_from_file_location("smart_app_ui", ROOT / "main" / "app.py")
