@@ -38,11 +38,10 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Retrieval and Flask tests with the real embedding model available (downloads all-MiniLM-L6-v2)
         run: python -m pytest tests/retrieval tests/app -q -rs
-      - name: Real-browser journeys (Chromium) against the stand-in-scorer demo server
-        run: |
-          SMART_DEMO_CODE_EVAL=1 python scripts/stage4a_demo_server.py --port 5058 > /tmp/demo_server.log 2>&1 &
-          for i in $(seq 1 30); do curl -fs http://127.0.0.1:5058/demo/ > /dev/null && break; sleep 1; done
-          python scripts/stage6a_browser_journey.py --base http://127.0.0.1:5058 --out "$RUNNER_TEMP/shots"
+      - name: Real-browser journeys (Chromium) against the current UI
+        env:
+          SMART_UI_SHOTS: ${{ runner.temp }}/shots
+        run: python -m pytest tests/ui/test_browser_journeys.py -q -rs
   docker-ml-image:
     runs-on: ubuntu-latest
     timeout-minutes: 45

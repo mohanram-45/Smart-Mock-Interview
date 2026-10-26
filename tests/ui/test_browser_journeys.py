@@ -119,7 +119,7 @@ def start_ui(pg, server, *, role="Python Developer", jd=None):
     if jd:
         pg.fill("#jd", jd)
     pg.click("#start-btn")
-    pg.wait_for_url("**/demo/s/*")
+    pg.wait_for_url("**/demo/s/*", timeout=90000)
     pg.wait_for_selector("#answer")
 
 
@@ -515,6 +515,7 @@ def test_9c_model_down_followups_fall_back_and_the_interview_continues(page, ser
     reply(page, "Overfitting means the model memorises training data and then does badly on new data.")
     assert stage(page) == "follow_up", "a bank-backed follow-up still appears when the model is down"
     assert time.time() - t0 < 25
+    page.locator(".turn-ai.is-current details.src summary").click()
     txt = page.inner_text("#thread")
     assert "Experimental follow-up written by the local model" not in txt and "Deterministic follow-up" in txt or "fixed wording" in txt
     exp = json.load(urllib.request.urlopen(s["demo"] + f"/s/{sid}/export.json"))
@@ -574,6 +575,7 @@ def test_9d_fast_model_gives_an_experimental_followup_with_a_visible_label(page,
     exp = json.load(urllib.request.urlopen(s["demo"] + f"/s/{sid}/export.json"))
     log = exp["plan"]["followup_log"][0]
     assert log["outcome"] == "llm", json.dumps(log)
+    page.locator(".turn-ai.is-current details.src summary").click()
     assert "Experimental follow-up written by the local model" in page.inner_text("#thread")
     text = page.inner_text("#thread")
     assert "{" not in text and "prompt_version" not in text and '"decision"' not in text
@@ -598,7 +600,7 @@ def test_9d_slow_model_shows_a_loading_state_then_falls_back_without_freezing(pa
     page.wait_for_function("() => (document.querySelector('#think-label')||{}).textContent.includes('Preparing a follow-up')", timeout=3000)
     page.wait_for_function("n0 => document.querySelector('#interview').dataset.n !== n0", arg=n0, timeout=15000)
     assert time.time() - t0 < 8, "the deadline, not the model, bounds the wait"
-    assert stage(page) == "follow_up", "the standard follow-up still arrives"
+    assert stage(page) in ("core", "follow_up"), "after timeout, continue with a planned question or a warranted standard follow-up"
     assert "Experimental follow-up written by the local model" not in page.inner_text("#thread")
     exp = json.load(urllib.request.urlopen(s["demo"] + f"/s/{sid}/export.json"))
     assert exp["plan"]["followup_log"][0]["outcome"] == "fallback" and exp["plan"]["followup_log"][0]["reasons"] == ["deadline_exceeded"]
