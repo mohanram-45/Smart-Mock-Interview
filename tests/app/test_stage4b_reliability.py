@@ -212,10 +212,13 @@ def test_a_slow_scorer_in_one_interview_does_not_block_another(c, eng):
 def test_refresh_and_back_button_pages(c, eng):
     _, sid = start(c, size=3)
     p1 = c.get(f"/demo/s/{sid}").get_data(as_text=True)
-    assert c.get(f"/demo/s/{sid}").get_data(as_text=True) == p1                    # refresh = same question
+    refreshed = c.get(f"/demo/s/{sid}").get_data(as_text=True)
+    # Refresh preserves the question while its timer keeps running.
+    elapsed = re.compile(r' data-elapsed="[0-9]+"')
+    assert elapsed.sub("", refreshed, count=1) == elapsed.sub("", p1, count=1)
     answer(c, sid, 1)
     p2 = c.get(f"/demo/s/{sid}").get_data(as_text=True)
-    assert "Technical question" in p2 and p2 != p1
+    assert "Technical question" in p2 and f'id="interview" data-sid="{sid}" data-n="3"' in p2
     stale = answer(c, sid, 1, "late tab")                                          # a back-button / stale tab submits question 1 again
     assert stale.status_code == 409 and stale.json["current"] == 3
     assert c.get(f"/demo/api/sessions/{sid}").json["current"] == 3
